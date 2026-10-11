@@ -4,12 +4,15 @@ Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B5
 [B1: plan-source/configuration contract](../../done/plan_file_supervision/card.md) and
 [B2: Codex runtime test round](../../done/codex_0160_validation/card.md).
 
-Status: active planning, 2026-10-11, on `codex/codex-fork-supervisor` from `main` at `5613b185`. The
-[execution checklist](checklist.md) is awaiting review. Product implementation and live probes have not started.
+Status: runtime findings ready for [contract review](gate-decision.md), 2026-10-11, on `codex/codex-fork-supervisor`,
+rebased onto `main` at `225ab3dd`. The user approved the [execution checklist](checklist.md). The
+[captures](evidence/README.md) use 48/60 native starts and 3/4 authorized API starts. Copied ancestry, dedicated login
+ownership, cancellation and inherited usage counters need a reviewed contract before product implementation.
 
 The revised checklist preserves B4's approved-plan requirement for native Stop, gates model/auth switching and
 long/compacted sources, and treats PreToolUse support as a measured scope decision. Native Stop product admission also
-depends on the separately proposed [global-ignore evidence fix](../../proposed/preserve_stop_global_ignores/card.md).
+depends on the shipped [global-ignore evidence fix](../../done/preserve_stop_global_ignores/card.md) and B5 composition
+checks; the fix merged through PR #264 before this rebase.
 
 ## Problem and outcome
 

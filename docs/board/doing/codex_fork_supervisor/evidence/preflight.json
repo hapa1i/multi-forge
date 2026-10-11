@@ -1,0 +1,174 @@
+{
+  "stage": "local preparation; native gate incomplete",
+  "date": "2026-10-11",
+  "round": "/private/tmp/forge-b5-20261011-r1",
+  "codex_identity": {
+    "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+    "selected_launcher": "/opt/homebrew/bin/codex",
+    "retained_package": "/private/tmp/forge-b5-20261011-r1/runtime/0.162.1",
+    "retained_path": "/private/tmp/forge-b5-20261011-r1/runtime/0.162.1/bin/codex",
+    "version": "codex-cli 0.162.1",
+    "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+  },
+  "independent_login": "ChatGPT; confirmed by login status, no credential values exported",
+  "native_starts": 0,
+  "api_starts": 0,
+  "subscription_extra_usage_off_confirmed": false,
+  "api_starts_authorized": 0,
+  "hooks": {
+    "SessionStart": {
+      "registered": 2,
+      "timeouts": [
+        60,
+        60
+      ],
+      "forge_hook_registered": true,
+      "observer_registered": true
+    },
+    "UserPromptSubmit": {
+      "registered": 2,
+      "timeouts": [
+        60,
+        60
+      ],
+      "forge_hook_registered": true,
+      "observer_registered": true
+    },
+    "PreToolUse": {
+      "registered": 2,
+      "timeouts": [
+        60,
+        60
+      ],
+      "forge_hook_registered": true,
+      "observer_registered": true
+    },
+    "PostToolUse": {
+      "registered": 2,
+      "timeouts": [
+        60,
+        60
+      ],
+      "forge_hook_registered": true,
+      "observer_registered": true
+    },
+    "Stop": {
+      "registered": 2,
+      "timeouts": [
+        60,
+        60
+      ],
+      "forge_hook_registered": true,
+      "observer_registered": true
+    }
+  },
+  "hook_delivery_verified": false,
+  "host_config_hashes_unchanged": true,
+  "auth_status_cases": [
+    {
+      "state": "empty",
+      "forced_login_method": "chatgpt",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Not logged in\n",
+      "auth_present_after": false,
+      "auth_unchanged": true
+    },
+    {
+      "state": "empty",
+      "forced_login_method": "api",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Not logged in\n",
+      "auth_present_after": false,
+      "auth_unchanged": true
+    },
+    {
+      "state": "synthetic-api",
+      "forced_login_method": "chatgpt",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Not logged in\n",
+      "auth_present_after": true,
+      "auth_unchanged": true
+    },
+    {
+      "state": "synthetic-api",
+      "forced_login_method": "api",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "Logged in using an API key - b5-inval***older\n",
+      "auth_present_after": true,
+      "auth_unchanged": true
+    },
+    {
+      "state": "independent-chatgpt-login",
+      "synthetic_api_variable": false,
+      "forced_login_method": "chatgpt",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "Logged in using ChatGPT\n",
+      "fixture_auth_unchanged": true
+    },
+    {
+      "state": "independent-chatgpt-login",
+      "synthetic_api_variable": true,
+      "forced_login_method": "chatgpt",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "Logged in using ChatGPT\n",
+      "fixture_auth_unchanged": true
+    },
+    {
+      "state": "independent-chatgpt-login",
+      "synthetic_api_variable": false,
+      "forced_login_method": "api",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Not logged in\n",
+      "fixture_auth_unchanged": true
+    },
+    {
+      "state": "independent-chatgpt-login",
+      "synthetic_api_variable": true,
+      "forced_login_method": "api",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Not logged in\n",
+      "fixture_auth_unchanged": true
+    }
+  ],
+  "models_available": [
+    {
+      "slug": "gpt-6.1-sol",
+      "default_reasoning_level": "low",
+      "supported_in_api": true
+    },
+    {
+      "slug": "gpt-6-sol",
+      "default_reasoning_level": "medium",
+      "supported_in_api": true
+    }
+  ],
+  "fork_help": {
+    "stdin_documented": true,
+    "stdin_execution_verified": false
+  },
+  "capture_runner": {
+    "returncode": 0,
+    "elapsed_seconds": 0.26724524999735877,
+    "survivors_before_sweep": [],
+    "kill_escalation": [],
+    "remaining": [],
+    "owner": "62debcfa87b149b4972759922a1bbe99",
+    "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "codex_identity_unchanged": true
+  },
+  "harness_sha256": {
+    "scripts/experiments/codex-hooks/b5-capture.py": "52cc6b5d388cc96d7eb96c3a219155c9827479d22e96e0fff8d7597ffa9f5d99",
+    "scripts/experiments/codex-hooks/b5-fixture.py": "927504aa842ecda7c2e40715535c2f02142233c3cab836e3e12a64c19fea1079",
+    "scripts/experiments/codex-hooks/b5-runtime.py": "4ba655f51f9d30d9024fa8e47cfaf38e474ca4edbb54364fd30c2c2d3fb312c0",
+    "scripts/experiments/codex-hooks/hooks/b5-observe.py": "8af76f6185af9bf9d503a82b5147b1ed60ab5ce9946f101d4227808ce2967fce"
+  }
+}

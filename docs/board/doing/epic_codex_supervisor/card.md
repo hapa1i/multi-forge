@@ -9,8 +9,11 @@ B3 shipped through [PR #262](https://github.com/hapa1i/multi-forge/pull/262), me
 [closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) records warning delivery, source-only
 formatting, and fixture teardown. B4 shipped through [PR #263](https://github.com/hapa1i/multi-forge/pull/263), merged
 as `2045aea1`; its [closeout](../../done/codex_stop_review/checklist.md#merged-closeout) records bounded Stop review,
-turn attribution, and evidence limits. B5 is active for checklist review on `codex/codex-fork-supervisor`; product work
-and live probes await that review.
+turn attribution, and evidence limits. B5 has
+[runtime findings for contract review](../codex_fork_supervisor/gate-decision.md) on `codex/codex-fork-supervisor`,
+rebased onto `225ab3dd` after the global-ignore correction shipped. Its captures use 48/60 native starts and 3/4
+authorized API starts. Product work awaits the source/home/trigger contract and remaining admission, lease and usage
+proofs.
 
 ## Problem and outcome
 
@@ -41,15 +44,16 @@ the source-only formatter, using B1's approved-plan snapshot contract. B4 owns t
 and depends on B3 to preserve source-only/provenance behavior in Stop's separately verified delivery channel. B5 owns
 native Codex context acquisition. Cards use separate execution branches when activated.
 
-B5's [checklist](../codex_fork_supervisor/checklist.md) starts from B4 closeout `5613b185`. B1/B2 remain its
+B5's [checklist](../codex_fork_supervisor/checklist.md) is rebased onto fix closeout `225ab3dd`. B1/B2 remain its
 prerequisites; B3/B4 are shipped integration contracts. Its runtime gate must establish hook-state isolation and an
 enforceable source boundary before product implementation. Source/auth configuration, shared-source admission, and the
-native probe budget are proposed for review, not accepted runtime guarantees.
+native probe budget were approved for gate execution, not accepted runtime guarantees. The user separately authorized
+four API starts; three have been used.
 
 The B5 review revision keeps Stop's approved-plan gate and adds measured model/auth, stdin and long/compacted-source
-admission. PreToolUse eligibility remains a scope decision after measurement. The separately proposed
-[global-ignore evidence correction](../../proposed/preserve_stop_global_ignores/card.md) blocks native Stop product
-admission; it needs its own execution branch if accepted and is not a sixth epic member.
+admission. PreToolUse eligibility remains a scope decision after measurement. The separate
+[global-ignore evidence correction](../../done/preserve_stop_global_ignores/card.md) shipped through PR #264 and is not
+a sixth epic member. B5 still verifies composition with native Stop review.
 
 ## Shared contract
 
@@ -133,7 +137,7 @@ forking wrappers, receive no new model/operator channel; launch and existing den
 ceiling and blocking QA pin did not move. The renderer caps model/operator serialized-string bytes at 12,000/5,000 and
 the whole wire at 20,000, with per-field/finding/count limits and visible omission counts. Claude retains its existing
 count summary; Jev A2 owns that formatter extension. B3 closed on 2026-10-11 after PR #262 merged; B4 subsequently
-shipped with this feedback dependency and B5 is now active for planning review. The
+shipped with this feedback dependency and B5 is now executing its reviewed runtime gate. The
 [merged closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) preserves runtime and host-state
 qualifications and records the independently owned login teardown.
 

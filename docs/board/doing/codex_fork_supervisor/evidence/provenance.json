@@ -1,0 +1,4073 @@
+{
+  "binary": {
+    "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+    "selected_launcher": "/opt/homebrew/bin/codex",
+    "retained_package": "<ROUND>/runtime/0.162.1",
+    "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+    "version": "codex-cli 0.162.1",
+    "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+    "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+  },
+  "captures": {
+    "G0-api-source": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "-o",
+          "<ROUND>/captures/G0-api-source/last.txt",
+          "-"
+        ],
+        "cwd": "<ROUND>/source",
+        "started_at": 1791729294.787594,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6709f14ed92d2347b44adc018fc47e46e03183da37cf744331d03d57d97d0c40",
+        "harness_snapshot": "cb6a256e98253bda561f59c908db27eede0263d607ae2eac3097a2453b58d757"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 9.459404708002694,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "0d9764ec5a744df3977a002570cbfa74",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "6377613bfda756f1457b2d7fa5dfd490f4113f490d8b39523d10261581b4cb85",
+        "case": "G0",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "api",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G0-compacted-copy-usage": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "features.apps=false",
+          "-c",
+          "features.plugins=false",
+          "-c",
+          "mcp_servers={}",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G0-compacted-copy-usage/last.txt",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791732039.661974,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "4f3a37155f32d95dec1d2e41e165b43aee969438330018ceefc0a593a2266601",
+        "harness_snapshot": "06f9148ef7366a86777a19c2a42acd5b6c92b4b3412f837ce208393902b3bbd2"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 12.68743416700454,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "c822fb858e8f4d01ba0780a277a93808",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "fea136cc66019de92f48cc26ea168924db8d8b73edda142db0a765f065efef31",
+        "case": "G0",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/copy-home/config.toml": "f59a5841b688160fd2b0c47053512524acd8613e12b100cd5eab4189118e2054"
+        }
+      }
+    },
+    "G0-compacted-source": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "resume",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-c",
+          "model_auto_compact_token_limit=32000",
+          "-o",
+          "<ROUND>/captures/G0-compacted-source/last.txt",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/source",
+        "started_at": 1791729669.867925,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "3b12eef96513d30677e8712bc0970b90dd521194f47d59885b2e22a23babbdce",
+        "harness_snapshot": "5cca9e3855b1faba66987fa4d013c2a6ea34833af180406a083dc33f061a96fe"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 36.112203000011505,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "d8eae8ba9f364c778c9a1286a2fb5067",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "2a9580d2cd6aaef7f8f594f66de5d426c323c5c64591f09373459a96c3af3841",
+        "case": "G0",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G0-enrollment": {
+      "command": {
+        "command": [
+          "forge",
+          "runtime",
+          "preflight",
+          "codex",
+          "--verify-enrollment",
+          "--json"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791728766.268374,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "05ae6dc91c419aa3abc7fa097f2fa0522a2a9237d591fcab8d7c9d7ba4487601",
+        "harness_snapshot": "55dece7ebeae6ea43f8594ad566099de79b5e1b77772e824fc1140efb7cf324a"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 22.89246670799912,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "12084ae9053149a8bb25dcb4e26fbc9e",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "c8aea2bb233f8a84e219fda47d8de0380bbbb2afc6191a134471b16aa2c290d3",
+        "case": "G0",
+        "model": "runtime-default",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G0-long-source": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-o",
+          "<ROUND>/captures/G0-long-source/last.txt",
+          "-"
+        ],
+        "cwd": "<ROUND>/source",
+        "started_at": 1791729459.313838,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "3b12eef96513d30677e8712bc0970b90dd521194f47d59885b2e22a23babbdce",
+        "harness_snapshot": "5cca9e3855b1faba66987fa4d013c2a6ea34833af180406a083dc33f061a96fe"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 14.096675125008915,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "f1617fca6ea34ee397d0b32f30131f3b",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "fbb9882dc3d79ddc3473a1f5bdb351218aed5e41460c2fa5eba3f8cb5f6178fc",
+        "case": "G0",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G0-second-model-source": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "-m",
+          "gpt-6-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-o",
+          "<ROUND>/captures/G0-second-model-source/last.txt",
+          "-"
+        ],
+        "cwd": "<ROUND>/source",
+        "started_at": 1791729187.633177,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6f20eb688e1f3018bc035676f821a5f6b194045258ff8315cc3bb3d974b108ea",
+        "harness_snapshot": "ee9e94d77316d31b02ef770d0d85a21f71464fc89378c24f3508e7e02fc9559d"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 8.553692792003858,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "1c47a6f8337e4da6be0b2ce777d2e50a",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "afe94399ff0e510f4db8ff97c051aa93ca6ca5abd91d9dd847bf76df4e30dab2",
+        "case": "G0",
+        "model": "gpt-6-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G0-shared-fork": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "fork",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "multi_agent",
+          "-c",
+          "features.multi_agent=false",
+          "-c",
+          "features.multi_agent_v2=false",
+          "-c",
+          "agents.max_threads=1",
+          "-c",
+          "features.apps=false",
+          "-c",
+          "features.plugins=false",
+          "-c",
+          "features.hooks=false",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791730327.419102,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "b179fd7e8bfecb728b29ef89c2322408cff9286d04d2a1e95bedefb4ed7d2161",
+        "harness_snapshot": "3801a7f271f70204f85b457df05b3c3c5d36ea500ac5c30cc8ed5bc85403d2f7"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 10.147481708001578,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "5ce2eef98299416083ce9aaab886f351",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ba6c0d5849fdbc7cc662ddacd158c34b7f40f3e7fc112df0c41309095bc3c522",
+        "case": "G0",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G0-short-source": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-o",
+          "<ROUND>/captures/G0-short-source/last.txt",
+          "-"
+        ],
+        "cwd": "<ROUND>/source",
+        "started_at": 1791728864.58884,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "05ae6dc91c419aa3abc7fa097f2fa0522a2a9237d591fcab8d7c9d7ba4487601",
+        "harness_snapshot": "55dece7ebeae6ea43f8594ad566099de79b5e1b77772e824fc1140efb7cf324a"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 6.818957208990469,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "2fd9b1250ab3403abe44a75b233ece97",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "c8aea2bb233f8a84e219fda47d8de0380bbbb2afc6191a134471b16aa2c290d3",
+        "case": "G0",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G0-sibling-fork": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "fork",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "features.hooks=false",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "Keep the inherited planning marker and approved plan. This sibling executor is SIBLING-EXECUTOR-B5. Reply READY without tools."
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791730646.208885,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6b5256917ee5a188d49b1f8dad0e749f92048530310973229f3957979c12b1cc",
+        "harness_snapshot": "2880dfca38eb88d8c4994f693e0fbced201b21ba36ce832c994c1b6eb8508035"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 6.076102374994662,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "72a5a4cb64ae4e378b307d5cc62f9fc6",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "20fd172c687eb30ce62a34f556ef8d1923f8e89d2f978753a8351cf489fc23b7",
+        "case": "G0",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G0-trust": {
+      "command": {
+        "command": [
+          "python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b4-terminal.py",
+          "<ROUND>/bin/codex",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--sandbox",
+          "workspace-write",
+          "-C",
+          "<ROUND>/action"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791728705.087768,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "05ae6dc91c419aa3abc7fa097f2fa0522a2a9237d591fcab8d7c9d7ba4487601",
+        "harness_snapshot": "55dece7ebeae6ea43f8594ad566099de79b5e1b77772e824fc1140efb7cf324a"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 45.93169100000523,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "27ffa633db5f49bea2bf8b65d1524eac",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "c8aea2bb233f8a84e219fda47d8de0380bbbb2afc6191a134471b16aa2c290d3",
+        "case": "G0",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "d1cb81855dea34b545231aa41d46472f6a513c08096e3bc10ce45c238b3711e5"
+        }
+      }
+    },
+    "G1-argv-control": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G1-argv-control/last.txt",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "Return the exact planning marker and approved color from the inherited planning conversation. Read only README.md in the current working directory using the shell, and include its text as checkout_readme. Do not read any other files or change any files. Return the required JSON.\n"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729103.781547,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6f20eb688e1f3018bc035676f821a5f6b194045258ff8315cc3bb3d974b108ea",
+        "harness_snapshot": "f00d57c51c1fce83a0b792e6243695d33d54024d7476e59c1a3f6d19e2aa6636"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 13.028902790989378,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "a90e35e45d354d8187e4e6c69d1a225d",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "afe94399ff0e510f4db8ff97c051aa93ca6ca5abd91d9dd847bf76df4e30dab2",
+        "case": "G1",
+        "model": "runtime-default",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G1-stdin-model": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G1-stdin-model/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729134.808959,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6f20eb688e1f3018bc035676f821a5f6b194045258ff8315cc3bb3d974b108ea",
+        "harness_snapshot": "89df23c4bdf9b5a54031c249113a54905ed65259c9e101677f8ef23195ec3adb"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 14.397186124988366,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "d262fc5516ef4f9c917d1c092aae530d",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "afe94399ff0e510f4db8ff97c051aa93ca6ca5abd91d9dd847bf76df4e30dab2",
+        "case": "G1",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G10-current-plan": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G10-current-plan/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791730409.573687,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "b179fd7e8bfecb728b29ef89c2322408cff9286d04d2a1e95bedefb4ed7d2161",
+        "harness_snapshot": "3801a7f271f70204f85b457df05b3c3c5d36ea500ac5c30cc8ed5bc85403d2f7"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 17.82206358399708,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "52507aa69e344c61a9cd358219144bb6",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ba6c0d5849fdbc7cc662ddacd158c34b7f40f3e7fc112df0c41309095bc3c522",
+        "case": "G10",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G11-copied-lineage": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-guard.py",
+          "45",
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G11-copied-lineage/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b73-202d-7dd0-a058-f74ec9375dd2",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791730885.721845,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "c813a4d8b56f83e5ca0fea4158d572eba7f026afb3c42a9b07d25d49bd1dbf4c",
+        "harness_snapshot": "38d900ee1ac6c8ae3835cac17993460047b3632f0cfc3592abc32c135db87e4c"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 24.699617167003453,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "6f3ab0037a6c4f679155bc63869d4864",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "b64bc3363bc2bb00a753729aa004a02a1ad4a7d296c0ec7bf096ae266718afe8",
+        "case": "G11",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/copy-home/config.toml": "f59a5841b688160fd2b0c47053512524acd8613e12b100cd5eab4189118e2054"
+        }
+      }
+    },
+    "G11-shared-plan": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-guard.py",
+          "45",
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G11-shared-plan/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b73-202d-7dd0-a058-f74ec9375dd2",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791730458.2571788,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "b179fd7e8bfecb728b29ef89c2322408cff9286d04d2a1e95bedefb4ed7d2161",
+        "harness_snapshot": "6c2bef7760eda2e6930f7f03fe0b505092b2d8bc03a575aa395dbe6d8ecf2c86"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 20.552384916998562,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "fe5498dde6b545558687a7369b97de41",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ba6c0d5849fdbc7cc662ddacd158c34b7f40f3e7fc112df0c41309095bc3c522",
+        "case": "G11",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G12-pretool": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-C",
+          "<ROUND>/action",
+          "resume",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791730516.920135,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6b5256917ee5a188d49b1f8dad0e749f92048530310973229f3957979c12b1cc",
+        "harness_snapshot": "2880dfca38eb88d8c4994f693e0fbced201b21ba36ce832c994c1b6eb8508035"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 29.47801750000508,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "88d899c43279425ea3658c378fb6681d",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "20fd172c687eb30ce62a34f556ef8d1923f8e89d2f978753a8351cf489fc23b7",
+        "case": "G12",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G12-pretool-review": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-guard.py",
+          "44.5085110420041",
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G12-pretool-review/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791730526.930923,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6b5256917ee5a188d49b1f8dad0e749f92048530310973229f3957979c12b1cc",
+        "harness_snapshot": "2880dfca38eb88d8c4994f693e0fbced201b21ba36ce832c994c1b6eb8508035"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 13.177266667000367,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "f8fd4acd71be4a9385fc8dd93e64b053",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "20fd172c687eb30ce62a34f556ef8d1923f8e89d2f978753a8351cf489fc23b7",
+        "case": "G12",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G12-stop": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-C",
+          "<ROUND>/action",
+          "resume",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791730560.1251252,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6b5256917ee5a188d49b1f8dad0e749f92048530310973229f3957979c12b1cc",
+        "harness_snapshot": "2880dfca38eb88d8c4994f693e0fbced201b21ba36ce832c994c1b6eb8508035"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 34.754973540999345,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "832162907cbb4010b56d2fa7a882cd91",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "20fd172c687eb30ce62a34f556ef8d1923f8e89d2f978753a8351cf489fc23b7",
+        "case": "G12",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G12-stop-review": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-guard.py",
+          "44.551725124998484",
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G12-stop-review/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791730575.8434901,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6b5256917ee5a188d49b1f8dad0e749f92048530310973229f3957979c12b1cc",
+        "harness_snapshot": "2880dfca38eb88d8c4994f693e0fbced201b21ba36ce832c994c1b6eb8508035"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 16.060338833005517,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "27160219bf2a4cb4a7602e6aad169c7d",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "20fd172c687eb30ce62a34f556ef8d1923f8e89d2f978753a8351cf489fc23b7",
+        "case": "G12",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G13-candidate-owner-complete": {
+      "command": {
+        "command": [
+          "python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-lifetime.py",
+          "run",
+          "owner-death"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791731292.4945989,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "c813a4d8b56f83e5ca0fea4158d572eba7f026afb3c42a9b07d25d49bd1dbf4c",
+        "harness_snapshot": "03656ff050d71d1eacec2f3a96d09e8ab40b7632e27ff64d655a8a7c44285a3a"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 4.486970666999696,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "d83a060ff5de44c8b1c4a73f1625e684",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "b64bc3363bc2bb00a753729aa004a02a1ad4a7d296c0ec7bf096ae266718afe8",
+        "case": null,
+        "model": null,
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G13-candidate-stub-cancel": {
+      "command": {
+        "command": [
+          "python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-lifetime.py",
+          "run",
+          "cancel"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791731196.5520482,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "c813a4d8b56f83e5ca0fea4158d572eba7f026afb3c42a9b07d25d49bd1dbf4c",
+        "harness_snapshot": "8f64bde4f4a3d3bd0b0900dcf483eea9fe013dc77f1f29856e39624b83578880"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 4.342971249992843,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "854216524c244231bc39f4c7c061e4e2",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "b64bc3363bc2bb00a753729aa004a02a1ad4a7d296c0ec7bf096ae266718afe8",
+        "case": null,
+        "model": null,
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G13-candidate-stub-owner-death": {
+      "command": {
+        "command": [
+          "python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-lifetime.py",
+          "run",
+          "owner-death"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791731201.095833,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "c813a4d8b56f83e5ca0fea4158d572eba7f026afb3c42a9b07d25d49bd1dbf4c",
+        "harness_snapshot": "8f64bde4f4a3d3bd0b0900dcf483eea9fe013dc77f1f29856e39624b83578880"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 7.599073124991264,
+        "survivors_before_sweep": [
+          {
+            "pid": 99944,
+            "ppid": 99930,
+            "pgid": 99944,
+            "status": "Rs",
+            "started": "Sun Oct 11 17:06:43 2026    "
+          },
+          {
+            "pid": 99946,
+            "ppid": 99944,
+            "pgid": 99946,
+            "status": "Ss",
+            "started": "Sun Oct 11 17:06:43 2026    "
+          }
+        ],
+        "kill_escalation": [
+          {
+            "pid": 99946,
+            "ppid": 99944,
+            "pgid": 99946,
+            "status": "Ss",
+            "started": "Sun Oct 11 17:06:43 2026    "
+          }
+        ],
+        "remaining": [],
+        "owner": "8df55434e5474e5593ffe3645ab582a9",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "b64bc3363bc2bb00a753729aa004a02a1ad4a7d296c0ec7bf096ae266718afe8",
+        "case": null,
+        "model": null,
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G13-candidate-stub-timeout": {
+      "command": {
+        "command": [
+          "python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-lifetime.py",
+          "run",
+          "timeout"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791731190.44343,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "c813a4d8b56f83e5ca0fea4158d572eba7f026afb3c42a9b07d25d49bd1dbf4c",
+        "harness_snapshot": "8f64bde4f4a3d3bd0b0900dcf483eea9fe013dc77f1f29856e39624b83578880"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 5.839432334003504,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "83a536292023488dbf9290307922989f",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "b64bc3363bc2bb00a753729aa004a02a1ad4a7d296c0ec7bf096ae266718afe8",
+        "case": null,
+        "model": null,
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G13-native-owner-death": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-guard.py",
+          "40.0",
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G13-native-owner-death/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791730747.029471,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "c813a4d8b56f83e5ca0fea4158d572eba7f026afb3c42a9b07d25d49bd1dbf4c",
+        "harness_snapshot": "a00f240e86994469adb0228a59bb6bd13544a6df8633b0f5a55093bdf3c5118a"
+      },
+      "process-result.json": {
+        "returncode": -9,
+        "elapsed_seconds": 8.852353750000475,
+        "survivors_before_sweep": [
+          {
+            "pid": 95706,
+            "ppid": 95498,
+            "pgid": 95706,
+            "status": "Ss",
+            "started": "Sun Oct 11 16:59:13 2026    "
+          }
+        ],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "5171c252dad34229b6e04396d665dae4",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "b64bc3363bc2bb00a753729aa004a02a1ad4a7d296c0ec7bf096ae266718afe8",
+        "case": "G13",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G13-stub-absent": {
+      "command": {
+        "command": [
+          "python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-lifetime.py",
+          "run",
+          "absent"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791730715.423289,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "2a2b364ebfaef7a5693e6ecd20d672f6ca6a9b78b27b2bb4635d8d282c17c7cc",
+        "harness_snapshot": "957ae010921e2bda9fd2e654d4d342318da6eb28eb5a77425228e0455cc6062d"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 2.5903843749983935,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "4479f43fe95747edbbbbf43750c02fc3",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ffb452569173f17c2f348346133f17f1e6cb83fda8e3dad38f1b27729c6a5f1f",
+        "case": null,
+        "model": null,
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G13-stub-cancel": {
+      "command": {
+        "command": [
+          "python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-lifetime.py",
+          "run",
+          "cancel"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791730708.151045,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "2a2b364ebfaef7a5693e6ecd20d672f6ca6a9b78b27b2bb4635d8d282c17c7cc",
+        "harness_snapshot": "957ae010921e2bda9fd2e654d4d342318da6eb28eb5a77425228e0455cc6062d"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 3.425596333996509,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "d8ef6820a22742cb950701be43428517",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ffb452569173f17c2f348346133f17f1e6cb83fda8e3dad38f1b27729c6a5f1f",
+        "case": null,
+        "model": null,
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G13-stub-malformed": {
+      "command": {
+        "command": [
+          "python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-lifetime.py",
+          "run",
+          "malformed"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791730718.199313,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "2a2b364ebfaef7a5693e6ecd20d672f6ca6a9b78b27b2bb4635d8d282c17c7cc",
+        "harness_snapshot": "957ae010921e2bda9fd2e654d4d342318da6eb28eb5a77425228e0455cc6062d"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 2.744728417004808,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "be4e81db64c04e5da7771ed2a50dd44c",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ffb452569173f17c2f348346133f17f1e6cb83fda8e3dad38f1b27729c6a5f1f",
+        "case": null,
+        "model": null,
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G13-stub-owner-death": {
+      "command": {
+        "command": [
+          "python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-lifetime.py",
+          "run",
+          "owner-death"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791730711.793422,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "2a2b364ebfaef7a5693e6ecd20d672f6ca6a9b78b27b2bb4635d8d282c17c7cc",
+        "harness_snapshot": "957ae010921e2bda9fd2e654d4d342318da6eb28eb5a77425228e0455cc6062d"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 3.4333486249961425,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "64da832d6afd4e859e089a3a07daefab",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ffb452569173f17c2f348346133f17f1e6cb83fda8e3dad38f1b27729c6a5f1f",
+        "case": null,
+        "model": null,
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G13-stub-quota": {
+      "command": {
+        "command": [
+          "python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-lifetime.py",
+          "run",
+          "quota"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791730721.153989,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "2a2b364ebfaef7a5693e6ecd20d672f6ca6a9b78b27b2bb4635d8d282c17c7cc",
+        "harness_snapshot": "957ae010921e2bda9fd2e654d4d342318da6eb28eb5a77425228e0455cc6062d"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 2.768279458003235,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "db194c9772304d27959dbcca6672bd22",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ffb452569173f17c2f348346133f17f1e6cb83fda8e3dad38f1b27729c6a5f1f",
+        "case": null,
+        "model": null,
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G13-stub-timeout": {
+      "command": {
+        "command": [
+          "python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-lifetime.py",
+          "run",
+          "timeout"
+        ],
+        "cwd": "<CHECKOUT>",
+        "started_at": 1791730702.7048461,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "2a2b364ebfaef7a5693e6ecd20d672f6ca6a9b78b27b2bb4635d8d282c17c7cc",
+        "harness_snapshot": "957ae010921e2bda9fd2e654d4d342318da6eb28eb5a77425228e0455cc6062d"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 5.175039207999362,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "4f483586cd6049119fb86c033e2f9609",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ffb452569173f17c2f348346133f17f1e6cb83fda8e3dad38f1b27729c6a5f1f",
+        "case": null,
+        "model": null,
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G14-copied-stop-fresh-index": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-guard.py",
+          "45",
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G14-copied-stop-fresh-index/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "sqlite_home=\"<ROUND>/copy-indexes/G14-copied-stop-fresh-index\"",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791732815.267513,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "aef24d2ede5ca3483d888a8c522de510a3c46a37a17ea33454b9e400c99fd789",
+        "harness_snapshot": "2d4c15b30d31c3656765d91f80ea74f51f4287c2fbf88eb2f8e64f02a41a6167"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 16.651089709004737,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "913aa28434354c4d936911d34fe08e42",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "1b342ae8f60fb905954fa7ef0550c2e182dd82adfa54a21b55e2d05cb16e20fc",
+        "case": "G14",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/copy-home/config.toml": "f59a5841b688160fd2b0c47053512524acd8613e12b100cd5eab4189118e2054"
+        }
+      }
+    },
+    "G2-first-to-second": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G2-first-to-second/last.txt",
+          "-m",
+          "gpt-6-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729268.5824509,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6709f14ed92d2347b44adc018fc47e46e03183da37cf744331d03d57d97d0c40",
+        "harness_snapshot": "cb6a256e98253bda561f59c908db27eede0263d607ae2eac3097a2453b58d757"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 7.587551457996597,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "c418ac803a1e48eeaf7dd9e7620b3ed8",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "6377613bfda756f1457b2d7fa5dfd490f4113f490d8b39523d10261581b4cb85",
+        "case": "G2",
+        "model": "gpt-6-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G2-second-to-first": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G2-second-to-first/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b61-bc18-7ef3-ac58-f5e55c1b4adb",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729336.447294,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6709f14ed92d2347b44adc018fc47e46e03183da37cf744331d03d57d97d0c40",
+        "harness_snapshot": "cb6a256e98253bda561f59c908db27eede0263d607ae2eac3097a2453b58d757"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 12.570106541999849,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "140c8eb6dc474c43a1235b7020ddfe9c",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "6377613bfda756f1457b2d7fa5dfd490f4113f490d8b39523d10261581b4cb85",
+        "case": "G2",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G3-api-to-subscription": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G3-api-to-subscription/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b63-5ec2-77b3-a859-80404bd5f53e",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729407.827976,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6709f14ed92d2347b44adc018fc47e46e03183da37cf744331d03d57d97d0c40",
+        "harness_snapshot": "cb6a256e98253bda561f59c908db27eede0263d607ae2eac3097a2453b58d757"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 12.083381208998617,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "34931d1b5c9746e0a275763a222366b4",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "6377613bfda756f1457b2d7fa5dfd490f4113f490d8b39523d10261581b4cb85",
+        "case": "G3",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G3-subscription-to-api": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G3-subscription-to-api/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729359.723778,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6709f14ed92d2347b44adc018fc47e46e03183da37cf744331d03d57d97d0c40",
+        "harness_snapshot": "cb6a256e98253bda561f59c908db27eede0263d607ae2eac3097a2453b58d757"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 7.15976820900687,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "fadc56698dfb4bbcbbc9d26a5272b5ed",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "6377613bfda756f1457b2d7fa5dfd490f4113f490d8b39523d10261581b4cb85",
+        "case": "G3",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "api",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G4-model-and-auth": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G4-model-and-auth/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b61-bc18-7ef3-ac58-f5e55c1b4adb",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729367.506531,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6709f14ed92d2347b44adc018fc47e46e03183da37cf744331d03d57d97d0c40",
+        "harness_snapshot": "cb6a256e98253bda561f59c908db27eede0263d607ae2eac3097a2453b58d757"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 5.754067333007697,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "8cc778735cec4badaa301fea931923f9",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "6377613bfda756f1457b2d7fa5dfd490f4113f490d8b39523d10261581b4cb85",
+        "case": "G4",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "api",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G5-long-first": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G5-long-first/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729540.263008,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "3b12eef96513d30677e8712bc0970b90dd521194f47d59885b2e22a23babbdce",
+        "harness_snapshot": "5cca9e3855b1faba66987fa4d013c2a6ea34833af180406a083dc33f061a96fe"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 13.738663500000257,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "6a379aefd85746e8aabfe991ecdb3d6a",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "fbb9882dc3d79ddc3473a1f5bdb351218aed5e41460c2fa5eba3f8cb5f6178fc",
+        "case": "G5",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G5-long-repeat": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G5-long-repeat/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729587.17922,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "3b12eef96513d30677e8712bc0970b90dd521194f47d59885b2e22a23babbdce",
+        "harness_snapshot": "5cca9e3855b1faba66987fa4d013c2a6ea34833af180406a083dc33f061a96fe"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 14.147923958997126,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "77ab3aa6275f455d8eced861f608fe1e",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "2a9580d2cd6aaef7f8f594f66de5d426c323c5c64591f09373459a96c3af3841",
+        "case": "G5",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G6-compacted-first": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G6-compacted-first/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729757.811341,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "b179fd7e8bfecb728b29ef89c2322408cff9286d04d2a1e95bedefb4ed7d2161",
+        "harness_snapshot": "367f280a4b5b569293a7beb2bb42e288cd2573cfff5558365a25b5b570ec8351"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 13.081395500004874,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "78ee32f60ec4441aa7305a8f1bb00ed2",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ba6c0d5849fdbc7cc662ddacd158c34b7f40f3e7fc112df0c41309095bc3c522",
+        "case": "G6",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G6-compacted-repeat": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G6-compacted-repeat/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729836.5094159,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "b179fd7e8bfecb728b29ef89c2322408cff9286d04d2a1e95bedefb4ed7d2161",
+        "harness_snapshot": "367f280a4b5b569293a7beb2bb42e288cd2573cfff5558365a25b5b570ec8351"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 13.934032541990746,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "4f30e4665de5441e8bb74493e4bcb22b",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ba6c0d5849fdbc7cc662ddacd158c34b7f40f3e7fc112df0c41309095bc3c522",
+        "case": "G6",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G7-cwd-hook-child": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G7-cwd-hook-child/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791730177.420867,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "b179fd7e8bfecb728b29ef89c2322408cff9286d04d2a1e95bedefb4ed7d2161",
+        "harness_snapshot": "1b535b16ffb39766a4a06ad3a6d1dc5a217c7db9406f43b38f95563468113998"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 15.041496500009089,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "08d4396a39dd4fe384c8a4a6039962e6",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ba6c0d5849fdbc7cc662ddacd158c34b7f40f3e7fc112df0c41309095bc3c522",
+        "case": "G7",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G7-identity-strip": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G7-identity-strip/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791730133.8059762,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "b179fd7e8bfecb728b29ef89c2322408cff9286d04d2a1e95bedefb4ed7d2161",
+        "harness_snapshot": "1b535b16ffb39766a4a06ad3a6d1dc5a217c7db9406f43b38f95563468113998"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 19.31022166699404,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "aecc0b489e91416b90f19d9cbe38cb08",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ba6c0d5849fdbc7cc662ddacd158c34b7f40f3e7fc112df0c41309095bc3c522",
+        "case": "G7",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "G8-copied-prefix": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G8-copied-prefix/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729921.779946,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "b179fd7e8bfecb728b29ef89c2322408cff9286d04d2a1e95bedefb4ed7d2161",
+        "harness_snapshot": "367f280a4b5b569293a7beb2bb42e288cd2573cfff5558365a25b5b570ec8351"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 11.788513791994774,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "0dd6ab74f8234420a8fa6e24def1c550",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ba6c0d5849fdbc7cc662ddacd158c34b7f40f3e7fc112df0c41309095bc3c522",
+        "case": "G8",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/copy-home/config.toml": "f59a5841b688160fd2b0c47053512524acd8613e12b100cd5eab4189118e2054"
+        }
+      }
+    },
+    "G8-incomplete-tool": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G8-incomplete-tool/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791730214.341213,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "b179fd7e8bfecb728b29ef89c2322408cff9286d04d2a1e95bedefb4ed7d2161",
+        "harness_snapshot": "3801a7f271f70204f85b457df05b3c3c5d36ea500ac5c30cc8ed5bc85403d2f7"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 14.078036083999905,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "f65a06807cae4e509d90a3730601adda",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ba6c0d5849fdbc7cc662ddacd158c34b7f40f3e7fc112df0c41309095bc3c522",
+        "case": "G8",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/copy-home/config.toml": "f59a5841b688160fd2b0c47053512524acd8613e12b100cd5eab4189118e2054"
+        }
+      }
+    },
+    "G9-readonly": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/write-schema.json",
+          "-o",
+          "<ROUND>/captures/G9-readonly/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "mcp_servers={}",
+          "-c",
+          "sandbox_mode=\"read-only\"",
+          "-c",
+          "approval_policy=\"never\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791730242.333493,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "b179fd7e8bfecb728b29ef89c2322408cff9286d04d2a1e95bedefb4ed7d2161",
+        "harness_snapshot": "3801a7f271f70204f85b457df05b3c3c5d36ea500ac5c30cc8ed5bc85403d2f7"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 24.371837625003536,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "546be148aaba45c399a2e2adea8b6053",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ba6c0d5849fdbc7cc662ddacd158c34b7f40f3e7fc112df0c41309095bc3c522",
+        "case": "G9",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d",
+          "<ROUND>/action/.codex/config.toml": "38bed50506e385e0d0a1426f0695fd9fd133f0bb77851cb4f929bbbec3216d1c"
+        }
+      }
+    },
+    "G9-writable": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/write-schema.json",
+          "-o",
+          "<ROUND>/captures/G9-writable/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "mcp_servers={}",
+          "-c",
+          "sandbox_mode=\"workspace-write\"",
+          "-c",
+          "approval_policy=\"never\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791730279.194001,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "b179fd7e8bfecb728b29ef89c2322408cff9286d04d2a1e95bedefb4ed7d2161",
+        "harness_snapshot": "3801a7f271f70204f85b457df05b3c3c5d36ea500ac5c30cc8ed5bc85403d2f7"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 19.71754458300711,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "246476b58d4f4016b3c3e762ac5776e0",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "ba6c0d5849fdbc7cc662ddacd158c34b7f40f3e7fc112df0c41309095bc3c522",
+        "case": "G9",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d",
+          "<ROUND>/action/.codex/config.toml": "38bed50506e385e0d0a1426f0695fd9fd133f0bb77851cb4f929bbbec3216d1c"
+        }
+      }
+    },
+    "R-api-ephemeral-without-key": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "Reply AUTH_FALLBACK_UNEXPECTED without calling any tools."
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729003.44211,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "85ee1f1c0376b3472a950a17d5f60ac26831d4649fd22d17cd1de90dc6a89bc9",
+        "harness_snapshot": "ae462cdce1a0d9cf3e795a8f42af1534638fa4393081f76a5648e63da0ad703a"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 5.989542540992261,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "c797f47dd426449185b3297d6ae75f58",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "9a4e86d1d89750c801d66bfb04c74b98e56d8cdb3e68dddf364df830992966fe",
+        "case": "R",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "api-without-key-control",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "R-api-exec-controls": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "Reply AUTH_FALLBACK_UNEXPECTED without calling any tools."
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729055.791012,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6f20eb688e1f3018bc035676f821a5f6b194045258ff8315cc3bb3d974b108ea",
+        "harness_snapshot": "7b0c27ad11896237271be71224a391cb12faa241fd0fd7b18d0d848db1e23ecd"
+      },
+      "process-result.json": {
+        "returncode": 1,
+        "elapsed_seconds": 18.03787391599326,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "bffbde68ed0c4332854539b7e86170ac",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "afe94399ff0e510f4db8ff97c051aa93ca6ca5abd91d9dd847bf76df4e30dab2",
+        "case": "R",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "api-without-key-control",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "R-api-without-key": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "Reply AUTH_FALLBACK_UNEXPECTED without calling any tools."
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791728900.89431,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "2fc21816f8b0e5a873b6606f088c895529f2a8ec994a9314d9df101bda37c690",
+        "harness_snapshot": "f37b46c8150d6f6d5e78c5e6080e17335ef29cc511ed1110123ed4c090b32666"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 6.067435957986163,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "08643ee3939d4d1aa44574e8a0231fc2",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "80a8d71673ec90b832699151f2a782a4f5912a03c72a4eeab912c4507719c3be",
+        "case": "R",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "api-without-key-control",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "R-copied-stop-boundary": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-guard.py",
+          "45",
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-copied-stop-boundary/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791732667.519165,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "bdddf5c6178b353f98acb7e27faf629e3a182067337425bddc59c845e4c0e306",
+        "harness_snapshot": "3876280e92b2d264445c2d833ce65b05f9ef5fb59f49072d5411c4d6b141fa03"
+      },
+      "process-result.json": {
+        "returncode": 1,
+        "elapsed_seconds": 2.930694875001791,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "46e455a32e5b4e46bf2a4e049fa4a718",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "7ccd673603224412ce6730e6c70f9ae2b99116f719c5261d318d0ecf665bb4b8",
+        "case": "R",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/copy-home/config.toml": "f59a5841b688160fd2b0c47053512524acd8613e12b100cd5eab4189118e2054"
+        }
+      }
+    },
+    "R-copy-missing-ancestor": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-copy-missing-ancestor/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b73-202d-7dd0-a058-f74ec9375dd2",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791730791.9633238,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "c813a4d8b56f83e5ca0fea4158d572eba7f026afb3c42a9b07d25d49bd1dbf4c",
+        "harness_snapshot": "443c1ae659eb60d2efebb5c107437c61b8cd67e36f68037b1b9bc5f2b2039d0e"
+      },
+      "process-result.json": {
+        "returncode": 1,
+        "elapsed_seconds": 0.7221492919925367,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "c81dc553bcee4c388a8cd40540a44c7b",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "b64bc3363bc2bb00a753729aa004a02a1ad4a7d296c0ec7bf096ae266718afe8",
+        "case": "R",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/copy-home/config.toml": "f59a5841b688160fd2b0c47053512524acd8613e12b100cd5eab4189118e2054"
+        }
+      }
+    },
+    "R-fork-api-without-key": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-fork-api-without-key/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729162.0071318,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6f20eb688e1f3018bc035676f821a5f6b194045258ff8315cc3bb3d974b108ea",
+        "harness_snapshot": "ee9e94d77316d31b02ef770d0d85a21f71464fc89378c24f3508e7e02fc9559d"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 12.073443417000817,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "21197d4f8d394e6f99935f1ff87bf4b9",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "afe94399ff0e510f4db8ff97c051aa93ca6ca5abd91d9dd847bf76df4e30dab2",
+        "case": "R",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "api-without-key-control",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "R-fork-leaf-api-control": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-fork-leaf-api-control/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729232.119949,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "6709f14ed92d2347b44adc018fc47e46e03183da37cf744331d03d57d97d0c40",
+        "harness_snapshot": "cb6a256e98253bda561f59c908db27eede0263d607ae2eac3097a2453b58d757"
+      },
+      "process-result.json": {
+        "returncode": 1,
+        "elapsed_seconds": 17.456379084003856,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "efdc85cd5a5e48419ae0607e97e1d465",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "6377613bfda756f1457b2d7fa5dfd490f4113f490d8b39523d10261581b4cb85",
+        "case": "R",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "api-without-key-control",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "R-large-stdin-isolated": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-guard.py",
+          "45",
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-large-stdin-isolated/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "sandbox_mode=\"read-only\"",
+          "-c",
+          "approval_policy=\"never\"",
+          "-c",
+          "mcp_servers={}",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791731733.756303,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "cf7184a926cf0840e39bfe7caddc5129cd63ee7ce209daf3bf6e868526042284",
+        "harness_snapshot": "b4c9d7bfa80e314bbf57067c5bfcdb464a08eb76f29968994889ed8e76546ac7"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 17.027903874986805,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "08247743e48846bb87d692e91abf8c33",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "16d91ee2462e6d4d40288ac066a8d53dfdc34277f0a4ceedc4756b4a597280a0",
+        "case": "R",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/copy-home/config.toml": "f59a5841b688160fd2b0c47053512524acd8613e12b100cd5eab4189118e2054"
+        }
+      }
+    },
+    "R-native-cancel-first-death": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-guard.py",
+          "40.0",
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-native-cancel-first-death/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791731007.7684102,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "c813a4d8b56f83e5ca0fea4158d572eba7f026afb3c42a9b07d25d49bd1dbf4c",
+        "harness_snapshot": "d9e2b13cd9aeeb11f84c30c6514a4224d0ce22f7ff2018ca7b520b59e13f7a81"
+      },
+      "process-result.json": {
+        "returncode": -9,
+        "elapsed_seconds": 10.723599499993725,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "e916ffef2fed4fbaa14b4c97722ec0c1",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "b64bc3363bc2bb00a753729aa004a02a1ad4a7d296c0ec7bf096ae266718afe8",
+        "case": "R",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "R-native-legacy-exec-death": {
+      "command": {
+        "command": [
+          "<CHECKOUT>/.venv/bin/python",
+          "<CHECKOUT>/scripts/experiments/codex-hooks/b5-guard.py",
+          "40.0",
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-native-legacy-exec-death/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "features.unified_exec=false",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791730854.268765,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "c813a4d8b56f83e5ca0fea4158d572eba7f026afb3c42a9b07d25d49bd1dbf4c",
+        "harness_snapshot": "d7d2b7f5b9fbc5831a5f0f71ec61a54eeac2b7a41b9a8c3c68103d154c4e7717"
+      },
+      "process-result.json": {
+        "returncode": 124,
+        "elapsed_seconds": 42.70867075001297,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "990fb9a72f5441c4b4eb3583c52982d7",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "b64bc3363bc2bb00a753729aa004a02a1ad4a7d296c0ec7bf096ae266718afe8",
+        "case": "R",
+        "model": "gpt-6.1-sol",
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "9bcae680f4636897504a711c27fd138deae38abf5106aa355dfd16091158337d"
+        }
+      }
+    },
+    "R-subscription-api-only": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "Reply AUTH_FALLBACK_UNEXPECTED without calling any tools."
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791729698.486308,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "3b12eef96513d30677e8712bc0970b90dd521194f47d59885b2e22a23babbdce",
+        "harness_snapshot": "5cca9e3855b1faba66987fa4d013c2a6ea34833af180406a083dc33f061a96fe"
+      },
+      "process-result.json": {
+        "returncode": 1,
+        "elapsed_seconds": 0.2458320419973461,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "e1692e064fcf49cda05737d3179ea9ff",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      }
+    },
+    "local-fork-help": {
+      "command": {
+        "command": [
+          "codex",
+          "exec",
+          "fork",
+          "--help"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791728439.533885,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_snapshot": "1475289af4c0a98cf83ac3cdc54cb6a4ac62ee907877ac97bd9fb7af59dbc86d"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 0.26724524999735877,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "62debcfa87b149b4972759922a1bbe99",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "bebcfc22ac44fac2b85342100ddbb4b67638ac4a9842a9b23da8a894b9d23b18",
+        "case": null,
+        "model": null,
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "d1cb81855dea34b545231aa41d46472f6a513c08096e3bc10ce45c238b3711e5"
+        }
+      }
+    },
+    "local-model-catalog": {
+      "command": {
+        "command": [
+          "codex",
+          "debug",
+          "models"
+        ],
+        "cwd": "<ROUND>/action",
+        "started_at": 1791728495.1570911,
+        "codex_identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harness_snapshot": "b68f2e02b7ed8c6caa1e09402204d6a7fa9204ad120b37f9ff042af0e0f9d856"
+      },
+      "process-result.json": {
+        "returncode": 0,
+        "elapsed_seconds": 1.2140190840000287,
+        "survivors_before_sweep": [],
+        "kill_escalation": [],
+        "remaining": [],
+        "owner": "54cad4e37f1e4ec69607a6742e43b23c",
+        "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "codex_identity_unchanged": true
+      },
+      "provenance": {
+        "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec",
+        "forge_diff_sha256": "333d74c9d4bfd96a6489787831d9d712b5724d98f15da56dc68bf7ad22213955",
+        "case": null,
+        "model": null,
+        "auth_mode": "subscription-only",
+        "identity": {
+          "installed_path": "/opt/homebrew/Caskroom/codex/0.162.1/bin/codex",
+          "selected_launcher": "/opt/homebrew/bin/codex",
+          "retained_package": "<ROUND>/runtime/0.162.1",
+          "retained_path": "<ROUND>/runtime/0.162.1/bin/codex",
+          "version": "codex-cli 0.162.1",
+          "sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "forge_revision": "0aca9c7e6c7fecba63a1093674936aca4ac003ec"
+        },
+        "configs": {
+          "<ROUND>/codex-home/config.toml": "d1cb81855dea34b545231aa41d46472f6a513c08096e3bc10ce45c238b3711e5"
+        }
+      }
+    }
+  }
+}
