@@ -15,6 +15,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -33,6 +34,10 @@ _BINARY_SHA256 = "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdf
 _binary_cache: dict[tuple[Any, ...], str] = {}
 
 
+class ReviewerBusyError(ValueError):
+    """The dedicated login is in use; reauthentication cannot resolve contention."""
+
+
 @dataclass(frozen=True)
 class ReviewerHome:
     home: Path
@@ -43,7 +48,9 @@ class ReviewerHome:
 
 
 def reviewer_home() -> Path:
-    return get_forge_home().absolute() / "reviewers" / "codex"
+    # Resolve the operator-selected root (including macOS /tmp aliases), while
+    # descriptor walks still refuse links below that root in Forge-owned stores.
+    return get_forge_home().expanduser().resolve() / "reviewers" / "codex"
 
 
 def reviewer_environment(home: Path) -> dict[str, str]:
@@ -121,7 +128,7 @@ def _ownership(home: Path) -> dict[str, Any]:
 
 
 @contextmanager
-def reviewer_lease(home: Path) -> Iterator[int]:
+def reviewer_lease(home: Path, *, deadline: float | None = None) -> Iterator[int]:
     """Do not unlock explicitly: inherited descriptors retain the lock after owner death."""
     _ownership(home)
     with directory_fd(home) as directory:
@@ -130,10 +137,20 @@ def reviewer_lease(home: Path) -> Iterator[int]:
         facts = os.fstat(descriptor)
         if not stat.S_ISREG(facts.st_mode) or facts.st_nlink != 1 or facts.st_uid != os.getuid():
             raise ValueError("Invalid reviewer lease file")
-        try:
-            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise ValueError("A native review or login owns the reviewer home; retry after it completes") from exc
+        while True:
+            if deadline is not None and time.monotonic() >= deadline:
+                raise ReviewerBusyError(
+                    "Review deadline exhausted waiting for the dedicated reviewer; retry after it completes"
+                )
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError as exc:
+                if deadline is None:
+                    raise ReviewerBusyError(
+                        "A native review or login owns the reviewer home; retry after it completes"
+                    ) from exc
+                time.sleep(min(0.05, max(0, deadline - time.monotonic())))
         yield descriptor
     finally:
         os.close(descriptor)
@@ -164,6 +181,7 @@ def auth_status() -> dict[str, Any]:
         auth_mode="subscription-only",
         extra_usage_off_asserted=False,
         lease_available=False,
+        busy=False,
         binary=None,
         unavailable_reason=None,
     )
@@ -171,11 +189,15 @@ def auth_status() -> dict[str, Any]:
         result["binary"] = require_codex_fork_binary()
         marker = _ownership(reviewer_home())
         result.update(owned=True, extra_usage_off_asserted=marker["extra_usage_off_asserted"])
-        with reviewer_lease(reviewer_home()):
-            result["lease_available"] = True
-            _account(reviewer_home())
+        _account(reviewer_home())
         result["ready"] = True
+        try:
+            with reviewer_lease(reviewer_home()):
+                result["lease_available"] = True
+        except ReviewerBusyError:
+            result["busy"] = True
     except (OSError, ValueError, TypeError, KeyError) as exc:
+        result["ready"] = False
         result["unavailable_reason"] = (
             str(exc)
             if isinstance(exc, ValueError) and not isinstance(exc, json.JSONDecodeError)
@@ -231,8 +253,7 @@ def require_reviewer_auth(auth_mode: str) -> None:
     if auth_mode == "subscription-only":
         home = reviewer_home()
         try:
-            with reviewer_lease(home):
-                _account(home)
+            _account(home)
         except (OSError, ValueError) as exc:
             raise ValueError(
                 "Run forge policy supervisor auth login --runtime codex --confirm-extra-usage-off"
@@ -249,14 +270,15 @@ def require_reviewer_auth(auth_mode: str) -> None:
 def require_source_account(selection: NativeSelection) -> None:
     """Compare locally without persisting or displaying account identifiers."""
     home = reviewer_home()
-    with reviewer_lease(home):
-        account = _account(home)
-        if any(prefix.metadata["creator_account_id"] != account for prefix in selection.prefixes):
-            raise ValueError("Reviewer login does not match the recorded source account")
+    account = _account(home)
+    if any(prefix.metadata["creator_account_id"] != account for prefix in selection.prefixes):
+        raise ValueError("Reviewer login does not match the recorded source account")
 
 
 @contextmanager
-def prepare_reviewer_home(selection: NativeSelection, *, auth_mode: str) -> Iterator[ReviewerHome]:
+def prepare_reviewer_home(
+    selection: NativeSelection, *, auth_mode: str, deadline: float | None = None
+) -> Iterator[ReviewerHome]:
     """Stage only immutable selected ancestry, plus a fresh per-attempt native index."""
     binary = require_codex_fork_binary()
     temporary = None
@@ -280,7 +302,7 @@ def prepare_reviewer_home(selection: NativeSelection, *, auth_mode: str) -> Iter
     else:
         raise ValueError("Unsupported native reviewer auth route")
     try:
-        with reviewer_lease(home) as lease:
+        with reviewer_lease(home, deadline=deadline) as lease:
             if auth_mode == "subscription-only":
                 account = _account(home)
                 if any(prefix.metadata["creator_account_id"] != account for prefix in selection.prefixes):

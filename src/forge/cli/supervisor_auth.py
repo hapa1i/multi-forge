@@ -42,6 +42,8 @@ def status(runtime: str, as_json: bool) -> None:
     else:
         click.echo(f"Codex reviewer: {'ready' if result['ready'] else 'unavailable'}")
         click.echo(f"Home: {result['home']}")
+        if result["busy"]:
+            click.echo("Reviewer busy; reviews wait within their deadlines.")
         if result["unavailable_reason"]:
             click.echo(result["unavailable_reason"], err=True)
 

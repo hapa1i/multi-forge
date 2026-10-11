@@ -18,11 +18,12 @@ now follow it; aggregate validation passes, with PR review and shipping remainin
    child-environment key and ephemeral credentials. Restrictions go on the `fork` leaf; mismatches never fall back.
    Setup and lifecycle use the commands and ownership below.
 3. **Protect copied inputs for the whole attempt.** A bounded lease serializes source copies in a subscription reviewer
-   home. The watchdog retains that lease if the hook dies until descendants are cleaned up. Contention means review
-   unavailable, never overwriting an active input or spending twice. API attempts may use separate ephemeral homes. This
-   is artifact ownership, not a second review budget. Give every attempt a fresh `sqlite_home`; a reused native index
-   refused an earlier complete Stop prefix as a shrunken rollout. Stage only the selected ancestry in the reviewer home
-   so background discovery cannot import unrelated copies.
+   home. The watchdog retains that lease if the hook dies until descendants are cleaned up. The user approved bounded
+   waiting on 2026-10-12: contention consumes the existing review deadline; expiry means unavailable review without
+   inference or overwriting active input. API attempts may use separate ephemeral homes. This is artifact ownership, not
+   a second review budget. Give every attempt a fresh `sqlite_home`; a reused native index refused an earlier complete
+   Stop prefix as a shrunken rollout. Stage only the selected ancestry in the reviewer home so background discovery
+   cannot import unrelated copies.
 4. **Use demonstrated trigger boundaries.** Recommend PreToolUse only for a separate source with complete, verifiable
    native history. Active/shared-executor review uses Stop and an approved plan. Admission verifies executor/turn,
    absence of pending calls and the captured prefix before selecting the copy. Unknown boundaries refuse before
@@ -58,7 +59,8 @@ yet.
   assertion, not a verified account setting. It refuses an unmarked or symlinked target. It does not enroll hooks or
   copy ordinary login state. Both fixture logins followed the equivalent native flow.
 - `status --json` reads dedicated-store readiness without inference and reports the selected binary identity, auth
-  route, confirmation state, ownership and lease availability. It exposes no credentials. Supervisor setup reports an
+  route, confirmation state, ownership, readiness, busy state and lease availability. Auth/source readiness reads do not
+  acquire the lease; dispatch rechecks under ownership. It exposes no credentials. Supervisor setup reports an
   actionable `auth login` command when this prerequisite is absent; hooks never initiate login.
 - `logout` acquires the same bounded lease, invokes native logout only in the owned store and removes owned copied
   inputs. It refuses while a review holds the lease. Turning a supervisor off does not log out other supervisors, and

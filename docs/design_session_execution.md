@@ -313,9 +313,12 @@ Load-bearing values (probe evidence in `scripts/experiments/codex-hooks/README.m
 
 Native-source supervision composes with this same journal and evidence scope. `codex_stop` passes the trusted thread,
 turn, transcript path and final answer to immutable native selection. Shared/active source prefixes must end at that
-verified Stop boundary, with no pending tool calls. A separate source must be complete. Every native Stop review still
-requires an approved plan, and global Git ignore rules remain part of evidence capture. B5 does not add a second Stop
-attempt, correction budget or hook registration. See [native supervision](end-user/native_supervision.md).
+verified Stop boundary, with no pending tool calls. A separate source must be complete. Executor ancestry reads only
+bounded metadata headers (up to 128 ancestors, 256 KiB per header), allowing active appends, long histories and TUI
+executors without applying source-only origin or size admission. Its transcript must match the hook thread; the existing
+hook/journal owns Stop turn provenance. TUI source histories remain unadmitted. Every native Stop review still requires
+an approved plan, and global Git ignore rules remain part of evidence capture. B5 does not add a second Stop attempt,
+correction budget or hook registration. See [native supervision](end-user/native_supervision.md).
 
 B4 admits Stop separately from PreToolUse feedback: only measured Codex 0.162.1, the directly launched managed executor,
 and the exact empirically observed hook configuration qualify. `codex_turn_enrollment.py` records UserPromptSubmit,

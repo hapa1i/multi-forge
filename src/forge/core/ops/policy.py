@@ -371,10 +371,6 @@ def supervisor_set(
             sidecar=_is_sidecar(candidate),
         )
         validate_reviewer(effective_config, selected_lane)
-        if effective_config.native_source:
-            from forge.policy.semantic.native_codex import validate_native_executor
-
-            validate_native_executor(effective_config, candidate)
         return effective_config
 
     try:
@@ -382,6 +378,10 @@ def supervisor_set(
         from forge.policy.semantic.identity import validate_sidecar_supervisor
 
         validate_sidecar_supervisor(validated_config, sidecar=_is_sidecar(manifest))
+        if validated_config.native_source:
+            from forge.policy.semantic.native_codex import validate_native_executor
+
+            validate_native_executor(validated_config, manifest)
         if validated_config.review_trigger == "stop":
             from forge.core.runtime.codex_turn_enrollment import require_for_launch
 
@@ -405,7 +405,7 @@ def supervisor_set(
 
             image = get_launch_preferences(manifest)[2] or get_runtime_config().sidecar_image
             require_sidecar_contract(image, schema_version=3 if selected_model else 2, reviewer=True)
-    except ValueError as exc:
+    except (OSError, ValueError) as exc:
         raise SupervisorInputError(str(exc)) from exc
 
     if supervisor_proxy:
@@ -431,6 +431,7 @@ def supervisor_set(
                 current_config != validated_config
                 or m.worktree != manifest.worktree
                 or m.forge_root != manifest.forge_root
+                or m.confirmed.codex != manifest.confirmed.codex
             ):
                 raise ValueError("Supervisor configuration changed during setup; repeat the set command")
         except ValueError as exc:
@@ -496,7 +497,7 @@ def supervisor_on(*, store: SessionStore, manifest: SessionState, lock_timeout_s
             m.intent.policy.supervisor.suspended = False
         validate_supervisor_transition(m, old, compute_effective_intent(m))
 
-    store.update(timeout_s=lock_timeout_s, mutate=_resume)
+    _update_ready_supervisor(store, manifest, _resume, lock_timeout_s=lock_timeout_s)
 
 
 def supervisor_remove(*, store: SessionStore, manifest: SessionState, lock_timeout_s: float = 5.0) -> None:
@@ -559,7 +560,7 @@ def supervisor_reload(
             m.intent.policy.supervisor.plan_override_path = plan_path
         validate_supervisor_transition(m, old, compute_effective_intent(m))
 
-    store.update(timeout_s=lock_timeout_s, mutate=_set_plan)
+    _update_ready_supervisor(store, manifest, _set_plan, lock_timeout_s=lock_timeout_s)
     return SupervisorReloadResult(plan_path=plan_path, source_desc=source_desc)
 
 
@@ -659,6 +660,35 @@ def validate_supervisor_cascade_input(
         raise SupervisorInputError("Checker options only apply when enabling cascade (state 'on')")
 
     _validate_checker_model(checker_model)
+
+
+def _update_ready_supervisor(
+    store: SessionStore,
+    manifest: SessionState,
+    mutate: Callable[[SessionState], None],
+    *,
+    lock_timeout_s: float,
+) -> None:
+    """Preflight outside the lock, then publish only against the inspected state."""
+    from forge.core.reactive.reviewer_runtime import preflight_host_supervisor
+    from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
+    from forge.session.exceptions import ForgeSessionError
+
+    candidate = deepcopy(manifest)
+    try:
+        mutate(candidate)
+        preflight_host_supervisor(candidate)
+
+        def apply(current: SessionState) -> None:
+            if current != manifest:
+                raise ValueError("Session changed during supervisor readiness checks; repeat the command")
+            mutate(current)
+
+        store.update(timeout_s=lock_timeout_s, mutate=apply)
+    except (StateCorruptedError, StateUnreadableError):
+        raise  # Preserve the CLI's dedicated corrupt-state recovery diagnostic.
+    except (OSError, ValueError, ForgeSessionError) as exc:
+        raise SupervisorInputError(str(exc)) from exc
 
 
 def _validate_checker_model(checker_model: str | None) -> None:

@@ -191,7 +191,8 @@ def test_native_malformed_or_quota_output_never_retries(native_review, monkeypat
     assert len(calls) == 1 and result.decision.fail_open
 
 
-def test_native_stop_keeps_global_ignores_and_one_correction(native_review, tmp_path, monkeypatch):
+@pytest.mark.parametrize("interactive", [False, True])
+def test_native_stop_keeps_global_ignores_and_one_correction(native_review, tmp_path, monkeypatch, interactive):
     from forge.core.native_review_types import NativeReviewBoundary
     from forge.policy.semantic import stop_review
     from tests.fixtures.stop_review import changed
@@ -202,7 +203,12 @@ def test_native_stop_keeps_global_ignores_and_one_correction(native_review, tmp_
     ctx = make_context(tmp_path)
     executor = synthetic_rows(ctx.thread_id, complete=False)
     executor[1]["payload"]["turn_id"] = ctx.turn_id
+    if interactive:
+        executor[0]["payload"].update(originator="codex_cli_rs", source="cli")
     rollout = write_rollout(tmp_path / "source", executor)
+    # Executor histories are evidence of identity only; old turns are not fork input.
+    with rollout.open("ab") as stream:
+        stream.write(b'{"type":"event_msg","payload":{"text":"' + b"x" * 2_000_000 + b'"}}\n')
     ctx = replace(
         ctx,
         config=replace(config, review_trigger="stop"),
@@ -222,3 +228,42 @@ def test_native_stop_keeps_global_ignores_and_one_correction(native_review, tmp_
     assert not repeated.correction
     calls = [json.loads(line) for line in log.read_text().splitlines()]
     assert len(calls) == 1 and not calls[0]["global_ignore_leaked"]
+
+
+def test_two_sessions_wait_for_one_login_and_each_dispatch_once(native_review, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    from forge.core.invoker.codex import CodexHeadlessInvoker
+
+    config, context, log = native_review
+    lane = LaneRecord("codex", "chatgpt", "gpt-6.1-sol")
+    first_entered, second_started, release = Event(), Event(), Event()
+    invoke = CodexHeadlessInvoker.run
+
+    def held_invoker(self, request):
+        if not first_entered.is_set():
+            first_entered.set()
+            assert release.wait(timeout=5)
+        return invoke(self, request)
+
+    def second_review():
+        second_started.set()
+        return run_supervisor_check(config, replace(context, session_name="second"), lane_record=lane)
+
+    monkeypatch.setattr(CodexHeadlessInvoker, "run", held_invoker)
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        first = workers.submit(run_supervisor_check, config, replace(context, session_name="first"), lane_record=lane)
+        try:
+            assert first_entered.wait(timeout=5)
+            second = workers.submit(second_review)
+            assert second_started.wait(timeout=5)
+            # A busy store is still locally ready and the second review waits.
+            assert reviewer.auth_status()["ready"]
+            assert not second.done()
+        finally:
+            release.set()
+        for result in (first.result(timeout=10), second.result(timeout=10)):
+            assert result.dispatched and not result.decision.fail_open, result
+    assert len(log.read_text().splitlines()) == 2
+    assert len(read_attempts("first")) == len(read_attempts("second")) == 1

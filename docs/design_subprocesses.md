@@ -159,6 +159,12 @@ the selected root/one-generation ancestry and starts a fresh native index. A rea
 anchor; explicit unlock is forbidden because hook death must not release another process's input. Cleanup acquires the
 lease before removing marked artifacts. API orphan recovery skips active, unmarked and unsafe homes.
 
+Subscription attempts queue for that lease within the existing absolute review deadline; expiry starts no reviewer and
+does not suggest reauthentication. Readiness and account comparison do not take the lease; dispatch rechecks both while
+holding it. Auth status reports readiness separately from a busy store. Login/logout remain exclusive and refuse while
+busy. Operator-selected Forge/Codex roots are canonicalized before descriptor walks, which still refuse symlinks inside
+owned stores. The single independently obtained login and its refresh ownership remain unchanged.
+
 The shared watchdog's opt-in native cancellation sends SIGINT, waits one second, sends TERM, then escalates to KILL
 after half a second. The independent anchor also cancels when the watcher dies. Legacy cancellation remains unchanged.
 Product requests use the existing hook deadline and completion reserve, not a second allowance. See the

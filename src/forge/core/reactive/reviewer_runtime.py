@@ -128,7 +128,11 @@ def preflight_host_supervisor(state: SessionState) -> None:
         validate_reviewer,
     )
     from forge.session.consumer_lanes import read_bound_lane
+    from forge.session.effective import compute_effective_intent
 
+    effective = compute_effective_intent(state)
+    if not effective.policy or not effective.policy.enabled:
+        return
     config = snapshot_supervisor_options(state)
     if config is None:
         return

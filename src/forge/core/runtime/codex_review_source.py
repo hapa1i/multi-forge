@@ -26,6 +26,8 @@ MAX_PREFIX_BYTES = 1_827_328
 MAX_CONTEXT_INPUT = 163_002
 SHORT_PREFIX_BYTES = 80_549
 MAX_FILES = 2
+MAX_HEADER_BYTES = 262_144
+MAX_EXECUTOR_ANCESTORS = 128
 THREAD_ID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
 ADMITTED_MODELS = {"gpt-6.1-sol", "gpt-6-sol"}
 # Default instructions observed on the retained executable, not user customizations.
@@ -88,7 +90,7 @@ def directory_fd(path: Path) -> Iterator[int]:
         os.close(descriptor)
 
 
-def read_regular(path: Path, *, limit: int, end: int | None = None) -> bytes:
+def read_regular(path: Path, *, limit: int, end: int | None = None, header_only: bool = False) -> bytes:
     """Capture a stable bounded file/prefix without following directory or leaf links."""
     if limit <= 0 or (end is not None and (type(end) is not int or not 0 < end <= limit)):
         raise ValueError("Native input exceeds the admitted byte limit")
@@ -98,9 +100,14 @@ def read_regular(path: Path, *, limit: int, end: int | None = None) -> bytes:
             before = os.fstat(fd)
             if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
                 raise ValueError("Native input must be a regular, unlinked file")
-            data = stream.read(end if end is not None else limit + 1)
+            data = stream.readline(limit + 1) if header_only else stream.read(end if end is not None else limit + 1)
             after = os.fstat(fd)
-            if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+            if header_only:
+                # Active executors append during PreToolUse. Pin and reread the
+                # header itself; growth beyond that line does not change ancestry.
+                if not data.endswith(b"\n") or os.pread(fd, len(data), 0) != data:
+                    raise ValueError("Native metadata header is incomplete or changed during capture")
+            elif (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
                 raise ValueError("Native input changed during capture; review unavailable")
     if len(data) > limit or (end is not None and len(data) != end):
         raise ValueError("Native input exceeds limit or required prefix is missing")
@@ -111,6 +118,7 @@ def select_prefixes(
     home: Path, thread_id: str, *, boundary: NativeReviewBoundary | None = None
 ) -> tuple[NativePrefix, ...]:
     """Capture a root or one fork generation, verifying every byte/ordinal boundary."""
+    home = home.expanduser().resolve(strict=True)
     selected: list[NativePrefix] = []
     ordinal = end = None
     while True:
@@ -177,7 +185,7 @@ def bind_source(target: str, *, forge_root: str | None) -> NativeSupervisorSourc
     from forge.session.manager import SessionManager
     from forge.session.models import session_runtime
 
-    home = codex_home().absolute()
+    home = codex_home().expanduser().resolve(strict=True)
     name = root = None
     thread_id = target
     expected_path = None
@@ -193,7 +201,7 @@ def bind_source(target: str, *, forge_root: str | None) -> NativeSupervisorSourc
     # Setup accepts only complete sources. Active Stop selection is attempt-owned.
     selected = select_prefixes(home, thread_id)
     first = selected[0]
-    if expected_path and str(first.path) != expected_path:
+    if expected_path and first.path != Path(expected_path).resolve(strict=True):
         raise ValueError("Managed source rollout does not match the selected native home")
     return NativeSupervisorSource(
         runtime="codex",
@@ -228,13 +236,14 @@ def select_source(
             session_runtime(state) != "codex"
             or not codex
             or codex.thread_id != source.thread_id
-            or codex.rollout_path != source.rollout_path
+            or not codex.rollout_path
+            or Path(codex.rollout_path).resolve(strict=True) != Path(source.rollout_path).resolve(strict=True)
         ):
             raise ValueError("Managed native source binding changed; remove and reconfigure supervision")
     prefixes = select_prefixes(Path(source.home), source.thread_id, boundary=boundary if trigger == "stop" else None)
     first = prefixes[0]
     if (
-        str(first.path) != source.rollout_path
+        first.path != Path(source.rollout_path).resolve(strict=True)
         or first.metadata["cwd"] != source.source_cwd
         or hashlib.sha256(first.data.splitlines(keepends=True)[0]).hexdigest() != source.header_digest
     ):
@@ -243,10 +252,9 @@ def select_source(
     if executor_origin == "claude_code":
         independence = "separate"
     elif executor_origin == "codex" and boundary:
-        if trigger == "stop" and boundary.thread_id != source.thread_id:
-            executor_ids = {p.thread_id for p in select_prefixes(codex_home(), boundary.thread_id, boundary=boundary)}
-        else:
-            executor_ids = _ancestry_ids(codex_home(), boundary.thread_id)
+        # The installed hook/journal establishes the executor turn. Only histories
+        # copied into the reviewer need source format, size and final-answer checks.
+        executor_ids = _ancestry_ids(codex_home(), boundary.thread_id, transcript_path=boundary.transcript_path)
         independence = "shared" if executor_ids & {p.thread_id for p in prefixes} else "separate"
     if trigger == "pre-tool-use" and independence != "separate":
         raise ValueError("Shared or unknown native ancestry requires host Codex Stop with an approved plan")
@@ -334,18 +342,27 @@ def _validate_metadata(prefix: NativePrefix) -> None:
         raise ValueError("Native source has no absolute launch directory")
 
 
-def _ancestry_ids(home: Path, thread_id: str) -> set[str]:
+def _ancestry_ids(home: Path, thread_id: str, *, transcript_path: str | None = None) -> set[str]:
     """Read only headers: the current executor's tool exchange may be unfinished."""
+    home = home.expanduser().resolve(strict=True)
     seen: set[str] = set()
     while True:
-        if not THREAD_ID.fullmatch(thread_id) or thread_id in seen or len(seen) >= MAX_FILES:
+        if (
+            not isinstance(thread_id, str)
+            or not THREAD_ID.fullmatch(thread_id)
+            or thread_id in seen
+            or len(seen) >= MAX_EXECUTOR_ANCESTORS
+        ):
             raise ValueError("Executor ancestry cannot be verified")
         paths = find_rollouts_by_thread_id(thread_id, home=home)
         if len(paths) != 1:
             raise ValueError("Executor native rollout is missing or ambiguous")
-        # Capture remains bounded even for the active executor.
-        data = read_regular(paths[0], limit=MAX_PREFIX_BYTES)
-        meta = json.loads(data.splitlines()[0])["payload"]
+        if not seen and transcript_path and paths[0] != Path(transcript_path).resolve(strict=True):
+            raise ValueError("Executor transcript does not match its native thread")
+        row = json.loads(read_regular(paths[0], limit=MAX_HEADER_BYTES, header_only=True))
+        if not isinstance(row, dict) or row.get("type") != "session_meta" or not isinstance(row.get("payload"), dict):
+            raise ValueError("Executor native metadata is unverified")
+        meta = row["payload"]
         if meta.get("id") != thread_id or meta.get("cli_version") != "0.162.1":
             raise ValueError("Executor native identity is unverified")
         seen.add(thread_id)
@@ -354,7 +371,11 @@ def _ancestry_ids(home: Path, thread_id: str) -> set[str]:
             if meta.get("forked_from_id"):
                 raise ValueError("Executor ancestry is incomplete")
             return seen
-        if not isinstance(base, dict) or base.get("thread_id") != meta.get("forked_from_id"):
+        if (
+            not isinstance(base, dict)
+            or not isinstance(base.get("thread_id"), str)
+            or base["thread_id"] != meta.get("forked_from_id")
+        ):
             raise ValueError("Executor ancestry is inconsistent")
         thread_id = base["thread_id"]
 
@@ -407,7 +428,7 @@ def _check_boundary(prefix: NativePrefix, boundary: NativeReviewBoundary | None)
     if (
         boundary.event != "Stop"
         or boundary.turn_id != started
-        or boundary.transcript_path != str(prefix.path)
+        or Path(boundary.transcript_path).resolve(strict=True) != prefix.path
         or finished is not None
         or not message
         or message.get("phase") != "final_answer"

@@ -19,6 +19,7 @@ from forge.core.reactive.codex_reviewer_home import (
 )
 from forge.core.reactive.env import derive_child_run_identity
 from forge.core.runtime.codex_review_source import _ancestry_ids, select_source
+from forge.core.runtime.codex_rollouts import codex_home
 from forge.policy.semantic.plan_source import read_plan
 from forge.policy.types import ActionContext
 from forge.session.models import SessionState, SupervisorConfig, session_runtime
@@ -62,7 +63,9 @@ def validate_native_executor(config: SupervisorConfig, state: SessionState) -> N
     codex = state.confirmed.codex
     if config.review_trigger == "pre-tool-use" and codex and codex.thread_id:
         home = Path(source.home)
-        if _ancestry_ids(home, source.thread_id) & _ancestry_ids(home, codex.thread_id):
+        if _ancestry_ids(home, source.thread_id) & _ancestry_ids(
+            codex_home(), codex.thread_id, transcript_path=codex.rollout_path
+        ):
             raise ValueError("Shared native sources require --trigger stop and --plan <approved-plan>")
 
 
@@ -118,7 +121,7 @@ def dispatch_native(
         executor_origin=context.origin,
         boundary=context.native_boundary,
     )
-    with prepare_reviewer_home(selected, auth_mode=config.auth_mode) as prepared:
+    with prepare_reviewer_home(selected, auth_mode=config.auth_mode, deadline=deadline) as prepared:
         schema_path = prepared.sqlite_home / "verdict-schema.json"
         with schema_path.open("x") as schema:
             json.dump(_VERDICT_SCHEMA, schema)

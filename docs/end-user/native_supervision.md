@@ -13,11 +13,17 @@ review keep their existing behavior. See [policy supervision](policy.md#semantic
   refuses native supervision even if it reports the same version. Forge's general runtime pin is unchanged.
 - A host Claude or Codex executor; sidecars, cascade, shadow review and manual `supervisor evaluate` are unsupported.
 - A completed source created by `codex exec` 0.162.1 with paginated history, the tested default instructions, OpenAI
-  provider, recorded ChatGPT account identity and supported model history. TUI/app histories, custom base instructions,
-  unknown response formats and histories without account provenance refuse before inference.
+  provider, recorded ChatGPT account identity and supported model history. TUI/app source histories, custom base
+  instructions, unknown response formats and histories without account provenance refuse before inference.
 - A root source or one native fork generation with its original ancestor present. Total selected history must fit
   1,827,328 bytes and its largest reported source context input must not exceed 163,002 tokens. These are measured
   admission limits, not model capacity promises.
+
+These source limits apply to history copied into the reviewer. A separate managed Codex executor can be interactive and
+have a larger transcript: Forge checks its identity and fork ancestry from bounded metadata headers, without reloading
+its body. Executor ancestry checks accept at most 128 headers of 256 KiB each. This does not admit a TUI history as the
+planning source. Configured `CODEX_HOME` and `FORGE_HOME` may be symlinks; links within the selected native store or
+Forge-owned reviewer directories remain refused.
 
 For short sources, use `gpt-6.1-sol` or `gpt-6-sol`, with `--supervisor-effort low`. Both source and reviewer model must
 belong to this pair. Long sources (over 80,549 selected bytes), compacted histories and the active executor source
@@ -38,9 +44,11 @@ Complete the device login with the same account recorded in the source thread. F
 credentials. The flag records your assertion about extra usage; Forge cannot verify that account setting. Status is a
 local readiness check without inference and exposes no credentials or account IDs.
 
-All subscription reviewers sharing this Forge home serialize their use of that store. A concurrent review or login makes
-another review unavailable. The lease survives hook death until reviewer cleanup completes. Do not delete its lock file
-to bypass contention.
+All subscription reviewers sharing this Forge home serialize their use of that store. Reviews wait for its lease within
+their existing review deadline; waiting reduces the time left for inference. An expired wait records unavailable review
+without starting a model. Readiness checks do not require the lease, and status distinguishes `ready` from `busy`.
+Login/logout refuse while the store is busy and advise retrying after completion. The lease survives hook death until
+reviewer cleanup completes. Do not delete its lock file to bypass contention.
 
 ```bash
 forge policy supervisor auth logout --runtime codex
@@ -81,11 +89,13 @@ forge policy supervisor set <planner-name-or-full-thread-id> \
   --trigger stop --plan ./approved-plan.md
 ```
 
-Enrollment uses a native turn. Configure from a completed source before resuming it. At Stop, Forge verifies the actual
-executor, turn, final answer and complete native prefix before copying it. Unknown or unfinished boundaries refuse
-before review. Every native Stop review requires a plan, including separate sources, preserving Stop's existing plan
-gate and single review/correction journal. Stop reviews work already performed; a correction is not a rollback or a
-second review. Shared context has reduced independence even when the reviewer gets a new thread ID.
+Enrollment uses a native turn. Configure from a completed source before resuming it. When copying the active executor as
+the source at Stop, Forge verifies its turn, final answer and complete native prefix. For a separate source, the
+installed hook and Stop journal establish the executor turn, while metadata headers establish its identity and ancestry.
+Unknown or unfinished source boundaries refuse before review. Every native Stop review requires a plan, including
+separate sources, preserving Stop's existing plan gate and single review/correction journal. Stop reviews work already
+performed; a correction is not a rollback or a second review. Shared context has reduced independence even when the
+reviewer gets a new thread ID.
 
 Each review reloads the selected history. Long sources therefore cost more input and can take longer, especially when
 reviewing every edit. Consider Stop for a long separate source too. Reviewer timeouts remain 1–45 seconds; Stop also
@@ -114,13 +124,18 @@ baseline and records both counters in attempt evidence. Missing, decreasing or i
 ## Status, limits and recovery
 
 - `status --json` separates native source identity, reviewer lane/model/auth, billing classification and latest attempt.
-  Copied-prefix hashes identify selected input; they do not prove that the model retained every source detail.
+  In-session `%policy status` and `%policy supervisor` also show the native thread ID. Copied-prefix hashes identify
+  selected input; they do not prove that the model retained every source detail.
 - Native verdict caching, sticky fallback, alternate reviewers and retries are disabled. Quota errors, malformed output
   and unavailable sources remain visible fail-open outcomes. A valid high-confidence cited divergence blocks a pending
   tool; low confidence warns. Source-only feedback includes only quotations verified against an explicit approved plan,
   so conversation-only citations are not forwarded as approved quotations.
-- Use `off`, `on`, `remove` and `reload --from <plan>` as with other supervisors. `on` rechecks admission. Frozen
-  source/model/effort/auth changes require `remove` then `set`; a failed replacement preserves the old configuration.
+- Use `off`, `on`, `remove` and `reload --from <plan>` as with other supervisors. Active `on`/`reload` recheck admission
+  before acquiring the session lock; a concurrent configuration change asks you to repeat the command. Generic policy
+  set/reset validates configuration without requiring a ready reviewer, so unavailable login/source state cannot prevent
+  `forge session set policy.enabled false`. Disabled policy also skips reviewer launch preflight. Source bindings
+  require `remove` then `set`; frozen model/effort/auth changes do too. A failed replacement preserves the old
+  configuration.
 - Repair a missing original rollout or select another complete source. For a replaced binary, use the verified build or
   wait for a Forge version with new native evidence. Login cannot make an unsupported binary or source compatible.
 - Interrupted subscription inputs are recovered by the next lease holder. Marked abandoned API homes are recovered by

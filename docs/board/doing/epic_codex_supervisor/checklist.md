@@ -110,6 +110,12 @@ passes after the approved three-guide token-count refresh. Review, CI and shippe
 
 ## Sequence and ownership
 
+B5 review fixes, 2026-10-12: PR #265 corrects executor/source admission, policy recovery and CLI issues. The user chose
+one reviewer login with deadline-bounded waiting. The
+[validation record](../codex_fork_supervisor/evidence/review-fixes.md) separates deterministic, stub-invoker and
+clean-wheel checks from the earlier native captures; the 60-start round remains closed. B5 stays in doing pending
+review, merge and shipped-tree verification.
+
 | Member                                         | State               | Dependency | Owned outcome                                                  |
 | ---------------------------------------------- | ------------------- | ---------- | -------------------------------------------------------------- |
 | [B1](../../done/plan_file_supervision/card.md) | Done                | None       | Plan source, reviewer selection, isolation, deadline, outcomes |

@@ -19,6 +19,9 @@ control; the total ceiling and API authorization did not change. A mistakenly co
 charged to G0. No Claude inference ran. The user confirmed extra usage is off and independently completed both fixture
 logins. No ordinary Codex login secrets were copied.
 
+The later [PR #265 review fixes](review-fixes.md) have separate validation evidence. Original live product captures
+remain attributed to `1b0f01cf`; the closed native round was not rerun for those fixes.
+
 ## Results
 
 | Concern                  | Observed result                                                                                                                                                                                                                                        | Evidence                                                                    |

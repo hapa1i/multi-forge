@@ -1552,6 +1552,9 @@ def supervisor_on(session_name: str | None) -> None:
             console=err_console,
         )
         sys.exit(1)
+    except policy_ops.SupervisorInputError as exc:
+        print_error(str(exc), console=err_console)
+        sys.exit(1)
 
     console.print(f"Supervisor resumed for session [cyan]{name}[/cyan]")
 

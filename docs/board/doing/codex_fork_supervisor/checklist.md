@@ -8,10 +8,12 @@ Review the implemented [runtime contract](gate-decision.md) on `codex/codex-fork
 `main` at `225ab3dd`. The user authorized B5 execution after the separate global-ignore fix merged and separately
 authorized four API starts. The [evidence](evidence/README.md) records 60/60 starts, including 3/4 API starts. The user
 approved the source/home/trigger decision on 2026-10-11. Installed admission, leases, accounting and native product
-controls and aggregate verification now pass; the per-card PR is ready for review. B1 and B2 remain the prerequisites.
-B3 and B4 are shipped integration contracts: native context must preserve their feedback provenance, turn attribution,
-dispatch cap, and failure behavior. Their completed captures do not establish native-fork isolation. Jev, native team
-orchestration, general session fork/resume, and the proposed Codex source adapter remain outside this card. The separate
+controls and aggregate verification passed on `1b0f01cf`; PR #265's review fixes are locally verified. The user approved
+keeping one login and waiting within review deadlines on 2026-10-12. [Review-fix evidence](evidence/review-fixes.md)
+qualifies the new paths separately from the closed native round. B1 and B2 remain the prerequisites. B3 and B4 are
+shipped integration contracts: native context must preserve their feedback provenance, turn attribution, dispatch cap,
+and failure behavior. Their completed captures do not establish native-fork isolation. Jev, native team orchestration,
+general session fork/resume, and the proposed Codex source adapter remain outside this card. The separate
 [Stop global-ignore fix](../../done/preserve_stop_global_ignores/card.md) shipped in PR #264 (`d33721a2`). Its merged
 tree matches the tested fix and its five PR checks pass; B5 still verifies native Stop composition.
 
@@ -482,3 +484,15 @@ The [fixture teardown](evidence/product-teardown.json) logged out both independe
 verified all fixture auth files absent and removed copied product inputs. No fixture processes remained, and the round
 is marked closed. Sanitized evidence and credential-free private captures remain for review. B5 and the epic remain in
 `doing/` until review, merge and shipped-tree closeout.
+
+PR #265 review fixes, 2026-10-12: executor ancestry now reads bounded headers independently of copied-source admission,
+so large and TUI executors can use a separate source. Subscription reviews wait within their deadlines; readiness reads
+do not acquire the lease. Policy set/reset is structural only, and active on/reload preflights outside the session lock.
+Configured home aliases, lifecycle diagnostics, direct help JSON and native status identity have regression coverage.
+The [new validation record](evidence/review-fixes.md) preserves the original live captures at `1b0f01cf` and does not
+claim new native compatibility. The user retained the single-login contract; concurrent subscription inference remains
+outside B5.
+
+Review-fix verification: aggregate unit **10,770 passed, 117 deselected**; aggregate regression **1,587 passed**;
+targeted integration **16 passed, 11 legacy native cases deselected**. A clean installed wheel matched all 386 Forge
+Python files and passed offline admission, ownership and CLI smoke checks. No additional native/API starts were used.

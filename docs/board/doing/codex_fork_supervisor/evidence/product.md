@@ -50,6 +50,10 @@ credentials nor native histories. The fixture requires a fresh explicit budget t
 
 ## Qualifications
 
+- The live product captures describe `1b0f01cf`. Subsequent PR #265 review fixes change executor-header admission,
+  subscription lease waiting, readiness placement and CLI behavior. Their regression/integration evidence uses synthetic
+  histories and local stub reviewers; it is not a new native compatibility or final-wheel inference claim. The original
+  60-start round remains closed. See the [review-fix validation](review-fixes.md).
 - P1 and the first P2 pair preceded the final stale-input guard. The final P2 Stop used that guard and the final wheel.
   Source, plan and config races also have installed-invoker tests that change each input after a stub completes and
   assert an unavailable outcome with exactly one dispatch. Earlier controls are evidence for the unchanged transport.

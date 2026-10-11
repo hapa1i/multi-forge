@@ -160,11 +160,17 @@ def snapshot_supervisor_options(state: SessionState) -> SupervisorConfig | None:
 
 
 def validate_supervisor_transition(state: SessionState, old: SupervisorConfig | None, effective: SessionIntent) -> None:
-    """Generic overrides and their removal obey the same frozen-identity contract."""
+    """Validate effective configuration under the session lock, without runtime I/O.
+
+    Reviewer readiness belongs to setup/launch and each review, not unrelated
+    overrides or recovery operations such as disabling policy.
+    """
     from forge.policy.semantic.deadline import validate_timeout
     from forge.session.consumer_lanes import confirmed_lane, read_bound_lane
 
     sup = effective.policy.supervisor if effective.policy else None
+    if (sup.native_source if sup else None) != (old.native_source if old else None):
+        raise ValueError("Native source identity requires remove/reconfigure with supervisor set.")
     if sup and sup.configured:
         validate_timeout(sup.timeout_seconds, trigger=sup.review_trigger)
         validate_reviewer(sup, read_bound_lane(state, SUPERVISOR_CONSUMER) or select_supervisor_lane())
@@ -173,19 +179,6 @@ def validate_supervisor_transition(state: SessionState, old: SupervisorConfig | 
         from forge.session.models import session_runtime
 
         validate_stop_executor(sup, runtime=session_runtime(state), sidecar=sidecar)
-        if sup.native_source:
-            from forge.policy.semantic.native_codex import (
-                preflight_native,
-                validate_native_executor,
-            )
-
-            validate_native_executor(sup, state)
-            if sup.active:
-                preflight_native(sup)
-        if sup.review_trigger == "stop":
-            from forge.core.runtime.codex_turn_enrollment import require_for_launch
-
-            require_for_launch(cwd=state.worktree.path if state.worktree else state.forge_root)
     if confirmed_lane(state, SUPERVISOR_CONSUMER) is not None:
 
         def identity(value: SupervisorConfig | None):

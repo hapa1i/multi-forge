@@ -669,7 +669,11 @@ def _handle_policy_status() -> None:
 
         if effective.policy.supervisor and effective.policy.supervisor.configured:
             sup = effective.policy.supervisor
-            sup_resume = sup.resume_id or sup.plan_override_path or ""
+            sup_resume = (
+                f"native codex {sup.native_source.thread_id}"
+                if sup.native_source
+                else sup.resume_id or sup.plan_override_path or ""
+            )
             lines.append(f"  Supervisor: {sup_resume}")
             if sup.suspended:
                 lines.append("    Status: suspended")
@@ -890,6 +894,15 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
     def _block(reason: str) -> None:
         click.echo(json.dumps({"decision": "block", "reason": reason}))
 
+    # Click's eager help callback writes to stdout. Hook stdout is one JSON
+    # response, so render help into that response without running the callback.
+    if "--help" in argv and "--" not in argv[: argv.index("--help")]:
+        from forge.cli.policy import supervisor_set as set_command
+
+        with click.Context(set_command, info_name="%policy supervisor set") as help_context:
+            _block(set_command.get_help(help_context))
+        return
+
     # %policy supervisor off — suspend
     if cmd == "off":
         if not _guard_direct_project_mutation(store):
@@ -1053,7 +1066,10 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
         return
 
     sup = effective.policy.supervisor
-    lines = [f"Supervisor: {sup.resume_id or sup.plan_override_path}"]
+    target = (
+        f"native codex {sup.native_source.thread_id}" if sup.native_source else sup.resume_id or sup.plan_override_path
+    )
+    lines = [f"Supervisor: {target}"]
     if sup.suspended:
         lines.append("  Status: suspended")
     try:

@@ -68,7 +68,7 @@ def test_executor_resume_refuses_unavailable_reviewer_before_launch(tmp_path, ru
     from forge.session.models import PolicyIntent, SupervisorConfig
 
     state = create_session_state("worker", worktree_path=str(tmp_path), runtime=runtime)
-    state.intent.policy = PolicyIntent(supervisor=SupervisorConfig(resume_id="planner"))
+    state.intent.policy = PolicyIntent(enabled=True, supervisor=SupervisorConfig(resume_id="planner"))
     with (
         patch(
             "forge.core.reactive.reviewer_runtime.preflight_supervisor_runtime",

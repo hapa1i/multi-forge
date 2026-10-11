@@ -128,6 +128,11 @@ encodings omit the new field entirely. Native source/auth/model/effort are froze
 set/reset, reload/on, inheritance and dispatch validate the same cross-field restrictions. Policy inheritance checks the
 child's copied intent and lane as well as the parent's effective state. No reader rewrites on inspection.
 
+Generic set/reset performs structural validation only, without source/auth reads or reviewer preflight under the session
+lock. Native source bindings must be created through supervisor setup; generic overrides cannot rewrite them. Explicit
+on/reload checks readiness outside the lock and publishes only if the inspected state is unchanged. Disabled policy
+skips reviewer launch preflight, so an unavailable reviewer cannot prevent policy recovery.
+
 In schema v2/v3/v4/v5, a present `intent.launch` object must include `model_route`, either `null` or the complete
 neutral route selection:
 
