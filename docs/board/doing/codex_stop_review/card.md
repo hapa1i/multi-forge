@@ -12,6 +12,9 @@ installed-wheel controls and regression suite are complete. [Validation](evidenc
 checks and measured limits for [PR #263](https://github.com/hapa1i/multi-forge/pull/263). The card remains active until
 merge and closeout.
 
+The [PR review follow-up](evidence/review-followup.md) adds explicit recovery for interrupted/incomplete turns,
+preserves enrollment receipts, reserves completion time, and avoids full CLI startup for inactive turn hooks.
+
 Execution starts with the checklist's runtime go/no-go gate. Product configuration, schema, CLI, and installed-hook
 changes follow only after that gate passes. Non-default Stop trigger state requires manifest v4; ordinary per-edit
 sessions retain compatible v2/v3 serialization. Codex children use `session start --runtime codex --resume-from`, with

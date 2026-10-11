@@ -388,10 +388,12 @@ User-scope Codex hooks also register UserPromptSubmit, PostToolUse and Stop, eac
 managed block requires a new Codex trust approval; then run `forge runtime preflight codex --verify-enrollment --json`.
 Its `stop_review_enrolled` field requires observations from the complete turn-hook set on the exact configuration.
 
-These handlers are inert for unmanaged, disabled, per-edit, or unverified executors. In opt-in Stop mode they capture a
-bounded baseline before tools, record outcomes, and reserve at most one semantic reviewer dispatch per explicit turn.
-PreToolUse keeps deterministic policy and authority checks and records requests. A completed divergent review may
-request one correction after edits have happened; later changes stay unreviewed. State survives telemetry reset. See
+The dispatcher avoids full CLI startup for unmanaged, disabled, and per-edit sessions by reading their current effective
+policy; enabling Stop while idle takes effect on the next hook. Enrollment probes and uncertain manifests still reach
+the handler. Unverified executors cannot run Stop review. In opt-in Stop mode the handlers capture a bounded baseline
+before tools, record outcomes, and reserve at most one semantic reviewer dispatch per explicit turn. PreToolUse keeps
+deterministic policy and authority checks and records requests. A completed divergent review may request one correction
+after edits have happened; later changes stay unreviewed. State survives telemetry reset. See
 [Stop review](policy.md#review-once-at-codex-stop-opt-in) for limits, recovery and model/operator feedback behavior.
 
 ### codex-session-start (Codex SessionStart)

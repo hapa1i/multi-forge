@@ -114,7 +114,8 @@ def render_stop_feedback(outcome: StopOutcome, *, source_only: bool, model_feedb
         if not findings:
             title += " No verified finding is available. Stop and ask the operator."
         wire.update(
-            decision="block", reason=_channel(findings, title, MODEL_BYTES, source_only=source_only, blocked=True)
+            decision="block",
+            reason=_channel(findings, title, MODEL_BYTES, source_only=source_only, blocked=True),
         )
     title = {
         "reviewed": "Forge reviewed the bounded repository snapshot; later changes are unreviewed.",
@@ -122,6 +123,8 @@ def render_stop_feedback(outcome: StopOutcome, *, source_only: bool, model_feedb
         "unreviewed": "Forge Stop review is stale or has unreviewed continuation changes.",
         "incomplete": "Forge Stop review incomplete; this turn's review allowance is spent.",
     }.get(outcome.status, "Forge Stop review unavailable; work is unreviewed.")
+    if outcome.correction:
+        title = "Forge requested one correction; the result and subsequent changes remain unreviewed."
     if outcome.status != "reviewed":
         title += " Submit a new explicit turn to assess outstanding work; inspect supervisor status for unavailable evidence."
     wire["systemMessage"] = _channel(findings, title, OPERATOR_BYTES, source_only=False, operator=True)

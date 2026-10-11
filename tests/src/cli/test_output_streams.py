@@ -268,6 +268,51 @@ def test_policy_supervisor_input_failure_is_stderr_only(command: list[str]) -> N
     assert "Example: google/gemini-3.8-flash" in result.stderr
 
 
+def test_stop_reset_preview_json_is_read_only_and_errors_use_stderr(tmp_path: Path, monkeypatch) -> None:
+    from forge.policy.semantic import stop_review
+    from forge.session.events import get_session_event_journal_path
+    from forge.session.store import SessionStore
+    from tests.fixtures.stop_review import changed, context
+
+    ctx = context(tmp_path)
+    changed(ctx)
+    store = SessionStore(str(ctx.forge_root), ctx.session)
+    monkeypatch.setattr(
+        "forge.cli.policy._resolve_supervisor_session",
+        lambda name: (store, ctx.session, None),
+    )
+    monkeypatch.setattr("forge.cli.policy._enforce_policy_store_compatibility", lambda store: None)
+    journal = get_session_event_journal_path(ctx.forge_root, ctx.session, "review")
+    before = journal.read_bytes()
+    command = [
+        "policy",
+        "supervisor",
+        "reset-review",
+        "--session",
+        ctx.session,
+        "--json",
+    ]
+    result = CliRunner().invoke(main, command)
+    assert result.exit_code == 0, result.output
+    assert result.stderr == ""
+    assert json.loads(result.stdout)["applied"] is False
+    assert journal.read_bytes() == before
+    human = CliRunner().invoke(main, command[:-1])
+    assert human.exit_code == 0
+    assert f"--session {ctx.session} --yes" in human.stderr
+    assert journal.read_bytes() == before
+    result = CliRunner().invoke(main, command + ["--yes"])
+    assert result.exit_code == 0, result.output
+    assert result.stderr == ""
+    assert json.loads(result.stdout)["applied"] is True
+    assert stop_review.status(ctx.forge_root, ctx.session)["reset_requested"]
+    journal.write_text("corrupt journal")
+    result = CliRunner().invoke(main, command + ["--yes"])
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "Cannot reset Stop review" in result.stderr
+
+
 @pytest.mark.parametrize(
     "args",
     [

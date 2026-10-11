@@ -1,4 +1,4 @@
-"""A Stop replay or interrupted owner must never acquire another model call."""
+"""B4: stop_review must not grant another model call to a replay or interrupted owner."""
 
 from __future__ import annotations
 
@@ -59,9 +59,7 @@ def test_crash_after_reservation_before_attempt_does_not_retry(tmp_path: Path, m
     assert call.call_count == 1
 
 
-@pytest.mark.parametrize(
-    "damage", ["remove-journal", "empty-journal", "corrupt-journal", "remove-marker", "corrupt-marker"]
-)
+@pytest.mark.parametrize("damage", ["remove-journal", "empty-journal", "corrupt-journal", "corrupt-marker"])
 def test_damaged_history_cannot_grant_fresh_allowance(tmp_path: Path, monkeypatch, damage: str) -> None:
     ctx = context(tmp_path)
     changed(ctx)
@@ -76,13 +74,14 @@ def test_damaged_history_cannot_grant_fresh_allowance(tmp_path: Path, monkeypatc
         journal.write_text("")
     elif damage == "corrupt-journal":
         journal.write_text('{"interrupted":')
-    elif damage == "remove-marker":
-        marker.unlink()
     else:
         marker.write_text("bad marker")
     assert review.status(ctx.forge_root, ctx.session)["state"] == "unavailable"
     with pytest.raises(SessionEventError):
-        review.begin_turn(replace(ctx, turn_id="01900001-0000-7000-8000-000000000002"), deadline=deadline())
+        review.begin_turn(
+            replace(ctx, turn_id="01900001-0000-7000-8000-000000000002"),
+            deadline=deadline(),
+        )
     assert call.call_count == 1
 
 

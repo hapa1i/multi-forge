@@ -334,27 +334,41 @@ Capture uses bounded raw repository bytes before tools and at Stop, including ed
 deletions, renames, mode changes, and recorded tool outcomes. Pre-existing dirty changes are excluded. Forge does not
 stage, stash, run clean/process filters, or write Git objects to capture evidence. The reviewed scope excludes ignored
 files and effects outside the repository; author attribution is not provable when another editor changes the checkout.
-Changed binary, oversized, symlink, or submodule content, a changed HEAD/index, missing tool events, or limits exceeded
-make coverage incomplete. They never become a clean whole-turn verdict. Current limits include 6,000 files, 64 MB per
-snapshot, 1 MB per file, 24 KB of review evidence, a 64 KB plan, 48 tool-event records, and a 7-second capture deadline.
+Changed binary, oversized, symlink, or submodule content, a changed HEAD/staged index, missing tool events, or limits
+exceeded make coverage incomplete. They never become a clean whole-turn verdict. Current limits include 6,000 files, 64
+MB per snapshot, 1 MB per file, 24 KB of review evidence, a 64 KB plan, 48 tool-event records, and a 7-second capture
+deadline.
 
 A completed divergent review may request one correction. Codex receives its reason as a user-role hook message; normal
 format attributes reviewer findings, while `source-only` includes verified approved-plan quotations and fixed Forge
 guidance. The correction is consumed before output, so even a lost response cannot be replayed. Further changes remain
-unreviewed and carry into the next explicit turn with their original baseline and provenance. `evaluate` is a separate
-single-file check and cannot clear that outstanding turn state.
+unreviewed and carry into the next explicit turn with their original baseline and provenance. Turns interrupted before
+Stop and changes across native thread boundaries also carry forward. Index stat refreshes and denied actions do not
+create missing-evidence failures. `evaluate` is a separate single-file check and cannot clear that outstanding turn
+state.
 
 Stop notices appear in Codex's operator notices, not the model context. `policy_summary_feedback=off` retains these
 notices and required correction guidance; there is no optional non-blocking model channel for Stop. Inspect
 `turn_review` in supervisor status or `forge telemetry activity <session> --json` for scope, coverage, spending,
 correction consumption, and unreviewed changes. A reservation is not proof of dispatch: `dispatched: null` preserves
-uncertainty after interruption. Review timeouts remain 1–45 seconds inside a 55-second whole-hook budget and the
-registered 60-second Stop timeout.
+uncertainty after interruption; `false` means no call was made. Review timeouts remain 1–45 seconds inside a 55-second
+whole-hook budget and the registered 60-second Stop timeout. Ten seconds are reserved for completion; shorter remaining
+budgets reduce reviewer time. Returned verdicts are saved before final freshness checks, even when those checks fail.
 
 Private operational state lives under `.forge/artifacts/<session>/review/` and survives telemetry reset. Its bounded
 journal preserves a turn watermark during compaction. Missing or damaged established history refuses review; restore
 those artifacts or start a new managed session. Do not delete them to retry a spent turn. Outstanding scope is bounded
-to 32 turns; lost provenance also requires restoration or a new session.
+to 32 turns, after which `carry_limit` requires an explicit reset. An incomplete scope can also be reset earlier:
+
+```bash
+forge policy supervisor reset-review --session executor --json
+forge policy supervisor reset-review --session executor --yes
+```
+
+The first command previews the exclusion. The second records the pending scope as **unreviewed**, preserves the current
+turn's spent allowance, and requires a new explicit prompt before taking a fresh baseline. It does not approve or undo
+the excluded changes. `turn_review.excluded_work` retains their bounded summary after later reviews. Restore damaged
+journal artifacts or start a new session if the reset cannot read them safely.
 
 Stop intent or overrides use manifest schema v4. Default-only supervision retains the existing v2/v3 encoding. Non-Codex
 executors and sidecars refuse Stop before deriving a child; choose a host Codex path or explicitly switch the source

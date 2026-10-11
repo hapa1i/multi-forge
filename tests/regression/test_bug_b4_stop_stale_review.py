@@ -1,4 +1,4 @@
-"""A completed result cannot approve a changed checkout, plan, configuration, or turn."""
+"""B4: A completed result cannot approve a changed checkout, plan, configuration, or turn."""
 
 from __future__ import annotations
 

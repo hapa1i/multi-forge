@@ -102,16 +102,17 @@ even when a binary is temporarily absent. Explicit narrowing refreshes selected 
 runtime ownership; sync derives its runtime set from the durable ownership relation. Removal belongs to disable.
 
 Settings merge remains additive (hooks append + dedupe, permissions union). The shared `hooks` module registers Claude
-settings and, when Codex is selected, `codex-session-start` and `codex-policy-check` in a marker-delimited user Codex
-config block (`$CODEX_HOME/config.toml`). Project/local installs write no runtime hook blocks. The Codex half remains
-best-effort when Codex is absent or its config conflicts; explicit Codex skill conflicts instead fail the whole install
-preflight. An automatically selected package that Forge already manages also blocks if a new same-name Codex duplicate
-appears, preventing sync from silently dropping ownership. Duplicate classification cross-references all valid tracking
-rows: a package managed by another Forge scope remains a conflict whose recovery names that scope's exact disable
-command, while only an untracked package receives remove-or-rename guidance. User-scope planning/status checks every
-valid, present tracked project/local package of the same name, even outside the current directory chain, because a new
-user package would be visible inside all of those projects. Registration alone is inert — Codex hooks fire only after
-the user's one-time interactive trust ceremony
+settings and, when Codex is selected, `codex-session-start`, `codex-policy-check`, `codex-turn-start`,
+`codex-turn-tool`, and `codex-stop` in a marker-delimited user Codex config block (`$CODEX_HOME/config.toml`). The
+dispatcher checks current effective policy before starting the full CLI for the three optional turn hooks. Project/local
+installs write no runtime hook blocks. The Codex half remains best-effort when Codex is absent or its config conflicts;
+explicit Codex skill conflicts instead fail the whole install preflight. An automatically selected package that Forge
+already manages also blocks if a new same-name Codex duplicate appears, preventing sync from silently dropping
+ownership. Duplicate classification cross-references all valid tracking rows: a package managed by another Forge scope
+remains a conflict whose recovery names that scope's exact disable command, while only an untracked package receives
+remove-or-rename guidance. User-scope planning/status checks every valid, present tracked project/local package of the
+same name, even outside the current directory chain, because a new user package would be visible inside all of those
+projects. Registration alone is inert — Codex hooks fire only after the user's one-time interactive trust ceremony
 ([session design §3.9](design_session_context.md#39-session-resume-context-management)).
 `forge runtime preflight codex --verify-enrollment` confirms enrollment by effect with one cheap managed turn.
 `~/.forge/installed.json` schema v3 records a sorted `module_owners` relation and a required tagged attribution on every

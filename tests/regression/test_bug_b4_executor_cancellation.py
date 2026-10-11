@@ -1,4 +1,4 @@
-"""Executor cancellation must close a detached Stop hook's reviewer control pipe."""
+"""B4: Executor cancellation must close a detached Stop hook's reviewer control pipe."""
 
 import json
 import os

@@ -493,25 +493,37 @@ def update_review_checkpoint(
     _reject_existing_symlinks(root, marker)
     with file_lock_for_target(target_path=journal, timeout_s=timeout_s):
         _validate_review_marker(marker)
-        if marker.exists() != journal.exists():
+        if marker.exists() and not journal.exists():
             raise SessionEventReadError("review checkpoint history is missing; restore artifacts or use a new session")
-        records = read_session_events(root, session, "review", payload_validator=payload_validator, max_bytes=2_000_000)
+        records = read_session_events(
+            root,
+            session,
+            "review",
+            payload_validator=payload_validator,
+            max_bytes=2_000_000,
+        )
         previous = records[-1] if records else None
-        if marker.exists() and previous is None:
+        if journal.exists() and previous is None:
             raise SessionEventReadError("established review checkpoint is empty")
         candidate = update(previous)
         if candidate is None:
             return previous
         validated = validate_session_event(
-            asdict(candidate), expected_session=session, payload_validator=payload_validator
+            asdict(candidate),
+            expected_session=session,
+            payload_validator=payload_validator,
         )
-        serialized = json.dumps(asdict(validated), separators=(",", ":"), sort_keys=True, allow_nan=False) + "\n"
+        serialized = (
+            json.dumps(
+                asdict(validated),
+                separators=(",", ":"),
+                sort_keys=True,
+                allow_nan=False,
+            )
+            + "\n"
+        )
         if len(serialized.encode()) > 900_000:
             raise SessionEventWriteError("review checkpoint exceeds its bounded storage limit")
-        if not marker.exists():
-            atomic_write_text(marker, "review-checkpoint-v1\n", create_parents=False)
-            marker.chmod(0o600)
-            _fsync_directory(marker.parent)
         # Persist the latest full state in the same rename as compaction. A
         # crash leaves either the previous spent watermark or the newer one.
         retained = "".join(json.dumps(asdict(row), separators=(",", ":"), sort_keys=True) + "\n" for row in records)
@@ -520,23 +532,37 @@ def update_review_checkpoint(
         atomic_write_text(journal, retained + serialized, create_parents=False)
         journal.chmod(0o600)
         _fsync_directory(journal.parent)
+        # First publish the complete checkpoint. A crash before marker creation
+        # leaves validated spending state, which the next writer can retain.
+        # Marker-first could leave an unrecoverable empty established journal.
+        if not marker.exists():
+            atomic_write_text(marker, "review-checkpoint-v1\n", create_parents=False)
+            marker.chmod(0o600)
+            _fsync_directory(marker.parent)
         return validated
 
 
 def read_review_checkpoint(
-    forge_root: str | Path, session: str, *, payload_validator: SessionEventPayloadValidator
+    forge_root: str | Path,
+    session: str,
+    *,
+    payload_validator: SessionEventPayloadValidator,
 ) -> SessionEvent | None:
     """Read bounded review state without repairing history or acquiring an allowance."""
     journal = get_session_event_journal_path(forge_root, session, "review")
     marker = journal.with_name("checkpoint-established")
     _reject_existing_symlinks(Path(forge_root).resolve(strict=True), marker)
     _validate_review_marker(marker)
-    if marker.exists() != journal.exists():
+    if marker.exists() and not journal.exists():
         raise SessionEventReadError("review checkpoint history is missing")
     records = read_session_events(
-        forge_root, session, "review", payload_validator=payload_validator, max_bytes=2_000_000
+        forge_root,
+        session,
+        "review",
+        payload_validator=payload_validator,
+        max_bytes=2_000_000,
     )
-    if not records and marker.exists():
+    if not records and journal.exists():
         raise SessionEventReadError("established review checkpoint is empty")
     return records[-1] if records else None
 

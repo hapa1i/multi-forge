@@ -1,4 +1,4 @@
-"""Codex's absolute patch paths must match relative snapshot keys, including carry-forward."""
+"""B4: Codex's absolute patch paths must match relative snapshot keys, including carry-forward."""
 
 from pathlib import Path
 

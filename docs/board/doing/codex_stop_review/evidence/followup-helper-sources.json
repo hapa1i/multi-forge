@@ -1,0 +1,13 @@
+{
+  "scope": "PR review follow-up, no inference",
+  "helpers": [
+    {
+      "path": "scripts/experiments/codex-hooks/b4-dispatcher-cost.py",
+      "sha256": "3e2c02e646e0a70fbe0f85420822057288c27ecc40ca819c4e2fa21393f43ab6"
+    },
+    {
+      "path": "scripts/experiments/codex-hooks/b4-wheel-followup.py",
+      "sha256": "b12c6089c9cf10286c79afb632bec5e0045a2c2886c0f02dc3a8e8f870b37c09"
+    }
+  ]
+}

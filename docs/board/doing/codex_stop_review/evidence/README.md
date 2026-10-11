@@ -1,9 +1,13 @@
 # B4 Stop-review evidence — 2026-10-11
 
-The opt-in product and installed-wheel controls pass on **Codex 0.162.1**. Candidate `c4354a9c` provides a durable
-one-review allowance per explicit turn, one consumed correction, and visible outstanding work after the correction. The
-round closed at **32 reserved Codex turn units**, one real Claude subscription-only review, and no API inference. The
-documentation count gate is resolved; [validation.md](validation.md) records the final checks and qualifications.
+The [PR review follow-up](review-followup.md) records the recovery, enrollment, completion and inactive-hook fixes,
+their regression coverage and clean-wheel verification. It did not repeat the closed native round below.
+
+The original opt-in product and installed-wheel controls passed on **Codex 0.162.1**. Candidate `c4354a9c` provides a
+durable one-review allowance per explicit turn, one consumed correction, and visible outstanding work after the
+correction. The round closed at **32 reserved Codex turn units**, one real Claude subscription-only review, and no API
+inference. The documentation count gate is resolved; [validation.md](validation.md) records the final checks and
+qualifications.
 
 [product.json](product.json) indexes every product attempt, including failures, wheel reports, reservations and
 teardown. The wheel's Python files match the candidate byte-for-byte; its SHA-256 is

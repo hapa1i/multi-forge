@@ -498,7 +498,7 @@ class SupervisorRun:
     run_ok: bool = False
     parsed: bool = False
     observed_models: tuple[str, ...] = ()
-    dispatched: bool | None = None  # None retains uncertainty if setup/dispatch was interrupted.
+    dispatched: bool | None = False  # Early admission refusals are known no-call; interrupted dispatch is unknown.
 
 
 def _supervisor_fail_open_decision(
@@ -530,9 +530,10 @@ class _SupervisorRoutingError(Exception):
     ``codex_unavailable`` (codex preflight not ready, T4).
     """
 
-    def __init__(self, message: str, *, failure_type: str = "proxy_not_found") -> None:
+    def __init__(self, message: str, *, failure_type: str = "proxy_not_found", dispatched: bool | None = False) -> None:
         super().__init__(message)
         self.failure_type = failure_type
+        self.dispatched = dispatched
 
 
 def _dispatch_supervisor(
@@ -705,6 +706,7 @@ def _dispatch_codex_supervisor(
     from forge.core.invoker.codex import CodexHeadlessInvoker, prepare_codex_request
     from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
 
+    entered_invoker = False
     try:
         preflight = read_fresh_codex_preflight()
         if preflight is None or not preflight.ready:
@@ -736,6 +738,7 @@ def _dispatch_codex_supervisor(
             label="supervisor",
         )
         request.watchdog_deadline = review_deadline(config.timeout_seconds, trigger=config.review_trigger)
+        entered_invoker = True
         result = CodexHeadlessInvoker().run(request)
     except _SupervisorRoutingError:
         raise  # already a structured fail-open trigger (cache miss / unready)
@@ -744,6 +747,7 @@ def _dispatch_codex_supervisor(
         raise _SupervisorRoutingError(
             f"Codex supervisor setup failed: {e}",
             failure_type="codex_unavailable",
+            dispatched=None if entered_invoker else False,
         ) from e
     return _headless_to_session_result(result)
 
@@ -845,7 +849,8 @@ def run_supervisor_check(
             _supervisor_fail_open_decision(
                 f"Supervisor evidence or setup unavailable: {exc}",
                 failure_type="review_unavailable",
-            )
+            ),
+            dispatched=None,
         )
     # Evidence is downstream of the decision. Even a recorder/cleanup error must
     # not turn a completed frontier deny into an operational fail-open.
@@ -1006,7 +1011,8 @@ def _run_supervisor_check(
             _supervisor_fail_open_decision(
                 str(e),
                 failure_type=e.failure_type,
-            )
+            ),
+            dispatched=e.dispatched,
         )
 
     if not result.success:

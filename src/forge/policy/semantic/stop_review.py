@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import subprocess
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -17,6 +19,7 @@ from uuid import UUID, uuid4
 
 from forge.core.state import utc_timestamp_z
 from forge.policy.semantic import turn_evidence
+from forge.policy.semantic.deadline import review_scope
 from forge.policy.semantic.identity import reviewer_cache_identity
 from forge.policy.semantic.plan_source import read_plan
 from forge.policy.semantic.supervisor import run_supervisor_check
@@ -33,6 +36,8 @@ from forge.session.models import LaneRecord, SupervisorConfig
 
 MAX_ACTIONS = 48
 MAX_PROVENANCE_TURNS = 32
+# Seven seconds for a final snapshot, then lock, config verification and output.
+COMPLETION_SECONDS = 10.0
 
 
 @dataclass(frozen=True)
@@ -75,11 +80,70 @@ def begin_turn(context: TurnContext, *, deadline: float) -> None:
 
     def update(previous: SessionEvent | None) -> SessionEvent | None:
         old = _state(previous, context)
-        if old and UUID(context.turn_id).int <= int(old["watermark"]):
+        watermark = (
+            max(
+                int(old["watermark"]),
+                UUID(old.get("blocked_until_turn", old["turn_id"])).int,
+            )
+            if old
+            else 0
+        )
+        if UUID(context.turn_id).int <= watermark:
             return None
-        outstanding = bool(old and old.get("outstanding"))
+        reset = bool(old and old.get("reset_requested"))
+        outstanding = bool(old and not reset and (old.get("outstanding") or old["status"] == "collecting"))
+        # Capture before choosing the next baseline: changes after an approval,
+        # including a missing follow-up Stop, must not become pre-existing work.
+        current = None
+        capture_error = None
+        try:
+            references = [old[k] for k in ("baseline", "reviewed") if old and old.get(k)]
+            if reset:
+                references = []
+            turn_evidence.prune(context.storage, references)
+            current = turn_evidence.capture(context.checkout, context.storage, deadline=deadline)
+            if (
+                old
+                and not reset
+                and (
+                    old["thread_id"] != context.thread_id
+                    or (old.get("reviewed") and current["digest"] != old["reviewed"]["digest"])
+                )
+            ):
+                outstanding = True
+        except (
+            OSError,
+            ValueError,
+            TimeoutError,
+            RuntimeError,
+            subprocess.SubprocessError,
+        ) as exc:
+            capture_error = type(exc).__name__
+            outstanding = bool(old and not reset)
+        if old and outstanding and len(old["provenance"]) >= MAX_PROVENANCE_TURNS:
+            # Do not truncate provenance underneath action records. Stop carry
+            # explicitly; the operator can exclude it without resetting spending.
+            old.update(
+                status="unavailable",
+                reason="carry_limit",
+                outstanding=True,
+                blocked_until_turn=context.turn_id,
+            )
+            return _event(context, old)
         provenance = list(old["provenance"]) if old and outstanding else []
         provenance.append(context.turn_id)
+        excluded = copy.deepcopy(old.get("excluded_work")) if old else None
+        if reset and old:
+            excluded = {
+                "turns": (excluded or {}).get("turns", 0) + len(old["provenance"]),
+                "last_turn": old["turn_id"],
+                "last_thread": old["thread_id"],
+                "reason": "operator_reset",
+                "reviewed": False,
+            }
+        baseline = old.get("baseline") if old and outstanding else current
+        if old and outstanding and not old["outstanding"] and old.get("reviewed"):
+            baseline = old["reviewed"]
         state: dict[str, Any] = {
             "schema": 1,
             "forge_root": str(context.forge_root.resolve()),
@@ -89,13 +153,21 @@ def begin_turn(context: TurnContext, *, deadline: float) -> None:
             "watermark": str(UUID(context.turn_id).int),
             "config_digest": context.config_digest,
             "spent": False,
+            "dispatched": False,
             "status": "collecting",
             "reason": None,
             "outstanding": outstanding,
-            "provenance": provenance[-MAX_PROVENANCE_TURNS:],
-            "actions": copy.deepcopy(old["actions"]) if old and outstanding else [],
+            "provenance": provenance,
+            "actions": (
+                copy.deepcopy(old["actions"])
+                if old and outstanding and (old["outstanding"] or old["status"] == "collecting")
+                else []
+            ),
             "correction_consumed": False,
-            "baseline": old.get("baseline") if old and outstanding else None,
+            "baseline": baseline,
+            "start_snapshot": current,
+            "excluded_work": excluded,
+            "reset_requested": bool(reset and capture_error),
             "reviewed": None,
             "attempt_id": None,
             "evidence_digest": None,
@@ -103,21 +175,24 @@ def begin_turn(context: TurnContext, *, deadline: float) -> None:
             "decision": None,
             "updated_at": utc_timestamp_z(),
             "coverage": None,
+            "carry_omissions": (
+                sorted(
+                    set(
+                        old.get("carry_omissions", [])
+                        + (old.get("coverage") or {}).get("omissions", [])
+                        + (["action_limit"] if old.get("reason") == "action_limit" else [])
+                    )
+                )
+                if old and outstanding
+                else []
+            ),
         }
-        try:
-            if outstanding and (not old or not old.get("baseline") or old.get("baseline_error")):
-                raise ValueError("Outstanding evidence lost its baseline; restore artifacts or use a new session")
-            if len(provenance) > MAX_PROVENANCE_TURNS:
-                raise ValueError("Outstanding evidence provenance exceeds its bounded history")
-            # Held only during local capture/recording, never during reviewer inference.
-            references = [old[k] for k in ("baseline", "reviewed") if old and old.get(k)]
-            turn_evidence.prune(context.storage, references)
-            current = turn_evidence.capture(context.checkout, context.storage, deadline=deadline)
-            state["baseline"] = state["baseline"] or current
-            state["start_snapshot"] = current
-        except (OSError, ValueError, TimeoutError, RuntimeError, subprocess.SubprocessError) as exc:
+        if capture_error or not baseline or (outstanding and old and old.get("baseline_error")):
             state.update(
-                status="unavailable", reason="baseline_unavailable", outstanding=True, baseline_error=type(exc).__name__
+                status="unavailable",
+                reason="baseline_unavailable",
+                outstanding=True,
+                baseline_error=capture_error or "MissingBaseline",
             )
         return _event(context, state)
 
@@ -134,6 +209,15 @@ def record_action(context: TurnContext, action: dict[str, Any]) -> None:
         if state["config_digest"] != context.config_digest:
             state.update(status="unavailable", reason="configuration_changed", outstanding=True)
             return _event(context, state)
+        if state.get("reset_requested") or state.get("blocked_until_turn"):
+            return None
+        if action.get("phase") == "denied":
+            state["actions"] = [
+                row
+                for row in state["actions"]
+                if not (row.get("id") == action.get("id") and row.get("turn_id") == action.get("turn_id"))
+            ]
+            return _event(context, state)
         if any(
             row.get("id") == action.get("id")
             and row.get("phase") == action.get("phase")
@@ -141,8 +225,13 @@ def record_action(context: TurnContext, action: dict[str, Any]) -> None:
             for row in state["actions"]
         ):
             return None
+        if state["spent"] and not state["outstanding"]:
+            state.update(baseline=state["reviewed"], actions=[])
+        if state["spent"]:
+            state.update(status="unreviewed", reason="actions_after_review", outstanding=True)
         if len(state["actions"]) >= MAX_ACTIONS:
             state.update(status="unavailable", reason="action_limit", outstanding=True)
+            state["carry_omissions"] = sorted(set(state.get("carry_omissions", []) + ["action_limit"]))
         else:
             state["actions"].append(action)
         return _event(context, state)
@@ -162,6 +251,12 @@ def review_stop(context: TurnContext, *, deadline: float, current_config: Callab
         if state is None or not _current(state, context):
             outcome = StopOutcome("unavailable", "missing_or_stale_turn")
             return None
+        if state.get("reset_requested") or state.get("blocked_until_turn"):
+            outcome = StopOutcome(
+                "unavailable",
+                ("new_explicit_turn_required" if state.get("reset_requested") else "carry_limit"),
+            )
+            return None
         if state["config_digest"] != context.config_digest:
             state.update(status="unavailable", reason="configuration_changed", outstanding=True)
             outcome = StopOutcome("unavailable", "configuration_changed")
@@ -169,13 +264,31 @@ def review_stop(context: TurnContext, *, deadline: float, current_config: Callab
         if state.get("spent"):
             # Never replay a stored block. Delivery may have happened before the owner died.
             if state["status"] == "reviewing":
-                state.update(status="incomplete", reason="reserved_without_completed_review", outstanding=True)
+                state.update(
+                    status="incomplete",
+                    reason="reserved_without_completed_review",
+                    outstanding=True,
+                )
             if state.get("reviewed"):
                 now = turn_evidence.capture(context.checkout, context.storage, deadline=deadline)
                 if now["digest"] != state["reviewed"]["digest"]:
-                    state.update(status="unreviewed", reason="changes_after_review", outstanding=True)
+                    state.update(
+                        status="unreviewed",
+                        reason="changes_after_review",
+                        outstanding=True,
+                    )
+                elif state["correction_consumed"]:
+                    state.update(
+                        status="unreviewed",
+                        reason="correction_not_reassessed",
+                        outstanding=True,
+                    )
             else:
-                state.update(status="incomplete", reason="reserved_without_completed_review", outstanding=True)
+                state.update(
+                    status="incomplete",
+                    reason="reserved_without_completed_review",
+                    outstanding=True,
+                )
             outcome = StopOutcome(state["status"], state.get("reason"))
             return _event(context, state)
         if not state.get("baseline") or state["status"] == "unavailable":
@@ -183,10 +296,16 @@ def review_stop(context: TurnContext, *, deadline: float, current_config: Callab
             return None
         now = turn_evidence.capture(context.checkout, context.storage, deadline=deadline)
         evidence = turn_evidence.compare(context.storage, state["baseline"], now, state["actions"])
+        if state.get("carry_omissions"):
+            evidence["omissions"] = sorted(set(evidence["omissions"] + state["carry_omissions"]))
+            evidence["complete"] = False
         evidence["provenance_turns"] = state["provenance"]
         if len(json.dumps(evidence, sort_keys=True).encode()) > turn_evidence.MAX_EVIDENCE_BYTES:
             evidence.update(complete=False, omissions=["review_prompt_byte_limit"])
-        state["coverage"] = {"complete": evidence["complete"], "omissions": evidence["omissions"]}
+        state["coverage"] = {
+            "complete": evidence["complete"],
+            "omissions": evidence["omissions"],
+        }
         if not evidence["complete"]:
             state.update(status="unavailable", reason="incomplete_evidence", outstanding=True)
             outcome = StopOutcome("unavailable", "incomplete_evidence")
@@ -202,6 +321,7 @@ def review_stop(context: TurnContext, *, deadline: float, current_config: Callab
             return _event(context, state)
         state.update(
             spent=True,
+            dispatched=None,
             status="reviewing",
             reason=None,
             outstanding=True,
@@ -231,12 +351,45 @@ def review_stop(context: TurnContext, *, deadline: float, current_config: Callab
         action_fingerprint=frozen["evidence_digest"],
     )
     # Only this owner reaches dispatch. Format retry is disabled for Stop by the transport.
-    result = run_supervisor_check(
-        context.config, action, snapshot=plan, lane_record=context.lane, attempt_id=frozen["attempt_id"]
-    )
-    after = turn_evidence.capture(context.checkout, context.storage, deadline=deadline)
-    latest_plan = read_plan(context.config)
-    config_matches = current_config() == context.config_digest
+    with review_scope(deadline - COMPLETION_SECONDS):
+        result = run_supervisor_check(
+            context.config,
+            action,
+            snapshot=plan,
+            lane_record=context.lane,
+            attempt_id=frozen["attempt_id"],
+        )
+
+    def save_result(previous: SessionEvent | None) -> SessionEvent | None:
+        state = _state(previous, context)
+        if state is None or not _current(state, context) or state.get("attempt_id") != frozen["attempt_id"]:
+            return None
+        state.update(decision=asdict(result.decision), dispatched=result.dispatched)
+        return _event(context, state)
+
+    # A completed deny is audit evidence even if the subsequent freshness check
+    # fails. Keep the reservation spent and save before another expensive capture.
+    _update(context, save_result)
+    completion_failed = False
+    try:
+        after = turn_evidence.capture(context.checkout, context.storage, deadline=deadline - 2)
+        latest_plan = read_plan(context.config)
+        config_matches = current_config() == context.config_digest
+        stale = (
+            after["digest"] != frozen["reviewed"]["digest"]
+            or latest_plan.fingerprint != plan.fingerprint
+            or not config_matches
+        )
+        if time.monotonic() >= deadline - 1:
+            raise TimeoutError("Stop completion budget exhausted")
+    except (
+        OSError,
+        ValueError,
+        TimeoutError,
+        RuntimeError,
+        subprocess.SubprocessError,
+    ):
+        completion_failed, stale = True, True
 
     def finish(previous: SessionEvent | None) -> SessionEvent | None:
         nonlocal outcome
@@ -246,21 +399,31 @@ def review_stop(context: TurnContext, *, deadline: float, current_config: Callab
             return None
         state["decision"] = asdict(result.decision)
         state["dispatched"] = result.dispatched
-        if (
-            after["digest"] != frozen["reviewed"]["digest"]
-            or latest_plan.fingerprint != plan.fingerprint
-            or not config_matches
-        ):
+        if state.get("reset_requested") or state.get("blocked_until_turn"):
+            outcome = StopOutcome(
+                "unavailable", "new_explicit_turn_required" if state.get("reset_requested") else "carry_limit"
+            )
+        elif completion_failed:
+            state.update(status="unavailable", reason="completion_unavailable", outstanding=True)
+            outcome = StopOutcome("unavailable", "completion_unavailable")
+        elif stale:
             state.update(status="unreviewed", reason="stale_review", outstanding=True)
             outcome = StopOutcome("unreviewed", "stale_review")
         elif not result.run_ok or not result.parsed or result.decision.fail_open or result.decision.failure_type:
             state.update(
-                status="unavailable", reason=result.decision.failure_type or "review_unavailable", outstanding=True
+                status="unavailable",
+                reason=result.decision.failure_type or "review_unavailable",
+                outstanding=True,
             )
             outcome = StopOutcome("unavailable", state["reason"])
         else:
             deny = result.decision.decision == "deny"
-            state.update(status="reviewed", reason=None, outstanding=deny, correction_consumed=deny)
+            state.update(
+                status="reviewed",
+                reason=None,
+                outstanding=deny,
+                correction_consumed=deny,
+            )
             outcome = StopOutcome("reviewed", decision=result.decision, correction=deny, complete=True)
         return _event(context, state)
 
@@ -269,15 +432,28 @@ def review_stop(context: TurnContext, *, deadline: float, current_config: Callab
 
 
 def status(
-    forge_root: Path, session: str, *, config: SupervisorConfig | None = None, lane: LaneRecord | None = None
+    forge_root: Path,
+    session: str,
+    *,
+    config: SupervisorConfig | None = None,
+    lane: LaneRecord | None = None,
 ) -> dict[str, Any]:
     """Project private operational records to a bounded public status without rewriting them."""
     try:
         event = read_review_checkpoint(forge_root, session, payload_validator=validate_payload)
     except (OSError, ValueError, RuntimeError, SessionEventError) as exc:
-        return {"state": "unavailable", "reason": "review_history_unavailable", "error_type": type(exc).__name__}
+        return {
+            "state": "unavailable",
+            "reason": "review_history_unavailable",
+            "error_type": type(exc).__name__,
+        }
     if event is None:
-        return {"state": "unavailable", "reason": "new_explicit_turn_required", "spent": False}
+        return {
+            "state": "unavailable",
+            "reason": "new_explicit_turn_required",
+            "spent": False,
+            "dispatched": False,
+        }
     data = event.payload
     changed_config = (
         config is not None
@@ -285,17 +461,20 @@ def status(
         != data["config_digest"]
     )
     return {
-        "state": "unavailable" if changed_config else "incomplete" if data["status"] == "reviewing" else data["status"],
+        "state": (
+            "unavailable" if changed_config else "incomplete" if data["status"] == "reviewing" else data["status"]
+        ),
         "reason": (
             "configuration_changed"
             if changed_config
-            else "reserved_without_completed_review" if data["status"] == "reviewing" else data.get("reason")
+            else ("reserved_without_completed_review" if data["status"] == "reviewing" else data.get("reason"))
         ),
         "thread_id": data["thread_id"],
         "turn_id": data["turn_id"],
+        "latest_seen_turn": data.get("blocked_until_turn", data["turn_id"]),
         "spent": data["spent"],
         "dispatch_cap": 1,
-        "dispatched": data.get("dispatched"),
+        "dispatched": data.get("dispatched") if data["spent"] else False,
         "assessed_snapshot": data.get("reviewed"),
         "attempt_id": data.get("attempt_id"),
         "evidence_digest": data.get("evidence_digest"),
@@ -303,8 +482,65 @@ def status(
         "outstanding": data["outstanding"],
         "correction_consumed": data["correction_consumed"],
         "provenance_turns": data["provenance"],
+        "carry_limit": MAX_PROVENANCE_TURNS,
+        "reset_required": data.get("reason") == "carry_limit" or bool(data.get("baseline_error")),
+        "reset_requested": data.get("reset_requested", False),
+        "excluded_work": data.get("excluded_work"),
         "updated_at": data["updated_at"],
     }
+
+
+def reset_review(forge_root: Path, session: str, *, apply: bool = False) -> dict[str, Any]:
+    """Exclude pending work on the next explicit prompt, never refund this turn.
+
+    The preview is read-only. Applying records the operator's choice in the same
+    bounded journal; the next baseline retains an unreviewed exclusion summary.
+    Corrupt/missing established history still requires restoration or a new session.
+    """
+    result: dict[str, Any] = {
+        "applied": False,
+        "session": session,
+        "requires_new_turn": True,
+    }
+
+    def update(previous: SessionEvent | None) -> SessionEvent | None:
+        if previous is None:
+            result["reason"] = "no_review_history"
+            return None
+        state = copy.deepcopy(previous.payload)
+        result.update(
+            turn_id=state["turn_id"],
+            spent=state["spent"],
+            excluded_turns=len(state["provenance"]),
+        )
+        if not apply:
+            return None
+        state.update(
+            reset_requested=True,
+            status="unavailable",
+            reason="operator_reset",
+            outstanding=True,
+            updated_at=utc_timestamp_z(),
+        )
+        result["applied"] = True
+        return new_session_event(
+            session=session,
+            runtime="codex",
+            event_type="review_checkpoint",
+            run_id=None,
+            origin_surface="external_cli",
+            operation="set",
+            outcome="success",
+            reason_code="operator_reset",
+            payload=state,
+            payload_validator=validate_payload,
+        )
+
+    if apply:
+        update_review_checkpoint(forge_root, session, update, payload_validator=validate_payload)
+    else:
+        update(read_review_checkpoint(forge_root, session, payload_validator=validate_payload))
+    return result
 
 
 def validate_payload(event_type: str, payload: dict[str, Any]) -> None:
@@ -341,16 +577,43 @@ def validate_payload(event_type: str, payload: dict[str, Any]) -> None:
         "reviewer_identity",
         "dispatched",
         "schema",
+        "reset_requested",
+        "excluded_work",
+        "carry_omissions",
+        "blocked_until_turn",
     }
     if not required <= payload.keys() or payload.keys() - allowed:
         raise ValueError("Malformed review checkpoint fields")
     for key in ("spent", "outstanding", "correction_consumed"):
         if type(payload[key]) is not bool:
             raise ValueError("Invalid review spending state")
+    if type(payload.get("reset_requested", False)) is not bool:
+        raise ValueError("Invalid review reset state")
+    excluded = payload.get("excluded_work")
+    if excluded is not None and (
+        not isinstance(excluded, dict)
+        or set(excluded) != {"turns", "last_turn", "last_thread", "reason", "reviewed"}
+        or type(excluded["turns"]) is not int
+        or excluded["turns"] < 1
+        or excluded["reviewed"] is not False
+        or excluded["reason"] != "operator_reset"
+    ):
+        raise ValueError("Invalid excluded review scope")
+    if excluded:
+        _native_id(excluded["last_turn"])
+        _native_id(excluded["last_thread"])
     for key in ("turn_id", "thread_id"):
         _native_id(payload[key])
     if str(UUID(payload["turn_id"]).int) != payload["watermark"]:
         raise ValueError("Invalid review watermark")
+    if payload.get("blocked_until_turn") is not None:
+        _native_id(payload["blocked_until_turn"])
+        if UUID(payload["blocked_until_turn"]).int <= int(payload["watermark"]):
+            raise ValueError("Invalid blocked review watermark")
+    if not isinstance(payload.get("carry_omissions", []), list) or not all(
+        isinstance(item, str) for item in payload.get("carry_omissions", [])
+    ):
+        raise ValueError("Invalid carried coverage gaps")
     if not isinstance(payload["actions"], list) or len(payload["actions"]) > MAX_ACTIONS:
         raise ValueError("Invalid bounded action evidence")
     if not isinstance(payload["provenance"], list) or len(payload["provenance"]) > MAX_PROVENANCE_TURNS:
@@ -372,7 +635,12 @@ def validate_payload(event_type: str, payload: dict[str, Any]) -> None:
     for key in ("baseline", "reviewed", "start_snapshot"):
         reference = payload.get(key)
         if reference is not None:
-            if not isinstance(reference, dict) or set(reference) != {"digest", "root", "files", "omissions"}:
+            if not isinstance(reference, dict) or set(reference) != {
+                "digest",
+                "root",
+                "files",
+                "omissions",
+            }:
                 raise ValueError("Invalid review snapshot reference")
             _hex(reference["digest"], 64)
             if reference["root"] != payload["checkout"] or type(reference["files"]) is not int:
@@ -451,7 +719,9 @@ def _event(context: TurnContext, state: dict[str, Any]) -> SessionEvent:
         origin_surface="codex_review_hook",
         operation="runtime_event",
         outcome="success",
-        reason_code=state.get("reason"),
+        # Runtime failure labels include signed return codes (exit_-9). The
+        # envelope uses a stable token; the exact failure stays in the payload.
+        reason_code=(re.sub(r"[^a-z0-9_]", "_", state["reason"]) if state.get("reason") else None),
         payload=state,
         payload_validator=validate_payload,
     )

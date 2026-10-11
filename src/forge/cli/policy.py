@@ -1230,7 +1230,9 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
     if isinstance(turn, dict):
         console.print(f"  Turn review: {turn['state']} ({turn.get('reason') or 'bounded snapshot'})")
         console.print(
-            f"  Turn allowance: spent={turn.get('spent', 'unknown')}; outstanding={turn.get('outstanding', 'unknown')}"
+            f"  Turn allowance: spent={turn.get('spent', 'unknown')}; "
+            f"dispatched={turn.get('dispatched') if turn.get('dispatched') is not None else 'unknown'}; "
+            f"outstanding={turn.get('outstanding', 'unknown')}"
         )
     latest = details.get("latest_review")
     if isinstance(latest, dict):
@@ -1474,6 +1476,38 @@ def supervisor_off(session_name: str | None) -> None:
         blank_before=False,
         console=console,
     )
+
+
+@supervisor.command(name="reset-review")
+@click.option("--yes", is_flag=True, help="Exclude pending work and require a fresh explicit turn")
+@click.option("--json", "as_json", is_flag=True, help="Output preview or result as JSON")
+@_session_option
+def supervisor_reset_review(yes: bool, as_json: bool, session_name: str | None) -> None:
+    """Preview resetting Stop review carry; --yes records excluded work as unreviewed."""
+    from forge.policy.semantic.stop_review import reset_review
+    from forge.session.events import SessionEventError
+
+    store, name, _manifest = _resolve_supervisor_session(session_name)
+    _enforce_policy_store_compatibility(store)
+    try:
+        result = reset_review(Path(store.forge_root), name, apply=yes)
+    except (OSError, ValueError, RuntimeError, SessionEventError) as exc:
+        print_error(f"Cannot reset Stop review: {exc}", console=err_console)
+        sys.exit(1)
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+    elif result.get("reason") == "no_review_history":
+        console.print("No Stop review history to reset.")
+    else:
+        console.print(
+            f"{'Reset recorded' if yes else 'Reset preview'}: {result['excluded_turns']} turn(s) excluded as unreviewed."
+        )
+        console.print("The current turn's review allowance is unchanged. A new explicit prompt takes a fresh baseline.")
+        if not yes:
+            print_tip(
+                f"Apply with 'forge policy supervisor reset-review --session {name} --yes'.",
+                console=err_console,
+            )
 
 
 @supervisor.command(name="on")

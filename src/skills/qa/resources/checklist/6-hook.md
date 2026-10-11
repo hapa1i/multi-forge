@@ -310,6 +310,9 @@ jq -e '
   and .scopes[0].registered == "yes"
   and any(.scopes[0].registered_pairs[]; contains("codex-session-start"))
   and any(.scopes[0].registered_pairs[]; contains("codex-policy-check"))
+  and any(.scopes[0].registered_pairs[]; contains("codex-turn-start"))
+  and any(.scopes[0].registered_pairs[]; contains("codex-turn-tool"))
+  and any(.scopes[0].registered_pairs[]; contains("codex-stop"))
 ' /tmp/qa-codex-status.json
 jq -e '
   .ready == true
@@ -318,7 +321,7 @@ jq -e '
 rm -f /tmp/qa-codex-status.json /tmp/qa-codex-preflight.json
 ```
 
-- [ ] Installed-wheel enable registers both Forge Codex hooks at user scope without duplicating project skills
+- [ ] Installed-wheel enable registers all five Forge Codex hooks at user scope without duplicating project skills
 - [ ] Static preflight is ready and records the observed Codex version
 - [ ] No empirical enrollment turn is counted or mistaken for positive hook-firing evidence
 

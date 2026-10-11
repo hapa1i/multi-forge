@@ -1,4 +1,4 @@
-"""Stop intent must be versioned without changing ordinary session serialization."""
+"""B4: Stop intent must be versioned without changing ordinary session serialization."""
 
 import json
 

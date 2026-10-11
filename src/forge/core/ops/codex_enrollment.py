@@ -243,7 +243,6 @@ def _run_probe_turn(preflight: CodexPreflight, *, timeout_seconds: int) -> tuple
                 label="codex-enroll-verify",
             )
             request.env[turn_enrollment.PROBE_ENV] = nonce
-            turn_enrollment.receipt_path().unlink(missing_ok=True)
             result = CodexHeadlessInvoker().run(request)
             if result.success:
                 turn_enrollment.publish(repo, nonce)

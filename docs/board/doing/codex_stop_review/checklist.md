@@ -328,6 +328,28 @@ inference ran.
 
 ## Product validation
 
+### PR review follow-up, 2026-10-11
+
+The first implementation missed explicit acceptance cases for turns without Stop, bounded recovery from incomplete
+carry, enrollment replacement, and inactive hook overhead. The earlier checked items did not prove these cases.
+
+- [x] Carry unfinished turns and work after a completed review across explicit prompts and native thread changes; never
+  absorb it into a fresh baseline. Bound automatic carry, retain omissions, and provide an explicit reset that records
+  excluded work as unreviewed without reopening a spent allowance.
+- [x] Ignore Git index stat refreshes and denied tool requests when assessing changed scope; preserve real staged
+  changes and missing outcomes as coverage gaps. Exercise more than 32 pending turns without corrupting provenance.
+- [x] Preserve the existing enrollment receipt on failed/incomplete probes. Atomically replace it only on success;
+  fingerprint hook definitions, hook feature switches and trust state, excluding unrelated Codex preferences.
+- [x] Reserve time for post-review capture and durable completion. Save every returned verdict before freshness checks,
+  including signal failures and denials. A stale or unverifiable denial remains audit evidence.
+- [x] Make initial journal publication recoverable without reopening spending. Distinguish known no-dispatch from
+  unknown dispatch, and correction follow-up notices from approvals.
+- [x] Skip full CLI startup for the three turn hooks in unmanaged, disabled and ordinary per-edit sessions; measure the
+  installed dispatcher path and preserve live configuration changes and empirical enrollment.
+- [x] Update QA/design hook inventories, regression bug-ID docstrings, end-user recovery instructions, and validation.
+  Run focused regressions, applicable integration and clean-wheel controls, aggregate suites and pre-commit. The closed
+  32-unit native round is historical evidence; no additional live inference is authorized by this follow-up.
+
 2026-10-11: native captures 12–22 cover exact event enrollment, multi-action aggregation, source-only correction with
 summary off, outstanding-work carry, a fresh-policy TUI child, deadline and hook SIGKILL. The one real Claude review
 completed on a retained aggregate through subscription-only Sonnet; it ran outside the native hook and did not approve
@@ -361,3 +383,9 @@ Final local validation after refreshing the published documents: `make test-unit
 integration tests passed (29 Docker controls and one native installed-wheel test), with one real-inference control
 deselected. [PR #263](https://github.com/hapa1i/multi-forge/pull/263) contains the implementation and evidence; merge,
 CI verification and lane closeout remain future work.
+
+PR review follow-up validation: **10,672 unit tests passed, 117 deselected; 1,519 regressions passed; 30 targeted
+integration tests passed, one real-inference control deselected**. Full pre-commit passes. The clean wheel matches all
+380 product Python files and the packaged QA checklist. [Follow-up evidence](evidence/review-followup.md) records
+recovery, receipt, completion, journal and inactive-hook cases, exact verification helpers, and final process timings.
+No additional live Codex or reviewer inference ran. The original native round remains historical evidence.

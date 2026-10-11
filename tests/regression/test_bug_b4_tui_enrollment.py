@@ -1,4 +1,4 @@
-"""Codex's TUI notice counter must not invalidate otherwise identical hook enrollment."""
+"""B4: Codex's TUI notice counter must not invalidate otherwise identical hook enrollment."""
 
 import hashlib
 import json

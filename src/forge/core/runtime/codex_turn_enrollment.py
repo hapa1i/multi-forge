@@ -43,12 +43,33 @@ def config_identity() -> dict[str, str]:
     if len(raw) > 1_000_000:
         raise ValueError("Codex hook configuration exceeds the enrollment read limit")
     config = tomllib.loads(raw.decode())
-    # Codex increments its model-availability notice counter on TUI launches.
-    # Presentation state cannot change hook delivery; all other configuration
-    # remains part of the empirical enrollment identity.
-    config.pop("tui", None)
-    stable = json.dumps(config, sort_keys=True, separators=(",", ":")).encode()
-    return {"path": str(path), "sha256": hashlib.sha256(stable).hexdigest(), "scope": "configuration_without_tui"}
+
+    # Bind definitions and trust, not unrelated model, display, or MCP settings.
+    # Include profile-level hook switches/definitions because they can override
+    # the user defaults. Never infer enrollment from a trust hash alone.
+    def hook_settings(values: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(values, dict) or not isinstance(values.get("features", {}), dict):
+            raise ValueError("Malformed Codex hook configuration")
+        features = values.get("features", {})
+        return {
+            "hooks": values.get("hooks"),
+            "features": {k: v for k, v in features.items() if "hook" in k},
+            "allow_managed_hooks_only": values.get("allow_managed_hooks_only"),
+        }
+
+    relevant = hook_settings(config)
+    if not isinstance(config.get("profiles", {}), dict):
+        raise ValueError("Malformed Codex profile configuration")
+    profiles = {name: hook_settings(values) for name, values in config.get("profiles", {}).items()}
+    relevant["profiles"] = {name: values for name, values in profiles.items() if values != hook_settings({})}
+    if relevant["profiles"]:
+        relevant["profile"] = config.get("profile")
+    stable = json.dumps(relevant, sort_keys=True, separators=(",", ":")).encode()
+    return {
+        "path": str(path),
+        "sha256": hashlib.sha256(stable).hexdigest(),
+        "scope": "hook_configuration_v1",
+    }
 
 
 def receipt_path() -> Path:
@@ -103,8 +124,7 @@ def publish(root: Path, nonce: str) -> bool:
         result = dict(rows[0], events=list(EVENTS), verified_at=utc_timestamp_z())
         path = receipt_path()
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        atomic_write_text(path, json.dumps(result))
-        path.chmod(0o600)
+        atomic_write_text(path, json.dumps(result), mode=0o600)
         return True
     except (OSError, ValueError, KeyError, TypeError):
         return False

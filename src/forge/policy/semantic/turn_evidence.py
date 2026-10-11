@@ -46,7 +46,11 @@ def capture(root: Path, storage: Path, *, deadline: float) -> dict[str, Any]:
         raise ValueError("Unsafe review evidence storage")
     with file_lock_for_target(target_path=storage / "capture", timeout_s=1):
         env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-        env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1", GIT_OPTIONAL_LOCKS="0")
+        env.update(
+            GIT_CONFIG_GLOBAL=os.devnull,
+            GIT_CONFIG_NOSYSTEM="1",
+            GIT_OPTIONAL_LOCKS="0",
+        )
 
         def git(*args: str) -> bytes:
             left = expires - time.monotonic()
@@ -59,9 +63,11 @@ def capture(root: Path, storage: Path, *, deadline: float) -> dict[str, Any]:
             raise ValueError("Stop evidence requires the executor worktree root")
         git_dir = Path(os.fsdecode(git("rev-parse", "--absolute-git-dir")).strip()).resolve()
         head = git("rev-parse", "HEAD").decode().strip()
-        index = git_dir / "index"
-        index_digest = hashlib.sha256(_read_regular(index, MAX_MANIFEST_BYTES)).hexdigest() if index.exists() else None
-        staged = git("ls-files", "--stage", "-z").split(b"\0")
+        # Index stat-cache refreshes do not change staged content. Compare the
+        # semantic entries (mode, object, stage, path), never raw index bytes.
+        index_entries = git("ls-files", "--stage", "-z")
+        index_digest = hashlib.sha256(index_entries).hexdigest()
+        staged = index_entries.split(b"\0")
         tracked: dict[str, str] = {}
         omissions: list[str] = []
         for entry in staged:
@@ -101,7 +107,10 @@ def capture(root: Path, storage: Path, *, deadline: float) -> dict[str, Any]:
                 info = path.lstat()
             except FileNotFoundError:
                 continue  # A pre-existing deletion is part of the baseline.
-            item: dict[str, Any] = {"mode": stat.S_IMODE(info.st_mode), "size": info.st_size}
+            item: dict[str, Any] = {
+                "mode": stat.S_IMODE(info.st_mode),
+                "size": info.st_size,
+            }
             if stat.S_ISLNK(info.st_mode):
                 item.update(unsupported="symlink", target=os.readlink(path))
             elif tracked.get(name) == "160000" or not stat.S_ISREG(info.st_mode):
@@ -137,7 +146,7 @@ def capture(root: Path, storage: Path, *, deadline: float) -> dict[str, Any]:
             files[name] = item
         if git("rev-parse", "HEAD").decode().strip() != head:
             omissions.append("head_changed_during_capture")
-        latest_index = hashlib.sha256(_read_regular(index, MAX_MANIFEST_BYTES)).hexdigest() if index.exists() else None
+        latest_index = hashlib.sha256(git("ls-files", "--stage", "-z")).hexdigest()
         if index_digest != latest_index:
             omissions.append("index_changed_during_capture")
         snapshot = {
@@ -155,7 +164,12 @@ def capture(root: Path, storage: Path, *, deadline: float) -> dict[str, Any]:
         sha = hashlib.sha256(encoded).hexdigest()
         atomic_write_bytes(storage / (sha + ".snapshot"), encoded)
         (storage / (sha + ".snapshot")).chmod(0o600)
-        return {"digest": sha, "root": str(root), "files": len(files), "omissions": snapshot["omissions"]}
+        return {
+            "digest": sha,
+            "root": str(root),
+            "files": len(files),
+            "omissions": snapshot["omissions"],
+        }
 
 
 def load(storage: Path, reference: dict[str, Any]) -> dict[str, Any]:
@@ -173,7 +187,10 @@ def load(storage: Path, reference: dict[str, Any]) -> dict[str, Any]:
 
 
 def compare(
-    storage: Path, before: dict[str, Any], after: dict[str, Any], actions: list[dict[str, Any]]
+    storage: Path,
+    before: dict[str, Any],
+    after: dict[str, Any],
+    actions: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Describe net changes and observed action outcomes without truncating a clean verdict."""
     old, new = load(storage, before), load(storage, after)
@@ -205,7 +222,10 @@ def compare(
                 continue
             change["diff"] = "".join(
                 difflib.unified_diff(
-                    texts[0].splitlines(keepends=True), texts[1].splitlines(keepends=True), fromfile=path, tofile=path
+                    texts[0].splitlines(keepends=True),
+                    texts[1].splitlines(keepends=True),
+                    fromfile=path,
+                    tofile=path,
                 )
             )
             change["kind"] = "add" if left is None else "delete" if right is None else "modify"
@@ -214,8 +234,12 @@ def compare(
     for change in changes:
         if change.get("kind") == "add" and change["after"].get("digest") in deleted:
             change["renamed_from"] = deleted[change["after"]["digest"]]
+    denied = {(row.get("turn_id"), row["id"]) for row in actions if row.get("phase") == "denied"}
+    # A denied action has no mutation or PostToolUse to cover. Retain the raw
+    # audit in the journal, but omit both halves from reviewer scope and limits.
+    actions = [row for row in actions if (row.get("turn_id"), row["id"]) not in denied]
     requests = {(row.get("turn_id"), row["id"]) for row in actions if row.get("phase") == "request"}
-    outcomes = {(row.get("turn_id"), row["id"]) for row in actions if row.get("phase") in {"outcome", "denied"}}
+    outcomes = {(row.get("turn_id"), row["id"]) for row in actions if row.get("phase") == "outcome"}
     if requests != outcomes:
         omissions.append("missing_tool_event")
     if changes and not actions:
