@@ -3,7 +3,7 @@
 The opt-in product and installed-wheel controls pass on **Codex 0.162.1**. Candidate `c4354a9c` provides a durable
 one-review allowance per explicit turn, one consumed correction, and visible outstanding work after the correction. The
 round closed at **32 reserved Codex turn units**, one real Claude subscription-only review, and no API inference. The
-remaining PR blocker is the documentation token-cache refresh described in [validation.md](validation.md).
+documentation count gate is resolved; [validation.md](validation.md) records the final checks and qualifications.
 
 [product.json](product.json) indexes every product attempt, including failures, wheel reports, reservations and
 teardown. The wheel's Python files match the candidate byte-for-byte; its SHA-256 is

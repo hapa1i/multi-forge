@@ -4,15 +4,16 @@ Card: [card.md](card.md). Epic: [Codex supervisor](../epic_codex_supervisor/card
 
 ## Current focus
 
-Implementing on `codex/codex-stop-review`, based on published `main` at `897ed95c` (B3 closeout), 2026-10-11. B1, B2,
-and B3 are done. B4 adds an opt-in Codex Stop trigger with at most one semantic reviewer dispatch per explicit user
-turn, including automatic continuations. It reviews changes already made; deterministic PreToolUse checks and artifact
+Implemented on `codex/codex-stop-review`, based on published `main` at `897ed95c` (B3 closeout), 2026-10-11. B1, B2, and
+B3 are done. B4 adds an opt-in Codex Stop trigger with at most one semantic reviewer dispatch per explicit user turn,
+including automatic continuations. It reviews changes already made; deterministic PreToolUse checks and artifact
 authority remain active. B5 and Jev are outside this branch.
 
 The runtime gate passed before product work. Trigger/schema, bounded evidence, durable spending, hook delivery, and
 status integration are implemented. Product controls, the installed-wheel native test, regression suite, and teardown
-are complete. PR publication and the documentation count gate remain. External documentation token counting is awaiting
-operator permission.
+are complete. [PR #263](https://github.com/hapa1i/multi-forge/pull/263) is open. The documentation count gate is
+resolved; unit, regression, integration and full pre-commit checks pass. B4 remains in `doing/` through review and
+merge.
 
 ### Verified starting point
 
@@ -281,7 +282,7 @@ B2/B3 private round paths. Bug reproductions belong in `tests/regression/` with 
 | E14 | Trusted current Codex, fresh fixture, editable checkout then same candidate wheel outside repo                                                              | Product Stop review/correction/counts observed; all required events enrolled; correct launcher and checkout                                     | **new** `tests/integration/core/test_codex_stop_review.py`; committed B4 experiment helpers under `scripts/experiments/codex-hooks/`                                    |
 | E15 | v1/v2/v3 reads; default/Stop in intent and override; default override masking Stop; switch back; old strict reader                                          | Read-only legacy defaulting; unchanged compatible v2/v3 shape; v4 only for stored non-default trigger state; old reader refuses by version      | `tests/src/session/test_store.py`, `test_models.py`, `test_effective.py`; **new** `tests/regression/test_bug_b4_manifest_compatibility.py`                              |
 
-- [ ] Run focused unit/real-command regressions for E1–E13 and E15, then `make test-unit`, `make test-regression`, and
+- [x] Run focused unit/real-command regressions for E1–E13 and E15, then `make test-unit`, `make test-regression`, and
   `make pre-commit` on the candidate. Mock binaries in hermetic launch tests; do not hash or invoke a developer's real
   Codex accidentally. Use coherent indexed-session fixtures from `tests.fixtures.session_state`.
 - [x] Run targeted Docker/integration owners through `./scripts/test-integration.sh`, with `-m 'not slow'` for the
@@ -301,7 +302,7 @@ B2/B3 private round paths. Bug reproductions belong in `tests/regression/` with 
 
 ## 7. PR and closeout
 
-- [ ] Reconcile the card and epic with final guarantees, supported versions, failure/coverage limits, and downstream B5
+- [x] Reconcile the card and epic with final guarantees, supported versions, failure/coverage limits, and downstream B5
   handoff. Link a compact evidence index and validation record. Recheck links and `git diff --check`; open B4's own PR
   with validation counts, skips, and unverified claims. Leave the card in `doing/` until merged and verified.
 - [x] Stop and verify all fixture-owned processes, preserving pre-sweep leak evidence. Remove only the round's own login
@@ -325,7 +326,7 @@ effects; its temporary files were removed. Product capture still needs E5. Revis
 including size and link checks; the standalone link audit passes for 652 sources and both diff checks pass. No live
 inference ran.
 
-## Product validation in progress
+## Product validation
 
 2026-10-11: native captures 12–22 cover exact event enrollment, multi-action aggregation, source-only correction with
 summary off, outstanding-work carry, a fresh-policy TUI child, deadline and hook SIGKILL. The one real Claude review
@@ -343,9 +344,20 @@ provider-token cache failure. Required refresh sends documentation text to Anthr
 approval review rejected that transfer without explicit permission. No cache values or tests were falsified. Final
 counts follow below.
 
-Final candidate validation: `c4354a9c`. `make test-unit`: 10,670 passed, 117 deselected, one stale provider-cache
-contract failure. `make test-regression`: 1,483 passed. Installed-wheel native integration: one passed; its hook module
-paths prove wheel provenance with `FORGE_DEV` absent. Local pre-commit checks pass with `file-size-limits` excluded
-while external counting is blocked. See [validation](evidence/validation.md) for commands, the exact blocker and limits,
-and [product evidence](evidence/product.json) for every attempt. The full round is 32 reserved Codex units and one real
-Claude subscription review. Teardown removed the fixture login and found no remaining recorded processes.
+Initial candidate validation before the count refresh: `c4354a9c`. `make test-unit`: 10,670 passed, 117 deselected, one
+stale provider-cache contract failure. `make test-regression`: 1,483 passed. Installed-wheel native integration: one
+passed; its hook module paths prove wheel provenance with `FORGE_DEV` absent. Local pre-commit checks pass with
+`file-size-limits` excluded while external counting is blocked. See [validation](evidence/validation.md) for commands,
+the exact blocker and limits, and [product evidence](evidence/product.json) for every attempt. The full round is 32
+reserved Codex units and one real Claude subscription review. Teardown removed the fixture login and found no remaining
+recorded processes.
+
+Documentation gate update: the four exact documents were fetched without authentication from public commit `86cdc6bb`
+and matched local SHA-256 values. Automatic approval review accepted the count-only refresh for those public bytes. Full
+`make pre-commit` passes, including size limits. The prior refusal and failed cache test above are historical.
+
+Final local validation after refreshing the published documents: `make test-unit` **10,671 passed, 117 deselected**;
+`make test-regression` **1,483 passed**; full `make pre-commit` passes with no excluded hooks. The 30 targeted
+integration tests passed (29 Docker controls and one native installed-wheel test), with one real-inference control
+deselected. [PR #263](https://github.com/hapa1i/multi-forge/pull/263) contains the implementation and evidence; merge,
+CI verification and lane closeout remain future work.

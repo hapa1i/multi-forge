@@ -8,8 +8,9 @@ Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B4
 Activated 2026-10-11 on `codex/codex-stop-review` from published `main` at `897ed95c` (B3 closeout). The
 [execution checklist](checklist.md) records the implementation plan and fresh runtime gates. The
 [runtime gate](evidence/README.md) passed on 2026-10-11 for retained Codex 0.162.1. The opt-in implementation,
-installed-wheel controls and regression suite are complete. [Validation](evidence/validation.md) records the remaining
-documentation count gate; the PR stays a draft while it is blocked. The card remains active until merge and closeout.
+installed-wheel controls and regression suite are complete. [Validation](evidence/validation.md) records the completed
+checks and measured limits for [PR #263](https://github.com/hapa1i/multi-forge/pull/263). The card remains active until
+merge and closeout.
 
 Execution starts with the checklist's runtime go/no-go gate. Product configuration, schema, CLI, and installed-hook
 changes follow only after that gate passes. Non-default Stop trigger state requires manifest v4; ordinary per-edit

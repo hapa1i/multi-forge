@@ -5,9 +5,9 @@ The card remains `doing/` until merge and closeout. See [results and qualificati
 
 | Check                                                         | Result                                                                                                                                                      |
 | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `make test-unit`                                              | 10,670 passed, 117 deselected; one failure in `test_shipped_provider_cache_matches_exact_file_bytes`.                                                       |
+| `make test-unit`                                              | 10,671 passed, 117 deselected.                                                                                                                              |
 | `make test-regression`                                        | 1,483 passed.                                                                                                                                               |
-| `SKIP=file-size-limits make pre-commit`                       | Passed formatting, types, secret scan, repository links and the other local hooks; provider-backed size check excluded pending permission.                  |
+| `make pre-commit`                                             | Passed all hooks, including repository file-size limits, formatting, types, secret scanning and links.                                                      |
 | Targeted installer Docker owners                              | 8 passed: `TestCodexHooksModule`, `TestCrossRuntimeSkillLifecycle`, `TestHookDispatcherRuntime`.                                                            |
 | Claude Stop/supervisor/auth-isolation Docker controls         | 21 passed, one slow real-inference test deselected.                                                                                                         |
 | `tests/integration/core/test_codex_stop_review.py --reruns 0` | One installed-wheel native integration test passed.                                                                                                         |
@@ -33,17 +33,13 @@ requires an explicit independently authenticated fixture; it cannot default to t
 must not be reused. `b4-fixture.py` creates a new round; enrollment and fresh budget authorization precede another live
 run.
 
-## Remaining check blocker
+## Documentation count gate
 
-Four changed documents have stale SHA-keyed Anthropic token counts: `docs/design_installation.md`,
-`docs/design_telemetry.md`, `docs/design_workflows.md`, and `docs/end-user/session.md`. Automatic approval review
-rejected transferring unpublished document text to the external count-only API without explicit permission. The cache
-was left intact and its regression test was not weakened. This is not a failed product test and not a passed size check.
-The PR remains a draft until the operator authorizes the refresh or chooses another acceptable documentation change.
-
-After permission, refresh those four exact files with `scripts/check-file-limits.py --refresh-token-cache`, then rerun
-the cache contract and full `make pre-commit`. Counting is not model inference. Do not retry the external operation
-while the permission question remains unanswered.
+The initial unit/pre-commit runs detected four stale provider-count entries. Automatic approval review first refused
+sending unpublished document text. After [PR #263](https://github.com/hapa1i/multi-forge/pull/263) published the exact
+files, unauthenticated reads at commit `86cdc6bb` matched every local SHA-256. Automatic review accepted counting those
+public bytes, and the four entries were refreshed. This was a count-only operation with no model inference. Full
+`make pre-commit` and the final aggregate unit rerun pass. The original cache contract remains intact.
 
 ## Material limits
 

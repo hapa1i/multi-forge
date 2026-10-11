@@ -129,6 +129,6 @@ qualifications and records the independently owned login teardown.
 
 B4 implements opt-in, once-per-explicit-turn Stop review on admitted Codex 0.162.1. Native and clean-wheel controls
 pass; operational journal state caps dispatch and correction independently of telemetry, and outstanding correction
-changes carry forward. [Validation](../codex_stop_review/evidence/validation.md) records the documentation-count
-permission blocker and measured limits. B4 stays `doing/` until merge; B5 remains parked and adds no authority to the
-Stop reason.
+changes carry forward. [Validation](../codex_stop_review/evidence/validation.md) records the checks and measured limits
+for [PR #263](https://github.com/hapa1i/multi-forge/pull/263). B4 stays `doing/` until merge; B5 remains proposed and
+adds no authority to the Stop reason.
