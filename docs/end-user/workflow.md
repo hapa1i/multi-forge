@@ -23,7 +23,7 @@ forge runtime preflight codex
 # Deep analysis on a topic (single model, default: claude-opus)
 forge workflow analyze "Should we use event sourcing for the audit log?"
 
-# Multi-model code review (default worker set: gpt-6-astra, gemini-3.1-pro-preview, claude-opus)
+# Multi-model code review (default worker set: gpt-6-astra, gemini-4-argon, claude-opus)
 forge workflow panel src/forge/session/store.py --code
 
 # Multi-model document review
@@ -45,7 +45,7 @@ forge workflow consensus "Should we adopt gRPC for internal services?"
 Unless you pass `-m`, the multi-model workflows use this built-in worker set:
 
 - `gpt-6-astra` -- OpenRouter (preferred proxy: `openrouter-openai`)
-- `gemini-3.1-pro-preview` -- OpenRouter (preferred proxy: `openrouter-gemini`)
+- `gemini-4-argon` -- OpenRouter (preferred proxy: `openrouter-gemini`)
 - `claude-opus` -- direct Anthropic, pinned to Claude Opus 5.5
 
 This default set is entirely Claude-backed. Add `-m codex` explicitly to run the runtime-native Codex worker. Codex
@@ -92,6 +92,14 @@ credential; runtime-native workers are grouped by runtime preflight. A Codex wor
 preflight is fresh and successful. Use `--available` to see only ready workers, or `--json` for structured output that
 includes each worker's `runtime`.
 
+For LiteLLM proxies with a saved configuration available on the host, readiness also checks the loaded backend's model
+inventory. A missing deployment makes the worker unavailable and stops a panel before workers launch. Add the complete
+deployment to the saved backend configuration and restart that backend; editing its file or restarting only the Forge
+proxy does not load the new model. If you change the upstream URL in `proxy.yaml`, restart that proxy before checking
+readiness: the check uses the saved URL, while a running proxy keeps its loaded configuration. `list-models` performs no
+inference. OpenRouter and sidecar/external routes without a local proxy snapshot retain routing-only checks, so
+readiness does not prove upstream connectivity or model support.
+
 Use `forge model catalog` for Forge's static model capability catalog; `forge workflow list-models` is the runtime
 readiness view for workflow runners.
 
@@ -130,7 +138,7 @@ forge workflow panel src/ --code --review-type security --severity high
 - `--code` -- use code review framework (default: document review)
 - `-p` -- custom review prompt (overrides target+framework and --review-type)
 - `--context` -- `blind` (default: fresh subprocess) or `resume:<uuid>` (fork session context)
-- `-m` -- models to use (default: `gpt-6-astra,gemini-3.1-pro-preview,claude-opus`)
+- `-m` -- models to use (default: `gpt-6-astra,gemini-4-argon,claude-opus`)
 - `--roles` -- comma-separated reviewer roles (security, performance, architecture, maintainability, correctness)
 - `--review-type` -- review focus: `full` (default), `security`, `performance`, `quick` (security/performance need
   --code)

@@ -57,9 +57,27 @@ def test_new_model_metadata_override_is_still_needed(model: str) -> None:
     )
 
 
+def test_argon_metadata_covers_both_packaged_deployment_names() -> None:
+    cost_map = _packaged_cost_map()
+    assert not {"gemini-4-argon", "gemini/gemini-4-argon"}.intersection(cost_map)
+    canonical = _backend_entry("gemini/gemini-4-argon")
+    alias = _backend_entry("gemini-4-argon")
+
+    assert alias["model_info"] == canonical["model_info"]
+    assert alias["litellm_params"] == canonical["litellm_params"]
+
+
 @pytest.mark.parametrize(
     ("model", "cases"),
     [
+        (
+            "gemini/gemini-4-argon",
+            [
+                (100, 0, 0, 0.0002, 0.0001),
+                (100, 80, 0, 0.000048, 0.0001),
+                (272_001, 1_000, 0, 0.542102, 0.0001),
+            ],
+        ),
         (
             "openai/gpt-6-astra",
             [

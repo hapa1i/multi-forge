@@ -2,7 +2,7 @@
 # Gemini models via remote/shared LiteLLM
 #
 # Default template for Gemini access through a shared LiteLLM gateway.
-# The shared instance must serve vertex_ai/gemini-3.8-flash.
+# The shared instance must serve vertex_ai/gemini-4-argon and vertex_ai/gemini-3.8-flash.
 # Requires LITELLM_API_KEY and LITELLM_BASE_URL in .env (or environment).
 
 proxy:
@@ -14,8 +14,8 @@ proxy:
   litellm:
     tiers:
       haiku: vertex_ai/gemini-3.8-flash
-      sonnet: vertex_ai/gemini-3.1-pro-preview
-      opus: vertex_ai/gemini-3.1-pro-preview
+      sonnet: vertex_ai/gemini-4-argon
+      opus: vertex_ai/gemini-4-argon
     model_alternatives:
       haiku:
         gemini-2.5-flash: vertex_ai/gemini-2.5-flash
@@ -23,12 +23,16 @@ proxy:
         gemini-3.6-flash: vertex_ai/gemini-3.6-flash
         gemini-3.7-flash: vertex_ai/gemini-3.7-flash
       sonnet:
+        gemini-3.1-pro-preview: vertex_ai/gemini-3.1-pro-preview
+        gemini-2.5-pro: vertex_ai/gemini-2.5-pro
         gemini-3.8-flash: vertex_ai/gemini-3.8-flash
         gemini-2.5-flash: vertex_ai/gemini-2.5-flash
         gemini-3.5-flash: vertex_ai/gemini-3.5-flash
         gemini-3.6-flash: vertex_ai/gemini-3.6-flash
         gemini-3.7-flash: vertex_ai/gemini-3.7-flash
       opus:
+        gemini-3.1-pro-preview: vertex_ai/gemini-3.1-pro-preview
+        gemini-2.5-pro: vertex_ai/gemini-2.5-pro
         gemini-3.8-flash: vertex_ai/gemini-3.8-flash
         gemini-2.5-flash: vertex_ai/gemini-2.5-flash
         gemini-3.5-flash: vertex_ai/gemini-3.5-flash

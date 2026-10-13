@@ -338,7 +338,8 @@ class LiteLLMClient:
 
         status = getattr(response, "status", "completed")
         if status == "incomplete":
-            finish_reason = "length"
+            incomplete_reason = getattr(getattr(response, "incomplete_details", None), "reason", None)
+            finish_reason = "content_filter" if incomplete_reason == "content_filter" else "length"
         elif status in ("failed", "cancelled"):
             finish_reason = "error"
         elif tool_calls:
@@ -349,6 +350,7 @@ class LiteLLMClient:
         return CompletionResponse(
             text=text,
             tool_calls=tool_calls if tool_calls else None,
+            finish_reason=finish_reason,
             usage=usage,
             raw={
                 "id": getattr(response, "id", f"responses-{int(time.time())}"),
@@ -397,6 +399,20 @@ class LiteLLMClient:
     ) -> dict[str, Any]:
         """Build kwargs for OpenAI chat completion request."""
         kwargs = build_chat_completion_kwargs(self._model, messages, tools, hyperparams)
+
+        if self._model in ("gemini/gemini-4-argon", "vertex_ai/gemini-4-argon", "gemini-4-argon"):
+            # LiteLLM 1.102 maps Argon's generic effort to unsupported token budgets.
+            # Its native provider parameter preserves all three thinking levels.
+            extra_body = dict(kwargs.get("extra_body") or {})
+            effort = extra_body.pop("reasoning_effort", kwargs.pop("reasoning_effort", None))
+            spec = get_model_spec(self._model)
+            if effort is None:
+                effort = spec.default_reasoning_effort
+            if spec.litellm_reasoning_efforts is None or effort not in spec.litellm_reasoning_efforts:
+                raise ValueError(f"{self._model} reasoning_effort must be one of {spec.litellm_reasoning_efforts}")
+            kwargs.pop("thinkingConfig", None)
+            extra_body["thinkingConfig"] = {"thinkingLevel": effort, "includeThoughts": True}
+            kwargs["extra_body"] = extra_body
 
         # GPT-5 Chat Completions API doesn't support reasoning_effort with
         # function tools. Runs AFTER extras merge so callers can't reintroduce it.
@@ -509,6 +525,19 @@ class LiteLLMClient:
             )
 
         kwargs = self._build_request_kwargs(messages, tools, merged_params)
+        if self._model == "vertex_ai/gemini-4-argon":
+            # Vertex generateContent allows 32K per hop; the catalog's 64K limit
+            # applies to streamGenerateContent and the other Argon providers.
+            extra_body = kwargs.get("extra_body")
+            if isinstance(extra_body, dict):
+                kwargs["extra_body"] = extra_body.copy()
+            for body in (kwargs, kwargs.get("extra_body")):
+                if not isinstance(body, dict):
+                    continue
+                for field in ("max_tokens", "max_completion_tokens", "max_output_tokens", "maxOutputTokens"):
+                    value = body.get(field)
+                    if isinstance(value, int):
+                        body[field] = min(value, 32_768)
         # with_raw_response exposes the x-litellm-response-cost header the typed
         # .create() drops; .parse() returns the same ChatCompletion model.
         if on_provider_dispatch is not None:
@@ -650,6 +679,7 @@ class LiteLLMClient:
                 yield StreamEvent(
                     type="response_end",
                     tool_calls=response.tool_calls,
+                    finish_reason=response.finish_reason,
                     usage=response.usage,
                     cost_usd=response.cost_usd,
                     provider_meta=response.provider_meta,
@@ -668,6 +698,7 @@ class LiteLLMClient:
         accumulator = ToolCallAccumulator()
         usage_data: dict[str, int] | None = None
         cost_usd: float | None = None
+        finish_reason: str | None = None
 
         try:
             kwargs = self._build_request_kwargs(messages, tools, merged_params)
@@ -700,6 +731,8 @@ class LiteLLMClient:
                     continue
 
                 choice = chunk.choices[0]
+                if isinstance(getattr(choice, "finish_reason", None), str):
+                    finish_reason = choice.finish_reason
                 delta = choice.delta
 
                 if delta.content:
@@ -726,6 +759,7 @@ class LiteLLMClient:
             yield StreamEvent(
                 type="response_end",
                 tool_calls=final_tool_calls,
+                finish_reason=finish_reason,
                 usage=usage_data,
                 cost_usd=cost_usd,
             )

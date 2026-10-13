@@ -681,6 +681,60 @@ models:
         source_id: litellm-remote
         template: litellm-openai
         model_ref: openai/o1
+  gemini-4-argon:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: google/gemini-4-argon
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: google/gemini-4-argon
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: google/gemini-4-argon
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: google/gemini-4-argon
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: google/gemini-4-argon
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: google/gemini-4-argon
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: google/gemini-4-argon
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: google/gemini-4-argon
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: google/gemini-4-argon
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: google/gemini-4-argon
+      - kind: proxy
+        source_id: litellm-remote
+        template: litellm-gemini
+        model_ref: vertex_ai/gemini-4-argon
+      - kind: proxy
+        source_id: litellm-gemini-local
+        template: litellm-gemini-local
+        model_ref: gemini/gemini-4-argon
+      - kind: proxy
+        source_id: litellm-gemini-local
+        template: litellm-gemini-flash-local
+        model_ref: gemini/gemini-4-argon
   gemini-3.1-pro-preview:
     routes:
       - kind: proxy
@@ -729,11 +783,11 @@ models:
         model_ref: vertex_ai/gemini-3.1-pro-preview
       - kind: proxy
         source_id: litellm-gemini-local
-        template: litellm-gemini-flash-local
+        template: litellm-gemini-local
         model_ref: gemini/gemini-3.1-pro-preview
       - kind: proxy
         source_id: litellm-gemini-local
-        template: litellm-gemini-local
+        template: litellm-gemini-flash-local
         model_ref: gemini/gemini-3.1-pro-preview
   gemini-3.1-pro-preview-customtools:
     routes:
@@ -761,6 +815,10 @@ models:
         source_id: litellm-remote
         template: litellm-gemini
         model_ref: vertex_ai/gemini-2.5-pro
+      - kind: proxy
+        source_id: litellm-gemini-local
+        template: litellm-gemini-local
+        model_ref: gemini/gemini-2.5-pro
   gemini-2.5-flash:
     routes:
       - kind: proxy

@@ -197,6 +197,8 @@ class CompletionResponse(BaseModel):
 
     text: str
     tool_calls: list[ToolCall] | None = None
+    # OpenAI-compatible termination reason; None when the provider did not report one.
+    finish_reason: str | None = None
     usage: dict[str, int] | None = None  # {prompt_tokens, completion_tokens, total_tokens}
     # Route-reported cost in USD (OpenRouter body usage.cost / LiteLLM response-cost header).
     # None = the route reported no cost. Reporter/confidence are derived at the proxy.
@@ -219,6 +221,7 @@ class StreamEvent(BaseModel):
     text: str | None = None
     tool_call_delta: ToolCallDelta | None = None
     tool_calls: list[ToolCall] | None = None  # Finalized tool calls at response_end
+    finish_reason: str | None = None  # Provider termination reason, carried on response_end
     usage: dict[str, int] | None = None
     # Route-reported cost in USD, carried on the final usage/response_end event.
     # None = no cost reported on this stream. Reporter/confidence derived at the proxy.

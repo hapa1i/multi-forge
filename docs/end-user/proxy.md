@@ -188,11 +188,11 @@ forge model backend start litellm --port 4000
 After updating the local adapter, restart each affected proxy with `--smoke-test`. Custom templates under
 `~/.forge/templates/` are also preserved and must be updated explicitly.
 
-LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. GPT-6.1 Sol, GPT-6 Sol/Luna, and Claude 5.5 require the
-bundled routes' `model_info` blocks for offline capability and cost support. Copy each complete deployment entry when
-editing an existing adapter, including its metadata; the GPT-6 entries cover cache tokens and the above-272K input
-premium. For remote LiteLLM, its operator must install compatible support and add these complete entries to that
-server's configuration.
+LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Argon, GPT-6.1 Sol, GPT-6 Sol/Luna, and Claude 5.5 require
+the bundled routes' `model_info` blocks for offline capability and cost support. Copy each complete deployment entry
+when editing an existing adapter, including its metadata; the GPT-6 entries cover cache tokens and the above-272K input
+premium. For remote LiteLLM, its operator must install compatible deployments using that server's upstream providers and
+credentials; the Gemini Vertex deployment differs from the bundled Google AI deployment as described below.
 
 Existing OpenRouter proxies can forward explicit GPT-6.1 Sol workflow requests. To select it as a session alternative,
 edit or recreate the proxy to include `gpt-6.1-sol: openai/gpt-6.1-sol` in the intended tier's `model_alternatives`.
@@ -211,9 +211,58 @@ New proxies created from the current built-in templates use these defaults:
 | `openrouter-qwen`                                   | haiku/sonnet -> Qwen3.8 27B, opus -> Qwen3.8 Max            |
 | `openrouter-glm`                                    | sonnet/opus -> GLM 5.3                                      |
 | `openrouter-gemini-flash`                           | all tiers -> Gemini 3.8 Flash                               |
-| `openrouter-gemini`                                 | haiku -> Gemini 3.8 Flash                                   |
-| `litellm-gemini`, `litellm-gemini-local`            | haiku -> Gemini 3.8 Flash                                   |
+| `openrouter-gemini`                                 | haiku -> Gemini 3.8 Flash, sonnet/opus -> Gemini 4 Argon    |
+| `litellm-gemini`, `litellm-gemini-local`            | haiku -> Gemini 3.8 Flash, sonnet/opus -> Gemini 4 Argon    |
 | `litellm-gemini-flash-local`                        | all tiers -> Gemini 3.8 Flash                               |
+
+Gemini 4 Argon replaces the older Gemini Pro models as the Sonnet/Opus default. Select it explicitly with
+`--model gemini-4-argon`; prior Pro models, including `gemini-3.1-pro-preview`, remain explicit selections. Argon has a
+unified 1,048,576-token context shared by input, thinking, and output. Forge uses its 65,536-token synchronous output
+limit on Google AI. Vertex allows 65,536 output tokens per streaming request and 32,768 per unary request. Choose `low`,
+`medium`, or `high` reasoning (`medium` is the model default); `temperature`, `top_p`, and `top_k` are ignored by Google
+and are not supported Forge overrides. Argon supports implicit caching but not explicit context caches. See Google's
+[model reference](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon) and
+[Vertex guide](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-argon).
+
+If an upstream response reaches its output limit, Forge preserves the cutoff as Anthropic `stop_reason: max_tokens` for
+both unary and streaming responses, including responses containing a partial tool call.
+
+The bundled LiteLLM entry uses Google's introductory Argon prices through November 30, 2026: $2 input, $10 output
+(including thinking), and $0.10 cached input per million tokens. Google doubles those rates on December 1. Saved backend
+configs retain their pricing metadata, so update the `model_info` rates explicitly when the promotion ends to keep cost
+reporting accurate. Google Cloud has the same introductory rates. See Google's
+[Gemini API pricing schedule](https://ai.google.dev/gemini-api/docs/latest-model#pricing) and
+[Cloud launch pricing](https://cloud.google.com/blog/products/ai-machine-learning/gemini-4-argon-available-on-google-cloud).
+
+To adopt Argon in an existing proxy, use `forge proxy edit <proxy_id>` and change its Sonnet/Opus tier models to
+`google/gemini-4-argon` for OpenRouter, `gemini/gemini-4-argon` for local LiteLLM, or `vertex_ai/gemini-4-argon` for
+remote LiteLLM. Remove sampling overrides from those tiers and retain older models under `model_alternatives` if you
+need explicit selections. Alternatively, create a fresh proxy from the updated family template. Upgrading Forge or
+restarting a saved proxy does not rewrite its tiers. LiteLLM also needs the corresponding deployment in its saved
+backend config. Current Forge supports Argon on pinned LiteLLM 1.102 by sending native `thinkingConfig` with the
+selected thinking level; no LiteLLM upgrade is required. Update Forge as well as the saved deployment metadata when
+adopting Argon, so requests avoid the adapter's generic reasoning conversion to an unsupported `thinkingBudget`.
+
+- **Local Google AI:** copy the complete bundled `gemini/gemini-4-argon` deployment into the saved backend config,
+  including `model_info`. It uses `GEMINI_API_KEY` and `prompt_cache_min_tokens: 4096`.
+- **Remote Vertex:** the server operator must configure a Vertex deployment. Set both `model_name` and
+  `litellm_params.model` to `vertex_ai/gemini-4-argon`. Replace the bundled Google AI `api_key` with the server's Vertex
+  authentication (ADC or `vertex_credentials`) and configure `vertex_project` and `vertex_location`. Retain the complete
+  capability and pricing metadata, changing `model_info.base_model` to `vertex_ai/gemini-4-argon` and
+  `prompt_cache_min_tokens` to `6144`. The 65,536 output limit describes streaming; unary requests are limited to
+  32,768. Forge's gateway connection still uses `LITELLM_BASE_URL` and `LITELLM_API_KEY`; Vertex credentials belong on
+  the server. See [LiteLLM's Vertex configuration](https://docs.litellm.ai/docs/providers/vertex) and Google's
+  [Vertex caching limits](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/4-argon).
+
+Restart the updated backend, then restart each affected proxy with `forge proxy stop <proxy_id>` followed by
+`forge proxy start <proxy_id> --smoke-test`. Existing OpenRouter proxies can forward an explicit Argon workflow request
+without changing their tier defaults.
+
+Argon workflow workers also send the model explicitly, so a saved LiteLLM proxy can keep its older tier defaults once
+the backend serves Argon. `forge workflow list-models --available --json` checks the loaded deployment inventory when
+the proxy's saved configuration is available locally. A backend snapshot without Argon makes that worker unavailable and
+fails workflow preflight with migration guidance; Forge does not silently select the older Pro model or rewrite the
+snapshot. Updating only the backend deployment requires a backend restart, not a proxy-tier change.
 
 Gemini 3.8 Flash is the current Gemini Flash default across OpenRouter and LiteLLM. It is a GA model with a
 1,048,576-token input limit, 65,536-token output limit, and `low`/`medium`/`high` thinking levels (`medium` by default).
@@ -254,7 +303,7 @@ Existing `proxy.yaml` files and the local LiteLLM adapter config are user-owned 
 tier selections. Passthrough forwards the client's model; Forge does not inject context-estimator model pins there.
 Follow the same remediation as the GPT-6 Astra section above: edit the affected tiers with `forge proxy edit <proxy_id>`
 or recreate the proxy from the template, then restart with `--smoke-test`. For the local LiteLLM path, the required
-Gemini 3.8 Flash, Claude Sonnet/Opus 5.5, and selected GPT-6 routes must exist in
+Gemini 4 Argon, Gemini 3.8 Flash, Claude Sonnet/Opus 5.5, and selected GPT-6 routes must exist in
 `~/.forge/backends/litellm/config.yaml` — update the materialized config or delete/recreate it, then restart the
 backend; restarting alone re-reads the old copy. A stale Anthropic proxy that does not expose Fable 5.1 fails explicitly
 on `--model fable`; it is never replaced implicitly.

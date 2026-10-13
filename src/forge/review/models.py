@@ -210,6 +210,7 @@ def _build_available_models() -> dict[str, ModelSpec]:
         ("gpt-6-luna", "openai", "Fast, cost-efficient review"),
         ("gpt-6-luna-pro", "openai", "Explicit Luna Pro review through OpenRouter"),
         ("gpt-5.6-sol", "openai", "Explicit GPT-5.6 Sol review"),
+        ("gemini-3.1-pro-preview", "gemini", "Explicit prior Gemini 3.1 Pro review"),
         ("gemini-3.8-flash", "gemini", "Fast multimodal review with large context"),
         ("deepseek-v4.1-flash", "deepseek", "Multimodal coding and reasoning review"),
         ("deepseek-v4-pro-0813", "deepseek", "Explicit DeepSeek V4 Pro GA snapshot"),
@@ -242,7 +243,7 @@ def _build_model_aliases(available: dict[str, ModelSpec]) -> dict[str, str]:
     """Return convenience aliases mapped to canonical workflow model names."""
     from forge.core.models.catalog import get_compact_name, get_default_model
 
-    aliases: dict[str, str] = {}
+    aliases: dict[str, str] = {"gemini-3.1-pro": "gemini-3.1-pro-preview"}
     for family in ("openai", "gemini", "deepseek", "minimax", "qwen", "glm", "kimi"):
         canonical = get_default_model(family, "opus")
         compact = get_compact_name(canonical)
@@ -307,12 +308,14 @@ def check_model_availability(
     fail on unavailable models -- returns status for each.
     """
     from forge.core.reactive.routing import resolve_subprocess_routing
+    from forge.review.backend_readiness import WorkflowBackendReadiness
     from forge.review.routing import derive_model_routes
 
     if specs is None:
         specs = list(DEFAULT_MODELS.values())
 
     results: list[ModelAvailability] = []
+    backend_readiness = WorkflowBackendReadiness(timeout_s=timeout_s)
     codex_preflight_loaded = False
     codex_preflight = None
 
@@ -376,7 +379,12 @@ def check_model_availability(
             )
 
             if result.route is not None:
-                results.append(ModelAvailability(spec=spec, status="ready", reason=""))
+                backend_error = backend_readiness.error_for(result)
+                results.append(
+                    ModelAvailability(
+                        spec=spec, status="unavailable" if backend_error else "ready", reason=backend_error or ""
+                    )
+                )
             else:
                 results.append(
                     ModelAvailability(

@@ -66,7 +66,7 @@ class TestSessionConfigRouting:
             assert resp.status_code == 200
             # X-Resolved-Tier should match proxy default (proxy.default_tier)
             assert resp.headers.get("X-Resolved-Tier") == "sonnet"
-            assert resp.headers.get("X-Resolved-Model") == "gemini/gemini-3.1-pro-preview"
+            assert resp.headers.get("X-Resolved-Model") == "gemini/gemini-4-argon"
 
     def test_explicit_request_tier_overrides_lease_default(
         self, proxy_server: str, temp_session: dict[str, Any]
@@ -143,5 +143,5 @@ class TestSessionConfigRouting:
             # X-Resolved-Tier header confirms template default (sonnet) was used
             assert resp.headers.get("X-Resolved-Tier") == "sonnet"
             # X-Resolved-Model confirms sonnet's backend model was used
-            # (litellm-gemini-test family: sonnet → gemini/gemini-3.1-pro-preview)
-            assert resp.headers.get("X-Resolved-Model") == "gemini/gemini-3.1-pro-preview"
+            # (litellm-gemini-test family: sonnet → gemini/gemini-4-argon)
+            assert resp.headers.get("X-Resolved-Model") == "gemini/gemini-4-argon"

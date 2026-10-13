@@ -113,48 +113,58 @@ class TestSessionModelRoutePlanning:
         with pytest.raises(SessionModelRoutingError, match="does not serve model"):
             plan_session_model_route("astra-pro", explicit_proxy=snapshot)
 
-    def test_astra_request_does_not_rewrite_an_existing_sol_snapshot(self) -> None:
+    @pytest.mark.parametrize(
+        ("template", "current_model", "previous_model", "haiku_model"),
+        [
+            ("openrouter-openai", "gpt-6-astra", "gpt-5.6-sol", "openai/gpt-5.4-mini"),
+            ("openrouter-gemini", "gemini-4-argon", "gemini-3.1-pro-preview", "google/gemini-3.8-flash"),
+        ],
+    )
+    def test_new_default_does_not_rewrite_an_existing_proxy_snapshot(
+        self, template: str, current_model: str, previous_model: str, haiku_model: str
+    ) -> None:
+        provider_model = f"{haiku_model.split('/')[0]}/{previous_model}"
         config = load_proxy_instance_config_from_dict(
             {
                 "proxy_format": 1,
-                "template": "openrouter-openai",
-                "template_digest": "prior-sol-template",
+                "template": template,
+                "template_digest": "prior-template",
                 "provider": "openrouter",
                 "backend": "openrouter",
                 "proxy_endpoint": "http://localhost:8096",
                 "port": 8096,
                 "upstream_base_url": "https://openrouter.ai/api/v1",
                 "tiers": {
-                    "haiku": "openai/gpt-5.4-mini",
-                    "sonnet": "openai/gpt-5.6-sol",
-                    "opus": "openai/gpt-5.6-sol",
+                    "haiku": haiku_model,
+                    "sonnet": provider_model,
+                    "opus": provider_model,
                 },
-                "tier_overrides": {"sonnet": {"verbosity": "low"}},
+                "tier_overrides": {"sonnet": {"reasoning_effort": "medium"}},
             }
         )
-        config_path = write_proxy_instance_config("existing-sol", config)
-        config_path.write_text(config_path.read_text() + "\n# Preserve my custom Sol configuration.\n")
+        config_path = write_proxy_instance_config("existing-model", config)
+        config_path.write_text(config_path.read_text() + "\n# Preserve my custom configuration.\n")
         original = config_path.read_bytes()
         original_mtime = config_path.stat().st_mtime_ns
         ProxyRegistryStore().write(
             ProxyRegistry(
                 proxies={
-                    "existing-sol": ProxyEntry(
-                        proxy_id="existing-sol",
-                        template="openrouter-openai",
+                    "existing-model": ProxyEntry(
+                        proxy_id="existing-model",
+                        template=template,
                         base_url="http://localhost:8096",
                         port=8096,
                     )
                 }
             )
         )
-        snapshot = inspect_proxy_reference("existing-sol")
+        snapshot = inspect_proxy_reference("existing-model")
 
         with pytest.raises(SessionModelRoutingError, match="does not serve model"):
-            plan_session_model_route("astra", explicit_proxy=snapshot)
+            plan_session_model_route(current_model, explicit_proxy=snapshot)
 
-        plan = plan_session_model_route("gpt-5.6-sol", explicit_proxy=snapshot)
-        assert plan.selected_model == "openai/gpt-5.6-sol"
+        plan = plan_session_model_route(previous_model, explicit_proxy=snapshot)
+        assert plan.selected_model == provider_model
         assert config_path.read_bytes() == original
         assert config_path.stat().st_mtime_ns == original_mtime
 

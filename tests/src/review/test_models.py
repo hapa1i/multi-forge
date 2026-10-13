@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from forge.core.models.catalog import get_compact_name, get_default_model
+from forge.core.models.catalog import get_default_model
 from forge.core.runtime.registry import RUNTIMES, get_runtime
 from forge.review.models import (
     AVAILABLE_MODELS,
@@ -27,7 +27,6 @@ from forge.review.routing import derive_model_routes, preferred_proxy_for_routes
 # DEFAULT_MODELS keys use canonical model names; compact names remain accepted aliases.
 OPENAI_DEFAULT = get_default_model("openai", "opus")
 GEMINI_DEFAULT = get_default_model("gemini", "opus")
-GEMINI_COMPACT = get_compact_name(GEMINI_DEFAULT)
 ANTHROPIC_DEFAULT = get_default_model("anthropic", "opus")
 
 
@@ -130,6 +129,7 @@ class TestDefaultModels:
             ("gpt-6-sol-pro", "openai"),
             ("gpt-6-luna", "openai"),
             ("gpt-6-luna-pro", "openai"),
+            ("gemini-3.1-pro-preview", "gemini"),
             ("gemini-3.8-flash", "gemini"),
             ("deepseek-v4.1-flash", "deepseek"),
             ("deepseek-v4-pro-0813", "deepseek"),
@@ -185,13 +185,19 @@ class TestDefaultModels:
         routes = derive_model_routes(DEFAULT_MODELS[GEMINI_DEFAULT])
         assert preferred_proxy_for_routes(routes) == "openrouter-gemini"
 
-    def test_compact_gemini_alias_is_accepted(self):
-        assert MODEL_ALIASES[GEMINI_COMPACT] == GEMINI_DEFAULT
+    def test_argon_is_default_and_prior_gemini_compact_alias_is_retained(self):
+        assert GEMINI_DEFAULT == "gemini-4-argon"
+        assert MODEL_ALIASES["gemini-3.1-pro"] == "gemini-3.1-pro-preview"
 
-        specs = resolve_model_specs(GEMINI_COMPACT)
+        specs = resolve_model_specs("gemini-4-argon,gemini-3.1-pro")
 
-        assert [s.name for s in specs] == [GEMINI_DEFAULT]
-        assert [s.effective_worker_id for s in specs] == [GEMINI_COMPACT]
+        assert [s.name for s in specs] == ["gemini-4-argon", "gemini-3.1-pro-preview"]
+        assert [s.effective_worker_id for s in specs] == ["gemini-4-argon", "gemini-3.1-pro"]
+        assert {route.model_ref for route in derive_model_routes(specs[1])} == {
+            "google/gemini-3.1-pro-preview",
+            "vertex_ai/gemini-3.1-pro-preview",
+            "gemini/gemini-3.1-pro-preview",
+        }
 
     def test_claude_is_direct(self):
         spec = DEFAULT_MODELS["claude-opus"]

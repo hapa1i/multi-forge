@@ -6,7 +6,7 @@
 
 <!-- test-count: 684 -->
 
-<!-- last-updated: 2026-10-01 -->
+<!-- last-updated: 2026-10-13 -->
 
 <!-- aligned-with: v1.0.0 -->
 

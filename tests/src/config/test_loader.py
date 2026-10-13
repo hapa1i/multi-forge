@@ -125,7 +125,7 @@ class TestLoadConfig:
         assert config.proxy.backend == "litellm-gemini-local"
         assert config.proxy.default_port == 8086
         assert config.proxy.litellm.base_url == ""
-        assert config.proxy.litellm.tiers.opus == "gemini/gemini-3.1-pro-preview"
+        assert config.proxy.litellm.tiers.opus == "gemini/gemini-4-argon"
         assert config.proxy.backend_dependency is not None
         assert config.proxy.backend_dependency.adapter == "litellm"
         assert config.proxy.backend_dependency.port == 4000
@@ -242,8 +242,8 @@ class TestLoadConfig:
         """get_model_for_tier returns correct model."""
         config = load_config(template="litellm-gemini-local")
 
-        assert config.proxy.get_model_for_tier("opus") == "gemini/gemini-3.1-pro-preview"
-        assert config.proxy.get_model_for_tier("sonnet") == "gemini/gemini-3.1-pro-preview"
+        assert config.proxy.get_model_for_tier("opus") == "gemini/gemini-4-argon"
+        assert config.proxy.get_model_for_tier("sonnet") == "gemini/gemini-4-argon"
         assert config.proxy.get_model_for_tier("haiku") == "gemini/gemini-3.8-flash"
 
     def test_template_loading_openrouter_anthropic(self, monkeypatch: pytest.MonkeyPatch):

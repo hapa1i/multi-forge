@@ -206,11 +206,11 @@ inline.
 
 **Default models:**
 
-| Model                    | Strength                            | Via                     |
-| ------------------------ | ----------------------------------- | ----------------------- |
-| `gpt-6-astra`            | Logical problems, systematic review | openrouter-openai proxy |
-| `gemini-3.1-pro-preview` | Balanced analysis, large context    | openrouter-gemini       |
-| `claude-opus`            | Default Claude Opus 5.5 reasoning   | Direct Anthropic        |
+| Model            | Strength                            | Via                     |
+| ---------------- | ----------------------------------- | ----------------------- |
+| `gpt-6-astra`    | Logical problems, systematic review | openrouter-openai proxy |
+| `gemini-4-argon` | Balanced analysis, large context    | openrouter-gemini       |
+| `claude-opus`    | Default Claude Opus 5.5 reasoning   | Direct Anthropic        |
 
 Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, `claude-opus-4.8`, `claude-opus-5`,
 `claude-opus-5.5`, `claude-sonnet`, `claude-sonnet-5.5`, `claude-sonnet-5`, and `claude-fable` (most capable). The
@@ -255,11 +255,11 @@ key disagreements, and an evidence-weighted recommendation.
 
 **Default models:**
 
-| Model                    | Stance  | Role                     | Via                     |
-| ------------------------ | ------- | ------------------------ | ----------------------- |
-| `gpt-6-astra`            | FOR     | Supporter -- strengths   | openrouter-openai proxy |
-| `gemini-3.1-pro-preview` | AGAINST | Critic -- risks          | openrouter-gemini       |
-| `claude-opus`            | NEUTRAL | Analyst -- balanced view | Direct Anthropic        |
+| Model            | Stance  | Role                     | Via                     |
+| ---------------- | ------- | ------------------------ | ----------------------- |
+| `gpt-6-astra`    | FOR     | Supporter -- strengths   | openrouter-openai proxy |
+| `gemini-4-argon` | AGAINST | Critic -- risks          | openrouter-gemini       |
+| `claude-opus`    | NEUTRAL | Analyst -- balanced view | Direct Anthropic        |
 
 **Requirements:** Each selected worker must be ready in `forge workflow list-models`. Codex readiness comes from
 `forge runtime preflight codex`; proxy and direct-Claude workers keep their existing prerequisites.
@@ -458,7 +458,7 @@ See [design_installation.md §C.5](../design_installation.md#c5-multi-scope-inst
 
 ### Panel fails with "No active proxy found"
 
-The panel's default model set includes `gpt-6-astra` and `gemini-3.1-pro-preview`, which require active proxies:
+The panel's default model set includes `gpt-6-astra` and `gemini-4-argon`, which require active proxies:
 
 ```bash
 forge proxy create openrouter-openai

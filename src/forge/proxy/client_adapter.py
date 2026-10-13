@@ -215,7 +215,7 @@ class CoreLLMClientAdapter:
                         "content": response.text,
                         **({"tool_calls": tool_calls} if tool_calls else {}),
                     },
-                    "finish_reason": "tool_calls" if tool_calls else "stop",
+                    "finish_reason": response.finish_reason or ("tool_calls" if tool_calls else "stop"),
                 }
             ],
             "usage": {
@@ -490,7 +490,7 @@ class CoreLLMClientAdapter:
                 }
 
             elif event.type == "response_end":
-                finish_reason = "tool_calls" if accumulated_tool_calls else "stop"
+                finish_reason = event.finish_reason or ("tool_calls" if accumulated_tool_calls else "stop")
                 yield {
                     "id": response_id,
                     "object": "chat.completion.chunk",

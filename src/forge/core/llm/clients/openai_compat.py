@@ -289,6 +289,7 @@ def openai_response_to_completion(response: Any, provider: str) -> CompletionRes
     return CompletionResponse(
         text=text,
         tool_calls=tool_calls,
+        finish_reason=choice.finish_reason if isinstance(getattr(choice, "finish_reason", None), str) else None,
         usage=usage,
         cost_usd=cost_usd,
         provider_meta=provider_trace_meta(response, provider),
