@@ -185,6 +185,7 @@ class OpenRouterClient:
         accumulator = ToolCallAccumulator()
         usage_data: dict[str, int] | None = None
         cost_usd: float | None = None
+        finish_reason: str | None = None
         # First-seen provider generation id, captured from the first chunk and EMITTED on the
         # first content/tool event -- not just the terminal usage/response_end. OpenRouter puts
         # the gen-... id on every stream chunk (probe 1); emitting early means a stream cancelled
@@ -234,6 +235,8 @@ class OpenRouterClient:
                     continue
 
                 choice = chunk.choices[0]
+                if isinstance(getattr(choice, "finish_reason", None), str):
+                    finish_reason = choice.finish_reason
                 delta = choice.delta
 
                 if delta.content:
@@ -272,6 +275,7 @@ class OpenRouterClient:
             yield StreamEvent(
                 type="response_end",
                 tool_calls=final_tool_calls,
+                finish_reason=finish_reason,
                 usage=usage_data,
                 cost_usd=cost_usd,
                 provider_meta=provider_meta,

@@ -338,7 +338,8 @@ class LiteLLMClient:
 
         status = getattr(response, "status", "completed")
         if status == "incomplete":
-            finish_reason = "length"
+            incomplete_reason = getattr(getattr(response, "incomplete_details", None), "reason", None)
+            finish_reason = "content_filter" if incomplete_reason == "content_filter" else "length"
         elif status in ("failed", "cancelled"):
             finish_reason = "error"
         elif tool_calls:
@@ -349,6 +350,7 @@ class LiteLLMClient:
         return CompletionResponse(
             text=text,
             tool_calls=tool_calls if tool_calls else None,
+            finish_reason=finish_reason,
             usage=usage,
             raw={
                 "id": getattr(response, "id", f"responses-{int(time.time())}"),
@@ -677,6 +679,7 @@ class LiteLLMClient:
                 yield StreamEvent(
                     type="response_end",
                     tool_calls=response.tool_calls,
+                    finish_reason=response.finish_reason,
                     usage=response.usage,
                     cost_usd=response.cost_usd,
                     provider_meta=response.provider_meta,
@@ -695,6 +698,7 @@ class LiteLLMClient:
         accumulator = ToolCallAccumulator()
         usage_data: dict[str, int] | None = None
         cost_usd: float | None = None
+        finish_reason: str | None = None
 
         try:
             kwargs = self._build_request_kwargs(messages, tools, merged_params)
@@ -727,6 +731,8 @@ class LiteLLMClient:
                     continue
 
                 choice = chunk.choices[0]
+                if isinstance(getattr(choice, "finish_reason", None), str):
+                    finish_reason = choice.finish_reason
                 delta = choice.delta
 
                 if delta.content:
@@ -753,6 +759,7 @@ class LiteLLMClient:
             yield StreamEvent(
                 type="response_end",
                 tool_calls=final_tool_calls,
+                finish_reason=finish_reason,
                 usage=usage_data,
                 cost_usd=cost_usd,
             )
