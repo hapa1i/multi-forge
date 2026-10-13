@@ -48,7 +48,9 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - `make test-integration` builds Docker images, starts test infrastructure, and runs integration-marked tests.
 - `./scripts/test-integration.sh <path-or-pytest-args>` runs targeted integration tests with the same Docker/LiteLLM
   prerequisites; paths, `-k`, and other pytest flags pass through. When `GEMINI_API_KEY` is available, the script owns a
-  temporary `FORGE_HOME` LiteLLM process on port 4001 and removes it on exit, so that port must be free.
+  temporary `FORGE_HOME` LiteLLM process on port 4001 and removes it on exit, so that port must be free. Set
+  `PYTHON_DOTENV_DISABLED=1` for no-`.env` runs; inherited environment variables remain available. If runtime startup
+  preflight fails, follow the same-version `--no-cache` rebuild in `docs/developer/testing_guidelines.md`.
 - `./scripts/test-wheel-runtime.sh` builds and installs a clean wheel with dependencies resolved outside `uv.lock`, then
   smoke-tests packaged LiteLLM start/health/stop; run it when the LiteLLM compatibility ceiling or Forge-owned proxy
   dependency set changes.
@@ -215,6 +217,29 @@ be disabled on the account. Plan-file supervision supports host Claude/Codex exe
 reviewer timeouts within 1–45 seconds and preserve the registered 60-second hooks. Verify reviewer capability admission
 on the old supported CLI and after an executable update; auth-only user/sidecar helpers must still work. Check stale
 sidecar-image refusal, v2-compatible ordinary writes, and separation of live review evidence from shadow audits.
+
+For Codex policy-feedback changes, test `forge config set codex_policy_feedback_format=source-only` against the `normal`
+default, and `forge config set policy_summary_feedback=off` against `on`. Clean allows stay silent; disabling summaries
+must retain blocking reasons, operator notices, audit evidence, and required Stop correction guidance. See
+`docs/end-user/policy.md` for verified quotation rules and executor admission.
+
+For Codex Stop-review changes, run `forge extension sync` and trust the updated user hooks, then verify
+`forge runtime preflight codex --verify-enrollment --json` reports `stop_review_enrolled: true`. Configure an idle
+managed host Codex executor with `forge policy supervisor set --session <session> --plan <path> --trigger stop`, then
+inspect `forge policy supervisor status --session <session> --json` and `forge telemetry activity <session> --json`.
+Verify at most one reviewer dispatch and one correction per explicit turn, with subsequent work retained as unreviewed.
+Preview `forge policy supervisor reset-review --session <session> --json` before applying with `--yes`; reset excludes
+pending work, preserves the spent allowance, and requires a new explicit prompt. Follow `docs/end-user/policy.md` for
+partial coverage and recovery; Stop rejects non-Codex executors, sidecars, cascade, and shadow sampling.
+
+For native Codex supervision, follow `docs/end-user/native_supervision.md` for the admitted binary/source matrix. After
+disabling account extra usage, use `forge policy supervisor auth login --runtime codex --confirm-extra-usage-off` with
+the source's ChatGPT account, then `forge policy supervisor auth status --runtime codex --json`. Configure a completed
+source with
+`forge policy supervisor set <planner-or-full-thread-id> --source-runtime codex --runtime codex --model gpt-6.1-sol --supervisor-effort low --auth-mode subscription-only`.
+Verify source identity and latest attempts through supervisor status and telemetry activity. Native Stop sources require
+`--trigger stop --plan <path>`; shared or active executor sources require Stop. Unsupported histories/binaries and
+unavailable auth must refuse without fallback; `--auth-mode api` is a separately authorized paid route.
 
 ## Coding Style & Naming Conventions
 
