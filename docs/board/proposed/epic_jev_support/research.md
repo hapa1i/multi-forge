@@ -8,7 +8,7 @@ Selected scope: OpenRouter Decisions first, then warning-only rule packs and a J
 Claude. Direct TypeSafe remains a later access path; standalone Jev enforcement remains a research avenue. Use Forge's
 existing `httpx`, a conservative 32,000-token total request budget and explicit yes/no criteria. Both policy consumers
 need atomic questions and calibrated decision rules; plan checking also needs decomposition and coverage. Codex
-supervision has a [separate epic](../../doing/epic_codex_supervisor/card.md). Jev Router remains separate work in its
+supervision has a [separate epic](../../done/epic_codex_supervisor/card.md). Jev Router remains separate work in its
 [own card](../jev_router/card.md).
 
 ## Initial assessment
@@ -29,7 +29,7 @@ A read-only measurement on 2026-10-06 found **78 local session manifests, zero c
 with effective policy enforcement enabled**. All 78 parsed through Forge's reader and effective-intent resolver without
 error. No confirmed supervisor lane bindings were present. The scope was this checkout's `.forge/sessions/`, not a
 historical usage ledger or other workspaces; the
-[audit details](../../doing/epic_codex_supervisor/research.md#measured-local-usage) record the method. This makes
+[audit details](../../done/epic_codex_supervisor/research.md#measured-local-usage) record the method. This makes
 adoption and useful warning/review quality part of the evaluation, alongside possible quota savings once supervision is
 used.
 
@@ -251,7 +251,7 @@ subscription supervision, with [B4](../../done/codex_stop_review/card.md) reduci
 paid opt-in. A warning-only pack adds checks and API cost; the cascade preserves quota only for requests where it
 actually skips the Claude supervisor. Subscription terms and the difference between a lane label and a guaranteed
 unbilled route are covered in the
-[Codex research](../../doing/epic_codex_supervisor/research.md#subscription-use-credentials-and-spending).
+[Codex research](../../done/epic_codex_supervisor/research.md#subscription-use-credentials-and-spending).
 
 At the researched Jev price, a request with 20,000 billed input tokens costs $0.00084; 1,000 such requests cost $0.84.
 This arithmetic concerns **reported billable tokens**, not a 20k state with arbitrarily many questions. It is not a

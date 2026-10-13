@@ -1,20 +1,21 @@
 # Epic: Codex supervisor
 
-Status: active coordination, 2026-10-11. B1 and its documentation prerequisites shipped through
-[PR #258](https://github.com/hapa1i/multi-forge/pull/258), merged to `main` as `56d4b8f5`. See the
-[coordination checklist](checklist.md) and [B1 closeout](../../done/plan_file_supervision/checklist.md#merged-closeout).
-B2 shipped through [PR #261](https://github.com/hapa1i/multi-forge/pull/261), merged as `2a15c087`; its
+Status: done, 2026-10-13. All five members shipped and the integrated outcome is verified. B1 and its documentation
+prerequisites shipped through [PR #258](https://github.com/hapa1i/multi-forge/pull/258), merged to `main` as `56d4b8f5`.
+See the [coordination checklist](checklist.md) and
+[B1 closeout](../../done/plan_file_supervision/checklist.md#merged-closeout). B2 shipped through
+[PR #261](https://github.com/hapa1i/multi-forge/pull/261), merged as `2a15c087`; its
 [closeout](../../done/codex_0160_validation/checklist.md#merged-closeout) records the Codex 0.161.0 evidence and limits.
 B3 shipped through [PR #262](https://github.com/hapa1i/multi-forge/pull/262), merged as `f1019f6c`; its
 [closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout) records warning delivery, source-only
 formatting, and fixture teardown. B4 shipped through [PR #263](https://github.com/hapa1i/multi-forge/pull/263), merged
 as `2045aea1`; its [closeout](../../done/codex_stop_review/checklist.md#merged-closeout) records bounded Stop review,
-turn attribution, and evidence limits. B5 implements the
-[approved native-source contract](../codex_fork_supervisor/gate-decision.md) on `codex/codex-fork-supervisor`, rebased
-onto `225ab3dd` after the global-ignore correction shipped. Its captures use 60/60 native starts and 3/4 authorized API
-starts. Installed and clean-wheel controls cover native allow/deny, shared-source Stop, source-only feedback,
-global-ignore composition and inherited usage deltas. Aggregate unit, regression and pre-commit checks pass; the
-per-card PR is ready for review, with CI and shipped-tree closeout remaining.
+turn attribution, and evidence limits. B5 shipped through [PR #265](https://github.com/hapa1i/multi-forge/pull/265),
+merged as `de3efca8`, identical to tested head `e222c575`. Reviewed follow-up fixes were committed on `main` as
+`f0d1d52c`. The [integrated closeout](checklist.md#merged-closeout) records aggregate checks, packaged-source
+verification and the limits attached to the retained native evidence. The B5 ledger closed at 60/60 starts and 3/4
+authorized API starts; both fixture logins were removed. No member was retired or counted as shipped without its own
+closeout.
 
 ## Problem and outcome
 
@@ -25,7 +26,7 @@ Codex planning context.
 
 Forge has Codex policy hooks and a Codex supervisor execution lane. B1 now selects the plan source and reviewer
 independently, allowing an approved plan file without a Claude planning target. B2 supplies broader runtime evidence; B3
-delivers model/operator feedback; B4 adds bounded Stop review. B5 still owns native planning forks. The
+delivers model/operator feedback; B4 adds bounded Stop review; B5 supplies optional native planning forks. The
 [research](research.md) retains dated source/runtime observations; the
 [B1 evidence](../../done/plan_file_supervision/evidence/README.md) records its shipped scope and limits.
 
@@ -45,16 +46,16 @@ the source-only formatter, using B1's approved-plan snapshot contract. B4 owns t
 and depends on B3 to preserve source-only/provenance behavior in Stop's separately verified delivery channel. B5 owns
 native Codex context acquisition. Cards use separate execution branches when activated.
 
-B5's [checklist](../codex_fork_supervisor/checklist.md) is rebased onto fix closeout `225ab3dd`. B1/B2 remain its
+B5's [closeout](../codex_fork_supervisor/checklist.md#merged-closeout) records its shipped tree. B1/B2 remain its
 prerequisites; B3/B4 are shipped integration contracts. The user approved dedicated login/copy ownership and the
 measured trigger limits after reviewing the runtime gate. The implementation uses immutable selected prefixes, retained
 leases, native cancellation and comparable usage baselines. The user separately authorized four API starts; three have
 been used. Other platforms, executable builds, source formats and larger/deeper histories remain unsupported.
 
 The B5 review revision keeps Stop's approved-plan gate and adds measured model/auth, stdin and long/compacted-source
-admission. PreToolUse eligibility remains a scope decision after measurement. The separate
-[global-ignore evidence correction](../../done/preserve_stop_global_ignores/card.md) shipped through PR #264 and is not
-a sixth epic member. B5 still verifies composition with native Stop review.
+admission. PreToolUse admits separate completed sources; shared/active context requires Stop and an approved plan. The
+separate [global-ignore evidence correction](../../done/preserve_stop_global_ignores/card.md) shipped through PR #264
+and is not a sixth epic member. B5 verified its composition with native Stop review.
 
 ## Shared contract
 
@@ -161,3 +162,11 @@ Quota exhaustion remains unverified. Native cancellation was not repeated after 
 real-process regression supplies the follow-up evidence. Later missing-tracking fixes likewise retain their recorded
 automated coverage and native-source drift. B5 must preserve these limits and still establish reviewer hook-state
 isolation and its own native-source contract.
+
+## Epic closeout (2026-10-13)
+
+B1-B5 are done. The [integrated closeout](checklist.md#merged-closeout) links each member's shipped result and records
+the final aggregate, stub-integration and clean-wheel checks. Dated handoffs above preserve what was known at each
+boundary; B5's own evidence subsequently establishes its bounded native-source contract. Quota, native-source drift,
+ordinary-config preservation and cancellation qualifications remain explicit. Jev and team supervision remain separate
+proposals; completing this epic does not activate them.

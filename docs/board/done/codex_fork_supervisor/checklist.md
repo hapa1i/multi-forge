@@ -4,18 +4,16 @@ Card: [card.md](card.md). Epic: [Codex supervisor](../epic_codex_supervisor/card
 
 ## Current focus
 
-Review the implemented [runtime contract](gate-decision.md) on `codex/codex-fork-supervisor`, rebased onto synchronized
-`main` at `225ab3dd`. The user authorized B5 execution after the separate global-ignore fix merged and separately
-authorized four API starts. The [evidence](evidence/README.md) records 60/60 starts, including 3/4 API starts. The user
-approved the source/home/trigger decision on 2026-10-11. Installed admission, leases, accounting and native product
-controls and aggregate verification passed on `1b0f01cf`; PR #265's review fixes are locally verified. The user approved
-keeping one login and waiting within review deadlines on 2026-10-12. [Review-fix evidence](evidence/review-fixes.md)
-qualifies the new paths separately from the closed native round. B1 and B2 remain the prerequisites. B3 and B4 are
-shipped integration contracts: native context must preserve their feedback provenance, turn attribution, dispatch cap,
-and failure behavior. Their completed captures do not establish native-fork isolation. Jev, native team orchestration,
-general session fork/resume, and the proposed Codex source adapter remain outside this card. The separate
-[Stop global-ignore fix](../../done/preserve_stop_global_ignores/card.md) shipped in PR #264 (`d33721a2`). Its merged
-tree matches the tested fix and its five PR checks pass; B5 still verifies native Stop composition.
+B5 and the Codex supervisor epic are closed on 2026-10-13. PR #265 merged as `de3efca8`, matching tested head
+`e222c575`; the reviewed follow-up fixes are committed on `main` as `f0d1d52c`. See the
+[merged closeout](#merged-closeout) and [verification record](evidence/closeout.md). The user approved the native
+source/home/trigger contract and deadline-bounded waiting with one independently obtained reviewer login. B1/B2 are the
+prerequisites; B3/B4's feedback and Stop contracts remain intact. The separate
+[global-ignore fix](../../done/preserve_stop_global_ignores/card.md) is included in native Stop composition.
+
+The native ledger remains closed at 60/60 starts, including 3/4 authorized API starts. Its live product captures belong
+to `1b0f01cf`; follow-up validation is offline. Jev, team orchestration, general session fork/resume and the proposed
+Codex source adapter remain outside this card.
 
 ### Verified starting point
 
@@ -383,14 +381,14 @@ delivery alone.
 
 ## Closeout
 
-- [ ] Complete or explicitly disposition every acceptance item, including active/shared-source limits; record the exact
+- [x] Complete or explicitly disposition every acceptance item, including active/shared-source limits; record the exact
   tested head and passing aggregate checks. Resolve any scope reduction with review before marking the card complete.
-- [ ] Open the per-card PR, verify CI, and reconcile the epic's native-fork outcome against its shared contract. Run its
+- [x] Open the per-card PR, verify CI, and reconcile the epic's native-fork outcome against its shared contract. Run its
   integrated plan-file, feedback, Stop and native-context acceptance; closing the last member alone does not prove the
   coordinated outcome.
-- [ ] After merge, sync `main`, verify the merged tree against the tested head and CI, record completed work in the
+- [x] After merge, sync `main`, verify the merged tree against the tested head and CI, record completed work in the
   changelog, move B5 to `done/`, and repair links. Close the epic only after its remaining integrated checks pass.
-- [ ] Promote durable implementation lessons only after human review; retain evidence limits in the card closeout.
+- [x] Promote durable implementation lessons only after human review; retain evidence limits in the card closeout.
 
 ## Planning validation
 
@@ -501,3 +499,18 @@ used.
 CI follow-up: preserve ordinary on/reload prerequisites while retaining native readiness outside the lock. Four added
 regressions forbid ordinary runtime probes and preserve Stop enrollment; 158 targeted tests pass. The wheel evidence was
 refreshed. See the [validation record](evidence/review-fixes.md) and PR #265 for the final aggregate checks.
+
+## Merged closeout
+
+2026-10-13: PR #265 merged as `de3efca8`; its tree is identical to reviewed head `e222c575`
+(`e2e6b529d8a652dfcb2c0d882364a7442ecf93fe`). All five PR checks and merged-main CodeQL checks passed. Reviewed changes
+that remained local after merge were committed separately as `f0d1d52c` on synchronized `main`.
+
+The [closeout record](evidence/closeout.md) documents **10,774 unit tests, 117 deselected; 1,618 regressions; 16
+targeted integrations; 66 offline clean-wheel checks; and full pre-commit**. No native/API starts were added. The
+approved support matrix and evidence qualifications remain explicit; no acceptance item claims broader native
+compatibility. The [epic closeout](../epic_codex_supervisor/checklist.md#merged-closeout) reconciles B1-B5 together.
+
+Design and end-user contracts were checked against the shipped behavior. Durable constraints already live in those
+documents; no new implementation-note promotion was needed. Both cards moved to `done/`, inbound links were repaired,
+and completed work was added to the changelog. Earlier dated execution entries remain historical evidence.

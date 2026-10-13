@@ -1,6 +1,6 @@
 # Codex runtime validation checklist
 
-Card: [card.md](card.md). Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md), member **B2**.
+Card: [card.md](card.md). Epic: [Codex supervisor](../../done/epic_codex_supervisor/card.md), member **B2**.
 
 ## Current focus
 

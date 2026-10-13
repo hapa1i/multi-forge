@@ -1,6 +1,6 @@
 # Codex runtime test round
 
-Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B2**. No new-card dependency.
+Epic: [Codex supervisor](../../done/epic_codex_supervisor/card.md). Member **B2**. No new-card dependency.
 [B1](../../done/plan_file_supervision/card.md) has shipped; this card supplies broader runtime evidence for B3, B4 and
 B5. Completed 2026-10-10 after [PR #261](https://github.com/hapa1i/multi-forge/pull/261) merged to `main` as `2a15c087`.
 The [merged closeout](checklist.md#merged-closeout) records verification and remaining evidence limits; the
@@ -15,7 +15,7 @@ leads, not end-to-end evidence. The extended
 selected binary. The checklist retains the dated installation observation; the slug and execution branch name stay
 unchanged.
 
-The [research](../../doing/epic_codex_supervisor/research.md#installed-codex-versus-verified-forge-contracts) separates
+The [research](../../done/epic_codex_supervisor/research.md#installed-codex-versus-verified-forge-contracts) separates
 current source claims from local observations. This card is an experiment and compatibility update, not implementation
 of the downstream features.
 

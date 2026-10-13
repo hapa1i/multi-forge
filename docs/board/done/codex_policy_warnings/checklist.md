@@ -1,6 +1,6 @@
 # Codex policy warnings checklist
 
-Card: [card.md](card.md). Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md), member **B3**.
+Card: [card.md](card.md). Epic: [Codex supervisor](../../done/epic_codex_supervisor/card.md), member **B3**.
 
 ## Current focus
 

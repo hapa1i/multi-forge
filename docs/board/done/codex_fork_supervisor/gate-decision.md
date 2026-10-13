@@ -4,7 +4,8 @@ The [evidence](evidence/README.md) supports a bounded native-fork implementation
 **Approved by the user on 2026-10-11: proceed under the dedicated login and trigger limits below.** The original plan
 cannot use ordinary login state or the shipped watchdog unchanged, and cannot emit native terminal usage directly. This
 supplement specifies the replacement contract. The implementation and [installed product evidence](evidence/product.md)
-now follow it; aggregate validation passes, with PR review and shipping remaining.
+now follow it. PR #265 is merged; the [closeout](checklist.md#merged-closeout) records shipped verification and
+subsequent offline repairs without expanding this approved support matrix.
 
 ## Approved contract
 
@@ -51,8 +52,7 @@ dispatch/correction journal. Only verified approved-plan quotations may enter B3
 ## Approved login and storage lifecycle
 
 Add `forge policy supervisor auth login|status|logout --runtime codex`. The three leaves own a supervisor credential
-store, distinct from a session's supervisor configuration. The B5 branch implements this surface; it is not released
-yet.
+store, distinct from a session's supervisor configuration. This surface shipped through PR #265.
 
 - `login` creates a marked, private `$FORGE_HOME/reviewers/codex/` and invokes native device login with file-backed,
   forced ChatGPT authentication. It requires the operator's extra-usage-off confirmation and records that as a user
@@ -123,5 +123,6 @@ implementation.”
   behavior. Experimental helpers and fixture stubs cannot satisfy those product acceptance items.
 
 The obligations above record the gate-to-product handoff. The [product report](evidence/product.md) supplies installed
-and clean-wheel results, qualifications and fixture teardown at 60/60 starts. Aggregate verification passes. Keep B5 in
-`doing/` for PR review, CI, merge and closeout.
+and clean-wheel results, qualifications and fixture teardown at 60/60 starts. The
+[merged closeout](checklist.md#merged-closeout) completes PR review, CI and shipped-tree verification. Later fixes have
+separate offline coverage; the original native captures remain unchanged.

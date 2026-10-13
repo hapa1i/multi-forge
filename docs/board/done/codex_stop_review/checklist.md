@@ -1,6 +1,6 @@
 # Once-per-turn Stop review checklist
 
-Card: [card.md](card.md). Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md), member **B4**.
+Card: [card.md](card.md). Epic: [Codex supervisor](../../done/epic_codex_supervisor/card.md), member **B4**.
 
 ## Current focus
 

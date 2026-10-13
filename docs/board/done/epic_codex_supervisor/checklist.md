@@ -22,13 +22,11 @@ tested head `81c14448` with all five GitHub checks passing. Its
 delivery limits, and fixture teardown. B4 closed on 2026-10-11 after
 [PR #263](https://github.com/hapa1i/multi-forge/pull/263) merged as `2045aea1`, matching tested head `5eecc6ff` with all
 five GitHub checks passing. Its [closeout](../../done/codex_stop_review/checklist.md#merged-closeout) records turn
-attribution and evidence limits. B5 implements the user-approved
-[native source/login/trigger contract](../codex_fork_supervisor/gate-decision.md) on `codex/codex-fork-supervisor`,
-rebased onto `225ab3dd`. Its [product evidence](../codex_fork_supervisor/evidence/product.md) records installed
-allow/deny, shared active Stop, source-only feedback, global-ignore composition and clean-wheel verification. The ledger
-is closed at 60/60 native starts and 3/4 authorized API starts; both fixture logins are removed. Aggregate validation
-passes and the per-card PR is ready for review. The epic remains active until its native-fork outcome ships and the
-merged tree is verified.
+attribution and evidence limits. B5 closed on 2026-10-13 after PR #265 merged as `de3efca8`, matching tested head
+`e222c575`, and the reviewed local follow-ups were committed to `main` as `f0d1d52c`. Its
+[closeout](../codex_fork_supervisor/checklist.md#merged-closeout) preserves the 60/60-start budget, native evidence
+limits and fixture teardown. All members are now done; the [integrated closeout](#merged-closeout) below verifies the
+coordinated outcome without reopening the native round.
 
 ## Activation
 
@@ -116,13 +114,13 @@ one reviewer login with deadline-bounded waiting. The
 clean-wheel checks from the earlier native captures; the 60-start round remains closed. B5 stays in doing pending
 review, merge and shipped-tree verification.
 
-| Member                                         | State               | Dependency | Owned outcome                                                  |
-| ---------------------------------------------- | ------------------- | ---------- | -------------------------------------------------------------- |
-| [B1](../../done/plan_file_supervision/card.md) | Done                | None       | Plan source, reviewer selection, isolation, deadline, outcomes |
-| [B2](../../done/codex_0160_validation/card.md) | Done                | None       | Current-runtime probe evidence                                 |
-| [B3](../../done/codex_policy_warnings/card.md) | Done                | B1, B2     | Allowed-action feedback and source-only formatting             |
-| [B4](../../done/codex_stop_review/card.md)     | Done                | B1, B2, B3 | Bounded review at turn completion                              |
-| [B5](../codex_fork_supervisor/card.md)         | Doing; verification | B1, B2     | Native Codex source context                                    |
+| Member                                         | State | Dependency | Owned outcome                                                  |
+| ---------------------------------------------- | ----- | ---------- | -------------------------------------------------------------- |
+| [B1](../../done/plan_file_supervision/card.md) | Done  | None       | Plan source, reviewer selection, isolation, deadline, outcomes |
+| [B2](../../done/codex_0160_validation/card.md) | Done  | None       | Current-runtime probe evidence                                 |
+| [B3](../../done/codex_policy_warnings/card.md) | Done  | B1, B2     | Allowed-action feedback and source-only formatting             |
+| [B4](../../done/codex_stop_review/card.md)     | Done  | B1, B2, B3 | Bounded review at turn completion                              |
+| [B5](../codex_fork_supervisor/card.md)         | Done  | B1, B2     | Native Codex source context                                    |
 
 - [x] Ship B1 independently, with its own current-runtime `apply_patch` deny, auth, isolation, and deadline evidence.
 - [x] Complete the [session](../../done/partition_session_design/card.md) and
@@ -153,7 +151,7 @@ member closeout checks, not assertions that every later member already ships.
   [merged closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout).
 - [x] B4 closeout: review Stop budget/failure evidence against the shared contract and record unreviewed-work behavior;
   see the [B4 handoff](#b4-handoff) and [merged closeout](../../done/codex_stop_review/checklist.md#merged-closeout).
-- [ ] B5 closeout: review source-context/checkout evidence against the shared contract and record independence limits.
+- [x] B5 closeout: review source-context/checkout evidence against the shared contract and record independence limits.
 
 ## B1 handoff
 
@@ -230,12 +228,38 @@ or Jev work is activated by this closeout.
 
 ## Closeout
 
-- [ ] Every live member is shipped and verified; record any retirement or scope change explicitly before counting the
+- [x] Every live member is shipped and verified; record any retirement or scope change explicitly before counting the
   epic outcome complete. A retired member is not shipped credit.
-- [ ] Verify the integrated plan-file, allowed-feedback, Stop, and opted-in native-fork paths, including quota/failure
+- [x] Verify the integrated plan-file, allowed-feedback, Stop, and opted-in native-fork paths, including quota/failure
   outcomes, checkout selection, and existing Claude supervision.
-- [ ] Run applicable integrated unit, regression, targeted integration, pre-commit, and board/link checks; retain exact
+- [x] Run applicable integrated unit, regression, targeted integration, pre-commit, and board/link checks; retain exact
   versions, commands, and sanitized evidence in the member checklists.
-- [ ] Synchronize the relevant design and end-user docs with shipped behavior, then record completed work in the
+- [x] Synchronize the relevant design and end-user docs with shipped behavior, then record completed work in the
   changelog. Promote durable implementation notes only after human review.
-- [ ] Move the epic to `done/` after its coordinated outcome ships, and repoint inbound links.
+- [x] Move the epic to `done/` after its coordinated outcome ships, and repoint inbound links.
+
+## Merged closeout
+
+2026-10-13: B1-B5 are shipped and verified; no member was retired or removed from the outcome. B5's PR #265 merged as
+`de3efca8`, matching tested head `e222c575`, with all five checks green. Merged-main CodeQL passed. The reviewed
+follow-up fixes were committed separately as `f0d1d52c` and tested before moving B5 and the epic to `done/`.
+
+| Integrated contract                                                                | Evidence and disposition                                                                                                                                                                        |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Plan-file review, everyday subscription route and existing Claude supervision      | [B1 closeout](../../done/plan_file_supervision/checklist.md#merged-closeout); final aggregate and plan-only stub integration preserve the shipped paths                                         |
+| Allowed-action and source-only feedback                                            | [B3 closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout); B5 product controls compose denial and Stop feedback with native context                                          |
+| Stop dispatch/correction bounds and unreviewed work                                | [B4 closeout](../../done/codex_stop_review/checklist.md#merged-closeout); final recovery and global-ignore integration pass                                                                     |
+| Native context, correct action checkout, source isolation and reduced independence | [B5 product report](../codex_fork_supervisor/evidence/product.md) and [approved limits](../codex_fork_supervisor/gate-decision.md); final offline ownership, executor and lifecycle checks pass |
+| Quota and failure outcomes                                                         | Automated refusal, timeout, cancellation and accounting coverage passes; empirical quota exhaustion and B4's post-fix native cancellation remain unverified                                     |
+
+The final source passed **10,774 unit tests (117 deselected), 1,618 regressions, 16 targeted integrations, 66 offline
+clean-wheel checks and full pre-commit**. Commands, package hashes and qualification details are in the
+[B5 verification record](../codex_fork_supervisor/evidence/closeout.md). No native or paid closeout probe ran. B5's
+original live product captures belong to `1b0f01cf`; later fixes retain their offline evidence boundary. The native
+ledger remains closed at 60/60 starts and 3/4 authorized API starts. Both independently obtained fixture logins were
+removed. The unexplained ordinary Codex config change recorded during the gate remains unresolved.
+
+Relevant session, runtime, workflow, telemetry and end-user contracts were checked; the new queue floor and ownership
+publication rules are documented. No new implementation-note promotion was needed because the approved constraints
+already live in those normative documents. The changelog records completion, both directories are under `done/`, and all
+inbound links were repaired and audited. Jev and team supervision remain separate proposals.

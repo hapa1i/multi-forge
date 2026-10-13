@@ -7,6 +7,28 @@ Older entries are retained verbatim in [2026-08-18](archive/change_log_2026-08-1
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-13
+
+### Ship native Codex supervision and close the supervisor epic
+
+**Goal**: Review complex work with explicitly selected native planning context while preserving plan authority, reviewer
+isolation, bounded execution and attributable usage.
+
+**Key changes**:
+
+- Shipped immutable copied source/ancestor prefixes, dedicated reviewer login ownership, fresh native indexes and
+  explicit model/auth admission. Separate completed sources support PreToolUse; shared/active context requires Stop and
+  an approved plan. Recorded input identity and new-review usage without claiming complete history retention.
+- Completed reviewed executor, policy recovery, lease queue, API-home ownership, hook dispatch and direct-command fixes.
+  Closed B5 and the Codex supervisor epic with every member shipped and its native evidence limits preserved.
+
+**Verification**: PR #265 merged as `de3efca8`, identical to tested head `e222c575`, with all five checks passing and
+merged-main CodeQL green. Follow-ups on `main` are `f0d1d52c`: 10,774 unit tests, 1,618 regressions, 16 targeted
+integrations, 66 offline clean-wheel checks and full pre-commit passed. The native round remains closed at 60/60 starts
+and 3/4 authorized API starts; no closeout inference ran. See the
+[B5 closeout](done/codex_fork_supervisor/checklist.md#merged-closeout) and
+[integrated epic closeout](done/epic_codex_supervisor/checklist.md#merged-closeout).
+
 ## 2026-10-11
 
 ### Preserve global ignores in Stop evidence

@@ -1,6 +1,6 @@
 # Plan-file supervision with a fresh `claude -p`
 
-Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B1**, first product card. No product-card
+Epic: [Codex supervisor](../../done/epic_codex_supervisor/card.md). Member **B1**, first product card. No product-card
 prerequisite; [B2](../../done/codex_0160_validation/card.md) can proceed alongside it. The
 [session](../../done/partition_session_design/card.md) and [runtime](../../done/partition_runtime_design/card.md) design
 partitions precede B1's normative documentation updates.
@@ -23,7 +23,7 @@ credential selection and billing semantics. Explicit paid routes remain availabl
 The existing Codex `apply_patch` deny path is the enforcement boundary. This card does not depend on new Codex fork,
 background-hook, or model-visible warning behavior. It does require its own current-runtime deadline and isolation
 tests. Verified source pointers and billing qualifications are in the
-[epic research](../../doing/epic_codex_supervisor/research.md).
+[epic research](../../done/epic_codex_supervisor/research.md).
 
 ## Scope
 
@@ -168,4 +168,4 @@ conversation and record the tested version, argv policy and outcome in sanitized
 
 Allowed-action model-visible feedback is [B3](../../done/codex_policy_warnings/card.md), turn-completion review is
 [B4](../../done/codex_stop_review/card.md), and native planning forks are
-[B5](../../doing/codex_fork_supervisor/card.md). Jev and team supervision are separate.
+[B5](../../done/codex_fork_supervisor/card.md). Jev and team supervision are separate.

@@ -1,6 +1,6 @@
 # Warnings Codex can see
 
-Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B3**. Depends on
+Epic: [Codex supervisor](../../done/epic_codex_supervisor/card.md). Member **B3**. Depends on
 [B2: Codex runtime test round](../../done/codex_0160_validation/card.md) and
 [B1: approved-plan snapshot contract](../../done/plan_file_supervision/card.md); both have shipped.
 

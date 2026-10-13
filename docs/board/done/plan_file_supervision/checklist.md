@@ -1,6 +1,6 @@
 # B1: Plan-file supervision execution checklist
 
-Card: [plan-file supervision](card.md). Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Branch:
+Card: [plan-file supervision](card.md). Epic: [Codex supervisor](../../done/epic_codex_supervisor/card.md). Branch:
 `feat/plan-file-supervision`, originally based on `main` at `6e0d1f4c`, then stacked on `docs/partition-runtime-design`
 at `6529ff38`. The PRs merged from the top of the stack: #260 into #259, #259 into
 [#258](https://github.com/hapa1i/multi-forge/pull/258), then #258 into `main`.
@@ -46,7 +46,7 @@ The activation pass checked these source seams at `6e0d1f4c`:
   [activity aggregation](../../../../src/forge/core/ops/usage_summary.py) does not by itself establish visibility of a
   hook killed before outcome recording.
 
-Read the [epic research](../../doing/epic_codex_supervisor/research.md) as dated evidence. Its Claude 2.1.291 / Codex
+Read the [epic research](../../done/epic_codex_supervisor/research.md) as dated evidence. Its Claude 2.1.291 / Codex
 0.160.1 observations and auth-status experiments are not a completed inference, isolation, or billing guarantee.
 Implementation follows [workflow policy ownership](../../../design_workflows.md#16-policy-state-and-ownership),
 [runtime routing](../../../design_subprocesses.md#g-subprocess-routing-reference),
@@ -70,7 +70,7 @@ Implementation follows [workflow policy ownership](../../../design_workflows.md#
   render action-file paths against that checkout. Prove correct reads and no writes in both directories. The flag only
   grants access; it does not select the right branch. If the combined boundary cannot be established, refuse the
   cross-checkout configuration. Current upstream cross-project resume documentation is recorded in the
-  [research update](../../doing/epic_codex_supervisor/research.md#planning-verification-2026-10-07); it is not a tested
+  [research update](../../done/epic_codex_supervisor/research.md#planning-verification-2026-10-07); it is not a tested
   shortcut.
 - **Executor scope:** support plan-only and target-plus-plan review for host Claude Write/Edit and host Codex
   `apply_patch`, with either supported reviewer runtime. Refuse plan-file-backed review in sidecars, including inherited
@@ -497,7 +497,7 @@ existing fail-open policy.
 Normative runtime, session, workflow, telemetry, installation, CLI, and end-user policy/session docs describe the
 shipped contracts. The documentation prerequisites and B1 are now in `done/`; inbound links and the changelog are
 updated. Durable decisions already live in those design docs, so this closeout makes no separate implementation-note
-promotion. The [epic handoff](../../doing/epic_codex_supervisor/checklist.md#b1-handoff) identifies the B3-B5/Jev
+promotion. The [epic handoff](../../done/epic_codex_supervisor/checklist.md#b1-handoff) identifies the B3-B5/Jev
 boundaries. B2 remains the next proposed member to review; no later member is activated by this closeout.
 
 Closeout validation: **65** file-limit/cache and Markdown-link tests pass; the repository link audit passes for **644**

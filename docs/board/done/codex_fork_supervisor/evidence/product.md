@@ -68,8 +68,8 @@ credentials nor native histories. The fixture requires a fresh explicit budget t
 - The gate previously observed an ordinary Codex config hash change of unknown origin. No restoration was attempted;
   these captures do not claim that ordinary settings stayed unchanged across the whole gate.
 
-Product code, documentation and review remain on the B5 branch. Shipping and board closeout require PR review, merge,
-merged-tree verification and CI.
+PR #265 merged on 2026-10-13. The [closeout record](closeout.md) verifies its tree and CI and records subsequent
+reviewed fixes on `main`; it does not reattribute these earlier native captures to the final source.
 
 ## Fixture teardown
 

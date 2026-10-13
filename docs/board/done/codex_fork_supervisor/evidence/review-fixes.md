@@ -44,3 +44,17 @@ that the local Claude installation masked. The follow-up restricts runtime readi
 ordinary Stop enrollment outside the session lock, and adds four cases that forbid ordinary runtime probes. The 158-test
 targeted rerun passed, including the exact failed dispatcher tests. The offline wheel report was regenerated for this
 repair. Current aggregate results belong to the exact PR head; the earlier native captures remain unchanged.
+
+## Reviewed follow-ups and closeout, 2026-10-13
+
+PR #265 merged at `e222c575` as `de3efca8`. The subsequent local fixes were reviewed and committed separately on `main`
+as `f0d1d52c`: claim API homes before publishing ownership, preserve useful time after a queued lease, cache executable
+identity, avoid redundant boundary probes, recognize native-only Stop configuration in the dispatcher, and align direct
+help with its parser. The final two repairs reject unsupported lifecycle arguments before mutation and recheck the
+waiting cutoff after a late successful lock acquisition.
+
+The [closeout record](closeout.md) gives aggregate results and commands. The separate
+[closeout wheel report](closeout-wheel.json) verifies the final packaged source and 66 copied offline tests. Earlier
+wheel/native reports retain their original provenance. An initial integration selection included eight credential-gated
+live cases, all of which refused before inference; the final explicitly selected stub suite passed. The 60-start ledger
+was not reopened.

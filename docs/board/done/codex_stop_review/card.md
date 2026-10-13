@@ -1,6 +1,6 @@
 # Once-per-turn Stop review
 
-Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B4**. Depends on
+Epic: [Codex supervisor](../../done/epic_codex_supervisor/card.md). Member **B4**. Depends on
 [B1: plan-file supervision](../../done/plan_file_supervision/card.md),
 [B2: Codex runtime test round](../../done/codex_0160_validation/card.md), and
 [B3: bounded, source-aware feedback](../../done/codex_policy_warnings/card.md); all have shipped.

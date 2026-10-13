@@ -20,7 +20,8 @@ charged to G0. No Claude inference ran. The user confirmed extra usage is off an
 logins. No ordinary Codex login secrets were copied.
 
 The later [PR #265 review fixes](review-fixes.md) have separate validation evidence. Original live product captures
-remain attributed to `1b0f01cf`; the closed native round was not rerun for those fixes.
+remain attributed to `1b0f01cf`; the closed native round was not rerun for those fixes. The
+[2026-10-13 closeout](closeout.md) records the merged tree, final offline checks and packaged-source verification.
 
 ## Results
 
@@ -126,9 +127,10 @@ tests prove guard descriptor retention; product copy serialization and cleanup r
   initial snapshot. It contains no fixture path/B5 observer reference; the cause is unverified and it was left
   untouched. Ordinary hooks remained absent. Earlier prose claiming unchanged ordinary settings is superseded by this
   comparison. Ordinary login validity was not tested through another model call.
-- Raw captures, retained package and independent homes remain in the open private round
-  `/private/tmp/forge-b5-20261011-r1`. Credentials, opaque history, account IDs and account balances are not exported.
-  Probe processes are cleaned up. Owned login teardown follows the eventual product/gate decision.
+- At the gate handoff, raw captures, retained package and independent homes were in the private round
+  `/private/tmp/forge-b5-20261011-r1`. Credentials, opaque history, account IDs and account balances were not exported.
+  The later [product teardown](product-teardown.json) removed both fixture logins and closed the round; private
+  temporary paths are historical capture locations, not guaranteed retained artifacts.
 
 ## Checks
 

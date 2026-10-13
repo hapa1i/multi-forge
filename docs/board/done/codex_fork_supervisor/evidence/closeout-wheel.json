@@ -1,0 +1,22 @@
+{
+  "kind": "offline-clean-wheel-closeout",
+  "native_starts": 0,
+  "api_starts": 0,
+  "python": "3.13.11",
+  "wheel_sha256": "ea39c5b64e02c50341819b47e639613840adff290e387b02ece78513e319ccef",
+  "matching_installed_python_files": 386,
+  "matching_bundled_python_files": 8,
+  "python_sources_sha256": "bee861c1876d1858b271419e1f4ba90f784fa6511e3de2045fba85e3d5de4d57",
+  "dependency_resolution": "fresh environment, independently resolved from wheel metadata",
+  "implementation_origin": "installed wheel; tests copied outside checkout",
+  "offline_tests_passed": 66,
+  "checks": [
+    "API home claim precedes publication",
+    "native-only Stop dispatcher",
+    "direct help JSON and argument validation",
+    "subscription contention and late-acquisition cutoff",
+    "copied input ownership and fresh indexes",
+    "native configuration and recovery"
+  ],
+  "source_commit": "f0d1d52c30a8551788287347a2ba971cebf90704"
+}

@@ -1,16 +1,18 @@
 # Codex fork supervisor
 
-Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B5**. Depends on
+Epic: [Codex supervisor](../../done/epic_codex_supervisor/card.md). Member **B5**. Depends on
 [B1: plan-source/configuration contract](../../done/plan_file_supervision/card.md) and
 [B2: Codex runtime test round](../../done/codex_0160_validation/card.md).
 
-Status: PR #265 review fixes locally verified, 2026-10-12, on `codex/codex-fork-supervisor`, rebased onto `main` at
-`225ab3dd`. The user approved the [contract supplement](gate-decision.md) and [execution checklist](checklist.md). The
-[captures](evidence/README.md) now use 60/60 native starts and 3/4 authorized API starts. Installed allow/deny,
-shared-source Stop, source-only feedback and clean-wheel controls pass, along with aggregate unit, regression and
-pre-commit checks on `1b0f01cf`, whose five CI checks passed. The [review fixes](evidence/review-fixes.md) address
-executor admission, deadline-bounded subscription waiting, policy recovery, home aliases and CLI behavior without
-additional native starts. PR review and shipped-tree closeout remain.
+Status: done, 2026-10-13. [PR #265](https://github.com/hapa1i/multi-forge/pull/265) merged as `de3efca8`, with a tree
+identical to tested head `e222c575` and all five PR checks passing. Reviewed follow-up fixes were committed to `main` as
+`f0d1d52c` and verified with aggregate tests, targeted integration and a clean installed wheel. The
+[merged closeout](checklist.md#merged-closeout) records the shipped scope and closes the Codex supervisor epic.
+
+The user-approved [contract supplement](gate-decision.md) remains the support boundary. The native round closed at 60/60
+starts and 3/4 authorized API starts; both fixture logins were removed. Live product captures describe `1b0f01cf`. Later
+[review fixes](evidence/review-fixes.md) and [closeout checks](evidence/closeout.md) use synthetic histories and stub
+reviewers, with no additional inference.
 
 The revised checklist preserves B4's approved-plan requirement for native Stop, gates model/auth switching and
 long/compacted sources, and treats PreToolUse support as a measured scope decision. Native Stop product admission also
