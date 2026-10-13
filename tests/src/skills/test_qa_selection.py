@@ -62,9 +62,11 @@ def test_category_and_range_filters_intersect_in_checklist_order() -> None:
     result = _resolve(categories=["session", "hooks"], from_id="5.24", to_id="7")
     ids = [step["id"] for step in result["steps"]]
 
-    assert ids[0] == "5.24"
+    requested = [step for step in result["steps"] if step["id"] not in result["prerequisite_ids"]]
+    assert requested[0]["id"] == "5.24"
     assert ids[-1] == "6.12"
-    assert all(step["section_id"] in {"5", "6"} for step in result["steps"])
+    assert all(step["section_id"] in {"5", "6"} for step in requested)
+    assert {"0.3", "2.4", "4.2"} <= set(result["prerequisite_ids"])
     assert "5.15" not in ids
 
 

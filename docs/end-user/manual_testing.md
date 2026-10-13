@@ -100,7 +100,8 @@ The skill frontend remains Claude-only. Codex is an optional subject under test;
 
 ## Full QA (`/qa`)
 
-Runs the full checklist inside a Docker container. Requires Docker Desktop.
+Runs the full checklist inside a Docker container. Requires Docker Desktop and a Forge source checkout for the runtime
+Dockerfiles. Start from that checkout (or a directory within it), including when `/qa` is installed at user scope.
 
 **Requires `full` install profile:**
 
@@ -129,7 +130,9 @@ Then in Claude Code:
 The agent reads the checklist section by section, runs commands inside the container via `docker exec`, and checks
 assertions. Auto-annotated sections run silently; human-annotated sections pause for your input. State is stored inside
 the mounted host QA directory for resume via `--from X.Y`. `--to X.Y` always means "stop before X.Y" rather than "run
-through X.Y".
+through X.Y". Section shorthand such as `--from 4.0` means the first step in section 4. Category and range selections
+include required setup steps; resume reuses prerequisites already validated in the same container rather than repeating
+them.
 
 The default selection runs clean-wheel and human-acceptance evidence and excludes exhaustive contracts already owned by
 automated tests. `--extended` adds provider-variance-prone exploratory journeys. The blocking plan is capped at 12 human
@@ -152,7 +155,10 @@ re-enable only the Claude assets with
 Only runs started with an explicit prebuilt `--wheel` can resume the same container. Development runs are
 single-invocation; start over with `--reset` if their container is still running. Their wheels remain under
 `~/.forge/manual-testing/qa/artifacts/build.*` because the evidence records their exact paths; remove an old build
-directory only after its development evidence is no longer needed.
+directory only after its development evidence is no longer needed. Changed provider credentials, endpoint configuration,
+or the selected Codex auth file require `--reset`; the reuse check never prints their values. An unchanged auth source
+preserves any credentials refreshed inside the container. Adding, changing, or removing certificates under
+`docker/certs/` also invalidates the cached runtime identity.
 
 The default `openrouter` profile is required for the blocking provider-trace and remote-reconciliation seam. The
 `remote-litellm` profile remains available for diagnostic compatibility coverage, but a full run on that profile records

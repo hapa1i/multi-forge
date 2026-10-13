@@ -80,6 +80,12 @@ def _base_env(tmp_path: Path, docker_body: str) -> dict[str, str]:
         {
             "PATH": f"{bin_dir}:{env['PATH']}",
             "FORGE_HOME": str(tmp_path / "forge-home"),
+            "GEMINI_API_KEY": "test-gemini-key",
+            "ANTHROPIC_API_KEY": "test-anthropic-key",
+            "LITELLM_API_KEY": "test-litellm-key",
+            "LITELLM_BASE_URL": "https://litellm.invalid",
+            "OPENAI_API_KEY": "test-openai-key",
+            "OPENROUTER_BASE_URL": "https://openrouter.invalid",
             "CODEX_API_KEY": "test-codex-key",
             "OPENROUTER_API_KEY": "test-key",
             "FORGE_QA_WORKFLOW_MODELS": "wfm",

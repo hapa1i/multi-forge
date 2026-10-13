@@ -262,7 +262,9 @@ printf '%s\n' "$SELECTION_JSON" > "$SELECTION_FILE"
 
 `selection.json` is the only execution allowlist: steps absent from `.steps[].id` must not run, including
 `automated-suite` references. `--extended` adds exploratory steps but does not alter the hard blocking counts in
-`.blocking_counts`.
+`.blocking_counts`. The resolver includes transitive step and section prerequisites outside the requested categories or
+range in `.prerequisite_ids`; an excluded prerequisite is an error before Docker starts. Section `.0` boundaries resolve
+to the section's first step, as they do in the state script.
 
 **Fresh run** (no `--from`): clear previous run-local logs/snapshots, reset container debug logs, then initialize
 progress tracking via `walkthrough-state.py`:
@@ -347,7 +349,9 @@ the model.
 #### Phase 4: Execute Sections (Main Loop)
 
 Execute only the ordered step ids in `selection.json`. The resolver has already applied category, `--from`, exclusive
-`--to`, and evidence-lane semantics; when the selected list ends, continue to Phase 5 (Summary).
+`--to`, and evidence-lane semantics; when the selected list ends, continue to Phase 5 (Summary). On resume, after prefix
+validation succeeds, reuse the validated records for added prerequisite ids before `--from` instead of executing them
+again. Fresh category runs execute their added prerequisites in checklist order.
 
 For each section/step in the filtered range:
 

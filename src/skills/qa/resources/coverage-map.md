@@ -40,7 +40,7 @@ The comments below are machine-checked. Each step excluded from the blocking sel
 
 <!-- evidence-owner: 6.11 | tests/integration/hooks/test_worktree_create.py -->
 
-<!-- evidence-owner: 7.10 | tests/src/proxy/test_passthrough.py -->
+<!-- evidence-owner: 7.10 | tests/src/proxy/test_metrics_integration.py -->
 
 <!-- evidence-owner: 10.5 | tests/src/session/test_transfer.py -->
 
