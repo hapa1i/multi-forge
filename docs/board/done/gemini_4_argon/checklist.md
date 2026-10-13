@@ -14,7 +14,7 @@ Base: `2ec4a22a`. Branch: `codex/gemini-4-argon`. Scope: Gemini Argon catalog/de
 - [x] Verify fresh and saved backend readiness, snapshot preservation, and explicit migration.
 - [x] Run `--available`, Codex preflight, and native/mixed/Argon workflow panels.
 - [x] Run final full pre-commit and aggregate checks after review fixes.
-- [ ] Review/merge and record closeout before moving to done.
+- [x] Review/merge and record closeout before moving to done.
 
 ## Evidence
 
@@ -50,5 +50,17 @@ first PR integration run did not load that environment; it did not establish liv
   retry after those suites finished passed without runtime changes. Dependencies remain unchanged. The earlier offline
   actual-LiteLLM pipeline covered 18 alias/effort/streaming combinations.
 
-Verification is complete. Merge and shipped closeout remain pending in
-[PR #267](https://github.com/hapa1i/multi-forge/pull/267).
+## Merged closeout
+
+[PR #267](https://github.com/hapa1i/multi-forge/pull/267) merged into `main` on October 13, 2026 as `42c150b7`. All five
+PR checks passed. PR #266 preceded the merge, so the merged tree includes additional changes beyond tested Argon head
+`d036a368`.
+
+- [x] Recheck merged main: 300 focused catalog, local-route, session-planner, native-thinking, Vertex-limit,
+  termination, workflow-model, and backend-readiness tests passed after `make deps`.
+- [x] Verify the runtime design and proxy/workflow guides describe shipped defaults, saved-config migration, loaded
+  deployment checks, and cutoff reporting.
+- [x] Record the completed change and promote the reviewed route/readiness/termination lessons to the runtime ledger.
+- [x] Move the card and checklist to `done/`; no pre-existing inbound links required repointing.
+- [x] Run closeout checks on `main`: `make pre-commit-md`, the 670-source Markdown link audit, file limits, lane
+  assertions, and staged/unstaged diff checks passed.

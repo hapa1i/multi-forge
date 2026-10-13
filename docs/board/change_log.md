@@ -9,6 +9,24 @@ Older entries are retained verbatim in [2026-08-18](archive/change_log_2026-08-1
 
 ## 2026-10-13
 
+### Adopt Gemini 4 Argon defaults
+
+**Goal**: Use Gemini 4 Argon for Gemini Pro-family defaults while preserving explicit older models and saved user
+configurations.
+
+**Key changes**:
+
+- Added Argon catalog metadata, provider aliases, native thinking controls, and fresh Gemini Sonnet/Opus defaults;
+  retained Flash and corrected local Pro routes for single-credential setups.
+- Kept saved snapshots user-owned and checked loaded LiteLLM deployments before workflow launch. Preserved token-limit
+  and content-filter termination through translation, including partial tool calls and streaming.
+- Documented provider-specific migration and pricing, and verified fresh/saved configurations and native/mixed panels.
+
+**Verification**: [PR #267](https://github.com/hapa1i/multi-forge/pull/267) merged as `42c150b7` with all five checks
+passing. The PR passed 10,804 unit tests, 1,727 regressions, 23 targeted integrations, full pre-commit, build, and clean
+wheel checks. The merged-main recheck passed 300 focused tests. See the
+[closeout](done/gemini_4_argon/checklist.md#merged-closeout).
+
 ### Ship native Codex supervision and close the supervisor epic
 
 **Goal**: Review complex work with explicitly selected native planning context while preserving plan authority, reviewer

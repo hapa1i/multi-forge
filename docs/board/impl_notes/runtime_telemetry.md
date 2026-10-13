@@ -8,6 +8,22 @@ Durable routing, backend, consumer, proxy, policy, and telemetry decisions.
 
 ## Notes
 
+### Model upgrades must verify route selection, loaded deployments, and termination (gemini_4_argon, shipped 2026-10-13)
+
+- Exercise the real planner with only the intended provider credential. Matching route coverage does not prove that the
+  first admissible template can serve the requested model.
+- Verify both fresh and saved backends. Preserved file bytes and proxy health do not prove that the running gateway has
+  loaded a new deployment; readiness must distinguish editing its configuration from restarting it.
+- Preserve upstream termination through canonical responses and streams. Partial tool calls and trailing usage chunks
+  must not replace token exhaustion with successful tool completion; keep content filtering distinct.
+- A dependency upgrade that fixes model parameter mapping can also change gateway authentication. Verify clean-wheel
+  backend startup and the existing auth contract before adopting it.
+
+Sources: [reviewed closeout](../done/gemini_4_argon/checklist.md#merged-closeout),
+[single-credential routing regression](../../../tests/regression/test_bug_gemini_pro_local_route.py),
+[loaded-deployment regression](../../../tests/regression/test_bug_workflow_backend_inventory.py), and
+[termination regression](../../../tests/regression/test_bug_proxy_finish_reason.py).
+
 ### Distinguish explicit effort from client defaults (session_launch_effort, shipped 2026-10-06)
 
 - Claude sends `output_config.effort` even when the user did not select effort. Field presence cannot establish intent:

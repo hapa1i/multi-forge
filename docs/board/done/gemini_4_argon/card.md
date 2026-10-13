@@ -1,5 +1,9 @@
 # Adopt Gemini 4 Argon
 
+Completed October 13, 2026 in [PR #267](https://github.com/hapa1i/multi-forge/pull/267), merged as `42c150b7`. All five
+PR checks passed; the merged-main recheck passed 300 focused tests. See the
+[merged closeout](checklist.md#merged-closeout).
+
 User-authorized on October 13, 2026. Branch `codex/gemini-4-argon` starts from freshly fetched `origin/main`
 `2ec4a22a37f1a94da946b8342d799549e638c7c7` in a separate worktree.
 
