@@ -210,6 +210,7 @@ def _build_available_models() -> dict[str, ModelSpec]:
         ("gpt-6-luna", "openai", "Fast, cost-efficient review"),
         ("gpt-6-luna-pro", "openai", "Explicit Luna Pro review through OpenRouter"),
         ("gpt-5.6-sol", "openai", "Explicit GPT-5.6 Sol review"),
+        ("gemini-3.1-pro-preview", "gemini", "Explicit prior Gemini 3.1 Pro review"),
         ("gemini-3.8-flash", "gemini", "Fast multimodal review with large context"),
         ("deepseek-v4.1-flash", "deepseek", "Multimodal coding and reasoning review"),
         ("deepseek-v4-pro-0813", "deepseek", "Explicit DeepSeek V4 Pro GA snapshot"),
@@ -242,7 +243,7 @@ def _build_model_aliases(available: dict[str, ModelSpec]) -> dict[str, str]:
     """Return convenience aliases mapped to canonical workflow model names."""
     from forge.core.models.catalog import get_compact_name, get_default_model
 
-    aliases: dict[str, str] = {}
+    aliases: dict[str, str] = {"gemini-3.1-pro": "gemini-3.1-pro-preview"}
     for family in ("openai", "gemini", "deepseek", "minimax", "qwen", "glm", "kimi"):
         canonical = get_default_model(family, "opus")
         compact = get_compact_name(canonical)

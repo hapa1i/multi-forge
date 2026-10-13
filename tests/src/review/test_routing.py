@@ -257,6 +257,7 @@ _EXPECTED_WORKFLOW_ROUTES.update(
         "gpt-6-luna-pro": tuple(
             template for template in _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"] if template.startswith("openrouter-")
         ),
+        "gemini-4-argon": _EXPECTED_WORKFLOW_ROUTES["gemini-3.1-pro-preview"],
         "gemini-3.8-flash": (
             "openrouter-gemini-flash",
             "openrouter-gemini",

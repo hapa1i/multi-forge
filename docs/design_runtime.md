@@ -557,6 +557,28 @@ Proxy/backend snapshots remain user-owned; upgrades preserve translated tier sel
 client's model. Context-estimator model pins apply only to translated Messages routes, including Responses-capable
 proxies; Anthropic passthrough and unknown wire shapes receive no pins.
 
+Gemini 4 Argon is the Gemini Sonnet/Opus default and default Gemini workflow worker. Gemini 3.8 Flash remains the Haiku
+and Flash-template default; explicit older Pro models remain selectable. Argon uses `google/gemini-4-argon` on
+OpenRouter, `gemini/gemini-4-argon` on local LiteLLM, and `vertex_ai/gemini-4-argon` on remote LiteLLM. Its
+1,048,576-token context is shared across input, thinking, and output. Google AI allows 65,536 output tokens for ordinary
+synchronous requests; Vertex allows 65,536 for streaming and 32,768 for unary requests. Reasoning supports `low`,
+`medium`, and `high` with a model default of `medium`. Sampling overrides are unsupported, and the translated request
+builder filters temperature, top-p, and top-k. Implicit caching is supported; explicit context-cache creation is not.
+The bundled Google AI deployment uses API-key authentication and a 4,096-token cache minimum. Remote Vertex deployments
+require Vertex route identities, Google Cloud credentials, and a 6,144-token cache minimum. Operators must adapt the
+full deployment metadata to the provider when updating saved configurations; the bundled Google AI entry cannot be
+copied unchanged into the remote Vertex route.
+
+The intrinsic catalog retains Argon's 65,536 output maximum. Forge's LiteLLM client caps non-streaming requests using
+the explicit `vertex_ai/gemini-4-argon` route to 32,768 after merging request overrides; streaming and other provider
+routes retain their configured limits.
+
+On pinned LiteLLM 1.102, Forge's LiteLLM client sends native `thinkingConfig` for the `gemini/gemini-4-argon`,
+`vertex_ai/gemini-4-argon`, and bare `gemini-4-argon` routes, for both streaming and unary requests. It replaces generic
+`reasoning_effort` with the validated `thinkingLevel` (`low`, `medium`, or `high`, default `medium`) and
+`includeThoughts: true` after merging request overrides. This bypasses the adapter's incompatible `thinkingBudget`
+conversion without changing the OpenRouter request shape or upgrading the managed backend runtime.
+
 Claude Opus 5.5 is the Anthropic/OpenRouter Opus default, stable `claude-opus` worker, and direct alias target; explicit
 Opus 5 pins remain selectable. It uses always-on adaptive thinking at `medium` effort. OpenRouter uses
 `anthropic/claude-opus-5.5`; native Anthropic uses `claude-opus-5-5`.
@@ -572,7 +594,7 @@ override validation reject manual budgets for every catalog model whose thinking
 translated request builder removes unsupported sampling fields after merging provider extras, using the intrinsic
 catalog even when gateway metadata does not yet recognize the model.
 
-LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Bundled GPT-6.1 Sol, GPT-6 Sol/Luna, and Claude 5.5
+LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Bundled Argon, GPT-6.1 Sol, GPT-6 Sol/Luna, and Claude 5.5
 deployments supply capability and token/cache pricing in `model_info`. Sol/Luna metadata covers the above-272K premium;
 6.1 Sol cache reads cost 5% of uncached input. Boundary tests require removing overrides when packaged support arrives.
 Pricing belongs to backend configuration, outside the intrinsic catalog. Sonnet 5.5's `thinking_always_on: false`

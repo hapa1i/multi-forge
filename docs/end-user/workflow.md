@@ -23,7 +23,7 @@ forge runtime preflight codex
 # Deep analysis on a topic (single model, default: claude-opus)
 forge workflow analyze "Should we use event sourcing for the audit log?"
 
-# Multi-model code review (default worker set: gpt-6-astra, gemini-3.1-pro-preview, claude-opus)
+# Multi-model code review (default worker set: gpt-6-astra, gemini-4-argon, claude-opus)
 forge workflow panel src/forge/session/store.py --code
 
 # Multi-model document review
@@ -45,7 +45,7 @@ forge workflow consensus "Should we adopt gRPC for internal services?"
 Unless you pass `-m`, the multi-model workflows use this built-in worker set:
 
 - `gpt-6-astra` -- OpenRouter (preferred proxy: `openrouter-openai`)
-- `gemini-3.1-pro-preview` -- OpenRouter (preferred proxy: `openrouter-gemini`)
+- `gemini-4-argon` -- OpenRouter (preferred proxy: `openrouter-gemini`)
 - `claude-opus` -- direct Anthropic, pinned to Claude Opus 5.5
 
 This default set is entirely Claude-backed. Add `-m codex` explicitly to run the runtime-native Codex worker. Codex
@@ -130,7 +130,7 @@ forge workflow panel src/ --code --review-type security --severity high
 - `--code` -- use code review framework (default: document review)
 - `-p` -- custom review prompt (overrides target+framework and --review-type)
 - `--context` -- `blind` (default: fresh subprocess) or `resume:<uuid>` (fork session context)
-- `-m` -- models to use (default: `gpt-6-astra,gemini-3.1-pro-preview,claude-opus`)
+- `-m` -- models to use (default: `gpt-6-astra,gemini-4-argon,claude-opus`)
 - `--roles` -- comma-separated reviewer roles (security, performance, architecture, maintainability, correctness)
 - `--review-type` -- review focus: `full` (default), `security`, `performance`, `quick` (security/performance need
   --code)

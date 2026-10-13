@@ -104,6 +104,7 @@ class TestPackagedCatalog:
     @pytest.mark.parametrize(
         "model_id",
         [
+            "gemini-4-argon",
             "gemini-3.1-pro-preview",
             "gemini-3.1-pro-preview-customtools",
             "gemini-3-flash-preview",

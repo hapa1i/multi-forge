@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 from click.testing import CliRunner
 
 from forge.cli.main import main
@@ -52,18 +53,37 @@ class TestBackendCLI:
 
         content = config_path.read_text()
         assert "model_list:" in content
+        deployments = {entry["model_name"] for entry in yaml.safe_load(content)["model_list"]}
+        assert {"gemini/gemini-4-argon", "gemini/gemini-3.1-pro-preview"} <= deployments
 
     def test_backend_create_already_exists(self, isolated_forge_home: Path) -> None:
-        """Verify backend create errors on duplicate with a recovery tip."""
+        """An upgrade cannot replace a user's older Gemini backend snapshot."""
         runner = CliRunner()
+        config_path = isolated_forge_home / "backends" / "litellm" / "config.yaml"
+        config_path.parent.mkdir(parents=True)
+        config_path.write_text(
+            "# Keep my provider configuration.\n"
+            "model_list:\n"
+            "  - model_name: gemini/gemini-3.1-pro-preview\n"
+            "    litellm_params:\n"
+            "      model: gemini/gemini-3.1-pro-preview\n"
+            "      api_key: os.environ/GEMINI_API_KEY\n"
+        )
+        config_path.chmod(0o600)
+        original = config_path.read_bytes()
+        original_stat = config_path.stat()
 
-        result1 = runner.invoke(main, ["model", "backend", "create", "litellm"])
-        assert result1.exit_code == 0
-
-        result2 = runner.invoke(main, ["model", "backend", "create", "litellm"])
-        assert result2.exit_code == 1
-        assert "already exists" in result2.output
-        assert "forge model backend start" in result2.output
+        result = runner.invoke(main, ["model", "backend", "create", "litellm"])
+        assert result.exit_code == 1
+        assert "already exists" in result.output
+        assert "forge model backend start" in result.output
+        shown = runner.invoke(main, ["model", "backend", "show", "litellm-4000", "--raw"])
+        assert shown.exit_code == 0
+        assert "gemini/gemini-3.1-pro-preview" in shown.output
+        assert "gemini-4-argon" not in shown.output
+        assert config_path.read_bytes() == original
+        assert config_path.stat().st_mtime_ns == original_stat.st_mtime_ns
+        assert config_path.stat().st_mode == original_stat.st_mode
 
     def test_backend_delete_removes_config(self, isolated_forge_home: Path) -> None:
         """Verify backend delete removes config directory."""
