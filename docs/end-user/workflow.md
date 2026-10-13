@@ -92,6 +92,14 @@ credential; runtime-native workers are grouped by runtime preflight. A Codex wor
 preflight is fresh and successful. Use `--available` to see only ready workers, or `--json` for structured output that
 includes each worker's `runtime`.
 
+For LiteLLM proxies with a saved configuration available on the host, readiness also checks the loaded backend's model
+inventory. A missing deployment makes the worker unavailable and stops a panel before workers launch. Add the complete
+deployment to the saved backend configuration and restart that backend; editing its file or restarting only the Forge
+proxy does not load the new model. If you change the upstream URL in `proxy.yaml`, restart that proxy before checking
+readiness: the check uses the saved URL, while a running proxy keeps its loaded configuration. `list-models` performs no
+inference. OpenRouter and sidecar/external routes without a local proxy snapshot retain routing-only checks, so
+readiness does not prove upstream connectivity or model support.
+
 Use `forge model catalog` for Forge's static model capability catalog; `forge workflow list-models` is the runtime
 readiness view for workflow runners.
 

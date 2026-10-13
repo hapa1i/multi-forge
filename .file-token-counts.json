@@ -81,10 +81,10 @@
       "tokens": 26290
     },
     "docs/end-user/proxy.md": {
-      "sha256": "cc72775f50e346d2df156b887b37b9154b26d4e039d459d5e3807f6cb53a22db",
+      "sha256": "5b5e381ca8b37e6e69b27985c3b1c4b6378052afe978e6454614fcd92707aca9",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 26612
+      "tokens": 26867
     },
     "docs/end-user/session.md": {
       "sha256": "207b7be6c033f2857d2b04d06cc3f32575997e53b38639d13c31c2f092acbbae",

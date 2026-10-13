@@ -228,6 +228,12 @@ durable observation point and a signature-safe control point.
    - `override`: inspect **plus** apply mutations to the current request. **Requires
      `wire_shape: anthropic_passthrough`** (rejected at config load otherwise) so mutations are signature-safe.
 
+Translated responses preserve the upstream finish reason through the optional `CompletionResponse.finish_reason` field
+and terminal `StreamEvent.finish_reason`. That reason takes precedence over inferring completion from tool calls or
+text: an upstream `length` maps to Anthropic `max_tokens`, including when a partial tool call is present. Trailing usage
+chunks do not erase the streaming finish reason. If the provider omits a reason, the existing content-based
+`stop`/`tool_calls` fallback applies.
+
 At proxy ingress, optional client `X-Request-ID` values are untrusted correlation metadata. Forge preserves values of
 1--128 ASCII letters, digits, `.`, `_`, and `-` exactly; absent or invalid values are replaced with a fresh endpoint
 identifier (`req_`, `tok_`, or `inf_`) before request state, logs, telemetry, audit, or response handling diverges. The
@@ -641,6 +647,16 @@ Codex bypass the catalog deliberately.
 
 Live workflow routing advisories compare provider model refs with both effective `runtime.tier_mappings` and
 `runtime.model_alternatives` from the proxy's `GET /` response.
+
+For selected LiteLLM routes with a readable host-owned proxy snapshot, `review.backend_readiness` checks the loaded
+deployment inventory at that snapshot's upstream endpoint before worker launch and in `workflow list-models`. This
+assumes the running proxy has loaded that snapshot; after editing `proxy.yaml`'s upstream URL, restart the proxy before
+checking readiness. `models?return_wildcard_routes=true`, relative to that API base URL, must advertise the exact
+provider model ref or a matching wildcard deployment. Inventory requests use the existing gateway credential resolver,
+are bounded by a timeout, and are cached per endpoint/credential for one check. Missing deployments and unreadable
+inventories fail preflight without rewriting saved files or invoking the model. OpenRouter routing remains advisory;
+sidecar-injected and external proxies without a local snapshot retain their existing route checks, with backend
+inventory unverified. Inventory presence does not attest upstream inference or provider credentials.
 
 ### A.10 System prompt addendums (non-Anthropic proxy routing)
 

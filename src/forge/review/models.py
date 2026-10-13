@@ -308,12 +308,14 @@ def check_model_availability(
     fail on unavailable models -- returns status for each.
     """
     from forge.core.reactive.routing import resolve_subprocess_routing
+    from forge.review.backend_readiness import WorkflowBackendReadiness
     from forge.review.routing import derive_model_routes
 
     if specs is None:
         specs = list(DEFAULT_MODELS.values())
 
     results: list[ModelAvailability] = []
+    backend_readiness = WorkflowBackendReadiness(timeout_s=timeout_s)
     codex_preflight_loaded = False
     codex_preflight = None
 
@@ -377,7 +379,12 @@ def check_model_availability(
             )
 
             if result.route is not None:
-                results.append(ModelAvailability(spec=spec, status="ready", reason=""))
+                backend_error = backend_readiness.error_for(result)
+                results.append(
+                    ModelAvailability(
+                        spec=spec, status="unavailable" if backend_error else "ready", reason=backend_error or ""
+                    )
+                )
             else:
                 results.append(
                     ModelAvailability(

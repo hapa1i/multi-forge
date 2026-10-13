@@ -84,6 +84,9 @@ def preflight_check(
         )
 
     if routing_plan is not None:
+        from .backend_readiness import WorkflowBackendReadiness
+
+        backend_readiness = WorkflowBackendReadiness()
         for spec, result in zip(specs, routing_plan.routes):
             if spec.runtime == "codex":
                 if result.source != "runtime_native":
@@ -108,6 +111,9 @@ def preflight_check(
             credential_error = _credential_preflight_error(spec, result)
             if credential_error:
                 errors.append(credential_error)
+            backend_error = backend_readiness.error_for(result)
+            if backend_error:
+                errors.append(f"{spec.name}: {backend_error}")
         return errors
 
     from .models import check_model_availability

@@ -224,6 +224,9 @@ and are not supported Forge overrides. Argon supports implicit caching but not e
 [model reference](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon) and
 [Vertex guide](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-argon).
 
+If an upstream response reaches its output limit, Forge preserves the cutoff as Anthropic `stop_reason: max_tokens` for
+both unary and streaming responses, including responses containing a partial tool call.
+
 The bundled LiteLLM entry uses Google's introductory Argon prices through November 30, 2026: $2 input, $10 output
 (including thinking), and $0.10 cached input per million tokens. Google doubles those rates on December 1. Saved backend
 configs retain their pricing metadata, so update the `model_info` rates explicitly when the promotion ends to keep cost
@@ -254,6 +257,12 @@ adopting Argon, so requests avoid the adapter's generic reasoning conversion to 
 Restart the updated backend, then restart each affected proxy with `forge proxy stop <proxy_id>` followed by
 `forge proxy start <proxy_id> --smoke-test`. Existing OpenRouter proxies can forward an explicit Argon workflow request
 without changing their tier defaults.
+
+Argon workflow workers also send the model explicitly, so a saved LiteLLM proxy can keep its older tier defaults once
+the backend serves Argon. `forge workflow list-models --available --json` checks the loaded deployment inventory when
+the proxy's saved configuration is available locally. A backend snapshot without Argon makes that worker unavailable and
+fails workflow preflight with migration guidance; Forge does not silently select the older Pro model or rewrite the
+snapshot. Updating only the backend deployment requires a backend restart, not a proxy-tier change.
 
 Gemini 3.8 Flash is the current Gemini Flash default across OpenRouter and LiteLLM. It is a GA model with a
 1,048,576-token input limit, 65,536-token output limit, and `low`/`medium`/`high` thinking levels (`medium` by default).
