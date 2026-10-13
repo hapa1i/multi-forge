@@ -79,6 +79,19 @@ def has_module_owner(
     )
 
 
+def has_claude_settings_baseline(installation: Installation | None) -> bool:
+    """Return whether prior settings ownership established a baseline, including null."""
+
+    return installation is not None and (
+        installation.settings_backup_path is not None
+        or bool(installation.settings_entries)
+        or any(
+            has_module_owner(installation, module, CLAUDE_CODE_RUNTIME)
+            for module in (InstallModule.HOOKS, InstallModule.STATUSLINE, InstallModule.PERMISSIONS)
+        )
+    )
+
+
 def attribution_pair(attribution: SurfaceAttribution) -> tuple[str, str] | None:
     """Return the attributed pair, or ``None`` for a legacy-unattributed row."""
 

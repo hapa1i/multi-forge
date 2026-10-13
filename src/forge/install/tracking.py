@@ -379,6 +379,11 @@ def _validate_current_manifest(path: Path, manifest: InstalledManifest) -> None:
             claimed_package_paths.update(package_paths)
 
         has_codex_hook_owner = (InstallModule.HOOKS.value, CODEX_RUNTIME) in owner_pairs
+        if installation.codex_config_path is not None and not Path(installation.codex_config_path).is_absolute():
+            raise TrackingCorruptedError(
+                str(path),
+                f"ownership invariant error: {label} codex_config_path must be a nonempty absolute path",
+            )
         if has_codex_hook_owner != (installation.codex_config_path is not None):
             raise TrackingCorruptedError(
                 str(path),

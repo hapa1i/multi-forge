@@ -15,7 +15,9 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import stat
 import subprocess
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -192,14 +194,50 @@ def _copy_file(
         return
 
     try:
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-        if not is_symlink_free_config_path(worktree_path, relative_path) or dest_path.exists():
-            result.skipped_exists.append(filename)
-            return
-        shutil.copy2(source_path, dest_path)
+        _copy_config_file(source_root, worktree_path, relative_path)
         result.copied.append(filename)
+    except FileExistsError:
+        result.skipped_exists.append(filename)
     except OSError as e:
         result.failed.append((filename, str(e)))
+
+
+def _open_config_parent(stack: ExitStack, root: Path, relative_path: Path, *, create: bool) -> int:
+    """Pin each directory so a concurrent symlink replacement cannot redirect I/O."""
+    directory = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    stack.callback(os.close, directory)
+    for component in relative_path.parts[:-1]:
+        if create:
+            try:
+                os.mkdir(component, dir_fd=directory)
+            except FileExistsError:
+                pass
+        directory = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+        stack.callback(os.close, directory)
+    return directory
+
+
+def _copy_config_file(source_root: Path, worktree_path: Path, relative_path: Path) -> None:
+    """Copy through pinned parents and exclusively claim the destination leaf."""
+    with ExitStack() as stack:
+        source_parent = _open_config_parent(stack, source_root, relative_path, create=False)
+        source_fd = os.open(relative_path.name, os.O_RDONLY | os.O_NONBLOCK, dir_fd=source_parent)
+        source = stack.enter_context(os.fdopen(source_fd, "rb"))
+        source_stat = os.fstat(source.fileno())
+        if not stat.S_ISREG(source_stat.st_mode):
+            raise OSError(f"Config source is not a regular file: {relative_path}")
+        target_parent = _open_config_parent(stack, worktree_path, relative_path, create=True)
+        target_fd = os.open(
+            relative_path.name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o600,
+            dir_fd=target_parent,
+        )
+        target = stack.enter_context(os.fdopen(target_fd, "wb"))
+        shutil.copyfileobj(source, target)
+        target.flush()
+        os.fchmod(target.fileno(), stat.S_IMODE(source_stat.st_mode))
+        os.utime(target.fileno(), ns=(source_stat.st_atime_ns, source_stat.st_mtime_ns))
 
 
 def _copy_single(

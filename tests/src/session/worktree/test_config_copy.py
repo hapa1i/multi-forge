@@ -176,7 +176,7 @@ class TestCopySingle:
         result = ConfigCopyResult()
         with (
             patch("forge.session.worktree.config_copy.is_file_tracked", return_value=False),
-            patch("forge.session.worktree.config_copy.shutil.copy2", side_effect=OSError("disk full")),
+            patch("forge.session.worktree.config_copy.shutil.copyfileobj", side_effect=OSError("disk full")),
         ):
             _copy_single(source, target, "docker/certs", result)
 

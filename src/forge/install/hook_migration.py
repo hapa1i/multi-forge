@@ -45,6 +45,7 @@ from .ownership import (
     CLAUDE_CODE_RUNTIME,
     CODEX_RUNTIME,
     attributed,
+    has_claude_settings_baseline,
     has_module_owner,
     module_owner_set,
 )
@@ -810,9 +811,9 @@ def _apply_user_runtime_transition(
         skill_packages=list(existing.skill_packages) if existing is not None else [],
         settings_entries=final_entries,
         settings_backup_path=(
-            str(settings_backups[plan.settings.path])
-            if plan.settings.path in settings_backups
-            else (existing.settings_backup_path if existing is not None else None)
+            existing.settings_backup_path
+            if existing is not None and has_claude_settings_baseline(existing)
+            else str(settings_backups[plan.settings.path]) if plan.settings.path in settings_backups else None
         ),
         codex_config_path=codex_config_path,
         codex_commands=codex_commands,
@@ -864,7 +865,11 @@ def _rewrite_project_tracking(
             installation,
             module_owners=module_owners,
             settings_entries=entries,
-            settings_backup_path=str(settings_backups.get(scope, installation.settings_backup_path or "")) or None,
+            settings_backup_path=(
+                installation.settings_backup_path
+                if has_claude_settings_baseline(installation)
+                else str(settings_backups[scope]) if scope in settings_backups else None
+            ),
             codex_config_path=codex_config_path,
             codex_commands=codex_commands,
             updated_at=now,

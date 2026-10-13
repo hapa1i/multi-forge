@@ -78,6 +78,7 @@ from .module_planning import (
 )
 from .ownership import (
     attributed,
+    has_claude_settings_baseline,
     has_module_owner,
     legacy_claude_skill_packages,
 )
@@ -1460,6 +1461,9 @@ class Installer:
         """
         plans: list[SettingsPlan] = []
 
+        if not modules & _CLAUDE_SETTINGS_MODULES:
+            return plans
+
         settings_path = get_settings_path(self._scope, self._project_root)
         current_settings = read_settings(settings_path)
 
@@ -1932,8 +1936,8 @@ class Installer:
             if package.reason == SkillPlanReason.MANAGED_RUNTIME_PRESERVATION.value
             for target in package.file_paths
         )
-        if existing is not None and inputs.skill_runtimes is not None:
-            preserved_runtimes = set(inputs.plan.preserved_runtime_ids)
+        if existing is not None:
+            preserved_runtimes = set(inputs.plan.preserved_runtime_ids) if inputs.skill_runtimes is not None else set()
             planned_targets.update(
                 record.target_path
                 for record in existing.files
@@ -2099,11 +2103,7 @@ class Installer:
             module_owners.discard(codex_owner)
 
         # An earlier no-file enable establishes authoritative null; later Forge-bearing snapshots stay history.
-        settings_baseline_established = existing is not None and (
-            existing.settings_backup_path is not None
-            or bool(existing.settings_entries)
-            or any(has_module_owner(existing, module, CLAUDE_CODE_RUNTIME) for module in _CLAUDE_SETTINGS_MODULES)
-        )
+        settings_baseline_established = has_claude_settings_baseline(existing)
         return Installation(
             scope=self._scope.value,
             mode=inputs.mode.value,
