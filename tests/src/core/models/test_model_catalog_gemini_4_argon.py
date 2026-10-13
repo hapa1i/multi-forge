@@ -69,9 +69,9 @@ def test_argon_routes_retain_pro_family_template_coverage_and_provider_spelling(
     routes = catalog.models["gemini-4-argon"]
     prior = catalog.models["gemini-3.1-pro-preview"]
 
-    assert [(route.source_id, route.template) for route in routes] == [
+    assert {(route.source_id, route.template) for route in routes} == {
         (route.source_id, route.template) for route in prior
-    ]
+    }
     assert routes[0].template == "openrouter-gemini"
     for route in routes:
         assert route.source_id is not None

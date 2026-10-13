@@ -181,8 +181,8 @@ _EXPECTED_WORKFLOW_ROUTES = {
         "openrouter-openai-codex",
         "openrouter-qwen",
         "litellm-gemini",
-        "litellm-gemini-flash-local",
         "litellm-gemini-local",
+        "litellm-gemini-flash-local",
     ),
     "deepseek-v4-pro": (
         "openrouter-deepseek",
@@ -261,7 +261,9 @@ _EXPECTED_WORKFLOW_ROUTES.update(
         "gemini-3.8-flash": (
             "openrouter-gemini-flash",
             "openrouter-gemini",
-            *_EXPECTED_WORKFLOW_ROUTES["gemini-3.1-pro-preview"][2:],
+            *_EXPECTED_WORKFLOW_ROUTES["gemini-3.1-pro-preview"][2:-2],
+            "litellm-gemini-flash-local",
+            "litellm-gemini-local",
         ),
         "deepseek-v4.1-flash": _EXPECTED_WORKFLOW_ROUTES["deepseek-v4-pro"],
         "deepseek-v4-pro-0813": _EXPECTED_WORKFLOW_ROUTES["deepseek-v4-pro"],
