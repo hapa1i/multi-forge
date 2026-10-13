@@ -491,9 +491,10 @@ explicit `{unattributed_reason}`; duplicate identities are invalid.
 
 Frozen v1/v2 rows normalize in memory and persist v3 on mutation. Only the released Codex-hook value migrates; unknown
 modules remain corruption. `(hooks, codex)` exists iff `codex_config_path` witnesses the block; a non-null witness must
-be a nonempty absolute path. Invalid witnesses block reads and mutations before registration or tracking can be lost. V2
-skills use package runtime; older rows use closed path/key maps and leave unknowns unattributed. New Codex-owned modules
-require a versioned migration.
+be nonblank. Relative witnesses remain valid because `CODEX_HOME` can be relative and released installers persist that
+spelling. Disable's config-scope checks resolve those paths before removal. Blank witnesses block reads and mutations.
+V2 skills use package runtime; older rows use closed path/key maps and leave unknowns unattributed. New Codex-owned
+modules require a versioned migration.
 
 Runtime removal intersects requested ids and `MODULE_RUNTIME_OWNERS` with persisted owners, never adopting untracked
 surfaces. Attributed file, settings, package, and owner rows drop together. Removing Codex hooks clears both fields;

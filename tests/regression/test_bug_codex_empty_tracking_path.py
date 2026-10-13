@@ -25,7 +25,7 @@ from forge.install.tracking import TrackingStore
 pytestmark = pytest.mark.regression
 
 
-@pytest.mark.parametrize("invalid_path", ["", " ", "config.toml"])
+@pytest.mark.parametrize("invalid_path", ["", " ", "\t\n"])
 def test_invalid_codex_config_path_is_rejected_before_mutation(tmp_path: Path, invalid_path: str) -> None:
     config = get_codex_config_path(InstallScope.USER)
     apply_codex_merge(config, get_builtin_codex_entries())
@@ -39,14 +39,14 @@ def test_invalid_codex_config_path_is_rejected_before_mutation(tmp_path: Path, i
         codex_config_path=invalid_path,
         codex_commands=["codex-session-start"],
     )
-    with pytest.raises(TrackingCorruptedError, match="codex_config_path.*absolute"):
+    with pytest.raises(TrackingCorruptedError, match="codex_config_path.*nonblank"):
         tracking.set_installation("user", installation)
     assert not tracking.path.exists()
 
     # Simulate a corrupted on-disk witness; normal writers must never produce this.
     tracking.path.write_text(json.dumps(asdict(InstalledManifest(installations={"user": installation}))))
     original_tracking = tracking.path.read_bytes()
-    with pytest.raises(TrackingCorruptedError, match="codex_config_path.*absolute"):
+    with pytest.raises(TrackingCorruptedError, match="codex_config_path.*nonblank"):
         Installer(scope=InstallScope.USER, tracking_store=tracking).uninstall()
     assert tracking.path.read_bytes() == original_tracking
     assert config.read_bytes() == original_config

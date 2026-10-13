@@ -18,7 +18,7 @@ fixes, and integrated verification.
 - [x] L5 Sidecar recovery suggests only accepted commands.
 - [x] I1 Codex-only installation does not read unrelated Claude settings.
 - [x] I2 Sync preserves files with unattributed ownership.
-- [x] I3 Invalid Codex config paths fail before ownership mutation.
+- [x] I3 Blank Codex config paths fail before ownership mutation; valid relative paths remain supported.
 - [x] I4 Hook migration preserves the original settings baseline.
 - [x] I5 Worktree config copying uses confined, exclusive destination creation.
 - [x] Q1 Installed QA resolves a validated source checkout independently of skill ancestry.
@@ -86,7 +86,7 @@ Independent final review replayed the original mixed-case cleanup and explicit-a
 refuse the unsafe behavior. Supervisor/lifecycle review found no remaining defect within scope. Submodule checkouts
 intentionally retain explicit incomplete evidence instead of claiming complete coverage.
 
-Final integrated checks:
+Integrated checks on the initial PR head (`64d0f3be`):
 
 - `make test-unit`: 10,775 passed, 117 integration-marked tests deselected.
 - `make test-regression`: 1,728 passed.
@@ -106,3 +106,30 @@ PYTHON_DOTENV_DISABLED=1 ./scripts/test-integration.sh \
   tests/integration/docker/test_qa_release_artifact.py \
   -m "integration and not slow" -q --tb=short
 ```
+
+## Relative Codex home correction
+
+User review identified an overstrict I3 check: `CODEX_HOME=.codex-alt` is legal, and released installers persist its
+relative `codex_config_path`. Requiring an absolute path rejected fresh installs and misclassified existing tracking as
+corrupt. Fresh-install rollback preserved the prior state, but `forge clean --yes` removed an existing tracking file
+while leaving its hooks and files orphaned.
+
+The corrected invariant rejects only blank/whitespace witnesses. Existing relative paths retain their prior read, sync,
+and disable behavior; no tracking migration or new path interpretation is introduced. Five regressions failed before
+this correction and now pass, alongside the three blank-path cases. Both `.codex-alt` and `.` exercise actual
+enable/sync/clean/disable, and preexisting on-disk records exercise read plus clean preview/apply. Independent replay
+confirmed preservation of tracking, command files, and the managed hook block. The Docker lifecycle test now covers
+absolute and relative homes with status, sync, and both clean modes.
+
+Follow-up installer/GC verification: 946 tests passed. `make build` produced the corrected wheel/sdist; wheel SHA-256
+`a490bbc46f4e6fa38ee16b046c2eeaaab4420b2e714171ba8a2626e7c838c186`. Reinstalling it into the isolated venv with
+independently resolved dependencies passed 666 tests across 37 files, with no skips. Fourteen actual packaged CLI checks
+for both relative home forms passed enable/status/sync/clean preview/apply/disable/final status, preserving all owned
+bytes through cleanup. Installed `tracking.py` exactly matched the candidate wheel. The original full unit/regression
+counts above belong to `64d0f3be`; these focused installer/GC/package checks validate this compatibility correction.
+
+The follow-up Docker installer suite passed 25 tests through
+`./scripts/test-integration.sh tests/integration/docker/test_installer.py -m "integration and not slow" -q --tb=short`.
+Its new absolute/relative hook cycles initially hit unrelated duplicate skills in the shared fixture; excluding skills
+from those hook-specific cycles resolved the fixture conflict. Both cycles now verify status/sync, cleanup preservation,
+and disable. `make pre-commit` and diff whitespace checks passed after the correction.

@@ -214,6 +214,10 @@ Notes:
 keeps the original pre-Forge settings backup, so a later disable can remove Forge settings while preserving your edits.
 Enable and sync also preserve tracked legacy files whose runtime ownership cannot be determined.
 
+Relative `CODEX_HOME` values such as `.codex-alt` are supported. Forge retains their relative config paths in
+installation tracking; run lifecycle commands from the same directory, or use an absolute `CODEX_HOME` for a stable
+location.
+
 ---
 
 ## Project compatibility (`.forge/project.toml`)
