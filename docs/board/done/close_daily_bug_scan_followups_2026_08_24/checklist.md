@@ -57,7 +57,7 @@ Evidence:
 - `make test-unit`: 9,897 passed, 117 deselected.
 - `make test-regression`: 1,072 passed.
 - `./scripts/test-integration.sh tests/integration/docker/test_session_routing.py`: 2 passed.
-- `make pre-commit`: all hooks passed; the 579-source Markdown audit, board file-limit preview, and `git diff --check`
+- `make pre-commit`: all hooks passed; the 581-source Markdown audit, board file-limit preview, and `git diff --check`
   passed.
 - Integrated review found and closed a nested-log symlink escape before final verification; both UUID-directory and
   `subagents`-directory escape regressions pass.

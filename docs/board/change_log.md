@@ -353,7 +353,7 @@ without weakening locked transcript ownership, deterministic route replay, or re
 
 **Verification**: 235 integrated focused cleanup/routing/Markdown tests plus 97 review-follow-up tests; 9,901 unit tests
 with 117 integration-marked tests deselected; 1,073 regressions; two targeted Docker session-routing integrations; full
-pre-commit including the 579-source Markdown audit. PR #246 merged as `6a4e7057` with all five GitHub checks passing.
+pre-commit including the 581-source Markdown audit. PR #246 merged as `6a4e7057` with all five GitHub checks passing.
 
 ### Correct post-merge session routing and cleanup defects
 
