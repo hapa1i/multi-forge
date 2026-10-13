@@ -116,6 +116,10 @@ def capture(root: Path, storage: Path, *, deadline: float) -> dict[str, Any]:
                 item.update(unsupported="symlink", target=os.readlink(path))
             elif tracked.get(name) == "160000" or not stat.S_ISREG(info.st_mode):
                 item.update(unsupported="submodule_or_special_file", mtime_ns=info.st_mtime_ns)
+                if tracked.get(name) == "160000":
+                    # Nested file edits need not change directory metadata. No
+                    # snapshot of these contents exists to prove them unchanged.
+                    omissions.append("unverified_submodule:" + name)
             elif info.st_size > MAX_FILE_BYTES or total + info.st_size > MAX_SNAPSHOT_BYTES:
                 item.update(unsupported="byte_limit", mtime_ns=info.st_mtime_ns)
             else:

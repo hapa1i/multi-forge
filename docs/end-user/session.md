@@ -592,6 +592,10 @@ reject unsupported levels. Forge reserves runtime `--worktree`, Claude `--model`
 disable authority hooks; `--no-launch` rejects both. For translated proxy routes, see
 [launch effort](proxy.md#launch-effort-on-translated-routes).
 
+Codex passthrough accepts options and their values, not subcommands, thread ids, or prompt text. Select the managed
+session with `forge session resume` and use `--task` for a prompt. For a Codex option Forge does not recognize, attach
+its value as `--option=value` so it cannot be mistaken for a positional argument.
+
 ### Adopt a conversation you started outside Forge
 
 You started `claude` or `codex` directly, the conversation turned out to matter, and now you want Forge to manage it.

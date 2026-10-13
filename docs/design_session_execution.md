@@ -84,9 +84,11 @@ a genuine duplicate trigger; both may appear.
 - `forge hook worktree-create` (WorktreeCreate): Replaces Claude Code worktree creation and installs Forge extensions.
   It strict-checks source, creates the checkout, maps nested roots, then strict-checks target before writes. Refusal
   removes the checkout/branch and reports incomplete cleanup. `config_copy.py` expands only symlink-free directories per
-  file, excluding tracked and nested `.git`/`node_modules` paths; dirty cleanup unlinks rechecked untracked files and
-  `rmdir`-prunes empty directories. `.forge/project.toml` stays uncopied, preserving tracked pins. Prints worktree path
-  to stdout; only this hook exits non-zero.
+  file, excluding tracked and nested `.git`/`node_modules` paths. Copies pin source and destination directory
+  descriptors and create destination leaves exclusively, so concurrent path replacement cannot redirect or overwrite a
+  copy. Source mode and timestamps are retained; supported source-leaf symlinks remain allowed. Dirty cleanup unlinks
+  rechecked untracked files and `rmdir`-prunes empty directories. `.forge/project.toml` stays uncopied, preserving
+  tracked pins. Prints worktree path to stdout; only this hook exits non-zero.
 - `forge hook subagent-stop` (SubagentStop): Tracks subagent activity (`total_count`, `by_type`, transcript path,
   message preview). Observe-only (phase 1).
 
@@ -349,18 +351,22 @@ watermark; repeated or stale turn-start delivery cannot reset spending. Automati
 native turn ID. Captured scope is the raw repository delta and observed tool requests/outcomes, not arbitrary external
 effects or proven authorship. Missing events, changed repository identity, unsupported changed files and exceeded bounds
 refuse a complete review. Tool outcomes preserve edit/revert activity even when the final net diff is empty. Ordinary
-dirty starting work is excluded. The next prompt snapshots the current checkout; changes since the previous observed
-tool outcome or Stop are unattributed context, outside any correction. Pending work carries only through that observed
-endpoint. Its baseline is rebased onto the current checkout, preserving intervening files and Git metadata. If an
-operator also changes a pending path, the old scope is explicitly excluded and the overlap becomes a coverage gap. An
-unfinished observed turn can carry across native thread changes; a thread change alone does not imply pending work. An
-unknown newer Stop records a missing-start exclusion without inventing a baseline or spending a reviewer call. Index
-stat-cache refreshes do not change repository identity; staged object/mode/path changes do. Denied requests have no tool
-outcome or changed-path obligation. Coverage is recomputed for the current net delta and observed actions. Bounded
-available evidence may receive a `partial` review; its verdict cannot approve omitted work or deliver a correction.
-Partial scope is recorded as unreviewed in `excluded_work`, then later prompts start their own scope. An unreviewable
-gap is excluded without a call. Lost requests/outcomes and edit/revert activity remain explicit evidence. After 32
-pending turns carry stops with `carry_limit`, preserving a valid checkpoint. The operator can preview/apply
+dirty starting work is excluded. Submodule contents remain an explicit coverage omission even when their directory
+metadata is unchanged. The action byte limit applies after adding patch paths; oversized actions retain a digest and
+coverage gap instead of disappearing from the checkpoint. The next prompt snapshots the current checkout; changes since
+the previous observed tool outcome or Stop are unattributed context, outside any correction. Pending work carries only
+through that observed endpoint. Its baseline is rebased onto the current checkout, preserving intervening files and Git
+metadata. If an operator also changes a pending path, the old scope is explicitly excluded and the overlap becomes a
+coverage gap. An unfinished observed turn can carry across native thread changes; a thread change alone does not imply
+pending work. An interrupted prompt without observed actions, changes or an existing obligation does not create pending
+work or spend the next prompt's review allowance. An unknown newer Stop records a missing-start exclusion without
+inventing a baseline or spending a reviewer call. Index stat-cache refreshes do not change repository identity; staged
+object/mode/path changes do. Denied requests, including fail-closed policy evaluation errors, have no tool outcome or
+changed-path obligation. Coverage is recomputed for the current net delta and observed actions. Bounded available
+evidence may receive a `partial` review; its verdict cannot approve omitted work or deliver a correction. Partial scope
+is recorded as unreviewed in `excluded_work`, then later prompts start their own scope. An unreviewable gap is excluded
+without a call. Lost requests/outcomes and edit/revert activity remain explicit evidence. After 32 pending turns carry
+stops with `carry_limit`, preserving a valid checkpoint. The operator can preview/apply
 `forge policy supervisor reset-review [--yes]`: it retains the watermark and current spending, records excluded scope as
 unreviewed, and takes a fresh baseline only on a later explicit prompt. Reset exclusions remain visible in status.
 

@@ -115,7 +115,7 @@ def find_agent_logs(project_root: str, session_id: str) -> list[Path]:
     encoded_path = encode_project_path(project_root)
     project_dir = get_claude_projects_dir() / encoded_path
 
-    if not project_dir.exists():
+    if project_dir.is_symlink() or not project_dir.exists():
         return []
 
     matching_logs: list[Path] = []

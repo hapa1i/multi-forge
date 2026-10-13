@@ -198,6 +198,15 @@ def _action(data: dict[str, Any], phase: str, context: stop_review.TurnContext) 
                     action["coverage_issue"] = "patch_outside_review_scope"
                 else:
                     action["paths"].append(path.relative_to(context.checkout).as_posix())
+    if len(json.dumps(action).encode()) > stop_review.MAX_ACTION_BYTES:
+        action = {
+            "id": identity,
+            "phase": phase,
+            "turn_id": context.turn_id,
+            "tool": tool,
+            "evidence_sha256": turn_evidence.digest(action),
+            "coverage_issue": "tool_evidence_byte_limit",
+        }
     return action
 
 

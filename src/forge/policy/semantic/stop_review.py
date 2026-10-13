@@ -38,6 +38,7 @@ from forge.session.models import LaneRecord, SupervisorConfig
 from forge.session.store import SessionStore
 
 MAX_ACTIONS = 48
+MAX_ACTION_BYTES = 8_000
 MAX_PROVENANCE_TURNS = 32
 # Seven seconds for a final snapshot, then lock, config verification and output.
 COMPLETION_SECONDS = 10.0
@@ -107,7 +108,21 @@ def begin_turn(context: TurnContext, *, deadline: float) -> None:
         if UUID(context.turn_id).int <= watermark:
             return None
         reset = bool(old and old.get("reset_requested"))
-        pending = bool(old and not reset and (old["outstanding"] or old["status"] == "collecting"))
+        pending = bool(
+            old
+            and not reset
+            and (
+                old["outstanding"]
+                or (
+                    old["status"] == "collecting"
+                    and (
+                        old["actions"]
+                        or old.get("carry_omissions")
+                        or old.get("baseline") != old.get("observed_snapshot")
+                    )
+                )
+            )
+        )
         if pending and old and len(old["provenance"]) >= MAX_PROVENANCE_TURNS:
             old.update(
                 status="unavailable",
@@ -765,7 +780,7 @@ def validate_payload(event_type: str, payload: dict[str, Any]) -> None:
             raise ValueError("Invalid action phase")
         if action.get("turn_id") not in payload["provenance"]:
             raise ValueError("Invalid action provenance")
-        if len(json.dumps(action).encode()) > 8_000:
+        if len(json.dumps(action).encode()) > MAX_ACTION_BYTES:
             raise ValueError("Unbounded action evidence")
     if payload["spent"]:
         _hex(payload.get("attempt_id"), 32)

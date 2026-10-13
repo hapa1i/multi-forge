@@ -723,9 +723,10 @@ def _dispatch_codex_supervisor(
             # still fires); the engine's policy.evaluate is this arm's only upstream row.
             attribution=Attribution(command=usage_command, session=context.session_name, operation=None),
             model=config.supervisor_model,
-            extra_args=(
-                ["-c", f'model_reasoning_effort="{config.supervisor_effort}"'] if config.supervisor_effort else ()
-            ),
+            # Reviewer SessionStart must not overwrite the executor receipt.
+            # Removing Forge environment alone still permits cwd-based resolution.
+            extra_args=["--disable", "hooks"]
+            + (["-c", f'model_reasoning_effort="{config.supervisor_effort}"'] if config.supervisor_effort else []),
             # The ACTION's checkout, not resolved.source_cwd. source_cwd is the *planner*
             # worktree, needed only because `claude --resume` is CWD-scoped to find the
             # transcript -- fresh Codex reviews do not use that lookup. Codex

@@ -102,7 +102,7 @@ def test_model_route_rejects_configured_sidecar_before_realization(
 
     assert result.exit_code == 1
     assert "--model cannot be combined with configured sidecar mode" in result.output
-    assert "pass --host-proxy or run 'forge config set proxy_mode=host'" in result.output
+    assert "run 'forge config set proxy_mode=host'" in result.output
     plan_route.assert_not_called()
     ensure_proxy.assert_not_called()
     assert not SessionStore(str(temp_env), name).exists()

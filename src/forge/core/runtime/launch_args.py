@@ -82,6 +82,30 @@ _CODEX_RESERVED_CONFIG_KEYS: dict[str, str] = {
     "model_providers": "a provider override changes the auth Forge preflighted",
 }
 
+# Separate values are consumed only for known options. Unknown options can use
+# --name=value; guessing their arity could admit a lifecycle subcommand or prompt.
+_CODEX_VALUE_OPTIONS = frozenset(
+    {
+        "-c",
+        "--config",
+        "-m",
+        "--model",
+        "--enable",
+        "--disable",
+        "-i",
+        "--image",
+        "--add-dir",
+        "-a",
+        "--ask-for-approval",
+        "--output-schema",
+        "--color",
+        "-o",
+        "--output-last-message",
+        "--thread-source",
+        "--cyber-access-program",
+    }
+)
+
 
 @dataclass(frozen=True)
 class RuntimeLaunchArgs:
@@ -141,6 +165,7 @@ def validate_launch_args(
             if _matches(token, flag.spellings):
                 raise LaunchArgsError(f"{label} flag {token.split('=', 1)[0]!r} is managed by Forge: {flag.reason}")
     if runtime == "codex":
+        _validate_codex_option_values(args.passthrough)
         for key in _codex_config_keys(args.passthrough):
             root = key.split(".", 1)[0]
             if root in _CODEX_RESERVED_CONFIG_KEYS:
@@ -159,6 +184,28 @@ def _matches(token: str, spellings: Sequence[str]) -> bool:
         elif not token.startswith("--") and token.startswith(spelling):
             return True
     return False
+
+
+def _validate_codex_option_values(tokens: Sequence[str]) -> None:
+    pending: str | None = None
+    for token in tokens:
+        if pending is not None:
+            if not token or token.startswith("-"):
+                raise LaunchArgsError(
+                    f"Codex option {pending!r} requires a value; use {pending}=VALUE for a leading '-'"
+                )
+            pending = None
+            continue
+        if token == "--" or not token.startswith("-") or token == "-":
+            raise LaunchArgsError(
+                "Codex positional arguments and subcommands are managed by Forge; "
+                "select the managed session with 'forge session resume' and use '--task' for a prompt. "
+                "Pass unknown option values as '--name=value'."
+            )
+        if token in _CODEX_VALUE_OPTIONS:
+            pending = token
+    if pending is not None:
+        raise LaunchArgsError(f"Codex option {pending!r} requires a value")
 
 
 def _codex_config_keys(tokens: Sequence[str]) -> Iterator[str]:
