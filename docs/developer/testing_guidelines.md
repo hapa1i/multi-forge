@@ -802,7 +802,10 @@ non-release verdicts. Paid observations are per-step and count only with current
 resume cannot double-count cleared or stale records. Runtime pins and probe facts live in
 `resources/runtime-matrix.json`; `latest` resolves fresh client layers in a fresh container. The default OpenRouter
 profile is required for the blocking provider-trace/reconciliation seam; remote LiteLLM remains diagnostic compatibility
-coverage.
+coverage. Final metrics require explicit positive API-key, Anthropic API, Codex, and OpenRouter infrastructure evidence.
+Selections include transitive step and section prerequisites; validated resume-prefix prerequisites are reused without
+execution. Installed QA drivers resolve source Dockerfiles from the action checkout independently of package location.
+Runtime reuse includes certificate inputs and refuses changed credential or endpoint values without exposing secrets.
 
 ---
 

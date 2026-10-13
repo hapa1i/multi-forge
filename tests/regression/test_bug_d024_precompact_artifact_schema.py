@@ -129,10 +129,12 @@ def test_precompact_migrates_legacy_tail_and_writes_only_the_dedicated_snapshot_
     assert "migrated 1 recognized legacy PreCompact snapshot" in caplog.text
 
 
+@pytest.mark.parametrize("include_legacy", [False, True])
 def test_precompact_preserves_malformed_dedicated_snapshot_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
+    include_legacy: bool,
 ) -> None:
     project = _project(tmp_path, monkeypatch)
     monkeypatch.setenv("FORGE_SESSION", "parent")
@@ -143,7 +145,8 @@ def test_precompact_preserves_malformed_dedicated_snapshot_state(
     legacy = _legacy_snapshot()
     malformed_snapshots = [{"snapshot_path": legacy["snapshot_path"]}]
     state.confirmed.claude_session_id = "parent-uuid"
-    state.confirmed.artifacts["transcripts"] = [canonical, legacy]
+    transcripts = [canonical, legacy] if include_legacy else [canonical]
+    state.confirmed.artifacts["transcripts"] = transcripts
     state.confirmed.compaction = CompactionConfirmed(
         compact_count=3,
         transcript_snapshots=malformed_snapshots,
@@ -168,7 +171,7 @@ def test_precompact_preserves_malformed_dedicated_snapshot_state(
 
     assert result.exit_code == 0
     updated = store.read()
-    assert updated.confirmed.artifacts["transcripts"] == [canonical, legacy]
+    assert updated.confirmed.artifacts["transcripts"] == transcripts
     assert updated.confirmed.compaction is not None
     assert updated.confirmed.compaction.compact_count == 3
     assert updated.confirmed.compaction.transcript_snapshots == malformed_snapshots

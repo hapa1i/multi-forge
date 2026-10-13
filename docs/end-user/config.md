@@ -210,6 +210,14 @@ Notes:
 - `forge claude preset reset` restores the built-in preset; without `--force`, it asks for confirmation.
 - If the preset file is corrupted, Forge tells you to fix it with `forge claude preset edit` or reset it.
 
+`forge extension enable --runtime codex` does not read or create Claude settings or this preset. Legacy hook migration
+keeps the original pre-Forge settings backup, so a later disable can remove Forge settings while preserving your edits.
+Enable and sync also preserve tracked legacy files whose runtime ownership cannot be determined.
+
+Relative `CODEX_HOME` values such as `.codex-alt` are supported. Forge retains their relative config paths in
+installation tracking; run lifecycle commands from the same directory, or use an absolute `CODEX_HOME` for a stable
+location.
+
 ---
 
 ## Project compatibility (`.forge/project.toml`)
@@ -396,8 +404,10 @@ runtime config from the main repo. These files are NOT git-tracked, so worktrees
 | `.mcp.json`, `.mcp.local.json` | MCP server configuration                      |
 | `docker/certs/`                | Additional CA certificates (entire directory) |
 
-Files/directories are skipped if they already exist in the target or are tracked by git. `--into` forks skip this copy
-entirely (the target worktree already has its own config).
+Files are skipped if they already exist in the target or are tracked by git; directory contents follow those same
+per-file rules. Copying never follows a replaced directory symlink or overwrites a concurrently created destination.
+Copied files retain source permissions and timestamps. `--into` forks skip this copy entirely (the target worktree
+already has its own config).
 
 ## Additional CA certificates
 

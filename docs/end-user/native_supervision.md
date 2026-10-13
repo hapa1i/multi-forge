@@ -134,9 +134,10 @@ baseline and records both counters in attempt evidence. Missing, decreasing or i
 - Use `off`, `on`, `remove` and `reload --from <plan>` as with other supervisors. Active `on`/`reload` recheck admission
   before acquiring the session lock; a concurrent configuration change asks you to repeat the command. Generic policy
   set/reset validates configuration without requiring a ready reviewer, so unavailable login/source state cannot prevent
-  `forge session set policy.enabled false`. Disabled policy also skips reviewer launch preflight. Source bindings
-  require `remove` then `set`; frozen model/effort/auth changes do too. A failed replacement preserves the old
-  configuration.
+  `forge session set policy.enabled false`. Disabled policy also skips reviewer launch preflight. Claude relaunch keeps
+  that override; a fresh resume or fork drops overrides and checks readiness if the inherited policy intent is enabled.
+  Source bindings require `remove` then `set`; frozen model/effort/auth changes do too. A failed replacement preserves
+  the old configuration.
 - Repair a missing original rollout or select another complete source. For a replaced binary, use the verified build or
   wait for a Forge version with new native evidence. Login cannot make an unsupported binary or source compatible.
 - Interrupted subscription inputs are recovered by the next lease holder. Marked abandoned API homes are recovered by

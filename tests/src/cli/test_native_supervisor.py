@@ -168,7 +168,8 @@ def test_on_revalidates_a_deleted_native_source(native_setup):
     assert native_setup.manifest_path.read_bytes() == before
 
 
-def test_inherited_intent_uses_child_lane_not_parent_frozen_binding(native_setup):
+@pytest.mark.parametrize("preserve_overrides", [False, True])
+def test_inherited_intent_uses_child_lane_not_parent_frozen_binding(native_setup, preserve_overrides):
     from forge.policy.semantic.identity import SUPERVISOR_CONSUMER
     from forge.session.consumer_lanes import (
         ensure_consumer_lane_binding,
@@ -181,7 +182,7 @@ def test_inherited_intent_uses_child_lane_not_parent_frozen_binding(native_setup
     ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, read_bound_lane(state, SUPERVISOR_CONSUMER))
     state.intent.consumer_lanes.supervisor = LaneRecord("claude_code", "anthropic-direct", "opus")
     with pytest.raises(ValueError, match="model differs"):
-        validate_inherited_claude_trigger(state)
+        validate_inherited_claude_trigger(state, preserve_overrides=preserve_overrides)
 
 
 def test_masking_override_cannot_bypass_native_setup(native_setup):

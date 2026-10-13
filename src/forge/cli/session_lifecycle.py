@@ -1223,7 +1223,7 @@ def start(
         if launch_mode == LAUNCH_MODE_SIDECAR:
             print_error(
                 "--model cannot be combined with configured sidecar mode; "
-                "pass --host-proxy or run 'forge config set proxy_mode=host' before selecting a model"
+                "run 'forge config set proxy_mode=host' before selecting a model"
             )
             sys.exit(1)
 
@@ -2425,7 +2425,7 @@ def incognito(
         if launch_mode == LAUNCH_MODE_SIDECAR:
             print_error(
                 "--model cannot be combined with configured sidecar mode; "
-                "pass --host-proxy or run 'forge config set proxy_mode=host' before selecting a model"
+                "run 'forge config set proxy_mode=host' before selecting a model"
             )
             sys.exit(1)
 

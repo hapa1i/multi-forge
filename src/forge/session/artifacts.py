@@ -164,11 +164,11 @@ def migrate_legacy_transcript_snapshots(state: SessionState) -> int:
     writer stored the same record in both collections.
     """
     entries = _validated_transcript_entries(state)
+    snapshots = _validated_compaction_snapshots(state)
     legacy = [entry for entry, kind in entries if kind == _LEGACY_PRECOMPACT_SNAPSHOT]
     if not legacy:
         return 0
 
-    snapshots = _validated_compaction_snapshots(state)
     migrated_snapshots = list(snapshots)
     existing_paths = {snapshot["snapshot_path"] for snapshot in snapshots}
     for snapshot in legacy:

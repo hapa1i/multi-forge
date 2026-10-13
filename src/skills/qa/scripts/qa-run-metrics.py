@@ -226,16 +226,25 @@ def compute_metrics(
     artifact_mode = artifact.get("artifact", {}).get("mode")
     if artifact_mode not in {"prebuilt", "development-build"}:
         raise MetricsError(f"unsupported artifact mode {artifact_mode!r}")
+    missing_infrastructure = [
+        name
+        for name in ("INFRA_API_KEY", "INFRA_ANTHROPIC_API", "INFRA_CODEX", "INFRA_OPENROUTER")
+        if state_vars.get(name) != "true"
+    ]
+    provider_ready = artifact.get("provider_profile") == "openrouter" and not missing_infrastructure
     artifact_release_capable = (
         artifact_mode == "prebuilt"
         and artifact.get("runtime", {}).get("track") == "pinned"
         and artifact.get("runtime", {}).get("blocking") is True
         and runtime_identity_preserved
+        and provider_ready
     )
 
     if not runtime_identity_preserved or blocking_summary["results"]["fail"]:
         verdict = "fail"
     elif blocking_summary["missing_steps"] or blocking_summary["results"]["skip"]:
+        verdict = "incomplete"
+    elif artifact_mode == "prebuilt" and artifact.get("runtime", {}).get("blocking") is True and not provider_ready:
         verdict = "incomplete"
     elif artifact_mode != "prebuilt":
         verdict = "development-only"
@@ -250,6 +259,8 @@ def compute_metrics(
 
     return {
         "schema_version": 1,
+        "provider_profile": artifact.get("provider_profile"),
+        "missing_release_infrastructure": missing_infrastructure,
         "scope": {
             "full": full_scope,
             "mode": selection.get("mode"),

@@ -98,15 +98,16 @@ supervisor, shadow-curation, memory-writer, and team-supervisor. Policy-check re
   `SUPERVISOR_CONSUMER` candidate on the `chatgpt` subscription backend, `reachable_via=("codex",)`, T2). The
   policy-check hook reads the binding (`read_bound_lane`, confirmed-first then intent) and **injects** the resolved lane
   into `run_supervisor_check`, which never reads the store. Runs headless `codex exec` **direct** to OpenAI (no proxy,
-  read-only sandbox), **blind/transfer-fed** -- Codex has no `--resume`, so the approved plan must reach it via the
-  plan-override preamble. Preflight is **cached, never probed in the hook**: `codex doctor` is ~20s and
-  `run_doctor=False` cannot see `codex_store` (ChatGPT-login) auth, so the arm reads the `run_doctor=True` preflight
-  that `forge runtime preflight codex` wrote to `core/runtime/codex_preflight_cache.py` (invalidated by codex-binary +
-  `$CODEX_HOME/auth.json` mtime + TTL). The invoker auto-emits the sole `emit_codex_usage`, and the arm passes
-  `Attribution.operation=None` so the shared invoker **suppresses** its upstream-outcome row -- the engine's
-  `policy.evaluate` is the arm's only upstream row (parity with the claude arm; T5/WS1 resolved T4's documented
-  double-count). Every failure (bad override, cold/stale/unready cache, plan-absent, or any setup exception) **fails
-  open** -- the supervisor's contract (design_workflows §1.2).
+  read-only sandbox). Fresh reviewers disable hooks explicitly, so their SessionStart cannot overwrite the managed
+  executor observation through inherited environment or checkout-based session lookup. They are **blind/transfer-fed**
+  -- Codex has no `--resume`, so the approved plan must reach it via the plan-override preamble. Preflight is **cached,
+  never probed in the hook**: `codex doctor` is ~20s and `run_doctor=False` cannot see `codex_store` (ChatGPT-login)
+  auth, so the arm reads the `run_doctor=True` preflight that `forge runtime preflight codex` wrote to
+  `core/runtime/codex_preflight_cache.py` (invalidated by codex-binary + `$CODEX_HOME/auth.json` mtime + TTL). The
+  invoker auto-emits the sole `emit_codex_usage`, and the arm passes `Attribution.operation=None` so the shared invoker
+  **suppresses** its upstream-outcome row -- the engine's `policy.evaluate` is the arm's only upstream row (parity with
+  the claude arm; T5/WS1 resolved T4's documented double-count). Every failure (bad override, cold/stale/unready cache,
+  plan-absent, or any setup exception) **fails open** -- the supervisor's contract (design_workflows §1.2).
 
 For supervisor, shadow-curation, and memory-writer, `runtime_id` selects the Claude Code or Codex arm. Codex
 `backend_id`/`model` are placement metadata: Codex selects its model; preflight auth determines billing. Claude Code

@@ -192,23 +192,30 @@ def validate_supervisor_transition(state: SessionState, old: SupervisorConfig | 
             raise ValueError("Frozen supervisor identity requires remove/reconfigure.")
 
 
-def validate_inherited_claude_trigger(parent: SessionState) -> None:
+def validate_inherited_claude_trigger(parent: SessionState, *, preserve_overrides: bool = False) -> None:
     """Guard policy-inheriting Claude derivation before transfer or publication."""
     sup = snapshot_supervisor_options(parent)
     if sup:
         validate_stop_executor(sup, runtime="claude")
     # Derivation copies intent without overrides. Validate both the parent's
     # effective identity and the exact native configuration the child inherits.
+    # Relaunch preserves overrides but not the parent's frozen lane binding.
     from forge.session.consumer_lanes import intent_lane, read_bound_lane
+    from forge.session.effective import apply_overrides
 
-    inherited = parent.intent.policy.supervisor if parent.intent.policy else None
-    for candidate, lane in (
-        (sup, read_bound_lane(parent, SUPERVISOR_CONSUMER)),
-        (inherited, intent_lane(parent, SUPERVISOR_CONSUMER)),
+    effective_policy = apply_overrides(asdict(parent.intent), parent.overrides).get("policy")
+    effective_enabled = bool(effective_policy and effective_policy.get("enabled"))
+    inherited = sup if preserve_overrides else parent.intent.policy.supervisor if parent.intent.policy else None
+    inherited_enabled = (
+        effective_enabled if preserve_overrides else bool(parent.intent.policy and parent.intent.policy.enabled)
+    )
+    for candidate, lane, enabled in (
+        (sup, read_bound_lane(parent, SUPERVISOR_CONSUMER), effective_enabled),
+        (inherited, intent_lane(parent, SUPERVISOR_CONSUMER), inherited_enabled),
     ):
         if candidate and candidate.native_source:
             validate_reviewer(candidate, lane or select_supervisor_lane())
-            if candidate.active:
+            if enabled and candidate.active:
                 from forge.policy.semantic.native_codex import preflight_native
 
                 preflight_native(candidate)

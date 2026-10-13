@@ -25,6 +25,7 @@ def _artifact(*, mode: str = "prebuilt", blocking: bool = True) -> dict:
     track = "pinned" if blocking else "latest"
     return {
         "schema_version": 1,
+        "provider_profile": "openrouter",
         "artifact": {"mode": mode},
         "driver": {"matches_artifact": True, "sha256": "a" * 64},
         "runtime": {
@@ -129,7 +130,14 @@ def _state(*, second_result: str = "pass", include_second: bool = True) -> dict:
             "hash": "hash-2",
         }
     return {
-        "vars": {"RUN_SCOPE": "container:one", "PAID_OPERATIONS_1_1": "1"},
+        "vars": {
+            "RUN_SCOPE": "container:one",
+            "PAID_OPERATIONS_1_1": "1",
+            "INFRA_API_KEY": "true",
+            "INFRA_ANTHROPIC_API": "true",
+            "INFRA_CODEX": "true",
+            "INFRA_OPENROUTER": "true",
+        },
         "steps": steps,
     }
 

@@ -53,6 +53,45 @@ cleanup_release_build_context() {
 
 trap cleanup_release_build_context EXIT
 
+resolve_source_checkout() {
+    python3 - "$PWD" "$REPO_ROOT" <<'PY'
+import pathlib
+import sys
+import tomllib
+
+cwd = pathlib.Path(sys.argv[1]).resolve()
+for root in (cwd, *cwd.parents, pathlib.Path(sys.argv[2])):
+    try:
+        project = tomllib.loads((root / "pyproject.toml").read_text())
+    except (OSError, ValueError):
+        continue
+    metadata = project.get("project")
+    if isinstance(metadata, dict) and metadata.get("name") == "multi-forge" and all(
+        (root / "docker" / name).is_file() for name in ("Dockerfile.forge", "Dockerfile.qa")
+    ):
+        print(root)
+        break
+else:
+    sys.exit(2)
+PY
+}
+
+certificate_digest() {
+    python3 - "$REPO_ROOT/docker/certs" <<'PY'
+import hashlib
+import pathlib
+import sys
+
+paths = sorted(path for path in pathlib.Path(sys.argv[1]).glob("*") if path.suffix in {".pem", ".crt"})
+if paths:
+    digest = hashlib.sha256()
+    for path in paths:
+        digest.update(path.name.encode() + b"\0")
+        digest.update(hashlib.sha256(path.read_bytes()).digest())
+    print(digest.hexdigest()[:12])
+PY
+}
+
 # Repo revision baked into built images (org.opencontainers.image.revision).
 # A trailing -dirty marks an uncommitted working tree so any local change forces
 # a rebuild instead of a stale reuse. Defined here (not just before the build) so
@@ -354,6 +393,45 @@ validate_running_container_profile() {
             fi
             ;;
     esac
+}
+
+validate_running_credentials() {
+    # Secrets travel through stdin only, never Docker labels, argv, or diagnostics.
+    if ! python3 - "$CONTAINER_NAME" "$CODEX_AUTH_MODE" "$CODEX_AUTH_FILE" <<'PY'
+import hashlib
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+keys = ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "CODEX_API_KEY", "LITELLM_API_KEY", "LITELLM_BASE_URL",
+        "OPENAI_API_KEY", "OPENROUTER_API_KEY", "OPENROUTER_BASE_URL")
+environment = {key: os.environ.get(key, "") for key in keys}
+expected = {"environment": environment}
+if sys.argv[2] == "explicit-file":
+    environment["CODEX_API_KEY"] = ""
+    expected["codex_auth_sha256"] = hashlib.sha256(Path(sys.argv[3]).read_bytes()).hexdigest()
+check = """import json,os,sys
+from pathlib import Path
+expected=json.load(sys.stdin)
+if any(os.environ.get(k, '') != v for k,v in expected['environment'].items()):
+    sys.exit(1)
+if 'codex_auth_sha256' in expected:
+    marker=Path('/root/.codex/.forge-qa-auth-source.sha256')
+    if not marker.is_file() or marker.read_text() != expected['codex_auth_sha256']:
+        sys.exit(1)
+"""
+result = subprocess.run(
+    ["docker", "exec", "-i", sys.argv[1], "/opt/forge-qa/bin/python", "-c", check],
+    input=json.dumps(expected), text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+)
+sys.exit(result.returncode)
+PY
+    then
+        error "Running container credentials or provider configuration changed; rerun QA with --reset."
+        exit 3
+    fi
 }
 
 docker_env_args() {
@@ -732,6 +810,14 @@ install_codex_auth() {
             exit 3
         fi
         docker exec "$CONTAINER_NAME" chmod 600 /root/.codex/auth.json
+        # Track the ingress separately: Codex may refresh auth.json during a run.
+        docker exec -i "$CONTAINER_NAME" /opt/forge-qa/bin/python <<'PY'
+import hashlib
+from pathlib import Path
+marker = Path('/root/.codex/.forge-qa-auth-source.sha256')
+marker.write_text(hashlib.sha256(Path('/root/.codex/auth.json').read_bytes()).hexdigest())
+marker.chmod(0o600)
+PY
     else
         docker exec "$CONTAINER_NAME" rm -f /root/.codex/auth.json
     fi
@@ -809,7 +895,17 @@ fi
 # Validate the selected release artifact and invoking QA driver before any
 # container or image mutation. A stale host-installed skill must not be able to
 # launch or reuse a container for a different wheel.
+if ! REPO_ROOT="$(resolve_source_checkout)"; then
+    error "Run QA from a Forge source checkout containing pyproject.toml and docker/Dockerfile.{forge,qa}."
+    exit 2
+fi
+QA_DOCKERFILE="$REPO_ROOT/docker/Dockerfile.qa"
+BASE_DOCKERFILE="$REPO_ROOT/docker/Dockerfile.forge"
 FORGE_REV="$(get_forge_rev)"
+CERTIFICATE_DIGEST="$(certificate_digest)"
+if [[ -n "$CERTIFICATE_DIGEST" ]]; then
+    FORGE_REV="${FORGE_REV}-certs-${CERTIFICATE_DIGEST}"
+fi
 prepare_artifact
 
 # Use the repository revision and artifact identity to detect stale containers and images.
@@ -884,7 +980,7 @@ if [[ "$RESET" != "true" ]] && docker ps -q -f "name=^${CONTAINER_NAME}$" | grep
         fi
     done
     validate_running_container_profile
-    install_codex_auth
+    validate_running_credentials
     record_artifact_identity
     info "Reusing running container: $CONTAINER_NAME"
     echo "$CONTAINER_NAME"

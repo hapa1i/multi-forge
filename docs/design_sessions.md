@@ -45,8 +45,11 @@ session. Relocated transcripts use the same ownership scan; a cached owner remai
 cached absence is rescanned at the unlink boundary after another process may have published a sibling during ordinary
 cleanup. The final negative scan and unlink share the global index-publication lock, so a sibling manifest cannot be
 published between the ownership decision and removal. When the current and relocated UUIDs alias, ordinary cleanup
-excludes that UUID; the locked final scan owns removal of its transcript and preidentified agent logs. Adoption resolves
-the `.forge/artifacts` root before enforcing destination containment, so relocating that root with a symlink is
+excludes that UUID; the locked final scan owns removal of its transcript and preidentified agent logs. Noncanonical raw
+current and artifact IDs from corrupt manifests grant no transcript or agent-log deletion authority, regardless of
+relocation metadata: case-insensitive filesystems can resolve case variants to a canonical UUID whose ownership scans
+use exact spelling. Agent-log discovery refuses symlinked encoded project, session and subagents directories. Adoption
+resolves the `.forge/artifacts` root before enforcing destination containment, so relocating that root with a symlink is
 supported; a descendant destination that escapes the resolved root or aliases the native transcript is refused, and
 rollback only unlinks an artifact created by the current copy attempt. Stop and StopFailure also reconcile
 `claude_session_id` and `transcript_path` from their hook payloads to correct fork-session launches where SessionStart

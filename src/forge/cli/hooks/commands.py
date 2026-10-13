@@ -1544,6 +1544,7 @@ def codex_policy_check() -> None:
         except Exception as e:
             print(f"[forge] Policy evaluation failed: {e}", file=sys.stderr)
             if fail_mode == "closed":
+                observe_request(data, denied=True)
                 # Wire JSON goes explicitly to stdout; everything else in this
                 # command rides stderr (Codex fails OPEN on malformed stdout).
                 print(

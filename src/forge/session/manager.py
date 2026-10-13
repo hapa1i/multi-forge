@@ -1895,7 +1895,7 @@ class SessionManager:
         parent = self.get_session(parent_name, forge_root=forge_root)
         from forge.policy.semantic.identity import validate_inherited_claude_trigger
 
-        validate_inherited_claude_trigger(parent)
+        validate_inherited_claude_trigger(parent, preserve_overrides=True)
         parent_entry = self.index_store.get_session(parent_name, forge_root=forge_root)
         parent_forge_root = parent_entry.forge_root or parent_entry.worktree_path
 
@@ -2269,11 +2269,7 @@ class SessionManager:
             _raw_current_session_id = _raw_confirmed_value(_raw_data, "claude_session_id")
             if isinstance(_raw_deriv, dict):
                 _raw_relocated_session_id = _raw_deriv.get("relocated_parent_session_id")
-                # A schema-invalid manifest is untrusted. Recover only the exact,
-                # canonical lowercase alias needed to avoid unlocked deletion: a
-                # mismatched or case-variant pointer must not gain authority over
-                # another spelling's transcript or sidechain logs, and the
-                # ownership scans compare exact strings.
+                # Exact ownership scans cannot authorize raw case variants on case-insensitive storage.
                 if (
                     _raw_deriv.get("resume_mode") == "native-relocate"
                     and isinstance(_raw_current_session_id, str)
@@ -2333,6 +2329,11 @@ class SessionManager:
             # can drift off the adoption source once hooks reconcile it, and the
             # session's other transcripts are Forge's to clean up.
             _protected_ids = dict(shared_ids)
+            if state is None:
+                # Raw IDs bypass schema validation; exact scans cannot authorize noncanonical spellings.
+                for _session_id in _cleanup_ids:
+                    if _UUID_RE.fullmatch(_session_id) is None or _session_id != _session_id.lower():
+                        _protected_ids[_session_id] = ["untrusted noncanonical raw transcript id"]
             _adopted_ids = _adopted_source_uuids(state, _raw_data)
             if _adopted_ids:
                 for _adopted_id in _adopted_ids:

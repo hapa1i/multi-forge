@@ -147,8 +147,8 @@ def resolve_selection(
         step["paid_operations"] = _paid_operations(step)
         all_steps.append(step)
 
-    start = _boundary_index(all_steps, from_id, default=0)
-    stop = _boundary_index(all_steps, to_id, default=len(all_steps))
+    start = _boundary_index(all_steps, state.resolve_step_id(parsed, from_id) if from_id else None, default=0)
+    stop = _boundary_index(all_steps, state.resolve_step_id(parsed, to_id) if to_id else None, default=len(all_steps))
     if start > stop:
         raise SelectionError(f"--from {from_id} is after --to {to_id}")
 
@@ -162,6 +162,34 @@ def resolve_selection(
         and (not selected_sections or step["section_id"] in selected_sections)
         and step["evidence_lane"] in allowed_lanes
     ]
+    by_id = {step["id"]: step for step in all_steps}
+    sections = {section["id"]: section for section in parsed["sections"]}
+    included: set[str] = set()
+    visiting: set[str] = set()
+
+    def include(step_id: str) -> None:
+        if step_id in included:
+            return
+        if step_id in visiting:
+            raise SelectionError(f"cyclic prerequisite at step {step_id}")
+        step = by_id.get(step_id)
+        if step is None or step["evidence_lane"] not in allowed_lanes:
+            raise SelectionError(f"prerequisite {step_id} is missing or excluded from the selected evidence lanes")
+        visiting.add(step_id)
+        for requirement in step["prereqs"] + sections[step["section_id"]]["prereqs"]:
+            if requirement in sections:
+                dependencies = [sub["id"] for sub in sections[requirement]["subsections"]]
+            else:
+                dependencies = [state.resolve_step_id(parsed, requirement)]
+            for dependency in dependencies:
+                include(dependency)
+        visiting.remove(step_id)
+        included.add(step_id)
+
+    requested_ids = {step["id"] for step in chosen}
+    for step in chosen:
+        include(step["id"])
+    chosen = [step for step in all_steps if step["id"] in included]
     blocking = [step for step in all_steps if step["evidence_lane"] in BLOCKING_LANES]
     limits = budget["blocking"]
     blocking_counts = _summary(blocking)
@@ -177,6 +205,7 @@ def resolve_selection(
         "categories": categories or [],
         "from": from_id,
         "to": to_id,
+        "prerequisite_ids": [step["id"] for step in chosen if step["id"] not in requested_ids],
         "steps": [
             {
                 "id": step["id"],

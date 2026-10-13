@@ -1537,38 +1537,47 @@ print('symlinks verified')
 class TestCodexHooksModule:
     """Codex-owned hooks: scope-mapped managed block in Codex config.toml."""
 
-    def test_enable_registers_block_and_disable_removes_it(self, synced_container: ContainerLike) -> None:
+    @pytest.mark.parametrize("codex_home", ["/tmp/codex-home", ".codex-alt"])
+    def test_enable_registers_block_and_disable_removes_it(
+        self, synced_container: ContainerLike, codex_home: str
+    ) -> None:
         """Full cycle with a codex shim on PATH: enable writes the block, disable removes it."""
-        synced_container.exec("rm -rf ~/.claude ~/.forge /tmp/codex-home /tmp/fake-bin")
+        synced_container.exec("rm -rf ~/.claude ~/.forge /tmp/codex-home /forge/.codex-alt /tmp/fake-bin")
         synced_container.exec(
             "mkdir -p /tmp/fake-bin /tmp/codex-home"
             " && printf '#!/bin/sh\\nexit 0\\n' > /tmp/fake-bin/codex"
             " && chmod +x /tmp/fake-bin/codex"
         )
 
-        result = synced_container.exec(
-            "cd /forge && CODEX_HOME=/tmp/codex-home PATH=/tmp/fake-bin:$PATH"
-            " uv run forge extension enable --scope user --profile standard"
-        )
+        prefix = f"cd /forge && CODEX_HOME={codex_home} PATH=/tmp/fake-bin:$PATH uv run forge"
+        config_path = str(Path("/forge") / codex_home / "config.toml")
+        # Keep this hook lifecycle independent of the checkout's installed Codex skills.
+        result = synced_container.exec(f"{prefix} extension enable --scope user --profile standard --without skills")
         assert result.returncode == 0, f"Enable failed: {result.stderr}"
         assert "Next steps (Codex hooks):" in result.stdout
 
-        config = synced_container.read_file("/tmp/codex-home/config.toml")
+        config = synced_container.read_file(config_path)
         assert "# >>> forge hooks >>>" in config
         assert "forge-hook codex-session-start" in config
         assert "forge-hook codex-policy-check" in config
 
-        status = synced_container.exec(
-            "cd /forge && CODEX_HOME=/tmp/codex-home uv run forge extension status --scope user"
-        )
+        status = synced_container.exec(f"{prefix} extension status --scope user")
+        assert status.returncode == 0, status.stderr
         assert "Codex:" in status.stdout
 
-        result = synced_container.exec(
-            "cd /forge && CODEX_HOME=/tmp/codex-home uv run forge extension disable --scope user --yes"
-        )
+        synced = synced_container.exec(f"{prefix} extension sync --scope user")
+        assert synced.returncode == 0, synced.stderr
+        tracking = synced_container.read_file("/root/.forge/installed.json")
+        for command in ("clean --scope all --json", "clean --scope all --yes --json"):
+            cleaned = synced_container.exec(f"{prefix} {command}")
+            assert cleaned.returncode == 0, cleaned.stderr
+            assert synced_container.read_file("/root/.forge/installed.json") == tracking
+            assert synced_container.read_file(config_path) == config
+
+        result = synced_container.exec(f"{prefix} extension disable --scope user --yes")
         assert result.returncode == 0, f"Disable failed: {result.stderr}"
         # Forge created the file, so removing the block deletes it entirely.
-        assert not synced_container.file_exists("/tmp/codex-home/config.toml")
+        assert not synced_container.file_exists(config_path)
 
     def test_enable_without_codex_binary_skips_visibly(self, synced_container: ContainerLike) -> None:
         """No codex on PATH: presence gate skips with a notice; no config written."""
