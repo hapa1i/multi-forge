@@ -71,6 +71,7 @@ def _direct_model_route_line() -> None:
 
 # --json success paths that need no seeded data: empty logs still yield valid JSON.
 _JSON_STDOUT_LEAVES = [
+    ["policy", "supervisor", "auth", "status", "--runtime", "codex", "--json"],
     ["logs", "show", "--json"],
     ["telemetry", "costs", "show", "--json"],
     ["telemetry", "trace", "list", "--json"],

@@ -314,7 +314,7 @@ def _needs_codex_turn_hooks() -> bool:
         if len(raw) > 1_000_000:
             return True
         state = json.loads(raw)
-        if state.get("schema_version") not in {1, 2, 3, 4}:
+        if state.get("schema_version") not in {1, 2, 3, 4, 5}:
             return True
 
         def merge(base, override):

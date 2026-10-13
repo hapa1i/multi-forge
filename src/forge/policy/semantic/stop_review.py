@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Callable
 from uuid import UUID, uuid4
 
+from forge.core.runtime.codex_review_source import NativeReviewBoundary
 from forge.core.state import utc_timestamp_z
 from forge.policy.semantic import turn_evidence
 from forge.policy.semantic.deadline import review_scope
@@ -52,6 +53,7 @@ class TurnContext:
     config: SupervisorConfig
     lane: LaneRecord | None
     session_identity: str
+    native_boundary: NativeReviewBoundary | None = None
 
     def __post_init__(self) -> None:
         _hex(self.session_identity, 32)
@@ -420,6 +422,7 @@ def review_stop(context: TurnContext, *, deadline: float, current_config: Callab
         session_name=context.session,
         raw_diff=json.dumps(frozen["evidence"], sort_keys=True),
         action_fingerprint=frozen["evidence_digest"],
+        native_boundary=context.native_boundary,
     )
     # Only this owner reaches dispatch. Format retry is disabled for Stop by the transport.
     with review_scope(deadline - COMPLETION_SECONDS):

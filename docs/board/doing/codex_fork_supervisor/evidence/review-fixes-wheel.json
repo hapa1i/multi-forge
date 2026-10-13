@@ -1,0 +1,20 @@
+{
+  "kind": "offline-clean-wheel",
+  "native_starts": 0,
+  "api_starts": 0,
+  "python": "3.13.11",
+  "wheel_sha256": "2b0367cef4ff4ecbaaaebcee3f5b86e99610b2ed9fe7d5ea9fcf2f4e7fb2d4dd",
+  "matching_installed_python_files": 386,
+  "python_sources_sha256": "14924f67c25fd8f7f6bfe98bd57bc7283a4667fc34ae1d0c30ffe12be0c4cefb",
+  "checks": [
+    "all installed forge Python files match checkout",
+    "home aliases",
+    "large TUI executor with separate source",
+    "busy login readiness",
+    "deadline-bounded lease contention",
+    "immutable copied inputs",
+    "installed terminal help and status",
+    "direct help emits one JSON reply"
+  ],
+  "synthetic_auth_removed": true
+}

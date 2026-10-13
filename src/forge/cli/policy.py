@@ -436,7 +436,11 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
         "model": sup.supervisor_model,
         "configured": sup.configured,
         "active": sup.active,
-        "source": "plan" if not sup.resume_id and sup.plan_override_path else "conversation",
+        "source": (
+            "native"
+            if sup.native_source
+            else "plan" if not sup.resume_id and sup.plan_override_path else "conversation"
+        ),
         "resume_id": sup.resume_id,
         "suspended": sup.suspended,
         "plan_override_path": sup.plan_override_path,
@@ -454,6 +458,12 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
         "resolved_uuid": None,
         "source_model": None,
     }
+    if sup.native_source:
+        from dataclasses import asdict
+
+        data["native_source"] = asdict(sup.native_source)
+        data["verdict_cache"] = "disabled"
+        data["billing_mode"] = "api" if sup.auth_mode == "api" else "subscription_quota"
     if sup.review_trigger == "stop":
         from forge.policy.semantic.stop_review import status as stop_status
 
@@ -488,7 +498,7 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
         data["lane"] = None
     # A sticky degrade routes dispatch to the default claude lane while the bound codex lane
     # above stays frozen -- surface it so the operator sees the lane was routed around this session.
-    marker = read_supervisor_degrade(manifest)
+    marker = None if sup.native_source else read_supervisor_degrade(manifest)
     data["degraded"] = (
         {
             "reason": marker.get("reason"),
@@ -925,6 +935,11 @@ def supervisor() -> None:
     """
 
 
+from forge.cli.supervisor_auth import auth as supervisor_auth  # noqa: E402
+
+supervisor.add_command(supervisor_auth)
+
+
 def _session_option(f: Any) -> Any:
     """Attach the shared --session/-s option used by every supervisor leaf."""
     return click.option("--session", "-s", "session_name", help="Target session (default: auto-detect)")(f)
@@ -1166,7 +1181,11 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
         console.print("No supervisor configured.")
         return
 
-    console.print(f"Supervisor: [green]{sup.resume_id or sup.plan_override_path}[/green]")
+    target = sup.native_source.thread_id if sup.native_source else sup.resume_id or sup.plan_override_path
+    console.print(f"Supervisor: [green]{target}[/green]")
+    if sup.native_source:
+        console.print(f"  Native source: Codex ({sup.native_source.source_cwd})")
+        console.print("  Verdict cache: disabled")
     if sup.suspended:
         console.print("  Status: [yellow]suspended[/yellow]")
 
@@ -1192,7 +1211,7 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
     # The bound lane remains frozen, but a sticky degrade routes dispatch to the default claude
     # lane this session (the codex subscription is spent). Surface it so `Lane: ...codex...` is not
     # read as "still running on codex".
-    marker = read_supervisor_degrade(manifest)
+    marker = None if sup.native_source else read_supervisor_degrade(manifest)
     if marker:
         frm = marker.get("from_lane") or {}
         console.print(
@@ -1253,7 +1272,14 @@ def _reject_supervisor_lane_change(frozen: LaneRecord) -> None:
 @supervisor.command(name="set")
 @click.argument("target", required=False)
 @click.option("--model", help="Supervisor model selector; proxy routes accept opus, sonnet, or haiku")
-@click.option("--auth-mode", type=click.Choice(["inherit", "subscription-only"]), default="inherit", show_default=True)
+@click.option(
+    "--auth-mode", type=click.Choice(["inherit", "subscription-only", "api"]), default="inherit", show_default=True
+)
+@click.option(
+    "--source-runtime",
+    type=click.Choice(["codex"]),
+    help="Select a native Codex source by managed name or full thread ID",
+)
 @click.option(
     "--trigger",
     "review_trigger",
@@ -1335,6 +1361,7 @@ def supervisor_set(
     plan: Path | None,
     model: str | None,
     auth_mode: str,
+    source_runtime: str | None,
     review_trigger: str | None,
     session_name: str | None,
     supervisor_proxy: str | None,
@@ -1388,6 +1415,7 @@ def supervisor_set(
             plan=plan,
             model=model,
             auth_mode=auth_mode,
+            source_runtime=source_runtime,
             review_trigger=review_trigger,
             policy_forge_root=_policy_fr,
             supervisor_proxy=supervisor_proxy,
@@ -1523,6 +1551,9 @@ def supervisor_on(session_name: str | None) -> None:
             "No supervisor configured. Use 'forge policy supervisor set <target>' to set one.",
             console=err_console,
         )
+        sys.exit(1)
+    except policy_ops.SupervisorInputError as exc:
+        print_error(str(exc), console=err_console)
         sys.exit(1)
 
     console.print(f"Supervisor resumed for session [cyan]{name}[/cyan]")

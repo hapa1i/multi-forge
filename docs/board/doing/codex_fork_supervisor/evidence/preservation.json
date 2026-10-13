@@ -1,0 +1,23 @@
+{
+  "ordinary_config": [
+    {
+      "path": "<HOME>/.codex/config.toml",
+      "before": "cd78cbd52f8a7e35fb62c4145fee5e81b4862b58b4bc3422223bd8ad3f8114e0",
+      "after": "b7c9854236fceff3896cfcf3d2a6f821d2b8de15b35fdfa8f2680053f08011e6",
+      "unchanged": false,
+      "modified_utc": "2026-10-11T14:21:29.626752+00:00",
+      "contains_fixture_path": false
+    },
+    {
+      "path": "<HOME>/.codex/hooks.json",
+      "before": null,
+      "after": null,
+      "unchanged": true,
+      "modified_utc": null,
+      "contains_fixture_path": false
+    }
+  ],
+  "held_originals": [],
+  "ordinary_auth_read_or_copied": false,
+  "round_closed": false
+}

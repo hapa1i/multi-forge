@@ -1,0 +1,3343 @@
+{
+  "api_starts": 3,
+  "attempts": [
+    {
+      "attempt_id": "2b81593140344a88b12f05c05585eca8",
+      "auth_mode": "subscription-only",
+      "effort": "low",
+      "model": "gpt-6.1-sol",
+      "model_run_id": "run_b0c7f12d6539",
+      "native_review": {
+        "action_cwd": "$ROUND/action",
+        "auth_mode": "subscription-only",
+        "baseline_origin": "event_msg.token_count.info.total_token_usage",
+        "billing_mode": "subscription_quota",
+        "effort": "low",
+        "independence": "separate",
+        "inherited_usage": {
+          "cached_tokens": 12288,
+          "input_tokens": 14258,
+          "output_tokens": 7
+        },
+        "inputs_preserved": true,
+        "model": "gpt-6.1-sol",
+        "native_boundary": {
+          "event": "PreToolUse",
+          "thread_id": "01a12b5e-ec8d-7ee2-9043-bb88352f72a8",
+          "turn_id": "01a12c0a-d3f2-7a42-83e0-bfd260c252b0"
+        },
+        "prefixes": [
+          {
+            "bytes": 41450,
+            "records": 15,
+            "sha256": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+            "thread_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00"
+          }
+        ],
+        "review_usage": {
+          "cached_tokens": 11264,
+          "input_tokens": 14158,
+          "output_tokens": 71
+        },
+        "reviewer_thread_id": "01a12c0a-f925-70d3-94b7-414061dbd335",
+        "runtime": "codex",
+        "source_context_input": 14258,
+        "source_cwd": "$ROUND/source",
+        "source_thread_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+        "state": "returned",
+        "terminal_usage": {
+          "cached_tokens": 23552,
+          "input_tokens": 28416,
+          "output_tokens": 78
+        },
+        "usage_baseline": {
+          "cached_tokens": 12288,
+          "input_tokens": 14258,
+          "output_tokens": 7
+        }
+      },
+      "origin": "codex",
+      "plan_digest": null,
+      "session": "b5-product-deny",
+      "state": "completed",
+      "tool_name": "Write",
+      "verdict": "deny"
+    },
+    {
+      "attempt_id": "a0d2faff66b745d787396cfddcfb5360",
+      "auth_mode": "subscription-only",
+      "effort": "low",
+      "model": "gpt-6.1-sol",
+      "model_run_id": "run_ee2ce579c1e6",
+      "native_review": {
+        "action_cwd": "$ROUND/action",
+        "auth_mode": "subscription-only",
+        "baseline_origin": "event_msg.token_count.info.total_token_usage",
+        "billing_mode": "subscription_quota",
+        "effort": "low",
+        "independence": "separate",
+        "inherited_usage": {
+          "cached_tokens": 12288,
+          "input_tokens": 14258,
+          "output_tokens": 7
+        },
+        "inputs_preserved": true,
+        "model": "gpt-6.1-sol",
+        "native_boundary": null,
+        "prefixes": [
+          {
+            "bytes": 41450,
+            "records": 15,
+            "sha256": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+            "thread_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00"
+          }
+        ],
+        "review_usage": {
+          "cached_tokens": 11264,
+          "input_tokens": 14160,
+          "output_tokens": 57
+        },
+        "reviewer_thread_id": "01a12c0d-2d8b-7800-8ce9-1fcb9b2665c3",
+        "runtime": "codex",
+        "source_context_input": 14258,
+        "source_cwd": "$ROUND/source",
+        "source_thread_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+        "state": "returned",
+        "terminal_usage": {
+          "cached_tokens": 23552,
+          "input_tokens": 28418,
+          "output_tokens": 64
+        },
+        "usage_baseline": {
+          "cached_tokens": 12288,
+          "input_tokens": 14258,
+          "output_tokens": 7
+        }
+      },
+      "origin": "claude_code",
+      "plan_digest": null,
+      "session": "b5-parent",
+      "state": "completed",
+      "tool_name": "Write",
+      "verdict": "allow"
+    },
+    {
+      "attempt_id": "1293b87d0d904b449e397e3b051c486d",
+      "auth_mode": "subscription-only",
+      "effort": "low",
+      "model": "gpt-6.1-sol",
+      "model_run_id": "run_562d93650f19",
+      "native_review": {
+        "action_cwd": "$ROUND/action",
+        "auth_mode": "subscription-only",
+        "baseline_origin": "event_msg.token_count.info.total_token_usage",
+        "billing_mode": "subscription_quota",
+        "effort": "low",
+        "independence": "shared",
+        "inherited_usage": {
+          "cached_tokens": 127104,
+          "input_tokens": 134499,
+          "output_tokens": 310
+        },
+        "inputs_current": true,
+        "inputs_preserved": true,
+        "model": "gpt-6.1-sol",
+        "native_boundary": {
+          "event": "Stop",
+          "thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "turn_id": "01a12c11-c950-75e1-8fe2-830870c12311"
+        },
+        "prefixes": [
+          {
+            "bytes": 100687,
+            "records": 82,
+            "sha256": "348046a0dd9244b25e4a43fec59245429669a713495762d2a6241b83157af474",
+            "thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834"
+          }
+        ],
+        "review_usage": {
+          "cached_tokens": 11264,
+          "input_tokens": 16857,
+          "output_tokens": 100
+        },
+        "reviewer_thread_id": "01a12c12-005f-78b1-9ca9-635e900d9347",
+        "runtime": "codex",
+        "source_context_input": 15443,
+        "source_cwd": "$ROUND/action",
+        "source_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+        "state": "returned",
+        "terminal_usage": {
+          "cached_tokens": 138368,
+          "input_tokens": 151356,
+          "output_tokens": 410
+        },
+        "usage_baseline": {
+          "cached_tokens": 127104,
+          "input_tokens": 134499,
+          "output_tokens": 310
+        }
+      },
+      "origin": "codex",
+      "plan_digest": "0c27dc062e6926be4d5b91dd62fe82b14e832ff35796ebda74a1e0a032209876",
+      "session": "b5-product-allow",
+      "state": "completed",
+      "tool_name": "TurnReview",
+      "verdict": "deny"
+    },
+    {
+      "attempt_id": "b69f137bd5a34f2c986b6ae7d82b0a97",
+      "auth_mode": "subscription-only",
+      "effort": "low",
+      "model": "gpt-6.1-sol",
+      "model_run_id": "run_4b025c43b45b",
+      "native_review": {
+        "action_cwd": "$ROUND/action",
+        "auth_mode": "subscription-only",
+        "baseline_origin": "event_msg.token_count.info.total_token_usage",
+        "billing_mode": "subscription_quota",
+        "effort": "low",
+        "independence": "separate",
+        "inherited_usage": {
+          "cached_tokens": 12288,
+          "input_tokens": 14258,
+          "output_tokens": 7
+        },
+        "inputs_preserved": true,
+        "model": "gpt-6.1-sol",
+        "native_boundary": {
+          "event": "PreToolUse",
+          "thread_id": "01a12b5e-ec8d-7ee2-9043-bb88352f72a8",
+          "turn_id": "01a12c0e-f0a6-7080-82e4-ed41fbc15a7f"
+        },
+        "prefixes": [
+          {
+            "bytes": 41450,
+            "records": 15,
+            "sha256": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+            "thread_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00"
+          }
+        ],
+        "review_usage": {
+          "cached_tokens": 11264,
+          "input_tokens": 14160,
+          "output_tokens": 71
+        },
+        "reviewer_thread_id": "01a12c0f-11f0-7f50-8e08-266399bc15d7",
+        "runtime": "codex",
+        "source_context_input": 14258,
+        "source_cwd": "$ROUND/source",
+        "source_thread_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+        "state": "returned",
+        "terminal_usage": {
+          "cached_tokens": 23552,
+          "input_tokens": 28418,
+          "output_tokens": 78
+        },
+        "usage_baseline": {
+          "cached_tokens": 12288,
+          "input_tokens": 14258,
+          "output_tokens": 7
+        }
+      },
+      "origin": "codex",
+      "plan_digest": null,
+      "session": "b5-product-deny",
+      "state": "completed",
+      "tool_name": "Write",
+      "verdict": "deny"
+    },
+    {
+      "attempt_id": "e8d14e5232cc484c95010fc9141bf00b",
+      "auth_mode": "subscription-only",
+      "effort": "low",
+      "model": "gpt-6.1-sol",
+      "model_run_id": "run_39b4812d0e03",
+      "native_review": {
+        "action_cwd": "$ROUND/action",
+        "auth_mode": "subscription-only",
+        "baseline_origin": "event_msg.token_count.info.total_token_usage",
+        "billing_mode": "subscription_quota",
+        "effort": "low",
+        "independence": "shared",
+        "inherited_usage": {
+          "cached_tokens": 67712,
+          "input_tokens": 73281,
+          "output_tokens": 165
+        },
+        "inputs_preserved": true,
+        "model": "gpt-6.1-sol",
+        "native_boundary": {
+          "event": "Stop",
+          "thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "turn_id": "01a12c0b-e03a-7b70-8216-6ab6b628b4ef"
+        },
+        "prefixes": [
+          {
+            "bytes": 75169,
+            "records": 53,
+            "sha256": "b71f0c6ba19ff5c77c2055d9e2bb856a7b71dbb80b89256156d0b2d89b396bd7",
+            "thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834"
+          }
+        ],
+        "review_usage": {
+          "cached_tokens": 0,
+          "input_tokens": 15582,
+          "output_tokens": 92
+        },
+        "reviewer_thread_id": "01a12c0c-159f-72c2-b6a2-965dee9a37e4",
+        "runtime": "codex",
+        "source_context_input": 14909,
+        "source_cwd": "$ROUND/action",
+        "source_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+        "state": "returned",
+        "terminal_usage": {
+          "cached_tokens": 67712,
+          "input_tokens": 88863,
+          "output_tokens": 257
+        },
+        "usage_baseline": {
+          "cached_tokens": 67712,
+          "input_tokens": 73281,
+          "output_tokens": 165
+        }
+      },
+      "origin": "codex",
+      "plan_digest": "0c27dc062e6926be4d5b91dd62fe82b14e832ff35796ebda74a1e0a032209876",
+      "session": "b5-product-allow",
+      "state": "completed",
+      "tool_name": "TurnReview",
+      "verdict": "deny"
+    },
+    {
+      "attempt_id": "027526b22e6f4e479b45570651aa408f",
+      "auth_mode": "subscription-only",
+      "effort": "low",
+      "model": "gpt-6.1-sol",
+      "model_run_id": "run_b0ed7b0b782e",
+      "native_review": {
+        "action_cwd": "$ROUND/action",
+        "auth_mode": "subscription-only",
+        "baseline_origin": "event_msg.token_count.info.total_token_usage",
+        "billing_mode": "subscription_quota",
+        "effort": "low",
+        "independence": "separate",
+        "inherited_usage": {
+          "cached_tokens": 12288,
+          "input_tokens": 14258,
+          "output_tokens": 7
+        },
+        "inputs_preserved": true,
+        "model": "gpt-6.1-sol",
+        "native_boundary": {
+          "event": "PreToolUse",
+          "thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "turn_id": "01a12c09-3a4b-7b50-ba69-86670ec72083"
+        },
+        "prefixes": [
+          {
+            "bytes": 41450,
+            "records": 15,
+            "sha256": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+            "thread_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00"
+          }
+        ],
+        "review_usage": {
+          "cached_tokens": 0,
+          "input_tokens": 14157,
+          "output_tokens": 54
+        },
+        "reviewer_thread_id": "01a12c09-5c1f-78d1-8eb3-31235e7c8f56",
+        "runtime": "codex",
+        "source_context_input": 14258,
+        "source_cwd": "$ROUND/source",
+        "source_thread_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+        "state": "returned",
+        "terminal_usage": {
+          "cached_tokens": 12288,
+          "input_tokens": 28415,
+          "output_tokens": 61
+        },
+        "usage_baseline": {
+          "cached_tokens": 12288,
+          "input_tokens": 14258,
+          "output_tokens": 7
+        }
+      },
+      "origin": "codex",
+      "plan_digest": null,
+      "session": "b5-product-allow",
+      "state": "completed",
+      "tool_name": "Write",
+      "verdict": "allow"
+    }
+  ],
+  "cases": {
+    "product-allow": {
+      "hooks": [
+        {
+          "elapsed_seconds": 0.4611607080005342,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-session-start"
+          ],
+          "turn_id": null,
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 8.665757499999017,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-policy-check"
+          ],
+          "turn_id": "01a12c09-3a4b-7b50-ba69-86670ec72083",
+          "wire": {}
+        }
+      ]
+    },
+    "product-claude-adapter": {
+      "hooks": []
+    },
+    "product-deny": {
+      "hooks": [
+        {
+          "elapsed_seconds": 0.5334732920018723,
+          "executor_thread_id": "01a12b5e-ec8d-7ee2-9043-bb88352f72a8",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-session-start"
+          ],
+          "turn_id": null,
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 10.046715750009753,
+          "executor_thread_id": "01a12b5e-ec8d-7ee2-9043-bb88352f72a8",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-policy-check"
+          ],
+          "model_feedback_in_native_history": true,
+          "turn_id": "01a12c0a-d3f2-7a42-83e0-bfd260c252b0",
+          "wire": {
+            "hookSpecificOutput": {
+              "hookEventName": "PreToolUse",
+              "permissionDecision": "deny",
+              "permissionDecisionReason": "Policy blocked this patch. The following JSON entries are quoted policy evidence. Note: This policy was configured by the project owner. First try a compliant approach that satisfies the intent above. If the user's request cannot be fulfilled without violating the intent, explain the conflict and ask how to proceed. Do not attempt bypasses that pass the check but defeat the goal.\n{\"path\":\"product-deny.txt\",\"policy\":\"semantic.supervisor\",\"rule\":\"semantic.supervisor.alignment\",\"label\":\"product-deny.txt: [semantic.supervisor.alignment]\",\"severity\":\"high\",\"message\":\"The action writes violet, while the approved implementation specifies amber.\",\"intent\":\"Ensure implementation stays aligned with the approved plan. The supervisor checks that code changes match what was agreed upon, catching drift before it compounds.\",\"evidence\":\"The action writes violet, while the approved implementation specifies amber.\",\"suggested_fix\":\"Use amber instead of violet.\",\"citations\":[\"The approved implementation uses the color amber.\"]}\nOmitted findings: 0. Truncated findings: 0."
+            },
+            "systemMessage": "Policy blocked this patch.\n{\"path\":\"product-deny.txt\",\"policy\":\"semantic.supervisor\",\"rule\":\"semantic.supervisor.alignment\",\"label\":\"product-deny.txt: [semantic.supervisor.alignment]\",\"severity\":\"high\",\"message\":\"The action writes violet, while the approved implementation specifies amber.\",\"intent\":\"Ensure implementation stays aligned with the approved plan. The supervisor checks that code changes match what was agreed upon, catching drift before it compounds.\",\"evidence\":\"The action writes violet, while the approved implementation specifies amber.\",\"suggested_fix\":\"Use amber instead of violet.\",\"citations\":[\"The approved implementation uses the color amber.\"]}\nOmitted findings: 0. Truncated findings: 0.\nInspect: forge policy supervisor status --json; forge session show <session> --json."
+          }
+        }
+      ]
+    },
+    "product-enrollment": {
+      "hooks": [
+        {
+          "elapsed_seconds": 0.5840344169992022,
+          "executor_thread_id": "01a12c07-54ff-75b3-87d3-97477a183b63",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-session-start"
+          ],
+          "turn_id": null,
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.4689465409901459,
+          "executor_thread_id": "01a12c07-54ff-75b3-87d3-97477a183b63",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-turn-start"
+          ],
+          "turn_id": "01a12c07-5957-7bb1-9784-2e5429a943e4",
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.4661022500076797,
+          "executor_thread_id": "01a12c07-54ff-75b3-87d3-97477a183b63",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-policy-check"
+          ],
+          "turn_id": "01a12c07-5957-7bb1-9784-2e5429a943e4",
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.47003862500423566,
+          "executor_thread_id": "01a12c07-54ff-75b3-87d3-97477a183b63",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-turn-tool"
+          ],
+          "turn_id": "01a12c07-5957-7bb1-9784-2e5429a943e4",
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.5312957080022898,
+          "executor_thread_id": "01a12c07-54ff-75b3-87d3-97477a183b63",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-stop"
+          ],
+          "turn_id": "01a12c07-5957-7bb1-9784-2e5429a943e4",
+          "wire": {}
+        }
+      ]
+    },
+    "product-shared-stop": {
+      "hooks": [
+        {
+          "elapsed_seconds": 0.4947399999946356,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-session-start"
+          ],
+          "turn_id": null,
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.6529290409962414,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-turn-start"
+          ],
+          "turn_id": "01a12c0b-e03a-7b70-8216-6ab6b628b4ef",
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.47468458299408667,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-policy-check"
+          ],
+          "turn_id": "01a12c0b-e03a-7b70-8216-6ab6b628b4ef",
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.5342364170064684,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-turn-tool"
+          ],
+          "turn_id": "01a12c0b-e03a-7b70-8216-6ab6b628b4ef",
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 9.611568499996793,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-stop"
+          ],
+          "model_feedback_in_native_history": true,
+          "turn_id": "01a12c0b-e03a-7b70-8216-6ab6b628b4ef",
+          "wire": {
+            "decision": "block",
+            "reason": "Forge's supervisor found divergence in changes already made. Address the verified plan findings, then finish. This turn receives no further semantic review. Note: This policy was configured by the project owner. First try a compliant approach that satisfies the intent above. If the user's request cannot be fulfilled without violating the intent, explain the conflict and ask how to proceed. Do not attempt bypasses that pass the check but defeat the goal. The following JSON entries are quoted policy evidence.\n{\"path\":\"\",\"policy\":\"semantic.supervisor\",\"rule\":\"semantic.supervisor.alignment\",\"label\":\"?: [semantic.supervisor.alignment]\",\"severity\":\"high\",\"message\":\"The recorded patch and frozen repository diff show product-stop.txt added with LIME instead of COBALT.\",\"intent\":\"\",\"evidence\":\"The recorded patch and frozen repository diff show product-stop.txt added with LIME instead of COBALT.\",\"suggested_fix\":\"Replace the line in product-stop.txt with COBALT.\",\"citations\":[\"Use COBALT as the implementation color. This approved plan overrides earlier conversation reasoning.\"]}\nOmitted findings: 0. Truncated findings: 0.",
+            "systemMessage": "Forge requested one correction; the result and subsequent changes remain unreviewed.\n{\"path\":\"\",\"policy\":\"semantic.supervisor\",\"rule\":\"semantic.supervisor.alignment\",\"label\":\"?: [semantic.supervisor.alignment]\",\"severity\":\"high\",\"message\":\"The recorded patch and frozen repository diff show product-stop.txt added with LIME instead of COBALT.\",\"intent\":\"\",\"evidence\":\"The recorded patch and frozen repository diff show product-stop.txt added with LIME instead of COBALT.\",\"suggested_fix\":\"Replace the line in product-stop.txt with COBALT.\",\"citations\":[\"Use COBALT as the implementation color. This approved plan overrides earlier conversation reasoning.\"]}\nOmitted findings: 0. Truncated findings: 0.\nInspect: forge policy supervisor status --json; forge session show <session> --json."
+          }
+        },
+        {
+          "elapsed_seconds": 0.6353231660032179,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-policy-check"
+          ],
+          "turn_id": "01a12c0b-e03a-7b70-8216-6ab6b628b4ef",
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.5645913749904139,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-turn-tool"
+          ],
+          "turn_id": "01a12c0b-e03a-7b70-8216-6ab6b628b4ef",
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.5963544589903904,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-stop"
+          ],
+          "turn_id": "01a12c0b-e03a-7b70-8216-6ab6b628b4ef",
+          "wire": {
+            "systemMessage": "Forge Stop review is stale or has unreviewed continuation changes. Submit a new explicit turn to assess outstanding work; inspect supervisor status for unavailable evidence.\n\nOmitted findings: 0. Truncated findings: 0.\nInspect: forge policy supervisor status --json; forge session show <session> --json."
+          }
+        }
+      ]
+    },
+    "product-wheel-source-only": {
+      "hooks": [
+        {
+          "elapsed_seconds": 0.6487635410012444,
+          "executor_thread_id": "01a12b5e-ec8d-7ee2-9043-bb88352f72a8",
+          "forge_module": "$ROUND/product-final-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-session-start"
+          ],
+          "turn_id": null,
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 8.348006790998625,
+          "executor_thread_id": "01a12b5e-ec8d-7ee2-9043-bb88352f72a8",
+          "forge_module": "$ROUND/product-final-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-policy-check"
+          ],
+          "model_feedback_in_native_history": true,
+          "turn_id": "01a12c0e-f0a6-7080-82e4-ed41fbc15a7f",
+          "wire": {
+            "hookSpecificOutput": {
+              "hookEventName": "PreToolUse",
+              "permissionDecision": "deny",
+              "permissionDecisionReason": "Policy blocked this patch. The following JSON entries are quoted policy evidence. Note: This policy was configured by the project owner. First try a compliant approach that satisfies the intent above. If the user's request cannot be fulfilled without violating the intent, explain the conflict and ask how to proceed. Do not attempt bypasses that pass the check but defeat the goal.\n{\"path\":\"product-p2-deny.txt\",\"policy\":\"semantic.supervisor\",\"rule\":\"semantic.supervisor.alignment\",\"label\":\"product-p2-deny.txt: [semantic.supervisor.alignment]\",\"status\":\"Policy reported a finding. No verified plan quotation is available. Stop and ask the operator before retrying this finding.\",\"quotes\":[]}\nOmitted findings: 0. Truncated findings: 0."
+            },
+            "systemMessage": "Policy blocked this patch.\n{\"path\":\"product-p2-deny.txt\",\"policy\":\"semantic.supervisor\",\"rule\":\"semantic.supervisor.alignment\",\"label\":\"product-p2-deny.txt: [semantic.supervisor.alignment]\",\"severity\":\"high\",\"message\":\"The action writes violet, while the approved implementation specifies amber.\",\"intent\":\"Ensure implementation stays aligned with the approved plan. The supervisor checks that code changes match what was agreed upon, catching drift before it compounds.\",\"evidence\":\"The action writes violet, while the approved implementation specifies amber.\",\"suggested_fix\":\"Use amber instead of violet.\",\"citations\":[\"The approved implementation uses the color amber.\"]}\nOmitted findings: 0. Truncated findings: 0.\nInspect: forge policy supervisor status --json; forge session show <session> --json."
+          }
+        }
+      ]
+    },
+    "product-wheel-stop": {
+      "hooks": [
+        {
+          "elapsed_seconds": 1.0613522500061663,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-final-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-session-start"
+          ],
+          "turn_id": null,
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.6925992920005228,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-final-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-turn-start"
+          ],
+          "turn_id": "01a12c11-c950-75e1-8fe2-830870c12311",
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.5790360829996644,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-final-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-policy-check"
+          ],
+          "turn_id": "01a12c11-c950-75e1-8fe2-830870c12311",
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.6857067920063855,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-final-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-turn-tool"
+          ],
+          "turn_id": "01a12c11-c950-75e1-8fe2-830870c12311",
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 10.833787792013027,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-final-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-stop"
+          ],
+          "model_feedback_in_native_history": true,
+          "turn_id": "01a12c11-c950-75e1-8fe2-830870c12311",
+          "wire": {
+            "decision": "block",
+            "reason": "Forge's supervisor found divergence in changes already made. Address the verified plan findings, then finish. This turn receives no further semantic review. Note: This policy was configured by the project owner. First try a compliant approach that satisfies the intent above. If the user's request cannot be fulfilled without violating the intent, explain the conflict and ask how to proceed. Do not attempt bypasses that pass the check but defeat the goal. The following JSON entries are quoted policy evidence.\n{\"path\":\"\",\"policy\":\"semantic.supervisor\",\"rule\":\"semantic.supervisor.alignment\",\"label\":\"?: [semantic.supervisor.alignment]\",\"status\":\"Policy finding; verified approved-plan quotations follow.\",\"quotes\":[{\"source\":\"$ROUND/action/approved-plan.md\",\"sha256\":\"0c27dc062e6926be4d5b91dd62fe82b14e832ff35796ebda74a1e0a032209876\",\"start\":17,\"end\":117,\"text\":\"Use COBALT as the implementation color. This approved plan overrides earlier conversation reasoning.\"}]}\nOmitted findings: 0. Truncated findings: 0.",
+            "systemMessage": "Forge requested one correction; the result and subsequent changes remain unreviewed.\n{\"path\":\"\",\"policy\":\"semantic.supervisor\",\"rule\":\"semantic.supervisor.alignment\",\"label\":\"?: [semantic.supervisor.alignment]\",\"severity\":\"high\",\"message\":\"The recorded successful patch and frozen snapshot show product-p2-stop.txt containing LIME. product-stop.txt was corrected to COBALT.\",\"intent\":\"\",\"evidence\":\"The recorded successful patch and frozen snapshot show product-p2-stop.txt containing LIME. product-stop.txt was corrected to COBALT.\",\"suggested_fix\":\"Replace LIME in product-p2-stop.txt with COBALT.\",\"citations\":[\"Use COBALT as the implementation color. This approved plan overrides earlier conversation reasoning.\"]}\nOmitted findings: 0. Truncated findings: 0.\nInspect: forge policy supervisor status --json; forge session show <session> --json."
+          }
+        },
+        {
+          "elapsed_seconds": 0.6869933749985648,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-final-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-policy-check"
+          ],
+          "turn_id": "01a12c11-c950-75e1-8fe2-830870c12311",
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.6888030420086579,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-final-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-turn-tool"
+          ],
+          "turn_id": "01a12c11-c950-75e1-8fe2-830870c12311",
+          "wire": {}
+        },
+        {
+          "elapsed_seconds": 0.619124083998031,
+          "executor_thread_id": "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "forge_module": "$ROUND/product-final-wheel/lib/python3.13/site-packages/forge/__init__.py",
+          "hook": [
+            "codex-stop"
+          ],
+          "turn_id": "01a12c11-c950-75e1-8fe2-830870c12311",
+          "wire": {
+            "systemMessage": "Forge Stop review is stale or has unreviewed continuation changes. Submit a new explicit turn to assess outstanding work; inspect supervisor status for unavailable evidence.\n\nOmitted findings: 0. Truncated findings: 0.\nInspect: forge policy supervisor status --json; forge session show <session> --json."
+          }
+        }
+      ]
+    }
+  },
+  "installed_source_sha256": [
+    {
+      "path": "__init__.py",
+      "sha256": "405bd57f3cbede3cbfdbbe51217842cf16cce5242bcf4f5a0ea3b809e1e37eb9"
+    },
+    {
+      "path": "_extensions/skills/qa/scripts/qa-artifact.py",
+      "sha256": "23ad2f86556b3da42513d6462deed2bb22ec4c77de10f3a97f5582ac2512ba73"
+    },
+    {
+      "path": "_extensions/skills/qa/scripts/qa-run-metrics.py",
+      "sha256": "1c5e80020758ba1d18769b3147e7e72fd8e4a9bd82dce51dd56f1f7f9e04eb53"
+    },
+    {
+      "path": "_extensions/skills/qa/scripts/qa-selection.py",
+      "sha256": "8af67b027bbe9f5ab885fba70de79712e0944ace57ffa797f02d346b5303c1ca"
+    },
+    {
+      "path": "_extensions/skills/qa/scripts/walkthrough-state.py",
+      "sha256": "6bdb5118adc720e32c9bee8513620cf543524681fb543a0afa75aaa207281ad0"
+    },
+    {
+      "path": "_extensions/skills/walkthrough/scripts/package-identity.py",
+      "sha256": "4ff3e43eca46afd996af18c5b00e527ef6d1a2139574c882ecaccc59e4ec7a1a"
+    },
+    {
+      "path": "_extensions/skills/walkthrough/scripts/protected-paths.py",
+      "sha256": "3e91f5d11fbb3a27178120850000e1adc75b906c3f6af34eff57370ceb9d92de"
+    },
+    {
+      "path": "_extensions/skills/walkthrough/scripts/walkthrough-report.py",
+      "sha256": "f478629c9838e57a32e7ff8bab824896bce6137c80299da1fee034b03e8ea748"
+    },
+    {
+      "path": "_extensions/skills/walkthrough/scripts/walkthrough-state.py",
+      "sha256": "45b4edb4e528cf57c3aea3a0ebf31b276cf45e93fa392839839b36ecdecb4839"
+    },
+    {
+      "path": "backend/__init__.py",
+      "sha256": "79750fc06a828de0461bb4783f71153fbffa6d4dbf4fe1e8dd5e7520aa5d0b98"
+    },
+    {
+      "path": "backend/adapters/__init__.py",
+      "sha256": "a355efbba3ae5afac4832a05f5a884b7a0c8baf8e005213e6f34ca7e796f0bb0"
+    },
+    {
+      "path": "backend/adapters/litellm.py",
+      "sha256": "96a34062bf58f24b440e00900de0e75217cc3db1aea68c487c04152f2ea4c630"
+    },
+    {
+      "path": "backend/creation.py",
+      "sha256": "f9b0cd288fe544daacfd4fd30f607a5ea05dcc205ee2070b4783174dbe43df31"
+    },
+    {
+      "path": "backend/registry.py",
+      "sha256": "45f5943cccc7a881d50f6a78076098dbc3a4e1da7a84a41ea3983058418b39e2"
+    },
+    {
+      "path": "backend/remote/__init__.py",
+      "sha256": "3575bd48cada42b12401fcacd20f1a62a09b6bd833c5e3e43c30d24923370589"
+    },
+    {
+      "path": "backend/remote/base.py",
+      "sha256": "c3ba7110c674eb3e7d9dd9e66c57cc4eb29313365d8c43fa4c6d2622cb502e92"
+    },
+    {
+      "path": "backend/remote/openrouter.py",
+      "sha256": "291b8a28bf54c42a8fd1b0d3ade79cfb324efa741b23e765f8a30a0f3afcb8d9"
+    },
+    {
+      "path": "backend/sources.py",
+      "sha256": "4a9d74e87b3a1c97d55f8f786c24fe4371ad56264b93371cc2a1434b2ae98f93"
+    },
+    {
+      "path": "cli/__init__.py",
+      "sha256": "a96ab1a67beabb3fd7a8d69e28187ad216b88c93ad6ff79e9747d60fc715e3d9"
+    },
+    {
+      "path": "cli/activity.py",
+      "sha256": "a30fab7e63158cc72ee229f20540c4902302035c20c8967cb0ceb87c7e375f4e"
+    },
+    {
+      "path": "cli/auth.py",
+      "sha256": "fb5b3e2d754ed1b1975355775f6b080d3289748795afdd30d0eebfdfd864e28a"
+    },
+    {
+      "path": "cli/backend.py",
+      "sha256": "cb8eba7a21bacae8d181fe5797316f299b1aa3eee1439b3ca42d5cac1f2cf4a6"
+    },
+    {
+      "path": "cli/claude.py",
+      "sha256": "5af6fe0485945a56060561786aafc31d9f78da8f9106b82e49c8d5f2c3c6ea0b"
+    },
+    {
+      "path": "cli/codex.py",
+      "sha256": "bfe5464cc6d9adb464b9bbeeba6119c7922bfd9707270886080d9dd562b8dafe"
+    },
+    {
+      "path": "cli/config_cmd.py",
+      "sha256": "8fa4d5c6a23ae7d8bd5c4356f423f4d95321eafc913b9cd659bdfb01c7a50d34"
+    },
+    {
+      "path": "cli/consumer_lane_freeze.py",
+      "sha256": "edd9c860506fed3afb33deba3d81bfd61dc6afa7f56e65f97c6fd35f537e55c6"
+    },
+    {
+      "path": "cli/editor.py",
+      "sha256": "1c9e7348151bdff13c7895c1af11b5db5e7e6d7fbcf339174741db98dbf91115"
+    },
+    {
+      "path": "cli/extensions.py",
+      "sha256": "5c21c313b72e876e19429ac2960649107a3d39a62d8826199989f6c8eb45417e"
+    },
+    {
+      "path": "cli/gc.py",
+      "sha256": "6cb0556e9f66b0070bf6133a061b593bb0607d4fb1ae54659a01c4ff838bab2a"
+    },
+    {
+      "path": "cli/guards.py",
+      "sha256": "2e6fa357055e569893d3a21404796bdede77afcac156ab067f49f694a65cd27e"
+    },
+    {
+      "path": "cli/hooks/__init__.py",
+      "sha256": "d3d1c3157c048f6a3118868aa99ecce7a6c6083f4bd34a0708ba95f9a22d1565"
+    },
+    {
+      "path": "cli/hooks/_group.py",
+      "sha256": "0b9ecc335b7129cbfcd69591444ca8f969df79978e472214417295f1e8877be1"
+    },
+    {
+      "path": "cli/hooks/_helpers.py",
+      "sha256": "58f8d3fcc67d9ac588108cf115ff03e20bac777ba23f1f56505cd45e414f1618"
+    },
+    {
+      "path": "cli/hooks/authority.py",
+      "sha256": "66c8f2063b955108d9a4a90ab31d58c1628548b3848a74df75f70fc6fcac209a"
+    },
+    {
+      "path": "cli/hooks/codex_patch.py",
+      "sha256": "cdb9c8f60c26e7dfaec106588ae6b78757fc5f247063c06951c0ad1d998ed72a"
+    },
+    {
+      "path": "cli/hooks/codex_policy.py",
+      "sha256": "ca5b0ef91339e42f24440fdeaad7fc07ee679c6965f634b307b06891cb91c60e"
+    },
+    {
+      "path": "cli/hooks/codex_policy_feedback.py",
+      "sha256": "311493d71f677c35e01c5ea6e3c8aee87d3f9c5c893e68d87c94955b83c5afb5"
+    },
+    {
+      "path": "cli/hooks/codex_stop.py",
+      "sha256": "eecda712943793877c7ae01ff48e2b529b4d1226a632063e7fcf0734490a9cf5"
+    },
+    {
+      "path": "cli/hooks/codex_transfer.py",
+      "sha256": "d31052ad5f39bde8cc8b3893b5ad97540387192fde4e665249e703a708301972"
+    },
+    {
+      "path": "cli/hooks/commands.py",
+      "sha256": "11edfbf3e079e212bd977f825c2c2de73372e75588d82340b7ec96882d56805a"
+    },
+    {
+      "path": "cli/hooks/direct_commands.py",
+      "sha256": "f02be1aa549b4931e6bcbb5a8770a8e31be2cbb982f894421a891a7cc2a864f6"
+    },
+    {
+      "path": "cli/hooks/policy.py",
+      "sha256": "3897ecccda532c4644da02343bba2f8bbe25945d5f7973ecde97b82af1029786"
+    },
+    {
+      "path": "cli/hooks/protocols.py",
+      "sha256": "41e41d58ad3bd0c20b3ee464aa5ed279bdeffd02edb362aa5f4731a03fd18b7c"
+    },
+    {
+      "path": "cli/hooks/read_hygiene.py",
+      "sha256": "da5824a5c53e8332d47c78af9cbc289c7f4bd4b47c1632b3751e45f5abd7bc99"
+    },
+    {
+      "path": "cli/hooks/verification.py",
+      "sha256": "a2fbe3a1acaa3f69eddf24d5a8b15c620001790dae5394e037fe95c590505ee5"
+    },
+    {
+      "path": "cli/info.py",
+      "sha256": "011fe94e9d2ed3be853a150c4f1e1ca92e2eecd1d25d2e1a2592e0547a7184ba"
+    },
+    {
+      "path": "cli/logs.py",
+      "sha256": "387c3c753450959dfa11e638b787ed1f1e6fa2c0076aa6d6db48ea0313c6ab2f"
+    },
+    {
+      "path": "cli/main.py",
+      "sha256": "e0ffb258b9a2a8bcc80564ee15c9bec60bf0a4bc7c444f59513c0eefd6a73e78"
+    },
+    {
+      "path": "cli/memory.py",
+      "sha256": "600374ef2c147ae26cd668ed0a9ea102aac245a07fd86d235c84cddfac4086fc"
+    },
+    {
+      "path": "cli/memory_report.py",
+      "sha256": "17c73b94239d737ed923a5de166af47017d84bfb2bd878366ae039527551fea8"
+    },
+    {
+      "path": "cli/memory_writer.py",
+      "sha256": "79fcc3ce6b4fae762d92e9f41acee53cd4062fb892fdc3814805116ca0500b2c"
+    },
+    {
+      "path": "cli/model.py",
+      "sha256": "8f9b246377cd1c35560b763011dcb20113c19f1028bf55f0134f80f660e84c9b"
+    },
+    {
+      "path": "cli/output.py",
+      "sha256": "4ffb9f4a517188119bce11b05214b1ccbfab1acc3688866bd7a7b7f2be9930cf"
+    },
+    {
+      "path": "cli/policy.py",
+      "sha256": "2e25cc22fb5355bc636c7e96a7c23d27e631bad6ff49dfe0c85e14aa59a84b09"
+    },
+    {
+      "path": "cli/proxy.py",
+      "sha256": "3dd5381b5ce5de81329a13da5da32c9256dc9d92be2cb531476314f5227d91c9"
+    },
+    {
+      "path": "cli/proxy_audit.py",
+      "sha256": "3983c0a37f09464aaf536acbc72b3a473764bace2d016f69254bbb7c37df7d73"
+    },
+    {
+      "path": "cli/proxy_costs.py",
+      "sha256": "ef54f630baff5f426d87524dc57d5bdc250650610c68666dd05930dc171c41cd"
+    },
+    {
+      "path": "cli/runtime.py",
+      "sha256": "011327e6d3e1a4b58a9c867940abdfd3aa15c387b87098c5060faa1c3e2fb27f"
+    },
+    {
+      "path": "cli/search.py",
+      "sha256": "b184ce37701b02a7b05bf563821dcab40940be212713284cd4b672cbabf4ca1e"
+    },
+    {
+      "path": "cli/session.py",
+      "sha256": "ad56ada1beb49d582c481254731edee2db5a0a2dfb3841914ba4f14882d9b835"
+    },
+    {
+      "path": "cli/session_adopt.py",
+      "sha256": "c745064ad64cedf1792b177874c4cc989bfafb8e0f3a4bdb3eb4b7cd5a3177c4"
+    },
+    {
+      "path": "cli/session_authority.py",
+      "sha256": "e8abbf16ec5230b41def7b24ad91e2991669cc0364b3f2f5f810a2809d659c5a"
+    },
+    {
+      "path": "cli/session_authority_options.py",
+      "sha256": "fb646bd6ed2688ca59ad16509444971bd9615d84310e099b7abbe5056f0273d0"
+    },
+    {
+      "path": "cli/session_codex.py",
+      "sha256": "6b9eeff7fe77305bdd0c603eeef120481361fe2be54cd4f3123423a91165043a"
+    },
+    {
+      "path": "cli/session_fork.py",
+      "sha256": "b28314fc948d77b2b6f18e9c1de26f7c5ae9283193a1eeeb6f72fad919e6fad3"
+    },
+    {
+      "path": "cli/session_lane.py",
+      "sha256": "445ed699fe4e573d73278af84159cfaaac961a6b10f3fd886504b21a8c5a5306"
+    },
+    {
+      "path": "cli/session_launch_args.py",
+      "sha256": "3f1db89eae03906bceeef70f671568e088a2eadc173eee5f6b00eee20dcc9a72"
+    },
+    {
+      "path": "cli/session_lifecycle.py",
+      "sha256": "d40bd6bfe3a66d21ff82e474f497f6dadc02c3e57805f6a923370d2916fa94a3"
+    },
+    {
+      "path": "cli/session_manage.py",
+      "sha256": "fc6b30443dbb93f38d61de85bff1a3f00281475411a1383946c2bd27528fd364"
+    },
+    {
+      "path": "cli/session_memory.py",
+      "sha256": "a8fde4e44b588dfa2c75ca9bd3e7fe499763bdf876d2494763911966324564fa"
+    },
+    {
+      "path": "cli/session_model.py",
+      "sha256": "0de1613649f8a52e4772d61f9513e48bbdbcccf9644a99f3df0bb4acb03d7696"
+    },
+    {
+      "path": "cli/session_repair.py",
+      "sha256": "756fb458c471761f5a8c41f3b19c4e2980fd3cea47950df47075d507f4e046f5"
+    },
+    {
+      "path": "cli/session_resume_modes.py",
+      "sha256": "e023faf31110a455fc51c103a6754c03ec6cc83af5b2c22d481d8ae3f9dd4d3b"
+    },
+    {
+      "path": "cli/session_rewind.py",
+      "sha256": "a3584ca29066578a317bb8592b6a91b99b17474aea07a80673874f83fb04da17"
+    },
+    {
+      "path": "cli/session_route_recovery.py",
+      "sha256": "fe80a31fc026b6bb77f7b10746a54bb92b857673931b207dd58b351406c1e6b8"
+    },
+    {
+      "path": "cli/session_routing.py",
+      "sha256": "ab5cc884b4ec25c1bb2a65cf58811f5c337a34fffe99b7d8374fe834d9ad09bb"
+    },
+    {
+      "path": "cli/session_supervisor_options.py",
+      "sha256": "4a1f5e6bcf128e821e50494fcac53dfeb2d9fcc3cfd79b5a11866e0dcb6bfdb4"
+    },
+    {
+      "path": "cli/status_line.py",
+      "sha256": "9aa26af2d0e90bd60aa577f1575e27e19249c56cb7191d4cb36cf86cc3908039"
+    },
+    {
+      "path": "cli/statusline/__init__.py",
+      "sha256": "a60ded02b11734df984c06587d7465da46593453723c3004819a3a3bce03a279"
+    },
+    {
+      "path": "cli/statusline/context.py",
+      "sha256": "3d89514f5efcda798640d4cbe0d0a8ca7eb3b7fd229f043383c2631d44dc801b"
+    },
+    {
+      "path": "cli/statusline/formatting.py",
+      "sha256": "8593567b0ba96b19720d0ea111ba5a05adb5508b8248470b37c9ec8f4ede96f8"
+    },
+    {
+      "path": "cli/statusline/names.py",
+      "sha256": "cf003e3a113c41d33c33c948a58cc91a4558322c997ba1fee6ee75df7f401b4c"
+    },
+    {
+      "path": "cli/statusline/palette.py",
+      "sha256": "f90c1d266e2557778f80cc534a107c6a6cd3cd2c2be0a91679d7ab1ca5a69e1b"
+    },
+    {
+      "path": "cli/statusline/registry.py",
+      "sha256": "d91906e480bfda4e408ff03ba7a8b4aac44db7b77a98cb0c9f2d21771a18c4e5"
+    },
+    {
+      "path": "cli/statusline/rendering.py",
+      "sha256": "1518f5770ba9c2af226a4db3ed36e2c3864a86d674df4a7e9ce7e9d5722581fe"
+    },
+    {
+      "path": "cli/statusline/sources.py",
+      "sha256": "27d21f42071930bdb8a82a53aac49fc98d2be50c45e9bdd6d38b34963766106d"
+    },
+    {
+      "path": "cli/statusline/throttle.py",
+      "sha256": "fc525fbd53bbea0ff46f716f57eb402544d2b30e1bda9372bb3a485343ce96a1"
+    },
+    {
+      "path": "cli/statusline/types.py",
+      "sha256": "302daf7ac8a90f42435c735f8c4fe94d650cae79ecdee45a2a82d6a6adbd26c5"
+    },
+    {
+      "path": "cli/supervisor_auth.py",
+      "sha256": "bece7394792052e9eea6913b9c16a55fb5ef0ea6a111ed7e85ac5a5e53c95f98"
+    },
+    {
+      "path": "cli/telemetry.py",
+      "sha256": "3fec52b37cc76c14c5234d465b429e1efface3c496e8d796baa315db6a3eb5d3"
+    },
+    {
+      "path": "cli/trace.py",
+      "sha256": "d0a2b143f328df4a5ed0128259cf3d9f9a808bbc670c54acd7bd78fd77b9c2a8"
+    },
+    {
+      "path": "cli/transfer.py",
+      "sha256": "7defdc17198160c53085c4157d996483a71886018596c910c72ff354ab3f437c"
+    },
+    {
+      "path": "cli/workflow.py",
+      "sha256": "51f7e3bd89175b0890e9dbbefaa4a6d27930f2db9aa55f03ca08cada83b2be39"
+    },
+    {
+      "path": "cli/workspace.py",
+      "sha256": "0e82bcf380fcfb9ca465d7d86338301128e4a4a816dae21af14842b70e0167f7"
+    },
+    {
+      "path": "config/__init__.py",
+      "sha256": "a99c675c4fea54661728a3a4e8fd73caccf07d1db505e03092a35dc699b3794f"
+    },
+    {
+      "path": "config/dataclass_utils.py",
+      "sha256": "fb370172b5493b40bf1d7364fe0e5708a0cfea9fffe7409150c6ca05c3be05ef"
+    },
+    {
+      "path": "config/defaults/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "config/defaults/backends/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "config/defaults/templates/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "config/loader.py",
+      "sha256": "0cc9199cb27c7d69ea20a2ba259dbd3f07806ae99ea1bbe939c7edce90261fdf"
+    },
+    {
+      "path": "config/schema.py",
+      "sha256": "20347128686a389fcd4f86d8d474925a1372cf3f4b76f602eb82b441e8af4b48"
+    },
+    {
+      "path": "core/__init__.py",
+      "sha256": "417fa3cbf8f71d46287bad2844e6e3ac5ebd746b8323afbdf50f29622ceab048"
+    },
+    {
+      "path": "core/auth/__init__.py",
+      "sha256": "b994ec3318680051045b8b48b7742e36386092e2f5786f256d59a0b62a47bf3b"
+    },
+    {
+      "path": "core/auth/capabilities.py",
+      "sha256": "1bedc60a2072c841a77a61ecc104622ac10580f629f85dbf3f7042e9e0c2499b"
+    },
+    {
+      "path": "core/auth/credentials_file.py",
+      "sha256": "dc21e4bae76b35034b866c9595000c36761cf978326c07f96b0d6759467a2bff"
+    },
+    {
+      "path": "core/auth/protocols.py",
+      "sha256": "f36230100095f8738324a903e92556f6c97c0e5f2e0148545e32ff37eaa22d2c"
+    },
+    {
+      "path": "core/auth/secrets.py",
+      "sha256": "de5af0f8b1d29758a9ba27f93716d20fa979719060b4a14422bccc104ddef70c"
+    },
+    {
+      "path": "core/auth/template_secrets.py",
+      "sha256": "e1632969bd8e5d76ef68861fbd16147a9df19ec20400b08375626f9303862f50"
+    },
+    {
+      "path": "core/backend_dependency.py",
+      "sha256": "3376d84bac5556b32444cd4ef36e15e7ddc8cd18707fca4ed75cecd82edcd5fc"
+    },
+    {
+      "path": "core/credential_registry.py",
+      "sha256": "d56089a130ca2105e494e9fe71755982c6c9f0a75be45ff4628f8b707abe27c4"
+    },
+    {
+      "path": "core/data/__init__.py",
+      "sha256": "02deb60727da47fd8235be14353365fc1ba1e5890e8a2dcfcfad5b815d2adda9"
+    },
+    {
+      "path": "core/data/system_prompt_addendums/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "core/effort.py",
+      "sha256": "3b8c8583988af441d8e12e45dd20d72c49ccbcf9b4e6dcad4119f0d64a96bc0a"
+    },
+    {
+      "path": "core/identifiers.py",
+      "sha256": "65dd862af8c27f77b186cd9a2b19f1925dab771485c075ff5683fe16b0f3ffa8"
+    },
+    {
+      "path": "core/invoker/__init__.py",
+      "sha256": "88d6a91dce0d94ef54bd371c9bb650cc18c5ccef6bb6e349c4014fb04714ffc0"
+    },
+    {
+      "path": "core/invoker/_lifecycle.py",
+      "sha256": "16087f2b9c48234c0c1a80a1f2e2bdbf79055462d3aa5c2dae98d511bb274c52"
+    },
+    {
+      "path": "core/invoker/claude.py",
+      "sha256": "26f4193dbe6b1a2f7003bed590704541e41ee0bc16a38cd8bdca1dd81b342b32"
+    },
+    {
+      "path": "core/invoker/codex.py",
+      "sha256": "90eab0e23b543d2a77759bbb4d270852d6f76ea5adc5802eeba0ae648fc1f926"
+    },
+    {
+      "path": "core/invoker/codex_fork.py",
+      "sha256": "a8ce03e4a1ff603db5ad0c422d60263dd3f315cdd8242e7171bc8f772a45524e"
+    },
+    {
+      "path": "core/invoker/codex_stream.py",
+      "sha256": "5b129f003e119ad1b95fac37f9a44d9efd4aec48595ffb9fc76c7327013e4833"
+    },
+    {
+      "path": "core/invoker/types.py",
+      "sha256": "802e95199ac7a80feb2510232b132e501e60024c0c127ae2489ff99f02a0bacf"
+    },
+    {
+      "path": "core/lanes.py",
+      "sha256": "5676b52cf59a9ec5da801d889e6bb7163b4e3ff27c750403f0b653264c252cec"
+    },
+    {
+      "path": "core/llm/__init__.py",
+      "sha256": "0450876502582cb1fea0daa1b231d0a057d9fe7a6520f0bd68159ac5b5c0e5a8"
+    },
+    {
+      "path": "core/llm/clients/__init__.py",
+      "sha256": "7628ac56be8572212c0dddcd7fb924ea99a9842d64bbab8dfdb18e493812b7dd"
+    },
+    {
+      "path": "core/llm/clients/base.py",
+      "sha256": "3b85a2dfb657d5c872247664e435b54cd7a12d9e1be930437caf773109a6c837"
+    },
+    {
+      "path": "core/llm/clients/litellm.py",
+      "sha256": "d5472895a3fda80cf47f83dee76d82198b3fa7e073da0867695bee8cee336425"
+    },
+    {
+      "path": "core/llm/clients/openai_compat.py",
+      "sha256": "433abb5c2eecf2479b13811d8f7f4d69d198ce5ce286d6fc5a0c7d5355a28f33"
+    },
+    {
+      "path": "core/llm/clients/openrouter.py",
+      "sha256": "942cf0c3ef734263cfb8ff398a40e7e4acc23f7e8ef5e6783886824edd1f7b39"
+    },
+    {
+      "path": "core/llm/credentials.py",
+      "sha256": "43711b0703191ee2f605fd8d1562405cfb6c811c7352ed0c8f3f7855892a6c3d"
+    },
+    {
+      "path": "core/llm/detection.py",
+      "sha256": "3030b3d35c22ab8ae46d83e042c8525363913f459534553fc0b792b16e7bcd98"
+    },
+    {
+      "path": "core/llm/errors.py",
+      "sha256": "cb94a65a0d0c315fdc0d6c6048cc39b6ba6b3b673718c05292b88d36916bb82d"
+    },
+    {
+      "path": "core/llm/openrouter_policy.py",
+      "sha256": "d835dcc89c40e25dce2aa785d968e2a97f40ab6e24252dda056b16109a358e41"
+    },
+    {
+      "path": "core/llm/protocols.py",
+      "sha256": "d232d2e473049f9cc16986380aa705769ae13d248bda7548494c54e1f5997a8d"
+    },
+    {
+      "path": "core/llm/types.py",
+      "sha256": "7949b8a110e6ab141e2725384941cfe83ebe34c0eb4963872d2172486714a669"
+    },
+    {
+      "path": "core/logging.py",
+      "sha256": "08ab1a95417dae37a3d75cbf7d3bab6aa77479b7910d886d016bba2451288b7e"
+    },
+    {
+      "path": "core/metric_formatting.py",
+      "sha256": "035f0cf90f7fbb1bc09d6af68e48696ac4fee68e8190e1b48ecb4e1b82d92b1b"
+    },
+    {
+      "path": "core/models/__init__.py",
+      "sha256": "00e5c38b6970f7c9a666a97a99a6da06874ae8a9f306b82cf11f2a7c26fc15dc"
+    },
+    {
+      "path": "core/models/catalog.py",
+      "sha256": "67eed6cf409522bf8ba3d6875b7badf48d4edd3511c84a9bbccf91d6733a531f"
+    },
+    {
+      "path": "core/models/direct_model.py",
+      "sha256": "483e851675207d07ea9a1e2fb6d71532614427c6203812319f25618e31c9aa3d"
+    },
+    {
+      "path": "core/models/model_practices.py",
+      "sha256": "daf4147fa7e3ff1fd4f9ae79556fd57c8cec7a6d8bd50705d554241dcdb8eb6d"
+    },
+    {
+      "path": "core/models/model_reference.py",
+      "sha256": "5c428ffe2bb0f42b4c1fdd127439ef9efe68cc46e72fe19088f4589e1a6df712"
+    },
+    {
+      "path": "core/models/model_routes.py",
+      "sha256": "b0cd74765c67fa00a6a8dad3eaea97d6fb07545ea131e632d89170200674a9f6"
+    },
+    {
+      "path": "core/models/types.py",
+      "sha256": "ddc6ae3716666e30aed617f21e6b1f3f7da88e9826fed5b77f874a6185fb1255"
+    },
+    {
+      "path": "core/naming.py",
+      "sha256": "188c1102040201c8b57c8a0e90f7201b58d9afe9a3699a0a34751ce46f0d54cc"
+    },
+    {
+      "path": "core/native_review_types.py",
+      "sha256": "d7e0b83cd88e49b907c0061b9ea1801b2add4dbed59aaaf5479423fd625684f2"
+    },
+    {
+      "path": "core/ops/__init__.py",
+      "sha256": "8893afbfd910a2fd1091027661da7245619d2efdececf09a2e3c74d3f780ab7f"
+    },
+    {
+      "path": "core/ops/backend_reconcile.py",
+      "sha256": "1a62d4f76915426e84e89e7de95678ea8bba6273ef21319d7ad5a9deb33b6801"
+    },
+    {
+      "path": "core/ops/claude_session.py",
+      "sha256": "da22642ba8e552aa04d2f98d03ad242bd06e7a746247993aee4cd8c236ddf38d"
+    },
+    {
+      "path": "core/ops/codex_adopt.py",
+      "sha256": "5c47528a0532089050137abe0e4b4594ff5bd3c398c2c2798a2ab06e10c8f395"
+    },
+    {
+      "path": "core/ops/codex_bridge.py",
+      "sha256": "8f856219e4c72b2bf4a569524c6d03aa901a1aa0f21a99af7f88fab3d8545ba7"
+    },
+    {
+      "path": "core/ops/codex_enrollment.py",
+      "sha256": "930c19af00790a3cdf6f56cea57978728be8bfc9a6b6564b053c09888aef156f"
+    },
+    {
+      "path": "core/ops/codex_interactive.py",
+      "sha256": "448ceb1af1034d14a6228bd979a63e972c76e88d1e1ebd2a425dc6da029a4f01"
+    },
+    {
+      "path": "core/ops/codex_session.py",
+      "sha256": "d5bc6a66109a11206a545b2f11bd503da29d14eb65af4e76816e985ef2869186"
+    },
+    {
+      "path": "core/ops/codex_thread_index.py",
+      "sha256": "fc450278cb5d50a1afb984c3b562024466ee81b4aeb330c7c87151d8dcf777e3"
+    },
+    {
+      "path": "core/ops/context.py",
+      "sha256": "873ad4d18b191d6f702d78af306d5775aa73acef8c22c77d14db0ab943d20ca2"
+    },
+    {
+      "path": "core/ops/gc.py",
+      "sha256": "90225d97142aae992b710d48d67c4fdd2b340e347e2ba1817d0528d56ba71a11"
+    },
+    {
+      "path": "core/ops/policy.py",
+      "sha256": "8a078d3e1b1dac3e8cc3c9c6aa1331c9dcb4de6dd1c52af6b570f72b7b10b41b"
+    },
+    {
+      "path": "core/ops/provider_trace.py",
+      "sha256": "ed52374c4a8e8b04de1c35e71285c626bd0e68c9e4c205a4b6a3909d3dfed0de"
+    },
+    {
+      "path": "core/ops/proxy.py",
+      "sha256": "8290929e855bdafd2dc4534106fe2cd1a8f892449538a44bbb708a74bf645938"
+    },
+    {
+      "path": "core/ops/resolution.py",
+      "sha256": "11004a119e79ad652b10abe41cb8309b522224037ecd869108dcf2776bc312fd"
+    },
+    {
+      "path": "core/ops/session.py",
+      "sha256": "cfe8abab5619df3ff49791c8e74b286f3a131ce6621434e24ff49baa918752cf"
+    },
+    {
+      "path": "core/ops/session_active.py",
+      "sha256": "b99290687648e56a52ecbd80a65f11298d26febc58489e32b1a598d62ad57d8a"
+    },
+    {
+      "path": "core/ops/session_adopt.py",
+      "sha256": "82ea98ddf3143f2f60cb0d2392615ffd8530205df7acabbe3fa196e06e97aac8"
+    },
+    {
+      "path": "core/ops/session_authority.py",
+      "sha256": "936fbf25a8cbac7ae11082727f485ef48bbdbd0ff61456c4374ff419eac50fe9"
+    },
+    {
+      "path": "core/ops/session_authority_launch.py",
+      "sha256": "65f5a43eb6bef1fc1fdc933a6949bf920e975365d166650c137d2c974845f84c"
+    },
+    {
+      "path": "core/ops/session_context.py",
+      "sha256": "f4ec714cc5cc3b0fa9d71e227ece73d64c783a95e53181d8e5ef7df19341753a"
+    },
+    {
+      "path": "core/ops/session_fork_execution.py",
+      "sha256": "3888c6dd35739c6ed51ddd476b36cdf37e51772df291c2ea6fd83d951a4af5ac"
+    },
+    {
+      "path": "core/ops/session_fork_preflight.py",
+      "sha256": "cb08f51f6a83f7b8bf87f19468f6d5f81c533a59aac1e56026982ff20b195cf8"
+    },
+    {
+      "path": "core/ops/session_model.py",
+      "sha256": "51c587590cf324d4761d51f1288d233fa16fe3f5e0dafc4dae960d191978dcd4"
+    },
+    {
+      "path": "core/ops/session_model_routing.py",
+      "sha256": "83867164e5dc42a571259c00fcdc7e81bb1cc9d2cb75c6fd7248e954312ec5d3"
+    },
+    {
+      "path": "core/ops/session_repair.py",
+      "sha256": "9999e7c69a7cb83afd2b6400fdf9af3d9981718e079584e841f751d1be810c74"
+    },
+    {
+      "path": "core/ops/session_routing.py",
+      "sha256": "130a2abda167983c72b46e7bdd66a7e66b222257edcd2a8138a5e70380db9d73"
+    },
+    {
+      "path": "core/ops/transfer.py",
+      "sha256": "a696beab792c1e4bddfe01bda69d9db2334522e4dd2e9d0cf2e974efa6a3580c"
+    },
+    {
+      "path": "core/ops/usage_summary.py",
+      "sha256": "446be38df808e213d8f58dea55103e6760f7991c73e9e0f7bcf462101d9e1ceb"
+    },
+    {
+      "path": "core/ops/workspace.py",
+      "sha256": "1e8266ee5c8423905b4c04fe6dc8e74a1e6a2550382eb428025fb4b6a868f497"
+    },
+    {
+      "path": "core/paths.py",
+      "sha256": "ecc27f1ff9aa96596367fb1363aa8843e909d845381990c6ecdd9c32a50d94b4"
+    },
+    {
+      "path": "core/process.py",
+      "sha256": "ae1a03e660bdd63e4301c55576370da1e7d463a98856cb43ff54085344d4fc83"
+    },
+    {
+      "path": "core/provider_types.py",
+      "sha256": "06c3f76d4b67d77c779918acdaf1b5e5bcee97353aa36a99f290c06a69f7a3d3"
+    },
+    {
+      "path": "core/reactive/__init__.py",
+      "sha256": "61b9086179dcfa571f4530cd06818da7d8f747a458f31fad11eca38328902091"
+    },
+    {
+      "path": "core/reactive/codex_reviewer_home.py",
+      "sha256": "eeaa9af2863aa4cc5443b9b6e8fec2b709a901c78a1c4906f698c15e1b9ecd41"
+    },
+    {
+      "path": "core/reactive/cost_tracking.py",
+      "sha256": "88a9c119ba0bee289cefb53d5b58b7d5445cfe06bdf304271b4d8d9e4e5963bb"
+    },
+    {
+      "path": "core/reactive/env.py",
+      "sha256": "61a79052d5d5100e3393f1cf31c723a4a2c24de96cde5bd4fdcf3cfb95ab2063"
+    },
+    {
+      "path": "core/reactive/headless_json.py",
+      "sha256": "b5330a274e29ac63d5dbaf0b97ee9bd37fbee0c143868da9513883df43c880b2"
+    },
+    {
+      "path": "core/reactive/llm_call.py",
+      "sha256": "a7c8391fa9b40ecf6573e593987d5cdc991022edc03385793a5a923d82078e3c"
+    },
+    {
+      "path": "core/reactive/proxy.py",
+      "sha256": "8b13eb064f8512905ebd576d8c631e05c59f295517c2f1c4733d97249ca6a461"
+    },
+    {
+      "path": "core/reactive/reviewer_runtime.py",
+      "sha256": "5f6e4882677e9e12016f9748c632d04c8638014bd4f1c84d84718dc82a6ae1a3"
+    },
+    {
+      "path": "core/reactive/reviewer_settings.py",
+      "sha256": "b127a462bdef9d2421413a67cfd47a619f1e89e28d44dfc628391a964cbdc41b"
+    },
+    {
+      "path": "core/reactive/routing.py",
+      "sha256": "12314e9e18e5b3c6e71404020772d2233a4e299179dcb113979c544f05a03370"
+    },
+    {
+      "path": "core/reactive/session_runner.py",
+      "sha256": "ab2526e09a86704da3d4b9e0662f00a5dea602bef23053f5da471bec5ffaf364"
+    },
+    {
+      "path": "core/reactive/structured_output.py",
+      "sha256": "ef56353a7af57037458d3e03b2e1f27a913e696f571ce8b1120f36c49f112841"
+    },
+    {
+      "path": "core/reactive/supervisor_auth.py",
+      "sha256": "5f29840caa9bf9bce5c1e7bf50feed574552cc4ea287ac6042510ed1297aa692"
+    },
+    {
+      "path": "core/reactive/tagger.py",
+      "sha256": "c5334b1443d47d0df0cca2dce6de42feb4e9726ae4a3287ef711ff3da6f89e78"
+    },
+    {
+      "path": "core/reactive/throttle.py",
+      "sha256": "eeecd22afc48350a07d3a26756cc5c2e30d5150058e675367abbee36bacc9b3f"
+    },
+    {
+      "path": "core/reactive/watchdog.py",
+      "sha256": "b0143d325b29df668a36fb1de2e1ae7c48df559cc6c95d5591e91f672a1e6eed"
+    },
+    {
+      "path": "core/run_id.py",
+      "sha256": "74bf123f492168096538d4a65836a8122f5e7f383cd2ec07a95865205b2f1ac7"
+    },
+    {
+      "path": "core/runtime/__init__.py",
+      "sha256": "d13ce7d8c19756d7f04b335ef93b294e4b69bcdf675d8f1e304642fb345d09f1"
+    },
+    {
+      "path": "core/runtime/codex_feedback.py",
+      "sha256": "88ec8d6de5ffe4719bf529857f560531069fb9821e483e6d19cd173bd3d020b3"
+    },
+    {
+      "path": "core/runtime/codex_preflight.py",
+      "sha256": "ca149191872bd0ce7c74ddb69ef89ceb350a632af5b631612e86ed0dae8a0398"
+    },
+    {
+      "path": "core/runtime/codex_preflight_cache.py",
+      "sha256": "92657b3b28e6383cff20fcc5a21b35bea4d3f5f6c033f86fe7d8c12b63bf2900"
+    },
+    {
+      "path": "core/runtime/codex_review_source.py",
+      "sha256": "79e4a7cb7277f9d1af0965ff3c00e8bb43b5a272f14844abdc35b6cb0cf52d0e"
+    },
+    {
+      "path": "core/runtime/codex_rollouts.py",
+      "sha256": "e5ca64e9a090aa951cabf6a1643e903ae9fdc65fff470b34dafd6f4987a7e51a"
+    },
+    {
+      "path": "core/runtime/codex_turn_enrollment.py",
+      "sha256": "30489a658e585e500115fcf2630caa81648de85122c2ca7ec49dc0ef47a0b257"
+    },
+    {
+      "path": "core/runtime/launch_args.py",
+      "sha256": "d716015f367477df7dd1879f5578c2337f71c1df85055939eff610664be1ef1c"
+    },
+    {
+      "path": "core/runtime/registry.py",
+      "sha256": "5d842db03e582936ea123e5817f9544acdff915def87768989e0b9998cb3d4fc"
+    },
+    {
+      "path": "core/runtime_vocab.py",
+      "sha256": "fccc22188258cd19413dfdd5f0dd8965b2ca3cd884774c2bd57b3d464902309c"
+    },
+    {
+      "path": "core/state/__init__.py",
+      "sha256": "73c5a1c0021af17a6bd3b3780b66b7d06efdd2cf53df88d2e2eb60279ef010bc"
+    },
+    {
+      "path": "core/state/exceptions.py",
+      "sha256": "fc9f985b4b90fa7e2ea2c3d60fa8f26f32e5b94db4e57b5593d7343af3eb2443"
+    },
+    {
+      "path": "core/state/io.py",
+      "sha256": "048570bf27363fcdaa180847ae0131e0a575e93a2f7d4af0221dd9e2f1c0e9f8"
+    },
+    {
+      "path": "core/state/lock.py",
+      "sha256": "0bcf452f76d8127fddb4d908ee80d849cba19f08c543d5e1056240fbc186621e"
+    },
+    {
+      "path": "core/state/retention.py",
+      "sha256": "96a1598177628425f32d3e0a1208c1c03873a25c28288e56f73f4f4260d56726"
+    },
+    {
+      "path": "core/state/timestamps.py",
+      "sha256": "fc6f620b1b11d84a52dcba67360037356a0d59f45143ab25d2804d64580fdb21"
+    },
+    {
+      "path": "core/state/versioned_store.py",
+      "sha256": "010df3e8cb4344a7a38dd6989bbe5e70e2a87f88c5f8fb3410ddd3ff156ec3bd"
+    },
+    {
+      "path": "core/telemetry/__init__.py",
+      "sha256": "7ebe1f31967b7b5fe7f0926ed93ea5eb0b908308870acf9f3f712c67f04cdd95"
+    },
+    {
+      "path": "core/telemetry/caps.py",
+      "sha256": "adb1c4b5c1ff093138d0379fa55d1660f02c954e6829f8695a6c959e51f021fd"
+    },
+    {
+      "path": "core/telemetry/downstream.py",
+      "sha256": "0598a762e48e78190d982c5fd9298e0eb8e3f3fbe1ad8c7ca414953373d00b2a"
+    },
+    {
+      "path": "core/telemetry/downstream_retention.py",
+      "sha256": "fbe9fd5d7390595039dc3ac159d75f0e3354c3e84bced6c84bf73a7d7c860388"
+    },
+    {
+      "path": "core/telemetry/jsonl_io.py",
+      "sha256": "6fe220845842d3129d47dae58d9f41553cb006afae71430852413884360418ba"
+    },
+    {
+      "path": "core/telemetry/upstream.py",
+      "sha256": "d2d1c356b70c6ef5b0106b991f1490a9717a776e5598fda9554de789fb6f5034"
+    },
+    {
+      "path": "core/telemetry/vocabulary.py",
+      "sha256": "1f0edee1c0019ee045096da580461f13137d28a1e80bcf3516209f60d41afb5a"
+    },
+    {
+      "path": "core/tiers.py",
+      "sha256": "f373eeb67446caa56117c77d3dcb336a16d42f86370c1c85d5e2de028776e1a8"
+    },
+    {
+      "path": "core/transcript.py",
+      "sha256": "2c3de646b6abd20dad36b1ca5a7f1683a8eb032f0fee3342db59548d0893e439"
+    },
+    {
+      "path": "core/typing_helpers.py",
+      "sha256": "b936cdf90c1d218780635b5ab80d927b63e31b024bbe4a11e92ade3455fc9d23"
+    },
+    {
+      "path": "core/usage/__init__.py",
+      "sha256": "5219a77534f21dacdfc2109b98634977c98f5af0b0f88474bf5e6edda09bdc13"
+    },
+    {
+      "path": "core/usage/billing.py",
+      "sha256": "f5a4d722aab4f999fac1d3b18ff4b54e6f56aad99b7e822a17d71f36f1e5094a"
+    },
+    {
+      "path": "core/usage/correlation.py",
+      "sha256": "3c067ba936cb4e19249e99605a0378e0be962376b823b69ed08c0ad6e0173769"
+    },
+    {
+      "path": "core/usage/emit.py",
+      "sha256": "cc65a0c82c3633fc767739e3a2893b1b60fb769198d409971c1dada819b0f960"
+    },
+    {
+      "path": "core/usage/ledger.py",
+      "sha256": "f6ba7f16916049f9aef2e33cea54c0bf2d524d5007aa4d392d789e68d3edbd52"
+    },
+    {
+      "path": "core/usage/measurement.py",
+      "sha256": "dbe19919282a82bea6d099015534d898c34126dc780bb11e929ba85f1d92ef0b"
+    },
+    {
+      "path": "core/usage/vocabulary.py",
+      "sha256": "8166565f93752099a5e5c58f22f2de3d8764be3bdd5edf3295c62a9692025423"
+    },
+    {
+      "path": "core/wire_shapes.py",
+      "sha256": "d0829c68e199cb13b62b4121c203251ee35a6fad4f3ed54cf1ff70acd1888572"
+    },
+    {
+      "path": "core/workqueue/__init__.py",
+      "sha256": "731bbd2fced33c40baf66879a90f0e42074099c60f5b96380168e9c6c3f3a996"
+    },
+    {
+      "path": "core/workqueue/queue.py",
+      "sha256": "9edd664cbb833be0a63efc6570e4256df5e56faf011aaa3ad5bcca9c63a44ce8"
+    },
+    {
+      "path": "core/workqueue/types.py",
+      "sha256": "79733d053b7fd09f1e9dbdfd8f6d759299399a0c5a99e06e22f360f064ff311f"
+    },
+    {
+      "path": "install/__init__.py",
+      "sha256": "a50e97a46dd16a48cb7e658242c59f327d9542473d2f51dea2b9df2eb4166458"
+    },
+    {
+      "path": "install/codex_hooks.py",
+      "sha256": "b54f23e7a2a066609b55bb08093473af2dc2e308d20ebcbda156c480a91c104f"
+    },
+    {
+      "path": "install/doctor.py",
+      "sha256": "4f2fa793fb6908389b50a356eb54cead947ebf25a4743bc1d81efc8b07d51c52"
+    },
+    {
+      "path": "install/exceptions.py",
+      "sha256": "8f029ee086c6daf37397408a35e0b22d1beb812e11e63acfcc1540b26ba6b23f"
+    },
+    {
+      "path": "install/hook_dispatcher.py",
+      "sha256": "5061aa33d589ae7be1a03a61fde7b4cc8a3c680c8500dbf5f6e97dd55aab8e70"
+    },
+    {
+      "path": "install/hook_migration.py",
+      "sha256": "4d2a8e241e441e816af7026a13e0bc0b20aef3f1cf543584ace9dc2433708e45"
+    },
+    {
+      "path": "install/hooks.py",
+      "sha256": "502a59e30ca9574f75fcad7a5839adf144b6722ced96d06e0048aa4022d4d8eb"
+    },
+    {
+      "path": "install/installer.py",
+      "sha256": "f12fe88abca6d5af734562247e069a62739038f0654d8ea8fbba54da8fe91bde"
+    },
+    {
+      "path": "install/models.py",
+      "sha256": "3f120940bcdf492c1da831607c0da9a819598dd3ec1689ded28704f38aa50f64"
+    },
+    {
+      "path": "install/module_planning.py",
+      "sha256": "bd340cf30e639e9a92a5e6e64a01700960bbf9ae2f0cf40f5819a248d43d7acb"
+    },
+    {
+      "path": "install/ownership.py",
+      "sha256": "b85b976fd8df71a566706bf800e547d42f64daeef1c562f8a5e6acef93efc518"
+    },
+    {
+      "path": "install/path_policy.py",
+      "sha256": "577971c06ed0a376ea44cdaee88825d255e2874994ad63476a9ed1208cd7d700"
+    },
+    {
+      "path": "install/preset.py",
+      "sha256": "a3f68d6403f80e69f956f62e2687a5378f9b28f0bf834619128263a455dace89"
+    },
+    {
+      "path": "install/project_compat.py",
+      "sha256": "ce62a54b95247becc22e25bf5294a594a431545d1ff77b50e037f21255a6ec6d"
+    },
+    {
+      "path": "install/project_registry.py",
+      "sha256": "a15b58316d2daf952187a464338046768310c1423d01d5e81b1e193970c1afa9"
+    },
+    {
+      "path": "install/runtime_removal.py",
+      "sha256": "db21774d4858f999bab65ec8a25bf207c6de8e6e9d348d385d957a4da36f551b"
+    },
+    {
+      "path": "install/settings_merge.py",
+      "sha256": "633ceb4b0070d933333cc7ac5a7928ec118176eba0ca51f14b396eb69b1571ff"
+    },
+    {
+      "path": "install/settings_rollback.py",
+      "sha256": "5e1ad1f78fb70bb3065385f3cd0355443989414643da3bf787def8c1d1f2ed2f"
+    },
+    {
+      "path": "install/skill_cache.py",
+      "sha256": "2956b35009b1ffba4abae3adbb5f53b91cd9dbc37b139ecbe21c229f4ac7b06e"
+    },
+    {
+      "path": "install/skill_compiler.py",
+      "sha256": "33adc3a82438c18b90858663f23bd885d517425439188fd14d7b49a833ddaa93"
+    },
+    {
+      "path": "install/skill_planning.py",
+      "sha256": "8b4866d56388b407a1b1b524eb46476ca32f303b40f97e2de89f626cd0641df2"
+    },
+    {
+      "path": "install/skill_validation.py",
+      "sha256": "4e5e19f4a001a744b34019bd3eeebd1feb1d5257a199db64b628fb2ddc18fa5c"
+    },
+    {
+      "path": "install/tracking.py",
+      "sha256": "279706a6dd2a4035bdde969f0cf512cb8196718d695a8580c5bb49206900575f"
+    },
+    {
+      "path": "install/unmanaged.py",
+      "sha256": "353c283b40c27b79e09bd0188e3d69db4a8b1dd50ffe702f89a8b29aa64800f4"
+    },
+    {
+      "path": "install/version.py",
+      "sha256": "f7ba76f72bd3ef0e4439d466aa8ff859ec8206c2de246bd487778ff4772c7787"
+    },
+    {
+      "path": "policy/__init__.py",
+      "sha256": "d83b771aede7811b52c637080b80b8e62f126375aa38e6e2a436e7984f88677e"
+    },
+    {
+      "path": "policy/action_identity.py",
+      "sha256": "61b92348f656490b10b65645b920de1a82e44f1d18f2a727796b6c6f12d1d2df"
+    },
+    {
+      "path": "policy/deterministic/__init__.py",
+      "sha256": "9889bf72bf48063171dcad7c2789db5edd282ca825b6b441479aec7df11d6aed"
+    },
+    {
+      "path": "policy/deterministic/base.py",
+      "sha256": "d4fac03521a8b853e1dc649622ba5f21e3c2a4857c0e36b57e375a9786175f6e"
+    },
+    {
+      "path": "policy/deterministic/coding_standards.py",
+      "sha256": "f9f926e97f533b41d7d492c957716a0e6c92055baea231f3f8c239232d61680b"
+    },
+    {
+      "path": "policy/deterministic/registry.py",
+      "sha256": "e9d15b14978726ec687f8461ccd8bea8bc16b01296bef11e382bc42cc5d036e6"
+    },
+    {
+      "path": "policy/deterministic/tdd.py",
+      "sha256": "6bfef1f64049803f5662504e44e747e2f557e32a2509e40fbd96e56f4e4fca19"
+    },
+    {
+      "path": "policy/diff.py",
+      "sha256": "82eb492b1b5f66bd04497965ccc62d2b72253c3f46c4bfa629bad119cc1fe3b3"
+    },
+    {
+      "path": "policy/engine.py",
+      "sha256": "5a3b8d4de4c3527208ea0107a0535342a712165a1dd4d460f17da8a444390382"
+    },
+    {
+      "path": "policy/protocols.py",
+      "sha256": "eb79792c65cda3886b3a4fa2057232342dcfbaab523e71bee5e27666bea75518"
+    },
+    {
+      "path": "policy/queries.py",
+      "sha256": "b2c7344d54c11589b0de76edd8e9a3f1376b987198fa69331e77deb41b024528"
+    },
+    {
+      "path": "policy/semantic/__init__.py",
+      "sha256": "c537ebf8f00ad330221572c773400bf871617746bf448f8f7190730be6c4a691"
+    },
+    {
+      "path": "policy/semantic/attempts.py",
+      "sha256": "3ebdaf95932fbd740d7c8c6c2bb0611c3111ac8bb0a42c4ee2c1700fe176a40e"
+    },
+    {
+      "path": "policy/semantic/deadline.py",
+      "sha256": "c1ddba34d786011d728aa66c8813251bc4076bcc761756d066a2a410269d3dcc"
+    },
+    {
+      "path": "policy/semantic/identity.py",
+      "sha256": "ec28a9c36dc83f35b23ec77a6cfc37acaeea86028ed7a947e8beb80c32fd4dcd"
+    },
+    {
+      "path": "policy/semantic/native_codex.py",
+      "sha256": "35ed739df4d2cf3b56993b34a532900cbff86325feb564d0de7f4e99d9b9d1a3"
+    },
+    {
+      "path": "policy/semantic/plan_check.py",
+      "sha256": "c468dbf01022713f681a128c484c9383fd68c2003bb90a53ac727c68b65c4271"
+    },
+    {
+      "path": "policy/semantic/plan_source.py",
+      "sha256": "f5da30fb4829a0143e4f82e7dee5d55e4ff6313ee63a8ed4f64032c8db95096e"
+    },
+    {
+      "path": "policy/semantic/shadow.py",
+      "sha256": "6a3e7cfea90e94172bf729cb6a71f1b121a8c8a5e692d64a9cd496da638b2ff4"
+    },
+    {
+      "path": "policy/semantic/shadow_runner.py",
+      "sha256": "ea1a99a294e3bc0a5a641b98f0d8893440b87fbe9093c5f1a856c231d76e2755"
+    },
+    {
+      "path": "policy/semantic/stop_review.py",
+      "sha256": "bc3b4d1ef491134c53d70e418f458109e3a7cd6879b3e7416f9790f61a2ee796"
+    },
+    {
+      "path": "policy/semantic/supervisor.py",
+      "sha256": "3856740037483ec4edb3e20da11592fe60fab86fa8077c24832128d5e40bcbcb"
+    },
+    {
+      "path": "policy/semantic/turn_evidence.py",
+      "sha256": "9a2e76c17f8dc02992284f6ae0b0d02867bcf9650f34b7c9f41a31474a47d43c"
+    },
+    {
+      "path": "policy/semantic/verdict.py",
+      "sha256": "e97c5bd2fd4ada322ae098cd81bd296e988099083801fbea2ba11b9e7ca77443"
+    },
+    {
+      "path": "policy/store.py",
+      "sha256": "e945f69e6fc15bfef52a8192b2e3f51651f862b4a2021d7f75c4231dc869240b"
+    },
+    {
+      "path": "policy/supervisor_lane_degrade.py",
+      "sha256": "5ce4c00ee9cee04b55bfa4aa2bbdc3c6ce4ffcabf7778da8e96f10205beb16c4"
+    },
+    {
+      "path": "policy/team/__init__.py",
+      "sha256": "5080af09af9da0ebaf8f8c82daad2e116f18e7e066e0bf740ab4dd138aab2a59"
+    },
+    {
+      "path": "policy/team/config.py",
+      "sha256": "70a47193390a499df809e4495e53675138d5e95df8d876f36aa5486b1431b747"
+    },
+    {
+      "path": "policy/team/handlers.py",
+      "sha256": "b76d791435bf0972d44e2b669c816816d6512a0692d60ba726df68b93f7d6e1e"
+    },
+    {
+      "path": "policy/team/prompts.py",
+      "sha256": "5a3ca7d4319c354ae875d95e4f7f4a919dd53d75af1ee11fa5663e0dde133e08"
+    },
+    {
+      "path": "policy/types.py",
+      "sha256": "980805f346ce456100c1d400d1b6950a80e584d18791a37ca3370e91fe32b499"
+    },
+    {
+      "path": "proxy/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "proxy/accounting_persistence.py",
+      "sha256": "31d02f8d388497e6631033b20abd16c0b1cda1cda11ae7edb9323a9aed2f4f0c"
+    },
+    {
+      "path": "proxy/audit_logger.py",
+      "sha256": "d070e45c82f86d44ae45df0e392b2027bb05dc08933215246a831c8c1708a4d8"
+    },
+    {
+      "path": "proxy/base_client.py",
+      "sha256": "6d42c8d83476e1d38f36616592b0c486c29ff16282d272dba3904d607265f72b"
+    },
+    {
+      "path": "proxy/client_adapter.py",
+      "sha256": "a6122f060a8def242ad4c007947919c9229de8562a354829d88f5616ee7fcc54"
+    },
+    {
+      "path": "proxy/client_factory.py",
+      "sha256": "b841ad443efb9fb1e4d7237e2b9656ab415dc3c6ad2fde10a2335da555f50dfa"
+    },
+    {
+      "path": "proxy/converters.py",
+      "sha256": "0efcc4b37b37f64a98ef09d6952310cc24e19f3c541115db866aa830fad84f17"
+    },
+    {
+      "path": "proxy/cost_logger.py",
+      "sha256": "90ed61cf43d1b87bf7872f898099dcb58760db749b8d3045108278332ec54396"
+    },
+    {
+      "path": "proxy/cost_tracker.py",
+      "sha256": "8227af62ba34d41243a85829daa2e38ca90a4f7e6f2d9f5852c7917160ae8c2a"
+    },
+    {
+      "path": "proxy/data_models.py",
+      "sha256": "753053f600f1cd4a898ba389c3aee8cfe40cc496328ad956d2d0205e7507458b"
+    },
+    {
+      "path": "proxy/error_hints.py",
+      "sha256": "695736f171053ca02df4e336679f24d0fd988c1ee1959f3a41779cbe9d418366"
+    },
+    {
+      "path": "proxy/intercept.py",
+      "sha256": "eb41ed599921967baf4113909860c37d16fd2d5684364700b451bc2679a578bc"
+    },
+    {
+      "path": "proxy/metrics.py",
+      "sha256": "9f0e6b48145753a03a02f8657fe77188c1e7aabc7ffb7fdcb3cac25326cbc326"
+    },
+    {
+      "path": "proxy/model_routes.py",
+      "sha256": "539ca15785169608575768c2b8aa760679926d275f0a5056841990ddcdba9699"
+    },
+    {
+      "path": "proxy/passthrough.py",
+      "sha256": "13f9173dfcb138a4213f003dedacd0b59881d6f81666ea88535aca5af24b9fdd"
+    },
+    {
+      "path": "proxy/passthrough_ingress.py",
+      "sha256": "0b4050b8350119d9f5b63de1c063e6e008ba83815b0dbc6cc4625161c8d9557f"
+    },
+    {
+      "path": "proxy/ports.py",
+      "sha256": "5c7df9c881ea7b420f486ba24966439edbaa7d98f7a3b1fe6130f8be2470dcc3"
+    },
+    {
+      "path": "proxy/provider_trace_logger.py",
+      "sha256": "a83e84da64d363a66277c352926535c9ab0bfa35e12791fd50d6c27b4a2efcf2"
+    },
+    {
+      "path": "proxy/proxies.py",
+      "sha256": "f65c240dd741541b34a8513f3fd30465be7188950aadd19bdacb67d0d5e922d9"
+    },
+    {
+      "path": "proxy/proxy_identity.py",
+      "sha256": "4d5fe2d5cca87ad277c7420030664fbb6be430572ec008f6369877a15b0d8d0f"
+    },
+    {
+      "path": "proxy/proxy_orchestrator.py",
+      "sha256": "c7ec3e5e9ae440eaa49eb8772fb3fb8c2ceaa1e0cda759b13beaa52b64f55640"
+    },
+    {
+      "path": "proxy/proxy_startup.py",
+      "sha256": "d85bc4ff0cbea8cf9a9e993a6a29888b9f4da421116f9f38c4b43bf07b87041a"
+    },
+    {
+      "path": "proxy/reasoning.py",
+      "sha256": "1c7d33419918db790b0e6f51f7be69bc15ca528d805faf77b7c593397596cffa"
+    },
+    {
+      "path": "proxy/request_id.py",
+      "sha256": "b23c6c138cd2dbd57f75fdf1f20580ccb834811981d5dfb948be652d39cff6d3"
+    },
+    {
+      "path": "proxy/response_headers.py",
+      "sha256": "cf420ce2cbea1024bc9a08d462c5aa0b786d2628938c04e3c7d8c6a85646dec9"
+    },
+    {
+      "path": "proxy/responses_ingress.py",
+      "sha256": "2d303c0bfee7a34d11ecdaacad5788c57b02ba65e892d726ea51fe513fb5d4fb"
+    },
+    {
+      "path": "proxy/responses_passthrough.py",
+      "sha256": "0f6039ea6ccfb0052c2ebc367089c2dc776c33c5d50bdc086b150f761014864c"
+    },
+    {
+      "path": "proxy/runtime_truth.py",
+      "sha256": "12d4a2dc423607f0527db4f8b475cb1ef9da04d98e1c467558406f5c61a31c60"
+    },
+    {
+      "path": "proxy/server.py",
+      "sha256": "cd4761ec6dc7a17e5b5566684975d0ae74e4236b80bd9f19afe6f07194ef7701"
+    },
+    {
+      "path": "proxy/sse_framing.py",
+      "sha256": "9114d8f00743f3892094d8ffc6288a04452148e3aef4c570d854d6ade609d7d6"
+    },
+    {
+      "path": "proxy/stream_relay.py",
+      "sha256": "6a530c7fd32943354bddd12d8e775b8be99beeec20b4a2d511b948f706275b89"
+    },
+    {
+      "path": "proxy/utils.py",
+      "sha256": "541ea49e6095dfa6212b1518eecc5080877e96a100d897a2ede528e53b02fc17"
+    },
+    {
+      "path": "review/__init__.py",
+      "sha256": "dd7a605a0c7b95c0442d89d6e4f1b842966181274fc0af5b2c3b722c9b657abf"
+    },
+    {
+      "path": "review/adversarial.py",
+      "sha256": "b47792e9bef62ffd23fc1fc3a75320e25ce6434ef2792775d887481878a0331e"
+    },
+    {
+      "path": "review/consensus.py",
+      "sha256": "75488d7480321e93600979a5fc8b76ec42e62769348716550f749f76d64482e9"
+    },
+    {
+      "path": "review/engine.py",
+      "sha256": "59e6dee7a68102428be52f7be51dc7adcb7d61416855edc734f58dae1e20631a"
+    },
+    {
+      "path": "review/models.py",
+      "sha256": "5560ecb16da02db3278fdba144cf011488289bf2758fce8d25f2612af20feb25"
+    },
+    {
+      "path": "review/resources/__init__.py",
+      "sha256": "2ed22281a8feb5695075a8ae8932e347af786398fdb107806b313fabfcdc4c31"
+    },
+    {
+      "path": "review/routing.py",
+      "sha256": "2188782060d45bc1354d6cb3aad1c077719b41978e48d1292ad7c3c1b02df21c"
+    },
+    {
+      "path": "review/synthesis.py",
+      "sha256": "13007e9c9c73e1b5f55f60899e622420a98de4eeedbb313826b9bb21ed12dabb"
+    },
+    {
+      "path": "review/worker_preparation.py",
+      "sha256": "03a44fd014a3897fadcb7bd8efeb0c4d35971547fe3751ec514611f350e59416"
+    },
+    {
+      "path": "runtime_config.py",
+      "sha256": "84ba821a36d8aca61d9c296dfb2255e11deb57f444cebd81aae41891563b4110"
+    },
+    {
+      "path": "search/__init__.py",
+      "sha256": "00c53a6c38fe5f2ee90acaf4f27d7fa3e7388276e14df640925800b7cad4d2ca"
+    },
+    {
+      "path": "search/bm25_store.py",
+      "sha256": "227b42638f3e6e081b3593086d5b3358c7768ce2728d7f60becfd991d4298eb5"
+    },
+    {
+      "path": "search/content_store.py",
+      "sha256": "935386270075a3db7d54b6c2c7c69cb628393144233d3ade0f837ebe0d968424"
+    },
+    {
+      "path": "search/engine.py",
+      "sha256": "bee7834ad9ab92402bfc7fc7a025a352efef37755485753ed24488d998b614c3"
+    },
+    {
+      "path": "search/exceptions.py",
+      "sha256": "250842b0ebeca1b880e8b8c91326103ebd87e8f1142cf038766d59ba68d070b8"
+    },
+    {
+      "path": "search/extractor.py",
+      "sha256": "c49cf7cab6d1e9580089127db502e871119b2cd82378f2eb420bf1c4c930dd10"
+    },
+    {
+      "path": "search/index_state.py",
+      "sha256": "f0551c9066901d0f5a0430c46667f2e3341d00f72a8036af33dfaadeb9e6c613"
+    },
+    {
+      "path": "search/store.py",
+      "sha256": "35a79f5398d72be3601bec140ac2c8774791272726031f8f62e6b92dac1e2e1b"
+    },
+    {
+      "path": "search/tokenizer.py",
+      "sha256": "7c08d2149ec091411c7e41dfaad5c35878bd82bb03ae7693acac1b65ba40e6c5"
+    },
+    {
+      "path": "session/__init__.py",
+      "sha256": "1ca68cc0dba1c748bb3036281f7ee0c179630d2999f0d75ac52fda6b86ff1028"
+    },
+    {
+      "path": "session/active.py",
+      "sha256": "09e96b910747844a23ae24dc2111e2e4dd2c54646070243a6bba2f64f0b4f68a"
+    },
+    {
+      "path": "session/addendum.py",
+      "sha256": "680c0301972a79a49a7bc38a107d405f035799cf11c0b099275ed395408f32a5"
+    },
+    {
+      "path": "session/artifacts.py",
+      "sha256": "ee5df22a51e432ee9e41c992742bb5f93cfacfc54a3fd311689cf358dc641100"
+    },
+    {
+      "path": "session/authority.py",
+      "sha256": "69e8d5de14d5896911bba4940650452e478c88b93795ad180f9da98960c8e2ea"
+    },
+    {
+      "path": "session/claude/__init__.py",
+      "sha256": "6695a54a9d78e4b5be0502dfcc8e041e590090e9274c3850cd317cefabdd0c41"
+    },
+    {
+      "path": "session/claude/cleanup.py",
+      "sha256": "ada15476c1a922a4e380aa727958978495a3f547dd3cace23b261ce59cd2300a"
+    },
+    {
+      "path": "session/claude/invoke.py",
+      "sha256": "5334cef9b50189fdcd94c68c075f97e04f1a189fd4b004164213c57a16f31751"
+    },
+    {
+      "path": "session/claude/paths.py",
+      "sha256": "c94d8de95cffe93ee1084e07da730942c6396b990379a4a62fc37b37cb036af9"
+    },
+    {
+      "path": "session/claude/relocate.py",
+      "sha256": "cdb9876662eef1fc5647203ad23f6cb4d8fe786fc265ece028e90b91c65a894d"
+    },
+    {
+      "path": "session/cleanup.py",
+      "sha256": "49513780642bbdabc1b4443aa862dfd03a801ad5cf2917bc9c31dac4f8138a81"
+    },
+    {
+      "path": "session/codex_handoff.py",
+      "sha256": "54a521d378fda13acaee967fe1773c96f06fef9b9485e80a3a885fde9d1a7e37"
+    },
+    {
+      "path": "session/codex_invoke.py",
+      "sha256": "6a8692a6682f25677d96f5d679670a9e10966363d2d26d7bc8aaa599d5036071"
+    },
+    {
+      "path": "session/config.py",
+      "sha256": "804ba4d2ea975ab113b228e12bc27af85ad11ad95924fd212ddc5e6e7bcd4909"
+    },
+    {
+      "path": "session/consumer_lanes.py",
+      "sha256": "165dd70b846115032939321388d2de74357e8fcee80dcdee2db4817c1737b2b9"
+    },
+    {
+      "path": "session/context_limit.py",
+      "sha256": "19348c6fd2696bc4e0cbc7b3de4d86e6d92dc33885fe07d9fbb5c79b35ce39a2"
+    },
+    {
+      "path": "session/context_rendering.py",
+      "sha256": "8ee4803b715a6d1770c66231f93f3fec7a3f33db1d8a9fcbf4afc5254bf410f0"
+    },
+    {
+      "path": "session/effective.py",
+      "sha256": "a54f0523d13216d5dc0d99b3f5724cf29e028e2d159721e8bd78b5ddc9757f87"
+    },
+    {
+      "path": "session/events.py",
+      "sha256": "a46b9126ebc4efed08f968244d540fd00aa3acda005d7445fd754d5083a47d89"
+    },
+    {
+      "path": "session/exceptions.py",
+      "sha256": "c63cdc94f540c27b38167bcfaa2475f2cb626934fd405798b299b5975a1bcf06"
+    },
+    {
+      "path": "session/git.py",
+      "sha256": "74b3b231e644d6832dde37ec78837b19f48631a434f6d75105ae42f1ea460da0"
+    },
+    {
+      "path": "session/hooks/__init__.py",
+      "sha256": "212a961bfd18ee9ac3a8ec9ca33f386ac91e2f2c38077630e26397380993bae2"
+    },
+    {
+      "path": "session/hooks/models.py",
+      "sha256": "f2e7726e5cc0b5d807ee102f6478538896b01fcf166281b3c1577dd3e4fb50ff"
+    },
+    {
+      "path": "session/hooks/session_start.py",
+      "sha256": "c78ac3dd034ce65c63ab6176a165fceb1c4046716b2ce00ff6e8cee3504985da"
+    },
+    {
+      "path": "session/identity.py",
+      "sha256": "df59d645f854b4a99ea3854542a44354ef5ee44418c1f4b40f326184b909ae8d"
+    },
+    {
+      "path": "session/index.py",
+      "sha256": "ff523fd91ca940397dc1f903197f16ff07a54323a8a7fbd77a99315e17d0c3a2"
+    },
+    {
+      "path": "session/launch.py",
+      "sha256": "7887df9a10361cb7c80a4b12424d91bb1430bf03c8515e008c4c9f23bf782218"
+    },
+    {
+      "path": "session/launch_confirmation.py",
+      "sha256": "c9dcaff1215e81d05544fec8dbe6b84bcc01778c9fdae666cfd0624894a0396a"
+    },
+    {
+      "path": "session/launchability.py",
+      "sha256": "50f65d4c29d9bf43afa778777ee845a46e59fb336b2cec902ebb6ae81280b1b0"
+    },
+    {
+      "path": "session/manager.py",
+      "sha256": "4b6ae1124bf08c89edbeb0c08a7139dd30adc3b44f7f795a91685a2fc6628e92"
+    },
+    {
+      "path": "session/memory_inheritance.py",
+      "sha256": "8f87f8df43d56d75f516c28a5ac618d5951026613c4ebb1f3bf1ce8355db3ae3"
+    },
+    {
+      "path": "session/memory_writer.py",
+      "sha256": "cd3c0d4f07f25c597d9d0559f748e6d0d4622cc47ad653001be575d96eb36ff4"
+    },
+    {
+      "path": "session/model_pin.py",
+      "sha256": "b232f7b43965e855f0d0b7db5756566d8a4196611ce6dfd479f856c8a21e50d3"
+    },
+    {
+      "path": "session/models.py",
+      "sha256": "116a5b9382e03575def969499ef682091db9db986553dc0265cd06814b04992f"
+    },
+    {
+      "path": "session/overrides.py",
+      "sha256": "1bc762042fc05e0bb34391a1e240c09a29fd0d41a092f71ed880683c355a8d3b"
+    },
+    {
+      "path": "session/passport.py",
+      "sha256": "6f8efdb0e9398922e3d7aa526a571681233d885bbb05131d77fc1b7a5cc11fc8"
+    },
+    {
+      "path": "session/plan_resolution.py",
+      "sha256": "744ed0fe81e50bf001af687b36530321d885a91215f151ec6635b7f85a248ad8"
+    },
+    {
+      "path": "session/prev_sessions.py",
+      "sha256": "19b6f038dd3fdaf7c7a0cd2be3138016979efc67759eccc1d6c0a1036095de39"
+    },
+    {
+      "path": "session/project_memory.py",
+      "sha256": "27ae18d3e04b6d0d892c33b9b013297213fee1de5cdaacc4a389d842765dd1c2"
+    },
+    {
+      "path": "session/rewind.py",
+      "sha256": "9bad6e6d7226b66479e4c60c99b522c05d379371b5aa408ac452472910e6e24c"
+    },
+    {
+      "path": "session/routing.py",
+      "sha256": "08acb8ca29bb9e7572ad1e432d85cf61c247bd384c8b847d6391dbb378d17376"
+    },
+    {
+      "path": "session/shadow_curation.py",
+      "sha256": "ded2244eaacf4713a0ce461598a6763b981cc97022c264db1a478c8a4594a3a2"
+    },
+    {
+      "path": "session/store.py",
+      "sha256": "71ebd109eed2584027b9d7e2877018c307b025972584455749d46211dbfbde06"
+    },
+    {
+      "path": "session/transfer.py",
+      "sha256": "3d0266d99ea2979a554de71d870d0cc9fdbfe52679cb20b9e0c41b59d0b0cdb2"
+    },
+    {
+      "path": "session/validation.py",
+      "sha256": "b1f42c4df80c9a88253a5275781df5ae0edcc4efd8cf337355fa8017af06bb5e"
+    },
+    {
+      "path": "session/verification_config.py",
+      "sha256": "5c8d2f1bc28f296ac7d9e96081ccd1b24f32ee9c34ba9d786c02b05ed54aa304"
+    },
+    {
+      "path": "session/workspace.py",
+      "sha256": "88b13957043f89d2b8a48d259df7534d33f63cb4338a0ece2f617dc43f558264"
+    },
+    {
+      "path": "session/worktree/__init__.py",
+      "sha256": "c50d682caa3454af166d34f18b45aa932f6eeec6fb278c53b95f6d08b103645a"
+    },
+    {
+      "path": "session/worktree/cleanup.py",
+      "sha256": "b7edad4f60ad5c2fc57ccf6cdf46fad6407a5f3ad53fe8a99e827609491c8ab7"
+    },
+    {
+      "path": "session/worktree/config_copy.py",
+      "sha256": "a0cd667b06672dc86a25a1c89cb5d9e1d307c6633129d1e33af743c5f9aa1276"
+    },
+    {
+      "path": "session/worktree/create.py",
+      "sha256": "5e3c87c07a98959a923b20c9e8833b7ce6521512c05cb505bea5937ae3fb8f44"
+    },
+    {
+      "path": "sidecar/__init__.py",
+      "sha256": "db3bdab8ee2e9dc29c0b1cc89dbfc740717c0de03656d9a8cbea5b244fd8701d"
+    },
+    {
+      "path": "sidecar/container.py",
+      "sha256": "4b1cdd724e74f2274a524bbc2c75a69c83374b4943b03a7c18760f0142d89b16"
+    },
+    {
+      "path": "sidecar/docker.py",
+      "sha256": "ac6e1841e9bf88bbcb18832fa9368ae9dba6e6c44bb0fd315040dac0753c3692"
+    }
+  ],
+  "operator_surfaces": [
+    {
+      "args": [
+        "session",
+        "lane",
+        "set",
+        "--consumer",
+        "supervisor",
+        "--session",
+        "b5-parent",
+        "--runtime",
+        "claude_code"
+      ],
+      "returncode": 1,
+      "stderr": "Error: Lane for 'supervisor' is frozen for this session (runtime=codex backend=chatgpt model=gpt-6.1-sol).\nTip: The binding is immutable once a run freezes it; it resets next session.\n",
+      "stdout": ""
+    },
+    {
+      "args": [
+        "session",
+        "lane",
+        "clear",
+        "--consumer",
+        "supervisor",
+        "--session",
+        "b5-parent"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "Cleared the requested lane for supervisor; a frozen binding (runtime=codex \nbackend=chatgpt model=gpt-6.1-sol) remains for this session.\n"
+    },
+    {
+      "args": [
+        "policy",
+        "supervisor",
+        "set",
+        "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+        "--source-runtime",
+        "codex",
+        "--runtime",
+        "codex",
+        "--model",
+        "gpt-6.1-sol",
+        "--session",
+        "b5-parent",
+        "--auth-mode",
+        "subscription-only"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "Supervisor set to 01a12b5c-ce1a-72c2-ad3f-05d75f3fba00 for session b5-parent\n  Lane: runtime=codex backend=chatgpt model=gpt-6.1-sol (freezes on first check)\n"
+    },
+    {
+      "args": [
+        "session",
+        "start",
+        "b5-api-config-only",
+        "--no-launch",
+        "--no-proxy"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "Created session b5-api-config-only\n  Routing: direct\n  Base URL: default Anthropic\n\nSession created (--no-launch: Claude not started)\n"
+    },
+    {
+      "args": [
+        "policy",
+        "supervisor",
+        "set",
+        "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+        "--source-runtime",
+        "codex",
+        "--runtime",
+        "codex",
+        "--model",
+        "gpt-6.1-sol",
+        "--session",
+        "b5-api-config-only",
+        "--auth-mode",
+        "api"
+      ],
+      "returncode": 1,
+      "stderr": "Error: Native API review requires CODEX_API_KEY in the environment or Forge credentials.yaml\n",
+      "stdout": ""
+    },
+    {
+      "args": [
+        "policy",
+        "supervisor",
+        "set",
+        "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+        "--source-runtime",
+        "codex",
+        "--runtime",
+        "codex",
+        "--model",
+        "gpt-6.1-sol",
+        "--session",
+        "b5-api-config-only",
+        "--auth-mode",
+        "api"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "Supervisor set to 01a12b5c-ce1a-72c2-ad3f-05d75f3fba00 for session \nb5-api-config-only\n  Lane: runtime=codex backend=chatgpt model=gpt-6.1-sol (freezes on first check)\n"
+    },
+    {
+      "args": [
+        "policy",
+        "supervisor",
+        "status",
+        "--session",
+        "b5-api-config-only",
+        "--json"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\n  \"session_name\": \"b5-api-config-only\",\n  \"supervisor\": {\n    \"auth_mode\": \"api\",\n    \"review_trigger\": \"pre-tool-use\",\n    \"model\": \"gpt-6.1-sol\",\n    \"configured\": true,\n    \"active\": false,\n    \"source\": \"native\",\n    \"resume_id\": null,\n    \"suspended\": false,\n    \"plan_override_path\": null,\n    \"proxy\": null,\n    \"direct\": false,\n    \"fork_session\": true,\n    \"timeout_seconds\": 45,\n    \"throttle_seconds\": 30,\n    \"cascade\": false,\n    \"checker_model\": null,\n    \"checker_provider\": null,\n    \"checker_budget_tokens\": null,\n    \"checker_effort\": null,\n    \"supervisor_effort\": \"low\",\n    \"resolved_uuid\": null,\n    \"source_model\": null,\n    \"native_source\": {\n      \"runtime\": \"codex\",\n      \"thread_id\": \"01a12b5c-ce1a-72c2-ad3f-05d75f3fba00\",\n      \"home\": \"$ROUND/codex-home\",\n      \"rollout_path\": \"$ROUND/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl\",\n      \"source_cwd\": \"$ROUND/source\",\n      \"header_digest\": \"4362467a7bca8298e4a691a37513c308e6fc05192c97dceebbbc2a909044bd20\",\n      \"managed_session\": null,\n      \"managed_root\": null\n    },\n    \"verdict_cache\": \"disabled\",\n    \"billing_mode\": \"api\",\n    \"lane\": {\n      \"runtime\": \"codex\",\n      \"backend\": \"chatgpt\",\n      \"model\": \"gpt-6.1-sol\"\n    },\n    \"degraded\": null,\n    \"latest_review\": null,\n    \"state\": \"unusable\",\n    \"unavailable_reason\": \"Native API review requires CODEX_API_KEY in the environment or Forge credentials.yaml\"\n  }\n}\n"
+    },
+    {
+      "args": [
+        "telemetry",
+        "activity",
+        "b5-parent",
+        "--json"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\n  \"session\": \"b5-parent\",\n  \"since\": \"2026-10-10T22:00:00+00:00\",\n  \"upstream\": {\n    \"operations\": [],\n    \"policy\": {\n      \"supervisor_allow\": 1,\n      \"supervisor_warn\": 0,\n      \"supervisor_deny\": 0,\n      \"plan_check_allow\": 0,\n      \"plan_check_needs_review\": 0,\n      \"total_warnings\": 0,\n      \"recent_warnings\": [],\n      \"log_capped\": false\n    },\n    \"manifest_fallback_used\": true,\n    \"log_capped\": false,\n    \"upstream_count\": 0\n  },\n  \"downstream\": {\n    \"rows\": [\n      {\n        \"command\": \"supervisor\",\n        \"calls\": 0,\n        \"workers\": 1,\n        \"attempts\": 1,\n        \"errors\": 0,\n        \"error_kinds\": {},\n        \"input_tokens\": 14160,\n        \"output_tokens\": 57,\n        \"cached_tokens\": 11264,\n        \"cost_micro_usd\": null,\n        \"cost_estimated\": true,\n        \"cost_partial\": true,\n        \"join_state\": \"downstream_only\",\n        \"root_run_ids\": [\n          \"run_ee2ce579c1e6\"\n        ],\n        \"runtime\": \"codex\",\n        \"billing_mode\": \"subscription_quota\"\n      }\n    ],\n    \"total_cost_micro_usd\": null,\n    \"total_input_tokens\": 14160,\n    \"total_output_tokens\": 57,\n    \"cost_partial\": false,\n    \"cost_estimated\": false,\n    \"downstream_records\": 1,\n    \"skipped_legacy_schema\": 0\n  },\n  \"shadow\": null,\n  \"supervisor_reviews\": [\n    {\n      \"schema_version\": 3,\n      \"attempt_id\": \"a0d2faff66b745d787396cfddcfb5360\",\n      \"session\": \"b5-parent\",\n      \"forge_root\": \"$ROUND/action\",\n      \"root_run_id\": null,\n      \"action_id\": \"8dc2efa26d8824cabe6cc762e5d11ff09a56969daeeab67635dbcf10332efb27\",\n      \"origin\": \"claude_code\",\n      \"tool_name\": \"Write\",\n      \"target_path\": \"product-claude-adapter.txt\",\n      \"plan_path\": null,\n      \"plan_digest\": null,\n      \"conversation\": null,\n      \"lane\": {\n        \"runtime_id\": \"codex\",\n        \"backend_id\": \"chatgpt\",\n        \"model\": \"gpt-6.1-sol\"\n      },\n      \"model\": \"gpt-6.1-sol\",\n      \"effort\": \"low\",\n      \"auth_mode\": \"subscription-only\",\n      \"stage\": \"frontier\",\n      \"started_at\": \"2026-10-11T17:40:23.223905+00:00\",\n      \"deadline_at\": \"2026-10-11T17:41:10.223904+00:00\",\n      \"owner_pid\": 51876,\n      \"state\": \"completed\",\n      \"reason\": null,\n      \"finished_at\": \"2026-10-11T17:40:31.268100+00:00\",\n      \"verdict\": \"allow\",\n      \"cached\": false,\n      \"model_run_id\": \"run_ee2ce579c1e6\",\n      \"observed_models\": [],\n      \"purpose\": \"live\",\n      \"native_review\": {\n        \"runtime\": \"codex\",\n        \"prefixes\": [\n          {\n            \"thread_id\": \"01a12b5c-ce1a-72c2-ad3f-05d75f3fba00\",\n            \"sha256\": \"fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4\",\n            \"bytes\": 41450,\n            \"records\": 15\n          }\n        ],\n        \"independence\": \"separate\",\n        \"source_context_input\": 14258,\n        \"usage_baseline\": {\n          \"input_tokens\": 14258,\n          \"output_tokens\": 7,\n          \"cached_tokens\": 12288\n        },\n        \"baseline_origin\": \"event_msg.token_count.info.total_token_usage\",\n        \"state\": \"returned\",\n        \"source_thread_id\": \"01a12b5c-ce1a-72c2-ad3f-05d75f3fba00\",\n        \"source_cwd\": \"$ROUND/source\",\n        \"action_cwd\": \"$ROUND/action\",\n        \"model\": \"gpt-6.1-sol\",\n        \"effort\": \"low\",\n        \"auth_mode\": \"subscription-only\",\n        \"billing_mode\": \"subscription_quota\",\n        \"native_boundary\": null,\n        \"inputs_preserved\": true,\n        \"reviewer_thread_id\": \"01a12c0d-2d8b-7800-8ce9-1fcb9b2665c3\",\n        \"terminal_usage\": {\n          \"input_tokens\": 28418,\n          \"output_tokens\": 64,\n          \"cached_tokens\": 23552\n        },\n        \"inherited_usage\": {\n          \"input_tokens\": 14258,\n          \"output_tokens\": 7,\n          \"cached_tokens\": 12288\n        },\n        \"review_usage\": {\n          \"input_tokens\": 14160,\n          \"output_tokens\": 57,\n          \"cached_tokens\": 11264\n        }\n      }\n    }\n  ],\n  \"turn_review\": null,\n  \"subagents\": 0,\n  \"notes\": [\n    \"session_tagging_partial\"\n  ]\n}\n"
+    },
+    {
+      "args": [
+        "telemetry",
+        "activity",
+        "b5-product-deny",
+        "--json"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\n  \"session\": \"b5-product-deny\",\n  \"since\": \"2026-10-10T22:00:00+00:00\",\n  \"upstream\": {\n    \"operations\": [\n      {\n        \"command\": \"policy-check\",\n        \"status\": \"deny\",\n        \"count\": 2,\n        \"operation\": \"policy.evaluate\",\n        \"policy_id\": \"semantic.supervisor\",\n        \"reason_code\": \"semantic.supervisor.alignment\",\n        \"message\": \"The action writes violet, while the approved implementation specifies amber.\",\n        \"run_id\": \"run_4b025c43b45b\",\n        \"root_run_id\": \"run_2cdcd4c80036\",\n        \"latest_at\": \"2026-10-11T17:42:34Z\",\n        \"join_state\": \"matched\"\n      }\n    ],\n    \"policy\": {\n      \"supervisor_allow\": 0,\n      \"supervisor_warn\": 0,\n      \"supervisor_deny\": 2,\n      \"plan_check_allow\": 0,\n      \"plan_check_needs_review\": 0,\n      \"total_warnings\": 0,\n      \"recent_warnings\": [],\n      \"log_capped\": false\n    },\n    \"manifest_fallback_used\": true,\n    \"log_capped\": false,\n    \"upstream_count\": 2\n  },\n  \"downstream\": {\n    \"rows\": [\n      {\n        \"command\": \"supervisor\",\n        \"calls\": 0,\n        \"workers\": 2,\n        \"attempts\": 2,\n        \"errors\": 0,\n        \"error_kinds\": {},\n        \"input_tokens\": 28318,\n        \"output_tokens\": 142,\n        \"cached_tokens\": 22528,\n        \"cost_micro_usd\": null,\n        \"cost_estimated\": true,\n        \"cost_partial\": true,\n        \"join_state\": \"matched\",\n        \"root_run_ids\": [\n          \"run_2cdcd4c80036\",\n          \"run_ded6c05fecf6\"\n        ],\n        \"runtime\": \"codex\",\n        \"billing_mode\": \"subscription_quota\"\n      },\n      {\n        \"command\": \"codex-resume\",\n        \"calls\": 0,\n        \"workers\": 2,\n        \"attempts\": 2,\n        \"errors\": 0,\n        \"error_kinds\": {},\n        \"input_tokens\": 118213,\n        \"output_tokens\": 348,\n        \"cached_tokens\": 103040,\n        \"cost_micro_usd\": null,\n        \"cost_estimated\": true,\n        \"cost_partial\": true,\n        \"join_state\": \"matched\",\n        \"root_run_ids\": [\n          \"run_2cdcd4c80036\",\n          \"run_ded6c05fecf6\"\n        ],\n        \"runtime\": \"codex\",\n        \"billing_mode\": \"subscription_quota\"\n      }\n    ],\n    \"total_cost_micro_usd\": null,\n    \"total_input_tokens\": 146531,\n    \"total_output_tokens\": 490,\n    \"cost_partial\": false,\n    \"cost_estimated\": false,\n    \"downstream_records\": 4,\n    \"skipped_legacy_schema\": 0\n  },\n  \"shadow\": null,\n  \"supervisor_reviews\": [\n    {\n      \"schema_version\": 3,\n      \"attempt_id\": \"b69f137bd5a34f2c986b6ae7d82b0a97\",\n      \"session\": \"b5-product-deny\",\n      \"forge_root\": \"$ROUND/action\",\n      \"root_run_id\": \"run_2cdcd4c80036\",\n      \"action_id\": \"58da003b3495d3e083c0c147b7e4fdc368f994f30df5f3e41d8598f582aa9aa1\",\n      \"origin\": \"codex\",\n      \"tool_name\": \"Write\",\n      \"target_path\": \"product-p2-deny.txt\",\n      \"plan_path\": null,\n      \"plan_digest\": null,\n      \"conversation\": null,\n      \"lane\": {\n        \"runtime_id\": \"codex\",\n        \"backend_id\": \"chatgpt\",\n        \"model\": \"gpt-6.1-sol\"\n      },\n      \"model\": \"gpt-6.1-sol\",\n      \"effort\": \"low\",\n      \"auth_mode\": \"subscription-only\",\n      \"stage\": \"frontier\",\n      \"started_at\": \"2026-10-11T17:42:27.185600+00:00\",\n      \"deadline_at\": \"2026-10-11T17:43:14.185598+00:00\",\n      \"owner_pid\": 55067,\n      \"state\": \"completed\",\n      \"reason\": null,\n      \"finished_at\": \"2026-10-11T17:42:34.969502+00:00\",\n      \"verdict\": \"deny\",\n      \"cached\": false,\n      \"model_run_id\": \"run_4b025c43b45b\",\n      \"observed_models\": [],\n      \"purpose\": \"live\",\n      \"native_review\": {\n        \"runtime\": \"codex\",\n        \"prefixes\": [\n          {\n            \"thread_id\": \"01a12b5c-ce1a-72c2-ad3f-05d75f3fba00\",\n            \"sha256\": \"fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4\",\n            \"bytes\": 41450,\n            \"records\": 15\n          }\n        ],\n        \"independence\": \"separate\",\n        \"source_context_input\": 14258,\n        \"usage_baseline\": {\n          \"input_tokens\": 14258,\n          \"output_tokens\": 7,\n          \"cached_tokens\": 12288\n        },\n        \"baseline_origin\": \"event_msg.token_count.info.total_token_usage\",\n        \"state\": \"returned\",\n        \"source_thread_id\": \"01a12b5c-ce1a-72c2-ad3f-05d75f3fba00\",\n        \"source_cwd\": \"$ROUND/source\",\n        \"action_cwd\": \"$ROUND/action\",\n        \"model\": \"gpt-6.1-sol\",\n        \"effort\": \"low\",\n        \"auth_mode\": \"subscription-only\",\n        \"billing_mode\": \"subscription_quota\",\n        \"native_boundary\": {\n          \"thread_id\": \"01a12b5e-ec8d-7ee2-9043-bb88352f72a8\",\n          \"turn_id\": \"01a12c0e-f0a6-7080-82e4-ed41fbc15a7f\",\n          \"event\": \"PreToolUse\"\n        },\n        \"inputs_preserved\": true,\n        \"reviewer_thread_id\": \"01a12c0f-11f0-7f50-8e08-266399bc15d7\",\n        \"terminal_usage\": {\n          \"input_tokens\": 28418,\n          \"output_tokens\": 78,\n          \"cached_tokens\": 23552\n        },\n        \"inherited_usage\": {\n          \"input_tokens\": 14258,\n          \"output_tokens\": 7,\n          \"cached_tokens\": 12288\n        },\n        \"review_usage\": {\n          \"input_tokens\": 14160,\n          \"output_tokens\": 71,\n          \"cached_tokens\": 11264\n        }\n      }\n    },\n    {\n      \"schema_version\": 3,\n      \"attempt_id\": \"2b81593140344a88b12f05c05585eca8\",\n      \"session\": \"b5-product-deny\",\n      \"forge_root\": \"$ROUND/action\",\n      \"root_run_id\": \"run_ded6c05fecf6\",\n      \"action_id\": \"05a75e517f66605a2618c64bf5d90a5f00fb5250b340d400c7598125610600ab\",\n      \"origin\": \"codex\",\n      \"tool_name\": \"Write\",\n      \"target_path\": \"product-deny.txt\",\n      \"plan_path\": null,\n      \"plan_digest\": null,\n      \"conversation\": null,\n      \"lane\": {\n        \"runtime_id\": \"codex\",\n        \"backend_id\": \"chatgpt\",\n        \"model\": \"gpt-6.1-sol\"\n      },\n      \"model\": \"gpt-6.1-sol\",\n      \"effort\": \"low\",\n      \"auth_mode\": \"subscription-only\",\n      \"stage\": \"frontier\",\n      \"started_at\": \"2026-10-11T17:37:58.735958+00:00\",\n      \"deadline_at\": \"2026-10-11T17:38:45.735957+00:00\",\n      \"owner_pid\": 50814,\n      \"state\": \"completed\",\n      \"reason\": null,\n      \"finished_at\": \"2026-10-11T17:38:08.290689+00:00\",\n      \"verdict\": \"deny\",\n      \"cached\": false,\n      \"model_run_id\": \"run_b0c7f12d6539\",\n      \"observed_models\": [],\n      \"purpose\": \"live\",\n      \"native_review\": {\n        \"runtime\": \"codex\",\n        \"prefixes\": [\n          {\n            \"thread_id\": \"01a12b5c-ce1a-72c2-ad3f-05d75f3fba00\",\n            \"sha256\": \"fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4\",\n            \"bytes\": 41450,\n            \"records\": 15\n          }\n        ],\n        \"independence\": \"separate\",\n        \"source_context_input\": 14258,\n        \"usage_baseline\": {\n          \"input_tokens\": 14258,\n          \"output_tokens\": 7,\n          \"cached_tokens\": 12288\n        },\n        \"baseline_origin\": \"event_msg.token_count.info.total_token_usage\",\n        \"state\": \"returned\",\n        \"source_thread_id\": \"01a12b5c-ce1a-72c2-ad3f-05d75f3fba00\",\n        \"source_cwd\": \"$ROUND/source\",\n        \"action_cwd\": \"$ROUND/action\",\n        \"model\": \"gpt-6.1-sol\",\n        \"effort\": \"low\",\n        \"auth_mode\": \"subscription-only\",\n        \"billing_mode\": \"subscription_quota\",\n        \"native_boundary\": {\n          \"thread_id\": \"01a12b5e-ec8d-7ee2-9043-bb88352f72a8\",\n          \"turn_id\": \"01a12c0a-d3f2-7a42-83e0-bfd260c252b0\",\n          \"event\": \"PreToolUse\"\n        },\n        \"inputs_preserved\": true,\n        \"reviewer_thread_id\": \"01a12c0a-f925-70d3-94b7-414061dbd335\",\n        \"terminal_usage\": {\n          \"input_tokens\": 28416,\n          \"output_tokens\": 78,\n          \"cached_tokens\": 23552\n        },\n        \"inherited_usage\": {\n          \"input_tokens\": 14258,\n          \"output_tokens\": 7,\n          \"cached_tokens\": 12288\n        },\n        \"review_usage\": {\n          \"input_tokens\": 14158,\n          \"output_tokens\": 71,\n          \"cached_tokens\": 11264\n        }\n      }\n    }\n  ],\n  \"turn_review\": null,\n  \"subagents\": 0,\n  \"notes\": [\n    \"session_tagging_partial\"\n  ]\n}\n"
+    },
+    {
+      "args": [
+        "session",
+        "lane",
+        "show",
+        "--session",
+        "b5-parent",
+        "--json"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\n  \"consumers\": [\n    {\n      \"consumer\": \"memory_writer\",\n      \"requested\": null,\n      \"frozen\": null,\n      \"drift\": false,\n      \"degraded\": false\n    },\n    {\n      \"consumer\": \"shadow_curation\",\n      \"requested\": null,\n      \"frozen\": null,\n      \"drift\": false,\n      \"degraded\": false\n    },\n    {\n      \"consumer\": \"supervisor\",\n      \"requested\": {\n        \"runtime\": \"codex\",\n        \"backend\": \"chatgpt\",\n        \"model\": \"gpt-6.1-sol\"\n      },\n      \"frozen\": {\n        \"runtime\": \"codex\",\n        \"backend\": \"chatgpt\",\n        \"model\": \"gpt-6.1-sol\"\n      },\n      \"drift\": false,\n      \"degraded\": false\n    },\n    {\n      \"consumer\": \"team_supervisor\",\n      \"requested\": null,\n      \"frozen\": null,\n      \"drift\": false,\n      \"degraded\": false\n    }\n  ]\n}\n"
+    },
+    {
+      "args": [
+        "policy",
+        "supervisor",
+        "status",
+        "--session",
+        "b5-product-allow",
+        "--json"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\n  \"session_name\": \"b5-product-allow\",\n  \"supervisor\": {\n    \"auth_mode\": \"subscription-only\",\n    \"review_trigger\": \"stop\",\n    \"model\": \"gpt-6.1-sol\",\n    \"configured\": true,\n    \"active\": true,\n    \"source\": \"native\",\n    \"resume_id\": null,\n    \"suspended\": false,\n    \"plan_override_path\": \"$ROUND/action/approved-plan.md\",\n    \"proxy\": null,\n    \"direct\": false,\n    \"fork_session\": true,\n    \"timeout_seconds\": 45,\n    \"throttle_seconds\": 30,\n    \"cascade\": false,\n    \"checker_model\": null,\n    \"checker_provider\": null,\n    \"checker_budget_tokens\": null,\n    \"checker_effort\": null,\n    \"supervisor_effort\": \"low\",\n    \"resolved_uuid\": null,\n    \"source_model\": null,\n    \"native_source\": {\n      \"runtime\": \"codex\",\n      \"thread_id\": \"01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834\",\n      \"home\": \"$ROUND/codex-home\",\n      \"rollout_path\": \"$ROUND/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-28-21-01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834.jsonl\",\n      \"source_cwd\": \"$ROUND/action\",\n      \"header_digest\": \"10d27d466b7b8c177abfa7a67c2a1201b9adc2f8c7b628147a4aca70420a54b5\",\n      \"managed_session\": null,\n      \"managed_root\": null\n    },\n    \"verdict_cache\": \"disabled\",\n    \"billing_mode\": \"subscription_quota\",\n    \"turn_review\": {\n      \"state\": \"unreviewed\",\n      \"reason\": \"changes_after_review\",\n      \"thread_id\": \"01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834\",\n      \"turn_id\": \"01a12c11-c950-75e1-8fe2-830870c12311\",\n      \"latest_seen_turn\": \"01a12c11-c950-75e1-8fe2-830870c12311\",\n      \"spent\": true,\n      \"dispatch_cap\": 1,\n      \"dispatched\": true,\n      \"assessed_snapshot\": {\n        \"digest\": \"dbfa03283c10490ba662d350ca9fbfdef87270850f66d528a7dd60204fb654ad\",\n        \"files\": 509,\n        \"omissions\": [],\n        \"root\": \"$ROUND/action\"\n      },\n      \"attempt_id\": \"1293b87d0d904b449e397e3b051c486d\",\n      \"evidence_digest\": \"57a0a180602b4848aee79a56e7cee04c7f6e120c46ae2841c12d571d05d56393\",\n      \"coverage\": {\n        \"complete\": true,\n        \"omissions\": []\n      },\n      \"outstanding\": true,\n      \"correction_consumed\": true,\n      \"provenance_turns\": [\n        \"01a12c0b-e03a-7b70-8216-6ab6b628b4ef\",\n        \"01a12c11-c950-75e1-8fe2-830870c12311\"\n      ],\n      \"carry_limit\": 32,\n      \"reset_required\": false,\n      \"reset_requested\": false,\n      \"excluded_work\": null,\n      \"unattributed_changes\": {\n        \"count\": 0,\n        \"paths\": []\n      },\n      \"updated_at\": \"2026-10-11T17:45:59Z\"\n    },\n    \"lane\": {\n      \"runtime\": \"codex\",\n      \"backend\": \"chatgpt\",\n      \"model\": \"gpt-6.1-sol\"\n    },\n    \"degraded\": null,\n    \"latest_review\": {\n      \"schema_version\": 3,\n      \"attempt_id\": \"1293b87d0d904b449e397e3b051c486d\",\n      \"session\": \"b5-product-allow\",\n      \"forge_root\": \"$ROUND/action\",\n      \"root_run_id\": \"run_1a775a55a6f7\",\n      \"action_id\": \"57a0a180602b4848aee79a56e7cee04c7f6e120c46ae2841c12d571d05d56393\",\n      \"origin\": \"codex\",\n      \"tool_name\": \"TurnReview\",\n      \"target_path\": null,\n      \"plan_path\": \"$ROUND/action/approved-plan.md\",\n      \"plan_digest\": \"0c27dc062e6926be4d5b91dd62fe82b14e832ff35796ebda74a1e0a032209876\",\n      \"conversation\": null,\n      \"lane\": {\n        \"runtime_id\": \"codex\",\n        \"backend_id\": \"chatgpt\",\n        \"model\": \"gpt-6.1-sol\"\n      },\n      \"model\": \"gpt-6.1-sol\",\n      \"effort\": \"low\",\n      \"auth_mode\": \"subscription-only\",\n      \"stage\": \"frontier\",\n      \"started_at\": \"2026-10-11T17:45:39.305426+00:00\",\n      \"deadline_at\": \"2026-10-11T17:46:26.212634+00:00\",\n      \"owner_pid\": 62501,\n      \"state\": \"completed\",\n      \"reason\": null,\n      \"finished_at\": \"2026-10-11T17:45:49.403054+00:00\",\n      \"verdict\": \"deny\",\n      \"cached\": false,\n      \"model_run_id\": \"run_562d93650f19\",\n      \"observed_models\": [],\n      \"purpose\": \"live\",\n      \"native_review\": {\n        \"runtime\": \"codex\",\n        \"prefixes\": [\n          {\n            \"thread_id\": \"01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834\",\n            \"sha256\": \"348046a0dd9244b25e4a43fec59245429669a713495762d2a6241b83157af474\",\n            \"bytes\": 100687,\n            \"records\": 82\n          }\n        ],\n        \"independence\": \"shared\",\n        \"source_context_input\": 15443,\n        \"usage_baseline\": {\n          \"input_tokens\": 134499,\n          \"output_tokens\": 310,\n          \"cached_tokens\": 127104\n        },\n        \"baseline_origin\": \"event_msg.token_count.info.total_token_usage\",\n        \"state\": \"returned\",\n        \"source_thread_id\": \"01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834\",\n        \"source_cwd\": \"$ROUND/action\",\n        \"action_cwd\": \"$ROUND/action\",\n        \"model\": \"gpt-6.1-sol\",\n        \"effort\": \"low\",\n        \"auth_mode\": \"subscription-only\",\n        \"billing_mode\": \"subscription_quota\",\n        \"native_boundary\": {\n          \"thread_id\": \"01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834\",\n          \"turn_id\": \"01a12c11-c950-75e1-8fe2-830870c12311\",\n          \"event\": \"Stop\"\n        },\n        \"inputs_preserved\": true,\n        \"inputs_current\": true,\n        \"reviewer_thread_id\": \"01a12c12-005f-78b1-9ca9-635e900d9347\",\n        \"terminal_usage\": {\n          \"input_tokens\": 151356,\n          \"output_tokens\": 410,\n          \"cached_tokens\": 138368\n        },\n        \"inherited_usage\": {\n          \"input_tokens\": 134499,\n          \"output_tokens\": 310,\n          \"cached_tokens\": 127104\n        },\n        \"review_usage\": {\n          \"input_tokens\": 16857,\n          \"output_tokens\": 100,\n          \"cached_tokens\": 11264\n        }\n      }\n    },\n    \"state\": \"active\",\n    \"unavailable_reason\": null\n  }\n}\n"
+    },
+    {
+      "args": [
+        "telemetry",
+        "activity",
+        "b5-product-allow",
+        "--json"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\n  \"session\": \"b5-product-allow\",\n  \"since\": \"2026-10-10T22:00:00+00:00\",\n  \"upstream\": {\n    \"operations\": [],\n    \"policy\": {\n      \"supervisor_allow\": 1,\n      \"supervisor_warn\": 0,\n      \"supervisor_deny\": 0,\n      \"plan_check_allow\": 0,\n      \"plan_check_needs_review\": 0,\n      \"total_warnings\": 0,\n      \"recent_warnings\": [],\n      \"log_capped\": false\n    },\n    \"manifest_fallback_used\": true,\n    \"log_capped\": false,\n    \"upstream_count\": 0\n  },\n  \"downstream\": {\n    \"rows\": [\n      {\n        \"command\": \"supervisor\",\n        \"calls\": 0,\n        \"workers\": 3,\n        \"attempts\": 3,\n        \"errors\": 0,\n        \"error_kinds\": {},\n        \"input_tokens\": 46596,\n        \"output_tokens\": 246,\n        \"cached_tokens\": 11264,\n        \"cost_micro_usd\": null,\n        \"cost_estimated\": true,\n        \"cost_partial\": true,\n        \"join_state\": \"downstream_only\",\n        \"root_run_ids\": [\n          \"run_1a775a55a6f7\",\n          \"run_2a26be316d0a\",\n          \"run_5619fbdff9a0\"\n        ],\n        \"runtime\": \"codex\",\n        \"billing_mode\": \"subscription_quota\"\n      },\n      {\n        \"command\": \"codex-resume\",\n        \"calls\": 0,\n        \"workers\": 3,\n        \"attempts\": 3,\n        \"errors\": 0,\n        \"error_kinds\": {},\n        \"input_tokens\": 313307,\n        \"output_tokens\": 690,\n        \"cached_tokens\": 295552,\n        \"cost_micro_usd\": null,\n        \"cost_estimated\": true,\n        \"cost_partial\": true,\n        \"join_state\": \"downstream_only\",\n        \"root_run_ids\": [\n          \"run_1a775a55a6f7\",\n          \"run_2a26be316d0a\",\n          \"run_5619fbdff9a0\"\n        ],\n        \"runtime\": \"codex\",\n        \"billing_mode\": \"subscription_quota\"\n      }\n    ],\n    \"total_cost_micro_usd\": null,\n    \"total_input_tokens\": 359903,\n    \"total_output_tokens\": 936,\n    \"cost_partial\": false,\n    \"cost_estimated\": false,\n    \"downstream_records\": 6,\n    \"skipped_legacy_schema\": 0\n  },\n  \"shadow\": null,\n  \"supervisor_reviews\": [\n    {\n      \"schema_version\": 3,\n      \"attempt_id\": \"1293b87d0d904b449e397e3b051c486d\",\n      \"session\": \"b5-product-allow\",\n      \"forge_root\": \"$ROUND/action\",\n      \"root_run_id\": \"run_1a775a55a6f7\",\n      \"action_id\": \"57a0a180602b4848aee79a56e7cee04c7f6e120c46ae2841c12d571d05d56393\",\n      \"origin\": \"codex\",\n      \"tool_name\": \"TurnReview\",\n      \"target_path\": null,\n      \"plan_path\": \"$ROUND/action/approved-plan.md\",\n      \"plan_digest\": \"0c27dc062e6926be4d5b91dd62fe82b14e832ff35796ebda74a1e0a032209876\",\n      \"conversation\": null,\n      \"lane\": {\n        \"runtime_id\": \"codex\",\n        \"backend_id\": \"chatgpt\",\n        \"model\": \"gpt-6.1-sol\"\n      },\n      \"model\": \"gpt-6.1-sol\",\n      \"effort\": \"low\",\n      \"auth_mode\": \"subscription-only\",\n      \"stage\": \"frontier\",\n      \"started_at\": \"2026-10-11T17:45:39.305426+00:00\",\n      \"deadline_at\": \"2026-10-11T17:46:26.212634+00:00\",\n      \"owner_pid\": 62501,\n      \"state\": \"completed\",\n      \"reason\": null,\n      \"finished_at\": \"2026-10-11T17:45:49.403054+00:00\",\n      \"verdict\": \"deny\",\n      \"cached\": false,\n      \"model_run_id\": \"run_562d93650f19\",\n      \"observed_models\": [],\n      \"purpose\": \"live\",\n      \"native_review\": {\n        \"runtime\": \"codex\",\n        \"prefixes\": [\n          {\n            \"thread_id\": \"01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834\",\n            \"sha256\": \"348046a0dd9244b25e4a43fec59245429669a713495762d2a6241b83157af474\",\n            \"bytes\": 100687,\n            \"records\": 82\n          }\n        ],\n        \"independence\": \"shared\",\n        \"source_context_input\": 15443,\n        \"usage_baseline\": {\n          \"input_tokens\": 134499,\n          \"output_tokens\": 310,\n          \"cached_tokens\": 127104\n        },\n        \"baseline_origin\": \"event_msg.token_count.info.total_token_usage\",\n        \"state\": \"returned\",\n        \"source_thread_id\": \"01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834\",\n        \"source_cwd\": \"$ROUND/action\",\n        \"action_cwd\": \"$ROUND/action\",\n        \"model\": \"gpt-6.1-sol\",\n        \"effort\": \"low\",\n        \"auth_mode\": \"subscription-only\",\n        \"billing_mode\": \"subscription_quota\",\n        \"native_boundary\": {\n          \"thread_id\": \"01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834\",\n          \"turn_id\": \"01a12c11-c950-75e1-8fe2-830870c12311\",\n          \"event\": \"Stop\"\n        },\n        \"inputs_preserved\": true,\n        \"inputs_current\": true,\n        \"reviewer_thread_id\": \"01a12c12-005f-78b1-9ca9-635e900d9347\",\n        \"terminal_usage\": {\n          \"input_tokens\": 151356,\n          \"output_tokens\": 410,\n          \"cached_tokens\": 138368\n        },\n        \"inherited_usage\": {\n          \"input_tokens\": 134499,\n          \"output_tokens\": 310,\n          \"cached_tokens\": 127104\n        },\n        \"review_usage\": {\n          \"input_tokens\": 16857,\n          \"output_tokens\": 100,\n          \"cached_tokens\": 11264\n        }\n      }\n    },\n    {\n      \"schema_version\": 3,\n      \"attempt_id\": \"e8d14e5232cc484c95010fc9141bf00b\",\n      \"session\": \"b5-product-allow\",\n      \"forge_root\": \"$ROUND/action\",\n      \"root_run_id\": \"run_2a26be316d0a\",\n      \"action_id\": \"fd6089bfd3e30e599e36e4f8d82d64f149b3e33ab9dfd82b2e16e5354a727d9c\",\n      \"origin\": \"codex\",\n      \"tool_name\": \"TurnReview\",\n      \"target_path\": null,\n      \"plan_path\": \"$ROUND/action/approved-plan.md\",\n      \"plan_digest\": \"0c27dc062e6926be4d5b91dd62fe82b14e832ff35796ebda74a1e0a032209876\",\n      \"conversation\": null,\n      \"lane\": {\n        \"runtime_id\": \"codex\",\n        \"backend_id\": \"chatgpt\",\n        \"model\": \"gpt-6.1-sol\"\n      },\n      \"model\": \"gpt-6.1-sol\",\n      \"effort\": \"low\",\n      \"auth_mode\": \"subscription-only\",\n      \"stage\": \"frontier\",\n      \"started_at\": \"2026-10-11T17:39:11.564986+00:00\",\n      \"deadline_at\": \"2026-10-11T17:39:58.483109+00:00\",\n      \"owner_pid\": 51228,\n      \"state\": \"completed\",\n      \"reason\": null,\n      \"finished_at\": \"2026-10-11T17:39:20.452795+00:00\",\n      \"verdict\": \"deny\",\n      \"cached\": false,\n      \"model_run_id\": \"run_39b4812d0e03\",\n      \"observed_models\": [],\n      \"purpose\": \"live\",\n      \"native_review\": {\n        \"runtime\": \"codex\",\n        \"prefixes\": [\n          {\n            \"thread_id\": \"01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834\",\n            \"sha256\": \"b71f0c6ba19ff5c77c2055d9e2bb856a7b71dbb80b89256156d0b2d89b396bd7\",\n            \"bytes\": 75169,\n            \"records\": 53\n          }\n        ],\n        \"independence\": \"shared\",\n        \"source_context_input\": 14909,\n        \"usage_baseline\": {\n          \"input_tokens\": 73281,\n          \"output_tokens\": 165,\n          \"cached_tokens\": 67712\n        },\n        \"baseline_origin\": \"event_msg.token_count.info.total_token_usage\",\n        \"state\": \"returned\",\n        \"source_thread_id\": \"01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834\",\n        \"source_cwd\": \"$ROUND/action\",\n        \"action_cwd\": \"$ROUND/action\",\n        \"model\": \"gpt-6.1-sol\",\n        \"effort\": \"low\",\n        \"auth_mode\": \"subscription-only\",\n        \"billing_mode\": \"subscription_quota\",\n        \"native_boundary\": {\n          \"thread_id\": \"01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834\",\n          \"turn_id\": \"01a12c0b-e03a-7b70-8216-6ab6b628b4ef\",\n          \"event\": \"Stop\"\n        },\n        \"inputs_preserved\": true,\n        \"reviewer_thread_id\": \"01a12c0c-159f-72c2-b6a2-965dee9a37e4\",\n        \"terminal_usage\": {\n          \"input_tokens\": 88863,\n          \"output_tokens\": 257,\n          \"cached_tokens\": 67712\n        },\n        \"inherited_usage\": {\n          \"input_tokens\": 73281,\n          \"output_tokens\": 165,\n          \"cached_tokens\": 67712\n        },\n        \"review_usage\": {\n          \"input_tokens\": 15582,\n          \"output_tokens\": 92,\n          \"cached_tokens\": 0\n        }\n      }\n    },\n    {\n      \"schema_version\": 3,\n      \"attempt_id\": \"027526b22e6f4e479b45570651aa408f\",\n      \"session\": \"b5-product-allow\",\n      \"forge_root\": \"$ROUND/action\",\n      \"root_run_id\": \"run_5619fbdff9a0\",\n      \"action_id\": \"0de5860be0e187f005728ddeb44195c813eef43076fc5238a190a7acfaacb789\",\n      \"origin\": \"codex\",\n      \"tool_name\": \"Write\",\n      \"target_path\": \"product-allow.txt\",\n      \"plan_path\": null,\n      \"plan_digest\": null,\n      \"conversation\": null,\n      \"lane\": {\n        \"runtime_id\": \"codex\",\n        \"backend_id\": \"chatgpt\",\n        \"model\": \"gpt-6.1-sol\"\n      },\n      \"model\": \"gpt-6.1-sol\",\n      \"effort\": \"low\",\n      \"auth_mode\": \"subscription-only\",\n      \"stage\": \"frontier\",\n      \"started_at\": \"2026-10-11T17:36:12.078035+00:00\",\n      \"deadline_at\": \"2026-10-11T17:36:59.078033+00:00\",\n      \"owner_pid\": 50319,\n      \"state\": \"completed\",\n      \"reason\": null,\n      \"finished_at\": \"2026-10-11T17:36:20.262927+00:00\",\n      \"verdict\": \"allow\",\n      \"cached\": false,\n      \"model_run_id\": \"run_b0ed7b0b782e\",\n      \"observed_models\": [],\n      \"purpose\": \"live\",\n      \"native_review\": {\n        \"runtime\": \"codex\",\n        \"prefixes\": [\n          {\n            \"thread_id\": \"01a12b5c-ce1a-72c2-ad3f-05d75f3fba00\",\n            \"sha256\": \"fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4\",\n            \"bytes\": 41450,\n            \"records\": 15\n          }\n        ],\n        \"independence\": \"separate\",\n        \"source_context_input\": 14258,\n        \"usage_baseline\": {\n          \"input_tokens\": 14258,\n          \"output_tokens\": 7,\n          \"cached_tokens\": 12288\n        },\n        \"baseline_origin\": \"event_msg.token_count.info.total_token_usage\",\n        \"state\": \"returned\",\n        \"source_thread_id\": \"01a12b5c-ce1a-72c2-ad3f-05d75f3fba00\",\n        \"source_cwd\": \"$ROUND/source\",\n        \"action_cwd\": \"$ROUND/action\",\n        \"model\": \"gpt-6.1-sol\",\n        \"effort\": \"low\",\n        \"auth_mode\": \"subscription-only\",\n        \"billing_mode\": \"subscription_quota\",\n        \"native_boundary\": {\n          \"thread_id\": \"01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834\",\n          \"turn_id\": \"01a12c09-3a4b-7b50-ba69-86670ec72083\",\n          \"event\": \"PreToolUse\"\n        },\n        \"inputs_preserved\": true,\n        \"reviewer_thread_id\": \"01a12c09-5c1f-78d1-8eb3-31235e7c8f56\",\n        \"terminal_usage\": {\n          \"input_tokens\": 28415,\n          \"output_tokens\": 61,\n          \"cached_tokens\": 12288\n        },\n        \"inherited_usage\": {\n          \"input_tokens\": 14258,\n          \"output_tokens\": 7,\n          \"cached_tokens\": 12288\n        },\n        \"review_usage\": {\n          \"input_tokens\": 14157,\n          \"output_tokens\": 54,\n          \"cached_tokens\": 0\n        }\n      }\n    }\n  ],\n  \"turn_review\": {\n    \"state\": \"unreviewed\",\n    \"reason\": \"changes_after_review\",\n    \"thread_id\": \"01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834\",\n    \"turn_id\": \"01a12c11-c950-75e1-8fe2-830870c12311\",\n    \"latest_seen_turn\": \"01a12c11-c950-75e1-8fe2-830870c12311\",\n    \"spent\": true,\n    \"dispatch_cap\": 1,\n    \"dispatched\": true,\n    \"assessed_snapshot\": {\n      \"digest\": \"dbfa03283c10490ba662d350ca9fbfdef87270850f66d528a7dd60204fb654ad\",\n      \"files\": 509,\n      \"omissions\": [],\n      \"root\": \"$ROUND/action\"\n    },\n    \"attempt_id\": \"1293b87d0d904b449e397e3b051c486d\",\n    \"evidence_digest\": \"57a0a180602b4848aee79a56e7cee04c7f6e120c46ae2841c12d571d05d56393\",\n    \"coverage\": {\n      \"complete\": true,\n      \"omissions\": []\n    },\n    \"outstanding\": true,\n    \"correction_consumed\": true,\n    \"provenance_turns\": [\n      \"01a12c0b-e03a-7b70-8216-6ab6b628b4ef\",\n      \"01a12c11-c950-75e1-8fe2-830870c12311\"\n    ],\n    \"carry_limit\": 32,\n    \"reset_required\": false,\n    \"reset_requested\": false,\n    \"excluded_work\": null,\n    \"unattributed_changes\": {\n      \"count\": 0,\n      \"paths\": []\n    },\n    \"updated_at\": \"2026-10-11T17:45:59Z\"\n  },\n  \"subagents\": 0,\n  \"notes\": [\n    \"session_tagging_partial\"\n  ]\n}\n"
+    },
+    {
+      "args": [
+        "policy",
+        "supervisor",
+        "set",
+        "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+        "--session",
+        "b5-product-allow",
+        "--source-runtime",
+        "codex",
+        "--runtime",
+        "codex",
+        "--model",
+        "gpt-6.1-sol",
+        "--auth-mode",
+        "subscription-only",
+        "--trigger",
+        "stop"
+      ],
+      "manifest_unchanged": true,
+      "returncode": 1,
+      "stderr": "Error: Native Stop supervision requires an explicit approved plan file\n",
+      "stdout": ""
+    }
+  ],
+  "p1_to_final_changed_modules": [
+    "policy/semantic/native_codex.py",
+    "cli/hooks/direct_commands.py"
+  ],
+  "product_starts": [
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "$ROUND/captures/product-enrollment",
+      "case": "P1",
+      "id": "b0d9e5ea2a914afdb4f0b4e12dd01509",
+      "invocation": {
+        "argv": [
+          "$ROUND/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only"
+        ],
+        "auth_mode": "subscription-only",
+        "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "capture": "$ROUND/captures/product-enrollment",
+        "case": "P1",
+        "cwd": "/tmp/forge-codex-enroll-k5qpuppn",
+        "env_keys": [
+          "CODEX_HOME",
+          "FORGE_CODEX_ENROLLMENT_NONCE",
+          "FORGE_CODEX_EXECUTOR_IDENTITY",
+          "FORGE_DEPTH",
+          "FORGE_FORGE_ROOT",
+          "FORGE_HOME",
+          "FORGE_PARENT_RUN_ID",
+          "FORGE_ROOT_RUN_ID",
+          "FORGE_RUN_ID",
+          "FORGE_SESSION",
+          "GIT_CONFIG_GLOBAL",
+          "GIT_CONFIG_NOSYSTEM",
+          "HOME",
+          "LANG",
+          "PATH",
+          "PROBE_ROUND_ROOT",
+          "PYTHON_DOTENV_DISABLED",
+          "TERM",
+          "XDG_CACHE_HOME",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "id": "b0d9e5ea2a914afdb4f0b4e12dd01509",
+        "model": "gpt-6.1-sol",
+        "pid": 49747,
+        "ppid": 49745,
+        "role": "executor",
+        "started_at": 1791740040.407147
+      },
+      "model": "gpt-6.1-sol",
+      "outcome": {
+        "elapsed_seconds": 13.893661624999368,
+        "id": "b0d9e5ea2a914afdb4f0b4e12dd01509",
+        "returncode": 0,
+        "stdin_bytes": 86
+      },
+      "pid": 49747,
+      "ppid": 49745,
+      "role": "executor",
+      "started_at": 1791740040.407147
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "$ROUND/captures/product-allow",
+      "case": "P1",
+      "id": "d4d0720c169b4e12ad214700ac410194",
+      "invocation": {
+        "argv": [
+          "$ROUND/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "resume",
+          "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834"
+        ],
+        "auth_mode": "subscription-only",
+        "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "capture": "$ROUND/captures/product-allow",
+        "case": "P1",
+        "cwd": "$ROUND/action",
+        "env_keys": [
+          "CODEX_HOME",
+          "FORGE_CODEX_EXECUTOR_IDENTITY",
+          "FORGE_DEPTH",
+          "FORGE_FORGE_ROOT",
+          "FORGE_HOME",
+          "FORGE_PARENT_RUN_ID",
+          "FORGE_ROOT_RUN_ID",
+          "FORGE_RUN_ID",
+          "FORGE_SESSION",
+          "GIT_CONFIG_GLOBAL",
+          "GIT_CONFIG_NOSYSTEM",
+          "HOME",
+          "LANG",
+          "PATH",
+          "PROBE_CAPTURE",
+          "PROBE_ROUND_ROOT",
+          "PYTHON_DOTENV_DISABLED",
+          "TERM",
+          "XDG_CACHE_HOME",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "id": "d4d0720c169b4e12ad214700ac410194",
+        "model": "gpt-6.1-sol",
+        "pid": 50198,
+        "ppid": 50195,
+        "role": "executor",
+        "started_at": 1791740164.6170628
+      },
+      "model": "gpt-6.1-sol",
+      "outcome": {
+        "elapsed_seconds": 21.323364374999073,
+        "id": "d4d0720c169b4e12ad214700ac410194",
+        "returncode": 0,
+        "stdin_bytes": 211
+      },
+      "pid": 50198,
+      "ppid": 50195,
+      "role": "executor",
+      "started_at": 1791740164.6170628
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "$ROUND/captures/product-allow",
+      "case": "P1",
+      "id": "92fb81e41bcc4d51b940f6e04f6ea0ea",
+      "invocation": {
+        "argv": [
+          "$ROUND/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "$ROUND/action",
+          "fork",
+          "--ephemeral",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--output-schema",
+          "$ROUND/forge-home/reviewers/codex/review-index/verdict-schema.json",
+          "-m",
+          "gpt-6.1-sol",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-c",
+          "sqlite_home=\"$ROUND/forge-home/reviewers/codex/review-index\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "auth_mode": "subscription-only",
+        "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "capture": "$ROUND/captures/product-allow",
+        "case": "P1",
+        "cwd": "$ROUND/action",
+        "env_keys": [
+          "CODEX_HOME",
+          "FORGE_DEPTH",
+          "HOME",
+          "LANG",
+          "PATH",
+          "PYTHON_DOTENV_DISABLED",
+          "TERM",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "id": "92fb81e41bcc4d51b940f6e04f6ea0ea",
+        "model": "gpt-6.1-sol",
+        "pid": 50324,
+        "ppid": 50323,
+        "role": "reviewer",
+        "started_at": 1791740172.359252
+      },
+      "model": "gpt-6.1-sol",
+      "outcome": {
+        "elapsed_seconds": 7.963189624992083,
+        "id": "92fb81e41bcc4d51b940f6e04f6ea0ea",
+        "returncode": 0,
+        "stdin_bytes": 1468
+      },
+      "pid": 50324,
+      "ppid": 50323,
+      "role": "reviewer",
+      "started_at": 1791740172.359252
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "$ROUND/captures/product-deny",
+      "case": "P1",
+      "id": "31addbfcd2ec4ab7855f3fea8220cba2",
+      "invocation": {
+        "argv": [
+          "$ROUND/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "resume",
+          "01a12b5e-ec8d-7ee2-9043-bb88352f72a8"
+        ],
+        "auth_mode": "subscription-only",
+        "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "capture": "$ROUND/captures/product-deny",
+        "case": "P1",
+        "cwd": "$ROUND/action",
+        "env_keys": [
+          "CODEX_HOME",
+          "FORGE_CODEX_EXECUTOR_IDENTITY",
+          "FORGE_DEPTH",
+          "FORGE_FORGE_ROOT",
+          "FORGE_HOME",
+          "FORGE_PARENT_RUN_ID",
+          "FORGE_ROOT_RUN_ID",
+          "FORGE_RUN_ID",
+          "FORGE_SESSION",
+          "GIT_CONFIG_GLOBAL",
+          "GIT_CONFIG_NOSYSTEM",
+          "HOME",
+          "LANG",
+          "PATH",
+          "PROBE_CAPTURE",
+          "PROBE_ROUND_ROOT",
+          "PYTHON_DOTENV_DISABLED",
+          "TERM",
+          "XDG_CACHE_HOME",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "id": "31addbfcd2ec4ab7855f3fea8220cba2",
+        "model": "gpt-6.1-sol",
+        "pid": 50685,
+        "ppid": 50682,
+        "role": "executor",
+        "started_at": 1791740269.4967282
+      },
+      "model": "gpt-6.1-sol",
+      "outcome": {
+        "elapsed_seconds": 23.919212707987754,
+        "id": "31addbfcd2ec4ab7855f3fea8220cba2",
+        "returncode": 0,
+        "stdin_bytes": 247
+      },
+      "pid": 50685,
+      "ppid": 50682,
+      "role": "executor",
+      "started_at": 1791740269.4967282
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "$ROUND/captures/product-deny",
+      "case": "P1",
+      "id": "b8c4f9b76d5f4bd1915e6e15c4961b8e",
+      "invocation": {
+        "argv": [
+          "$ROUND/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "$ROUND/action",
+          "fork",
+          "--ephemeral",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--output-schema",
+          "$ROUND/forge-home/reviewers/codex/review-index/verdict-schema.json",
+          "-m",
+          "gpt-6.1-sol",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-c",
+          "sqlite_home=\"$ROUND/forge-home/reviewers/codex/review-index\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "auth_mode": "subscription-only",
+        "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "capture": "$ROUND/captures/product-deny",
+        "case": "P1",
+        "cwd": "$ROUND/action",
+        "env_keys": [
+          "CODEX_HOME",
+          "FORGE_DEPTH",
+          "HOME",
+          "LANG",
+          "PATH",
+          "PYTHON_DOTENV_DISABLED",
+          "TERM",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "id": "b8c4f9b76d5f4bd1915e6e15c4961b8e",
+        "model": "gpt-6.1-sol",
+        "pid": 50820,
+        "ppid": 50819,
+        "role": "reviewer",
+        "started_at": 1791740279.033839
+      },
+      "model": "gpt-6.1-sol",
+      "outcome": {
+        "elapsed_seconds": 9.320299375001923,
+        "id": "b8c4f9b76d5f4bd1915e6e15c4961b8e",
+        "returncode": 0,
+        "stdin_bytes": 1468
+      },
+      "pid": 50820,
+      "ppid": 50819,
+      "role": "reviewer",
+      "started_at": 1791740279.033839
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "$ROUND/captures/product-shared-stop",
+      "case": "P1",
+      "id": "0823e67ba5d447faaaadffb634796ba7",
+      "invocation": {
+        "argv": [
+          "$ROUND/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "resume",
+          "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834"
+        ],
+        "auth_mode": "subscription-only",
+        "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "capture": "$ROUND/captures/product-shared-stop",
+        "case": "P1",
+        "cwd": "$ROUND/action",
+        "env_keys": [
+          "CODEX_HOME",
+          "FORGE_CODEX_EXECUTOR_IDENTITY",
+          "FORGE_DEPTH",
+          "FORGE_FORGE_ROOT",
+          "FORGE_HOME",
+          "FORGE_PARENT_RUN_ID",
+          "FORGE_ROOT_RUN_ID",
+          "FORGE_RUN_ID",
+          "FORGE_SESSION",
+          "GIT_CONFIG_GLOBAL",
+          "GIT_CONFIG_NOSYSTEM",
+          "HOME",
+          "LANG",
+          "PATH",
+          "PROBE_CAPTURE",
+          "PROBE_ROUND_ROOT",
+          "PYTHON_DOTENV_DISABLED",
+          "TERM",
+          "XDG_CACHE_HOME",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "id": "0823e67ba5d447faaaadffb634796ba7",
+        "model": "gpt-6.1-sol",
+        "pid": 51063,
+        "ppid": 51060,
+        "role": "executor",
+        "started_at": 1791740338.172857
+      },
+      "model": "gpt-6.1-sol",
+      "outcome": {
+        "elapsed_seconds": 33.22554245899664,
+        "id": "0823e67ba5d447faaaadffb634796ba7",
+        "returncode": 0,
+        "stdin_bytes": 360
+      },
+      "pid": 51063,
+      "ppid": 51060,
+      "role": "executor",
+      "started_at": 1791740338.172857
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "$ROUND/captures/product-shared-stop",
+      "case": "P1",
+      "id": "46589b32af2445c78a0128dc6e99fd2f",
+      "invocation": {
+        "argv": [
+          "$ROUND/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "$ROUND/action",
+          "fork",
+          "--ephemeral",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--output-schema",
+          "$ROUND/forge-home/reviewers/codex/review-index/verdict-schema.json",
+          "-m",
+          "gpt-6.1-sol",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-c",
+          "sqlite_home=\"$ROUND/forge-home/reviewers/codex/review-index\"",
+          "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "-"
+        ],
+        "auth_mode": "subscription-only",
+        "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "capture": "$ROUND/captures/product-shared-stop",
+        "case": "P1",
+        "cwd": "$ROUND/action",
+        "env_keys": [
+          "CODEX_HOME",
+          "FORGE_DEPTH",
+          "HOME",
+          "LANG",
+          "PATH",
+          "PYTHON_DOTENV_DISABLED",
+          "TERM",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "id": "46589b32af2445c78a0128dc6e99fd2f",
+        "model": "gpt-6.1-sol",
+        "pid": 51245,
+        "ppid": 51244,
+        "role": "reviewer",
+        "started_at": 1791740351.85868
+      },
+      "model": "gpt-6.1-sol",
+      "outcome": {
+        "elapsed_seconds": 8.660200541999075,
+        "id": "46589b32af2445c78a0128dc6e99fd2f",
+        "returncode": 0,
+        "stdin_bytes": 3872
+      },
+      "pid": 51245,
+      "ppid": 51244,
+      "role": "reviewer",
+      "started_at": 1791740351.85868
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "$ROUND/captures/product-claude-adapter",
+      "case": "P1",
+      "id": "9db55fb5cc9840f19cce0a561dd47345",
+      "invocation": {
+        "argv": [
+          "$ROUND/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "$ROUND/action",
+          "fork",
+          "--ephemeral",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--output-schema",
+          "$ROUND/forge-home/reviewers/codex/review-index/verdict-schema.json",
+          "-m",
+          "gpt-6.1-sol",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-c",
+          "sqlite_home=\"$ROUND/forge-home/reviewers/codex/review-index\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "auth_mode": "subscription-only",
+        "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "capture": "$ROUND/captures/product-claude-adapter",
+        "case": "P1",
+        "cwd": "$ROUND/action",
+        "env_keys": [
+          "CODEX_HOME",
+          "FORGE_DEPTH",
+          "HOME",
+          "LANG",
+          "PATH",
+          "PYTHON_DOTENV_DISABLED",
+          "TERM",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "id": "9db55fb5cc9840f19cce0a561dd47345",
+        "model": "gpt-6.1-sol",
+        "pid": 51879,
+        "ppid": 51878,
+        "role": "reviewer",
+        "started_at": 1791740423.515348
+      },
+      "model": "gpt-6.1-sol",
+      "outcome": {
+        "elapsed_seconds": 7.811378792001051,
+        "id": "9db55fb5cc9840f19cce0a561dd47345",
+        "returncode": 0,
+        "stdin_bytes": 1478
+      },
+      "pid": 51879,
+      "ppid": 51878,
+      "role": "reviewer",
+      "started_at": 1791740423.515348
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "$ROUND/captures/product-wheel-source-only",
+      "case": "P2",
+      "id": "6e3de80236d0412c86ac12855b460a71",
+      "invocation": {
+        "argv": [
+          "$ROUND/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "resume",
+          "01a12b5e-ec8d-7ee2-9043-bb88352f72a8"
+        ],
+        "auth_mode": "subscription-only",
+        "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "capture": "$ROUND/captures/product-wheel-source-only",
+        "case": "P2",
+        "cwd": "$ROUND/action",
+        "env_keys": [
+          "CODEX_HOME",
+          "FORGE_CODEX_EXECUTOR_IDENTITY",
+          "FORGE_DEPTH",
+          "FORGE_FORGE_ROOT",
+          "FORGE_HOME",
+          "FORGE_PARENT_RUN_ID",
+          "FORGE_ROOT_RUN_ID",
+          "FORGE_RUN_ID",
+          "FORGE_SESSION",
+          "GIT_CONFIG_GLOBAL",
+          "GIT_CONFIG_NOSYSTEM",
+          "HOME",
+          "LANG",
+          "PATH",
+          "PROBE_CAPTURE",
+          "PROBE_ROUND_ROOT",
+          "PYTHON_DOTENV_DISABLED",
+          "TERM",
+          "XDG_CACHE_HOME",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "id": "6e3de80236d0412c86ac12855b460a71",
+        "model": "gpt-6.1-sol",
+        "pid": 54504,
+        "ppid": 54500,
+        "role": "executor",
+        "started_at": 1791740538.960463
+      },
+      "model": "gpt-6.1-sol",
+      "outcome": {
+        "elapsed_seconds": 21.13024095899891,
+        "id": "6e3de80236d0412c86ac12855b460a71",
+        "returncode": 0,
+        "stdin_bytes": 271
+      },
+      "pid": 54504,
+      "ppid": 54500,
+      "role": "executor",
+      "started_at": 1791740538.960463
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "$ROUND/captures/product-wheel-source-only",
+      "case": "P2",
+      "id": "7fa49802706049cd9da3cb65dfed4b3b",
+      "invocation": {
+        "argv": [
+          "$ROUND/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "$ROUND/action",
+          "fork",
+          "--ephemeral",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--output-schema",
+          "$ROUND/forge-home/reviewers/codex/review-index/verdict-schema.json",
+          "-m",
+          "gpt-6.1-sol",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-c",
+          "sqlite_home=\"$ROUND/forge-home/reviewers/codex/review-index\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "auth_mode": "subscription-only",
+        "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "capture": "$ROUND/captures/product-wheel-source-only",
+        "case": "P2",
+        "cwd": "$ROUND/action",
+        "env_keys": [
+          "CODEX_HOME",
+          "FORGE_DEPTH",
+          "HOME",
+          "LANG",
+          "PATH",
+          "PYTHON_DOTENV_DISABLED",
+          "TERM",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "id": "7fa49802706049cd9da3cb65dfed4b3b",
+        "model": "gpt-6.1-sol",
+        "pid": 55101,
+        "ppid": 55097,
+        "role": "reviewer",
+        "started_at": 1791740547.516051
+      },
+      "model": "gpt-6.1-sol",
+      "outcome": {
+        "elapsed_seconds": 7.540376875011134,
+        "id": "7fa49802706049cd9da3cb65dfed4b3b",
+        "returncode": 0,
+        "stdin_bytes": 1471
+      },
+      "pid": 55101,
+      "ppid": 55097,
+      "role": "reviewer",
+      "started_at": 1791740547.516051
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "$ROUND/captures/product-wheel-stop",
+      "case": "P2",
+      "id": "f8d0e1e8a3ee4ba3b3e045b4cc45394d",
+      "invocation": {
+        "argv": [
+          "$ROUND/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "resume",
+          "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834"
+        ],
+        "auth_mode": "subscription-only",
+        "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "capture": "$ROUND/captures/product-wheel-stop",
+        "case": "P2",
+        "cwd": "$ROUND/action",
+        "env_keys": [
+          "CODEX_HOME",
+          "FORGE_CODEX_EXECUTOR_IDENTITY",
+          "FORGE_DEPTH",
+          "FORGE_FORGE_ROOT",
+          "FORGE_HOME",
+          "FORGE_PARENT_RUN_ID",
+          "FORGE_ROOT_RUN_ID",
+          "FORGE_RUN_ID",
+          "FORGE_SESSION",
+          "GIT_CONFIG_GLOBAL",
+          "GIT_CONFIG_NOSYSTEM",
+          "HOME",
+          "LANG",
+          "PATH",
+          "PROBE_CAPTURE",
+          "PROBE_ROUND_ROOT",
+          "PYTHON_DOTENV_DISABLED",
+          "TERM",
+          "XDG_CACHE_HOME",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "id": "f8d0e1e8a3ee4ba3b3e045b4cc45394d",
+        "model": "gpt-6.1-sol",
+        "pid": 61672,
+        "ppid": 61669,
+        "role": "executor",
+        "started_at": 1791740725.4383092
+      },
+      "model": "gpt-6.1-sol",
+      "outcome": {
+        "elapsed_seconds": 36.63969387499674,
+        "global_ignore_sentinel_seen": false,
+        "id": "f8d0e1e8a3ee4ba3b3e045b4cc45394d",
+        "returncode": 0,
+        "stdin_bytes": 361
+      },
+      "pid": 61672,
+      "ppid": 61669,
+      "role": "executor",
+      "started_at": 1791740725.4383092
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "$ROUND/captures/product-wheel-stop",
+      "case": "P2",
+      "id": "96ff94c6f8194e638039582f86b881d8",
+      "invocation": {
+        "argv": [
+          "$ROUND/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "$ROUND/action",
+          "fork",
+          "--ephemeral",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--output-schema",
+          "$ROUND/forge-home/reviewers/codex/review-index/verdict-schema.json",
+          "-m",
+          "gpt-6.1-sol",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-c",
+          "sqlite_home=\"$ROUND/forge-home/reviewers/codex/review-index\"",
+          "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834",
+          "-"
+        ],
+        "auth_mode": "subscription-only",
+        "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+        "capture": "$ROUND/captures/product-wheel-stop",
+        "case": "P2",
+        "cwd": "$ROUND/action",
+        "env_keys": [
+          "CODEX_HOME",
+          "FORGE_DEPTH",
+          "HOME",
+          "LANG",
+          "PATH",
+          "PYTHON_DOTENV_DISABLED",
+          "TERM",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "id": "96ff94c6f8194e638039582f86b881d8",
+        "model": "gpt-6.1-sol",
+        "pid": 62554,
+        "ppid": 62553,
+        "role": "reviewer",
+        "started_at": 1791740739.625889
+      },
+      "model": "gpt-6.1-sol",
+      "outcome": {
+        "elapsed_seconds": 9.862155167007586,
+        "global_ignore_sentinel_seen": false,
+        "id": "96ff94c6f8194e638039582f86b881d8",
+        "returncode": 0,
+        "stdin_bytes": 5836
+      },
+      "pid": 62554,
+      "ppid": 62553,
+      "role": "reviewer",
+      "started_at": 1791740739.625889
+    }
+  ],
+  "qualifications": [
+    "P1 and the first P2 pair precede the final stale-input revalidation guard; final P2 Stop uses the final wheel.",
+    "P1 Claude adapter uses a synthetic hook payload with a real Codex reviewer; no real Claude executor was started.",
+    "Claude adapter observer failed at exit on an empty byte-write probe; native result, usage and attempt evidence survived.",
+    "Product API setup uses a synthetic key without inference; runtime API evidence is the three earlier gate starts.",
+    "Original active executor sources advance after Stop returns; each selected prefix remains byte-identical."
+  ],
+  "total_starts": 60,
+  "wheel": {
+    "sha256": "255c0681beb8a38bd4b15f8fb1dec919ba8ecf8db2dff83f870d227940b4225a",
+    "size": 1839386,
+    "wheel": "$WORKSPACE/dist/multi_forge-1.0.2-py3-none-any.whl"
+  }
+}

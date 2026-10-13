@@ -1,0 +1,803 @@
+{
+  "G1-argv-control": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b60-74b2-7023-af34-057016e07745"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [
+      "sessions/b5-parent/codex/observation-receipt.json"
+    ],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SHORT-67a5140bf9a248b793c8b894ee54c126",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "argv control",
+    "prompt_bytes": 280,
+    "prompt_sha256": "460a317533b64535e3932d8463baca87bd202e3d7025507f7249cd0f38cd0051",
+    "returncode": 0
+  },
+  "G1-stdin-model": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b60-eda3-7963-8eb4-26e6996afac7"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [
+      "sessions/b5-parent/codex/observation-receipt.json"
+    ],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SHORT-67a5140bf9a248b793c8b894ee54c126",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 105503,
+    "prompt_sha256": "26f1ba5c6ea250dad0a2bb873210c9a380e3473433d838c807780c433f082633",
+    "returncode": 0
+  },
+  "G10-current-plan": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b74-6139-7a53-9fb7-0c9cefd622b6"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SHORT-67a5140bf9a248b793c8b894ee54c126",
+      "approved_color": "COBALT",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 337,
+    "prompt_sha256": "7cd1178498919d3918943a068108ad9e474624f52d7862d073460880b2ae684e",
+    "returncode": 0,
+    "identity_variables_removed": [],
+    "hook_observations": []
+  },
+  "G11-copied-lineage": {
+    "source_id": "01a12b73-202d-7dd0-a058-f74ec9375dd2",
+    "source_path": "<ROUND>/copy-home/sessions/2026/10/11/rollout-2026-10-11T16-52-07-01a12b73-202d-7dd0-a058-f74ec9375dd2.jsonl",
+    "source_sha256_before": "6b11e539e231921e954007ff83dadf5aef2eccd93b24b2669bbbd376216d0fe1",
+    "source_sha256_after": "6b11e539e231921e954007ff83dadf5aef2eccd93b24b2669bbbd376216d0fe1",
+    "source_bytes": 39099,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b7b-a9fc-7453-92bb-43c401ac5fa2"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SHORT-67a5140bf9a248b793c8b894ee54c126",
+      "approved_color": "COBALT",
+      "checkout_readme": "Exact README.md contents: \"# B5 action checkout\\n\".\nThe later IMPLEMENTATION-REASONING-B5 entry recommended LIME because it is simpler. That recommendation was not approval. The current approved-plan.md explicitly approves COBALT and overrides the inherited amber plan and implementation reasoning.\nlist_agents is unavailable in the current tool set; no result was fabricated. No files were written or other models started."
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 600,
+    "prompt_sha256": "328c5e040fc3522c85b9b41610e69cb4da111912d193f229f388e271ccd6e8b5",
+    "returncode": 0,
+    "identity_variables_removed": [],
+    "hook_observations": [],
+    "copy": {
+      "original_path_unavailable_during_fork": true,
+      "original_sha256": "6b11e539e231921e954007ff83dadf5aef2eccd93b24b2669bbbd376216d0fe1",
+      "prefix_sha256": "6b11e539e231921e954007ff83dadf5aef2eccd93b24b2669bbbd376216d0fe1",
+      "prefix_bytes": 39099,
+      "prefix_records": 21,
+      "pending_calls": [],
+      "copy_unchanged": true,
+      "held_original_unchanged": true,
+      "original_auth_copied": false,
+      "copy_home_independently_logged_in": true,
+      "copied_ancestor_unavailable": false,
+      "original_ancestor_unavailable": true
+    }
+  },
+  "G11-shared-plan": {
+    "source_id": "01a12b73-202d-7dd0-a058-f74ec9375dd2",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-52-07-01a12b73-202d-7dd0-a058-f74ec9375dd2.jsonl",
+    "source_sha256_before": "6b11e539e231921e954007ff83dadf5aef2eccd93b24b2669bbbd376216d0fe1",
+    "source_sha256_after": "6b11e539e231921e954007ff83dadf5aef2eccd93b24b2669bbbd376216d0fe1",
+    "source_bytes": 39099,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b75-2036-7c72-ac02-d67648caa201"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SHORT-67a5140bf9a248b793c8b894ee54c126",
+      "approved_color": "COBALT",
+      "checkout_readme": "Exact README.md: \"# B5 action checkout\\n\"\nThe later IMPLEMENTATION-REASONING-B5 entry recommended LIME because it was simpler, but explicitly did not approve changing the plan. The current approved-plan.md explicitly approves COBALT and overrides inherited reasoning and the earlier amber approval. list_agents is unavailable in the current tool set; no agent-list call was made."
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 600,
+    "prompt_sha256": "328c5e040fc3522c85b9b41610e69cb4da111912d193f229f388e271ccd6e8b5",
+    "returncode": 0,
+    "identity_variables_removed": [],
+    "hook_observations": []
+  },
+  "G12-pretool-review": {
+    "source_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+    "source_sha256_before": "1cb30332676c24e056acdb3134b880c4655e7ebe2a7588fe55709d2e667851a4",
+    "source_sha256_after": "1cb30332676c24e056acdb3134b880c4655e7ebe2a7588fe55709d2e667851a4",
+    "source_bytes": 1806582,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b76-2c67-7580-85c2-9d4a3417d134"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-LONG-EARLY-2684c50a495e42d0bb2ad9682aba7322\nB5-LONG-MIDDLE-b418197657b14c1da419416d426b49b6\nB5-LONG-LATE-beb1050a2f5f43ae8157e7b1bfdf0081\nACTIVE-BOUNDARY-PreToolUse-bb67c1",
+      "approved_color": "COBALT",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 1053,
+    "prompt_sha256": "3588935014ab53e6490c558c176fbd6460506b7e3c5de0c63146f1e105c5be8b",
+    "returncode": 0,
+    "identity_variables_removed": [],
+    "hook_observations": []
+  },
+  "G12-stop-review": {
+    "source_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+    "source_sha256_before": "3c0c010a6663b38ced61a31f5af906d5fadd11c4dd3267849cfc8dcf1363fdf7",
+    "source_sha256_after": "3c0c010a6663b38ced61a31f5af906d5fadd11c4dd3267849cfc8dcf1363fdf7",
+    "source_bytes": 1826980,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b76-eb77-7780-aaed-773d9800f3a4"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-LONG-EARLY-2684c50a495e42d0bb2ad9682aba7322\nB5-LONG-MIDDLE-b418197657b14c1da419416d426b49b6\nB5-LONG-LATE-beb1050a2f5f43ae8157e7b1bfdf0081\nACTIVE-BOUNDARY-Stop-bb67c1",
+      "approved_color": "COBALT",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 1335,
+    "prompt_sha256": "cb58b585e6657948bdc8394592f369505eef79d9fcdf70357ccdf60d9a6ff761",
+    "returncode": 0,
+    "identity_variables_removed": [],
+    "hook_observations": []
+  },
+  "G13-native-owner-death": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": false,
+    "verdict": null,
+    "prompt_transport": "stdin",
+    "prompt_bytes": 224,
+    "prompt_sha256": "285a0c94161f6e8c41ba7062dfc93af5f8e9a1fd8cf8909fc9dc8becc439e3f8",
+    "returncode": 247,
+    "identity_variables_removed": [],
+    "hook_observations": []
+  },
+  "G14-copied-stop-fresh-index": {
+    "source_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+    "source_path": "<ROUND>/copy-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+    "source_sha256_before": "3c0c010a6663b38ced61a31f5af906d5fadd11c4dd3267849cfc8dcf1363fdf7",
+    "source_sha256_after": "3c0c010a6663b38ced61a31f5af906d5fadd11c4dd3267849cfc8dcf1363fdf7",
+    "source_bytes": 1826980,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b99-1a58-7212-980f-9109751ac7f1"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-LONG-EARLY-2684c50a495e42d0bb2ad9682aba7322\nB5-LONG-MIDDLE-b418197657b14c1da419416d426b49b6\nB5-LONG-LATE-beb1050a2f5f43ae8157e7b1bfdf0081\nACTIVE-BOUNDARY-Stop-bb67c1",
+      "approved_color": "COBALT",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 1335,
+    "prompt_sha256": "cb58b585e6657948bdc8394592f369505eef79d9fcdf70357ccdf60d9a6ff761",
+    "returncode": 0,
+    "identity_variables_removed": [],
+    "hook_observations": [],
+    "boundary_copy": {
+      "event": "Stop",
+      "replayed_captured_boundary": true,
+      "live_hook_during_this_repeat": false,
+      "prefix_sha256": "3c0c010a6663b38ced61a31f5af906d5fadd11c4dd3267849cfc8dcf1363fdf7",
+      "prefix_bytes": 1826980,
+      "original_path_unavailable": true,
+      "original_unchanged": true,
+      "copy_unchanged": true,
+      "fresh_sqlite_home": "<ROUND>/copy-indexes/G14-copied-stop-fresh-index",
+      "sqlite_files_created": [
+        "goals_1.sqlite",
+        "logs_2.sqlite",
+        "memories_1.sqlite",
+        "queue_1.sqlite",
+        "state_5.sqlite",
+        "thread_history_1.sqlite"
+      ],
+      "unselected_copied_rollouts_held": 3,
+      "existing_sqlite_files_unchanged": true,
+      "admission_helper_sha256": "8374ec7d0a9ca4320a40940528f55086913de9389e679a9c901e8936600e2ae7"
+    }
+  },
+  "G2-first-to-second": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b62-f82d-75e0-b669-e448b1ba2c40"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SHORT-67a5140bf9a248b793c8b894ee54c126",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 280,
+    "prompt_sha256": "460a317533b64535e3932d8463baca87bd202e3d7025507f7249cd0f38cd0051",
+    "returncode": 0
+  },
+  "G2-second-to-first": {
+    "source_id": "01a12b61-bc18-7ef3-ac58-f5e55c1b4adb",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-33-07-01a12b61-bc18-7ef3-ac58-f5e55c1b4adb.jsonl",
+    "source_sha256_before": "4147f6fc3e7990d564546b66def347127f5d371c2d1a91b7785fcdb7aa8de255",
+    "source_sha256_after": "4147f6fc3e7990d564546b66def347127f5d371c2d1a91b7785fcdb7aa8de255",
+    "source_bytes": 39002,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b64-049b-7753-abe8-8a276ed4d7b3"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SECOND-63e0904ef36046549a01d408569bef9a",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 280,
+    "prompt_sha256": "460a317533b64535e3932d8463baca87bd202e3d7025507f7249cd0f38cd0051",
+    "returncode": 0
+  },
+  "G3-api-to-subscription": {
+    "source_id": "01a12b63-5ec2-77b3-a859-80404bd5f53e",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-34-57-01a12b63-5ec2-77b3-a859-80404bd5f53e.jsonl",
+    "source_sha256_before": "92f35af6be8261c299e97218e0b54d971f02ff22b54bdbcfc870ea5995ec5ff6",
+    "source_sha256_after": "92f35af6be8261c299e97218e0b54d971f02ff22b54bdbcfc870ea5995ec5ff6",
+    "source_bytes": 40039,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b65-1bf3-7a63-846a-0aba75a22c42"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-API-b1cdc31e5c1448e086bc75d9305a3be3",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 280,
+    "prompt_sha256": "460a317533b64535e3932d8463baca87bd202e3d7025507f7249cd0f38cd0051",
+    "returncode": 0
+  },
+  "G3-subscription-to-api": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b64-5ebf-7872-ae64-13bb22607dfe"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SHORT-67a5140bf9a248b793c8b894ee54c126",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 280,
+    "prompt_sha256": "460a317533b64535e3932d8463baca87bd202e3d7025507f7249cd0f38cd0051",
+    "returncode": 0
+  },
+  "G4-model-and-auth": {
+    "source_id": "01a12b61-bc18-7ef3-ac58-f5e55c1b4adb",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-33-07-01a12b61-bc18-7ef3-ac58-f5e55c1b4adb.jsonl",
+    "source_sha256_before": "4147f6fc3e7990d564546b66def347127f5d371c2d1a91b7785fcdb7aa8de255",
+    "source_sha256_after": "4147f6fc3e7990d564546b66def347127f5d371c2d1a91b7785fcdb7aa8de255",
+    "source_bytes": 39002,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b64-7a98-7b12-b1ae-e3ac4474076a"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SECOND-63e0904ef36046549a01d408569bef9a",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 280,
+    "prompt_sha256": "460a317533b64535e3932d8463baca87bd202e3d7025507f7249cd0f38cd0051",
+    "returncode": 0
+  },
+  "G5-long-first": {
+    "source_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+    "source_sha256_before": "c019408aad0cf1c29c1a89bc9ad3e1b51b193cfe17c4b9794c1a3369987a72a6",
+    "source_sha256_after": "c019408aad0cf1c29c1a89bc9ad3e1b51b193cfe17c4b9794c1a3369987a72a6",
+    "source_bytes": 1206767,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b67-1d9b-76a0-ab8f-cc4a4896fc5c"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-LONG-EARLY-2684c50a495e42d0bb2ad9682aba7322\nB5-LONG-MIDDLE-b418197657b14c1da419416d426b49b6\nB5-LONG-LATE-beb1050a2f5f43ae8157e7b1bfdf0081",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 334,
+    "prompt_sha256": "cf6a017942567152d45577e7fefb5b8add32c928fbb4c0aa3e5edf78a5abacd8",
+    "returncode": 0
+  },
+  "G5-long-repeat": {
+    "source_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+    "source_sha256_before": "c019408aad0cf1c29c1a89bc9ad3e1b51b193cfe17c4b9794c1a3369987a72a6",
+    "source_sha256_after": "c019408aad0cf1c29c1a89bc9ad3e1b51b193cfe17c4b9794c1a3369987a72a6",
+    "source_bytes": 1206767,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b67-d4d3-7570-8bdf-c8793bd6853b"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-LONG-EARLY-2684c50a495e42d0bb2ad9682aba7322\nB5-LONG-MIDDLE-b418197657b14c1da419416d426b49b6\nB5-LONG-LATE-beb1050a2f5f43ae8157e7b1bfdf0081",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 334,
+    "prompt_sha256": "cf6a017942567152d45577e7fefb5b8add32c928fbb4c0aa3e5edf78a5abacd8",
+    "returncode": 0
+  },
+  "G6-compacted-first": {
+    "source_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+    "source_sha256_before": "0bfccf6544399c8cc216870ff291c39c46306d982b7945bafe482eb3b4e2a914",
+    "source_sha256_after": "0bfccf6544399c8cc216870ff291c39c46306d982b7945bafe482eb3b4e2a914",
+    "source_bytes": 1792560,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b6a-6f3a-7161-aca4-8d19b3c63901"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-LONG-EARLY-2684c50a495e42d0bb2ad9682aba7322\nB5-LONG-MIDDLE-b418197657b14c1da419416d426b49b6\nB5-LONG-LATE-beb1050a2f5f43ae8157e7b1bfdf0081",
+      "approved_color": "COBALT",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 334,
+    "prompt_sha256": "cf6a017942567152d45577e7fefb5b8add32c928fbb4c0aa3e5edf78a5abacd8",
+    "returncode": 0
+  },
+  "G6-compacted-repeat": {
+    "source_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+    "source_sha256_before": "0bfccf6544399c8cc216870ff291c39c46306d982b7945bafe482eb3b4e2a914",
+    "source_sha256_after": "0bfccf6544399c8cc216870ff291c39c46306d982b7945bafe482eb3b4e2a914",
+    "source_bytes": 1792560,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b6b-a2c5-70c3-8924-a06711a59728"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-LONG-EARLY-2684c50a495e42d0bb2ad9682aba7322\nB5-LONG-MIDDLE-b418197657b14c1da419416d426b49b6\nB5-LONG-LATE-beb1050a2f5f43ae8157e7b1bfdf0081",
+      "approved_color": "COBALT",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 334,
+    "prompt_sha256": "cf6a017942567152d45577e7fefb5b8add32c928fbb4c0aa3e5edf78a5abacd8",
+    "returncode": 0
+  },
+  "G7-cwd-hook-child": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b70-d66d-7941-b9aa-f564be012c72"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SHORT-67a5140bf9a248b793c8b894ee54c126",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 557,
+    "prompt_sha256": "440e27d87ced9bdb78820e7865473ab3a549b4ca942e27bb52e9ef9162c6e921",
+    "returncode": 0,
+    "identity_variables_removed": [
+      "FORGE_AUTHORITY_MARKER",
+      "FORGE_CODEX_EXECUTOR_IDENTITY",
+      "FORGE_FORGE_ROOT",
+      "FORGE_LAUNCH_MODE",
+      "FORGE_SESSION"
+    ],
+    "hook_observations": []
+  },
+  "G7-identity-strip": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b70-2c12-7ba0-8db6-557efabaa9c3"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SHORT-67a5140bf9a248b793c8b894ee54c126",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 774,
+    "prompt_sha256": "c787f4ce39b5f0439f00031b4451a8399c216596b79cf92d7d78984730f5aa50",
+    "returncode": 0,
+    "identity_variables_removed": [
+      "CODEX_THREAD_ID",
+      "FORGE_AUTHORITY_MARKER",
+      "FORGE_COMMAND",
+      "FORGE_DEPTH",
+      "FORGE_FORGE_ROOT",
+      "FORGE_LAUNCH_ID",
+      "FORGE_PARENT_RUN_ID",
+      "FORGE_PARENT_SESSION",
+      "FORGE_ROOT_RUN_ID",
+      "FORGE_RUN_ID",
+      "FORGE_SESSION"
+    ],
+    "hook_observations": []
+  },
+  "G8-copied-prefix": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/copy-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b6c-f445-7951-8367-12e6f7ebedbc"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SHORT-67a5140bf9a248b793c8b894ee54c126",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 280,
+    "prompt_sha256": "460a317533b64535e3932d8463baca87bd202e3d7025507f7249cd0f38cd0051",
+    "returncode": 0,
+    "copy": {
+      "original_path_unavailable_during_fork": true,
+      "original_sha256": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+      "copy_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+      "held_original_unchanged": true,
+      "original_auth_copied": false,
+      "copy_home_independently_logged_in": true,
+      "source_complete_records": 15
+    }
+  },
+  "G8-incomplete-tool": {
+    "source_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+    "source_path": "<ROUND>/copy-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+    "source_sha256_before": "75a0bcc063c40b5713242ae4f4cbcdf57811a2299add8e76abf399531f2f4809",
+    "source_sha256_after": "75a0bcc063c40b5713242ae4f4cbcdf57811a2299add8e76abf399531f2f4809",
+    "source_bytes": 1200470,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b71-669e-7470-8c6d-299e00e8d332"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-LONG-EARLY-2684c50a495e42d0bb2ad9682aba7322\nB5-LONG-MIDDLE-b418197657b14c1da419416d426b49b6\nB5-LONG-LATE-beb1050a2f5f43ae8157e7b1bfdf0081",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 334,
+    "prompt_sha256": "cf6a017942567152d45577e7fefb5b8add32c928fbb4c0aa3e5edf78a5abacd8",
+    "returncode": 0,
+    "identity_variables_removed": [],
+    "hook_observations": [],
+    "copy": {
+      "original_path_unavailable_during_fork": true,
+      "original_sha256": "0bfccf6544399c8cc216870ff291c39c46306d982b7945bafe482eb3b4e2a914",
+      "prefix_sha256": "75a0bcc063c40b5713242ae4f4cbcdf57811a2299add8e76abf399531f2f4809",
+      "prefix_bytes": 1200470,
+      "prefix_records": 13,
+      "pending_calls": [
+        "call_c6d0a0dfad944d3297241523f449660f"
+      ],
+      "copy_unchanged": true,
+      "held_original_unchanged": true,
+      "original_auth_copied": false,
+      "copy_home_independently_logged_in": true
+    }
+  },
+  "G9-readonly": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b71-d3e3-7f31-912e-54dfeb618cf7"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "attempts": "apply_patch attempted once for all three absolute paths: \"patch rejected: writing is blocked by read-only sandbox; rejected by user approval settings\". Exact Python command ran once (exit 0); each of the source, action, and outside shell paths returned PermissionError [Errno 1] Operation not permitted. No retries or alternative writes.",
+      "tools": "Native delegation tools are available but were not invoked. No app/plugin or b5_fixture MCP tools are available in the exposed tool registry. No model or network tools were invoked."
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 1036,
+    "prompt_sha256": "ecd3f639ac9e592e2b7f92177cc136cdc97c59caf989005008664a54f4bc4196",
+    "returncode": 0,
+    "identity_variables_removed": [],
+    "hook_observations": []
+  },
+  "G9-writable": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b72-63d8-7bd3-91d6-61ead13a22f1"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "attempts": "apply_patch: one call attempted all three absolute paths; returned {}, with no reported error. Exact Python command: run once, exit code 0; source, action, and outside shell files each reported WRITTEN. No retries or alternative writes.",
+      "tools": "Native delegation tools are available. App/plugin tools and b5_fixture MCP tools are not available in the exposed tool catalog. No model or network tools were invoked."
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 1036,
+    "prompt_sha256": "46019e3ee1d9d5e0b0b96e0724da77d2fdec4d7c9c42a8d7e74f1e3051c715ad",
+    "returncode": 0,
+    "identity_variables_removed": [],
+    "hook_observations": []
+  },
+  "R-copied-stop-boundary": {
+    "source_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+    "source_path": "<ROUND>/copy-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+    "source_sha256_before": "3c0c010a6663b38ced61a31f5af906d5fadd11c4dd3267849cfc8dcf1363fdf7",
+    "source_sha256_after": "3c0c010a6663b38ced61a31f5af906d5fadd11c4dd3267849cfc8dcf1363fdf7",
+    "source_bytes": 1826980,
+    "source_unchanged": true,
+    "child_ids": [],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": false,
+    "verdict": null,
+    "prompt_transport": "stdin",
+    "prompt_bytes": 1335,
+    "prompt_sha256": "cb58b585e6657948bdc8394592f369505eef79d9fcdf70357ccdf60d9a6ff761",
+    "returncode": 1,
+    "identity_variables_removed": [],
+    "hook_observations": [],
+    "boundary_copy": {
+      "event": "Stop",
+      "replayed_captured_boundary": true,
+      "live_hook_during_this_repeat": false,
+      "prefix_sha256": "3c0c010a6663b38ced61a31f5af906d5fadd11c4dd3267849cfc8dcf1363fdf7",
+      "prefix_bytes": 1826980,
+      "original_path_unavailable": true,
+      "original_unchanged": true,
+      "copy_unchanged": true,
+      "admission_helper_sha256": "8374ec7d0a9ca4320a40940528f55086913de9389e679a9c901e8936600e2ae7"
+    }
+  },
+  "R-copy-missing-ancestor": {
+    "source_id": "01a12b73-202d-7dd0-a058-f74ec9375dd2",
+    "source_path": "<ROUND>/copy-home/sessions/2026/10/11/rollout-2026-10-11T16-52-07-01a12b73-202d-7dd0-a058-f74ec9375dd2.jsonl",
+    "source_sha256_before": "6b11e539e231921e954007ff83dadf5aef2eccd93b24b2669bbbd376216d0fe1",
+    "source_sha256_after": "6b11e539e231921e954007ff83dadf5aef2eccd93b24b2669bbbd376216d0fe1",
+    "source_bytes": 39099,
+    "source_unchanged": true,
+    "child_ids": [],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": false,
+    "verdict": null,
+    "prompt_transport": "stdin",
+    "prompt_bytes": 600,
+    "prompt_sha256": "328c5e040fc3522c85b9b41610e69cb4da111912d193f229f388e271ccd6e8b5",
+    "returncode": 1,
+    "identity_variables_removed": [],
+    "hook_observations": [],
+    "copy": {
+      "original_path_unavailable_during_fork": true,
+      "original_sha256": "6b11e539e231921e954007ff83dadf5aef2eccd93b24b2669bbbd376216d0fe1",
+      "prefix_sha256": "6b11e539e231921e954007ff83dadf5aef2eccd93b24b2669bbbd376216d0fe1",
+      "prefix_bytes": 39099,
+      "prefix_records": 21,
+      "pending_calls": [],
+      "copy_unchanged": true,
+      "held_original_unchanged": true,
+      "original_auth_copied": false,
+      "copy_home_independently_logged_in": true,
+      "copied_ancestor_unavailable": true
+    }
+  },
+  "R-fork-api-without-key": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b61-580a-76a3-9dc3-21bd34e008af"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SHORT-67a5140bf9a248b793c8b894ee54c126",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 280,
+    "prompt_sha256": "460a317533b64535e3932d8463baca87bd202e3d7025507f7249cd0f38cd0051",
+    "returncode": 0
+  },
+  "R-fork-leaf-api-control": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b62-69cd-7743-8166-f840e2723258"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": false,
+    "verdict": null,
+    "prompt_transport": "stdin",
+    "prompt_bytes": 280,
+    "prompt_sha256": "460a317533b64535e3932d8463baca87bd202e3d7025507f7249cd0f38cd0051",
+    "returncode": 1
+  },
+  "R-large-stdin-isolated": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/copy-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [
+      "01a12b88-9ac9-7de2-8838-0f7cefe034e3"
+    ],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": true,
+    "verdict": {
+      "planning_marker": "B5-SHORT-67a5140bf9a248b793c8b894ee54c126",
+      "approved_color": "amber",
+      "checkout_readme": "# B5 action checkout\n"
+    },
+    "prompt_transport": "stdin",
+    "prompt_bytes": 105503,
+    "prompt_sha256": "26f1ba5c6ea250dad0a2bb873210c9a380e3473433d838c807780c433f082633",
+    "returncode": 0,
+    "identity_variables_removed": [
+      "FORGE_CODEX_EXECUTOR_IDENTITY",
+      "FORGE_FORGE_ROOT",
+      "FORGE_SESSION"
+    ],
+    "hook_observations": []
+  },
+  "R-native-cancel-first-death": {
+    "source_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+    "source_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-27-44-01a12b5c-ce1a-72c2-ad3f-05d75f3fba00.jsonl",
+    "source_sha256_before": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_sha256_after": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4",
+    "source_bytes": 41450,
+    "source_unchanged": true,
+    "child_ids": [],
+    "persistent_child_rollouts": [],
+    "parent_state_changed": [],
+    "completed": false,
+    "verdict": null,
+    "prompt_transport": "stdin",
+    "prompt_bytes": 224,
+    "prompt_sha256": "285a0c94161f6e8c41ba7062dfc93af5f8e9a1fd8cf8909fc9dc8becc439e3f8",
+    "returncode": 247,
+    "identity_variables_removed": [],
+    "hook_observations": []
+  }
+}

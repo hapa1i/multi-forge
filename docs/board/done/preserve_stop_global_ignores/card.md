@@ -2,7 +2,7 @@
 
 Status: done, 2026-10-11. [PR #264](https://github.com/hapa1i/multi-forge/pull/264) merged as `d33721a2`. Execution
 branch: `codex/preserve-stop-global-ignores`, based on `main` at `5613b185`. Discovered during
-[B5 planning](../../proposed/codex_fork_supervisor/card.md). This is a separate correction to shipped
+[B5 planning](../../doing/codex_fork_supervisor/card.md). This is a separate correction to shipped
 [B4 Stop evidence](../../done/codex_stop_review/card.md), not B5 implementation work.
 
 ## Problem and evidence
@@ -38,5 +38,5 @@ explicitly supplied in a tool request.
 
 B5's native Stop product admission waits for this correction and a composition regression. B5's disposable runtime
 experiments may continue after their own review using synthetic content. This correction does not reopen or rewrite B4's
-historical captures. B5 planning is committed separately at `a5428554`; reconcile its proposed copy of this card when
-that branch takes the fix.
+historical captures. B5 planning was committed separately at `a5428554`; its duplicate proposal was removed when that
+branch rebased onto `225ab3dd`.

@@ -1,0 +1,30 @@
+{
+  "sources": [
+    {
+      "id": "01a12b73-202d-7dd0-a058-f74ec9375dd2",
+      "forked_from_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+      "forked_from_ordinal_exclusive": 15,
+      "history_mode": "paginated",
+      "history_base": {
+        "thread_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+        "end_ordinal_exclusive": 15,
+        "end_byte_offset": 41450
+      },
+      "multi_agent_version": "v2"
+    },
+    {
+      "id": "01a12b77-fda2-7b53-a435-ba7de8501d7e",
+      "forked_from_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+      "forked_from_ordinal_exclusive": 15,
+      "history_mode": "paginated",
+      "history_base": {
+        "thread_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+        "end_ordinal_exclusive": 15,
+        "end_byte_offset": 41450
+      },
+      "multi_agent_version": "disabled"
+    }
+  ],
+  "shared_ancestor": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+  "different_ids": true
+}

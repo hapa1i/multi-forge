@@ -1,0 +1,540 @@
+{
+  "G12-pretool": {
+    "boundary-before.json": {
+      "event": "PreToolUse",
+      "source_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+      "turn_id": "01a12b76-04ac-7032-9195-029cf6d32c96",
+      "prefix_sha256": "1cb30332676c24e056acdb3134b880c4655e7ebe2a7588fe55709d2e667851a4",
+      "prefix_bytes": 1806582,
+      "prefix_records": 66,
+      "pending_calls": [
+        "call_504a0ac48ebb42ce99e1b2f12871a33e"
+      ],
+      "record_tail": [
+        {
+          "type": "world_state",
+          "payload_type": null
+        },
+        {
+          "type": "turn_context",
+          "payload_type": null
+        },
+        {
+          "type": "response_item",
+          "payload_type": "message"
+        },
+        {
+          "type": "event_msg",
+          "payload_type": "item_completed"
+        },
+        {
+          "type": "event_msg",
+          "payload_type": "item_completed"
+        },
+        {
+          "type": "response_item",
+          "payload_type": "message"
+        },
+        {
+          "type": "response_item",
+          "payload_type": "custom_tool_call"
+        },
+        {
+          "type": "token_usage_record",
+          "payload_type": null
+        }
+      ],
+      "source_contains_current_marker": true,
+      "setup_and_capture_seconds": 0.4924219999957131,
+      "remaining_review_seconds": 44.5085110420041,
+      "hook_internal_seconds": 55,
+      "completion_reserve_seconds": 10,
+      "evidence": {
+        "representation": "raw working bytes; executable Git filters are not run",
+        "scope": "Repository delta and observed tools only; ignored/external effects and author attribution are unverified.",
+        "before": "200813c773dc783727a056a9bc83c3914a88aab8cd6956593a38c9de0048e22c",
+        "after": "200813c773dc783727a056a9bc83c3914a88aab8cd6956593a38c9de0048e22c",
+        "changes": [],
+        "actions": [],
+        "omissions": [],
+        "complete": true
+      }
+    },
+    "boundary-result.json": {
+      "event": "PreToolUse",
+      "source_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+      "turn_id": "01a12b76-04ac-7032-9195-029cf6d32c96",
+      "prefix_sha256": "1cb30332676c24e056acdb3134b880c4655e7ebe2a7588fe55709d2e667851a4",
+      "prefix_bytes": 1806582,
+      "prefix_records": 66,
+      "pending_calls": [
+        "call_504a0ac48ebb42ce99e1b2f12871a33e"
+      ],
+      "record_tail": [
+        {
+          "type": "world_state",
+          "payload_type": null
+        },
+        {
+          "type": "turn_context",
+          "payload_type": null
+        },
+        {
+          "type": "response_item",
+          "payload_type": "message"
+        },
+        {
+          "type": "event_msg",
+          "payload_type": "item_completed"
+        },
+        {
+          "type": "event_msg",
+          "payload_type": "item_completed"
+        },
+        {
+          "type": "response_item",
+          "payload_type": "message"
+        },
+        {
+          "type": "response_item",
+          "payload_type": "custom_tool_call"
+        },
+        {
+          "type": "token_usage_record",
+          "payload_type": null
+        }
+      ],
+      "source_contains_current_marker": true,
+      "setup_and_capture_seconds": 0.4924219999957131,
+      "remaining_review_seconds": 44.5085110420041,
+      "hook_internal_seconds": 55,
+      "completion_reserve_seconds": 10,
+      "evidence": {
+        "representation": "raw working bytes; executable Git filters are not run",
+        "scope": "Repository delta and observed tools only; ignored/external effects and author attribution are unverified.",
+        "before": "200813c773dc783727a056a9bc83c3914a88aab8cd6956593a38c9de0048e22c",
+        "after": "200813c773dc783727a056a9bc83c3914a88aab8cd6956593a38c9de0048e22c",
+        "changes": [],
+        "actions": [],
+        "omissions": [],
+        "complete": true
+      },
+      "returncode": 0,
+      "source_unchanged_while_hook_blocked": true,
+      "source_sha256_after": "1cb30332676c24e056acdb3134b880c4655e7ebe2a7588fe55709d2e667851a4",
+      "hook_elapsed_seconds": 14.209698624996236
+    },
+    "hooks": [
+      {
+        "at": 1791730519.444393,
+        "cwd": "<ROUND>/action",
+        "event": "SessionStart",
+        "forge_identity": {
+          "FORGE_COMMAND": null,
+          "FORGE_DEPTH": null,
+          "FORGE_FORGE_ROOT": null,
+          "FORGE_LAUNCH_ID": null,
+          "FORGE_SESSION": null
+        },
+        "payload": {
+          "cwd": "<ROUND>/action",
+          "hook_event_name": "SessionStart",
+          "model": "gpt-6.1-sol",
+          "permission_mode": "bypassPermissions",
+          "session_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "source": "resume",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl"
+        },
+        "pid": 91459,
+        "ppid": 91327
+      },
+      {
+        "at": 1791730519.982,
+        "cwd": "<ROUND>/action",
+        "event": "UserPromptSubmit",
+        "forge_identity": {
+          "FORGE_COMMAND": null,
+          "FORGE_DEPTH": null,
+          "FORGE_FORGE_ROOT": null,
+          "FORGE_LAUNCH_ID": null,
+          "FORGE_SESSION": null
+        },
+        "payload": {
+          "cwd": "<ROUND>/action",
+          "hook_event_name": "UserPromptSubmit",
+          "model": "gpt-6.1-sol",
+          "permission_mode": "bypassPermissions",
+          "prompt": "Keep all long-history markers and the approved COBALT plan. This current user marker is ACTIVE-BOUNDARY-PreToolUse-bb67c1. Use apply_patch exactly once to add active-PreToolUse.txt containing DONE, then finish with BOUNDARY_DONE. Do not use other tools, spawn agents, or retry.\n",
+          "session_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+          "turn_id": "01a12b76-04ac-7032-9195-029cf6d32c96"
+        },
+        "pid": 91478,
+        "ppid": 91327
+      },
+      {
+        "at": 1791730526.118345,
+        "cwd": "<ROUND>/action",
+        "event": "PreToolUse",
+        "forge_identity": {
+          "FORGE_COMMAND": null,
+          "FORGE_DEPTH": null,
+          "FORGE_FORGE_ROOT": null,
+          "FORGE_LAUNCH_ID": null,
+          "FORGE_SESSION": null
+        },
+        "payload": {
+          "cwd": "<ROUND>/action",
+          "hook_event_name": "PreToolUse",
+          "model": "gpt-6.1-sol",
+          "permission_mode": "bypassPermissions",
+          "session_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "tool_input": {
+            "command": "*** Begin Patch\n*** Add File: <ROUND>/action/active-PreToolUse.txt\n+DONE\n*** End Patch"
+          },
+          "tool_name": "apply_patch",
+          "tool_use_id": "exec-08ff2888-0c18-428b-a2a1-ae2e4ad9f8af",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+          "turn_id": "01a12b76-04ac-7032-9195-029cf6d32c96"
+        },
+        "pid": 91646,
+        "ppid": 91327
+      },
+      {
+        "at": 1791730540.427485,
+        "cwd": "<ROUND>/action",
+        "event": "PostToolUse",
+        "forge_identity": {
+          "FORGE_COMMAND": null,
+          "FORGE_DEPTH": null,
+          "FORGE_FORGE_ROOT": null,
+          "FORGE_LAUNCH_ID": null,
+          "FORGE_SESSION": null
+        },
+        "payload": {
+          "cwd": "<ROUND>/action",
+          "hook_event_name": "PostToolUse",
+          "model": "gpt-6.1-sol",
+          "permission_mode": "bypassPermissions",
+          "session_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "tool_input": {
+            "command": "*** Begin Patch\n*** Add File: <ROUND>/action/active-PreToolUse.txt\n+DONE\n*** End Patch"
+          },
+          "tool_name": "apply_patch",
+          "tool_response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nA <ROUND>/action/active-PreToolUse.txt\n",
+          "tool_use_id": "exec-08ff2888-0c18-428b-a2a1-ae2e4ad9f8af",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+          "turn_id": "01a12b76-04ac-7032-9195-029cf6d32c96"
+        },
+        "pid": 92448,
+        "ppid": 91327
+      },
+      {
+        "at": 1791730543.480982,
+        "cwd": "<ROUND>/action",
+        "event": "Stop",
+        "forge_identity": {
+          "FORGE_COMMAND": null,
+          "FORGE_DEPTH": null,
+          "FORGE_FORGE_ROOT": null,
+          "FORGE_LAUNCH_ID": null,
+          "FORGE_SESSION": null
+        },
+        "payload": {
+          "cwd": "<ROUND>/action",
+          "hook_event_name": "Stop",
+          "last_assistant_message": "BOUNDARY_DONE",
+          "model": "gpt-6.1-sol",
+          "permission_mode": "bypassPermissions",
+          "session_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "stop_hook_active": false,
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+          "turn_id": "01a12b76-04ac-7032-9195-029cf6d32c96"
+        },
+        "pid": 92529,
+        "ppid": 91327
+      }
+    ]
+  },
+  "G12-stop": {
+    "boundary-before.json": {
+      "event": "Stop",
+      "source_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+      "turn_id": "01a12b76-ad83-7083-aebf-1dc70fddbbc0",
+      "prefix_sha256": "3c0c010a6663b38ced61a31f5af906d5fadd11c4dd3267849cfc8dcf1363fdf7",
+      "prefix_bytes": 1826980,
+      "prefix_records": 91,
+      "pending_calls": [],
+      "record_tail": [
+        {
+          "type": "token_usage_record",
+          "payload_type": null
+        },
+        {
+          "type": "event_msg",
+          "payload_type": "item_completed"
+        },
+        {
+          "type": "response_item",
+          "payload_type": "custom_tool_call_output"
+        },
+        {
+          "type": "event_msg",
+          "payload_type": "token_count"
+        },
+        {
+          "type": "event_msg",
+          "payload_type": "item_completed"
+        },
+        {
+          "type": "response_item",
+          "payload_type": "message"
+        },
+        {
+          "type": "token_usage_record",
+          "payload_type": null
+        },
+        {
+          "type": "event_msg",
+          "payload_type": "token_count"
+        }
+      ],
+      "source_contains_current_marker": true,
+      "setup_and_capture_seconds": 0.4492179170047166,
+      "remaining_review_seconds": 44.551725124998484,
+      "hook_internal_seconds": 55,
+      "completion_reserve_seconds": 10,
+      "evidence": {
+        "representation": "raw working bytes; executable Git filters are not run",
+        "scope": "Repository delta and observed tools only; ignored/external effects and author attribution are unverified.",
+        "before": "c13dfd6884a38f4a0039da9a53d7e4cd9bc6244bc86741984eef2574ff2fb43c",
+        "after": "2d7a0624e297da826ebe84498652e63bdb40880c1f85fe4014425f5293805f96",
+        "changes": [
+          {
+            "path": "active-Stop.txt",
+            "before": null,
+            "after": {
+              "digest": "8221ac66be71558c921fb44cfb66f7997699aea754d917763882d6d9eddc836e",
+              "mode": 420,
+              "size": 5
+            },
+            "diff": "--- active-Stop.txt\n+++ active-Stop.txt\n@@ -0,0 +1 @@\n+DONE\n",
+            "kind": "add"
+          }
+        ],
+        "actions": [],
+        "omissions": [
+          "changes_without_observed_actions"
+        ],
+        "complete": false
+      }
+    },
+    "boundary-result.json": {
+      "event": "Stop",
+      "source_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+      "turn_id": "01a12b76-ad83-7083-aebf-1dc70fddbbc0",
+      "prefix_sha256": "3c0c010a6663b38ced61a31f5af906d5fadd11c4dd3267849cfc8dcf1363fdf7",
+      "prefix_bytes": 1826980,
+      "prefix_records": 91,
+      "pending_calls": [],
+      "record_tail": [
+        {
+          "type": "token_usage_record",
+          "payload_type": null
+        },
+        {
+          "type": "event_msg",
+          "payload_type": "item_completed"
+        },
+        {
+          "type": "response_item",
+          "payload_type": "custom_tool_call_output"
+        },
+        {
+          "type": "event_msg",
+          "payload_type": "token_count"
+        },
+        {
+          "type": "event_msg",
+          "payload_type": "item_completed"
+        },
+        {
+          "type": "response_item",
+          "payload_type": "message"
+        },
+        {
+          "type": "token_usage_record",
+          "payload_type": null
+        },
+        {
+          "type": "event_msg",
+          "payload_type": "token_count"
+        }
+      ],
+      "source_contains_current_marker": true,
+      "setup_and_capture_seconds": 0.4492179170047166,
+      "remaining_review_seconds": 44.551725124998484,
+      "hook_internal_seconds": 55,
+      "completion_reserve_seconds": 10,
+      "evidence": {
+        "representation": "raw working bytes; executable Git filters are not run",
+        "scope": "Repository delta and observed tools only; ignored/external effects and author attribution are unverified.",
+        "before": "c13dfd6884a38f4a0039da9a53d7e4cd9bc6244bc86741984eef2574ff2fb43c",
+        "after": "2d7a0624e297da826ebe84498652e63bdb40880c1f85fe4014425f5293805f96",
+        "changes": [
+          {
+            "path": "active-Stop.txt",
+            "before": null,
+            "after": {
+              "digest": "8221ac66be71558c921fb44cfb66f7997699aea754d917763882d6d9eddc836e",
+              "mode": 420,
+              "size": 5
+            },
+            "diff": "--- active-Stop.txt\n+++ active-Stop.txt\n@@ -0,0 +1 @@\n+DONE\n",
+            "kind": "add"
+          }
+        ],
+        "actions": [],
+        "omissions": [
+          "changes_without_observed_actions"
+        ],
+        "complete": false
+      },
+      "returncode": 0,
+      "source_unchanged_while_hook_blocked": true,
+      "source_sha256_after": "3c0c010a6663b38ced61a31f5af906d5fadd11c4dd3267849cfc8dcf1363fdf7",
+      "hook_elapsed_seconds": 17.023485084006097
+    },
+    "hooks": [
+      {
+        "at": 1791730562.894752,
+        "cwd": "<ROUND>/action",
+        "event": "SessionStart",
+        "forge_identity": {
+          "FORGE_COMMAND": null,
+          "FORGE_DEPTH": null,
+          "FORGE_FORGE_ROOT": null,
+          "FORGE_LAUNCH_ID": null,
+          "FORGE_SESSION": null
+        },
+        "payload": {
+          "cwd": "<ROUND>/action",
+          "hook_event_name": "SessionStart",
+          "model": "gpt-6.1-sol",
+          "permission_mode": "bypassPermissions",
+          "session_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "source": "resume",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl"
+        },
+        "pid": 92806,
+        "ppid": 92665
+      },
+      {
+        "at": 1791730563.3166678,
+        "cwd": "<ROUND>/action",
+        "event": "UserPromptSubmit",
+        "forge_identity": {
+          "FORGE_COMMAND": null,
+          "FORGE_DEPTH": null,
+          "FORGE_FORGE_ROOT": null,
+          "FORGE_LAUNCH_ID": null,
+          "FORGE_SESSION": null
+        },
+        "payload": {
+          "cwd": "<ROUND>/action",
+          "hook_event_name": "UserPromptSubmit",
+          "model": "gpt-6.1-sol",
+          "permission_mode": "bypassPermissions",
+          "prompt": "Keep all long-history markers and the approved COBALT plan. This current user marker is ACTIVE-BOUNDARY-Stop-bb67c1. Use apply_patch exactly once to add active-Stop.txt containing DONE, then finish with BOUNDARY_DONE. Do not use other tools, spawn agents, or retry.\n",
+          "session_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+          "turn_id": "01a12b76-ad83-7083-aebf-1dc70fddbbc0"
+        },
+        "pid": 92821,
+        "ppid": 92665
+      },
+      {
+        "at": 1791730570.946468,
+        "cwd": "<ROUND>/action",
+        "event": "PreToolUse",
+        "forge_identity": {
+          "FORGE_COMMAND": null,
+          "FORGE_DEPTH": null,
+          "FORGE_FORGE_ROOT": null,
+          "FORGE_LAUNCH_ID": null,
+          "FORGE_SESSION": null
+        },
+        "payload": {
+          "cwd": "<ROUND>/action",
+          "hook_event_name": "PreToolUse",
+          "model": "gpt-6.1-sol",
+          "permission_mode": "bypassPermissions",
+          "session_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "tool_input": {
+            "command": "*** Begin Patch\n*** Add File: <ROUND>/action/active-Stop.txt\n+DONE\n*** End Patch"
+          },
+          "tool_name": "apply_patch",
+          "tool_use_id": "exec-95316f81-0de2-460c-adc7-647e777091ef",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+          "turn_id": "01a12b76-ad83-7083-aebf-1dc70fddbbc0"
+        },
+        "pid": 93034,
+        "ppid": 92665
+      },
+      {
+        "at": 1791730571.3805282,
+        "cwd": "<ROUND>/action",
+        "event": "PostToolUse",
+        "forge_identity": {
+          "FORGE_COMMAND": null,
+          "FORGE_DEPTH": null,
+          "FORGE_FORGE_ROOT": null,
+          "FORGE_LAUNCH_ID": null,
+          "FORGE_SESSION": null
+        },
+        "payload": {
+          "cwd": "<ROUND>/action",
+          "hook_event_name": "PostToolUse",
+          "model": "gpt-6.1-sol",
+          "permission_mode": "bypassPermissions",
+          "session_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "tool_input": {
+            "command": "*** Begin Patch\n*** Add File: <ROUND>/action/active-Stop.txt\n+DONE\n*** End Patch"
+          },
+          "tool_name": "apply_patch",
+          "tool_response": "Exit code: 0\nWall time: 0 seconds\nOutput:\nSuccess. Updated the following files:\nA <ROUND>/action/active-Stop.txt\n",
+          "tool_use_id": "exec-95316f81-0de2-460c-adc7-647e777091ef",
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+          "turn_id": "01a12b76-ad83-7083-aebf-1dc70fddbbc0"
+        },
+        "pid": 93050,
+        "ppid": 92665
+      },
+      {
+        "at": 1791730575.0992892,
+        "cwd": "<ROUND>/action",
+        "event": "Stop",
+        "forge_identity": {
+          "FORGE_COMMAND": null,
+          "FORGE_DEPTH": null,
+          "FORGE_FORGE_ROOT": null,
+          "FORGE_LAUNCH_ID": null,
+          "FORGE_SESSION": null
+        },
+        "payload": {
+          "cwd": "<ROUND>/action",
+          "hook_event_name": "Stop",
+          "last_assistant_message": "BOUNDARY_DONE",
+          "model": "gpt-6.1-sol",
+          "permission_mode": "bypassPermissions",
+          "session_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "stop_hook_active": false,
+          "transcript_path": "<ROUND>/codex-home/sessions/2026/10/11/rollout-2026-10-11T16-37-39-01a12b65-e16b-7753-8b13-1764cd34a007.jsonl",
+          "turn_id": "01a12b76-ad83-7083-aebf-1dc70fddbbc0"
+        },
+        "pid": 93151,
+        "ppid": 92665
+      }
+    ]
+  }
+}

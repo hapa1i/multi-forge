@@ -100,6 +100,8 @@ def resolve_context(data: dict[str, Any]) -> tuple[stop_review.TurnContext, Sess
     confirmed = state.confirmed.codex
     if confirmed and confirmed.thread_id and confirmed.thread_id != data.get("session_id"):
         raise ValueError("Executor thread does not match the managed session")
+    from forge.core.runtime.codex_review_source import boundary_from_hook
+
     context = stop_review.TurnContext(
         Path(store.forge_root),
         state.name,
@@ -109,6 +111,7 @@ def resolve_context(data: dict[str, Any]) -> tuple[stop_review.TurnContext, Sess
         sup,
         read_bound_lane(state, SUPERVISOR_CONSUMER),
         store.review_identity(create=True) or "",
+        native_boundary=boundary_from_hook(data),
     )
     return context, store
 

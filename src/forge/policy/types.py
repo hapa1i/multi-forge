@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from forge.core.native_review_types import NativeReviewBoundary
+
 # Type aliases for clarity
 DecisionType = Literal["allow", "deny", "warn", "needs_review"]
 Severity = Literal["critical", "high", "medium", "low"]
@@ -70,6 +72,7 @@ class ActionContext:
     new_content: str | None = None
     raw_diff: str | None = None
     action_fingerprint: str | None = None
+    native_boundary: NativeReviewBoundary | None = None
 
 
 @dataclass(frozen=True)

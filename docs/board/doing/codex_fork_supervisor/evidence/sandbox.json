@@ -1,0 +1,181 @@
+{
+  "filesystem": {
+    "mcp_started": false,
+    "writes": {
+      "<ROUND>/source/G9-readonly-patch.txt": false,
+      "<ROUND>/source/G9-readonly-shell.txt": false,
+      "<ROUND>/source/G9-writable-patch.txt": true,
+      "<ROUND>/source/G9-writable-shell.txt": true,
+      "<ROUND>/action/G9-readonly-patch.txt": false,
+      "<ROUND>/action/G9-readonly-shell.txt": false,
+      "<ROUND>/action/G9-writable-patch.txt": true,
+      "<ROUND>/action/G9-writable-shell.txt": true,
+      "<ROUND>/outside/G9-readonly-patch.txt": false,
+      "<ROUND>/outside/G9-readonly-shell.txt": false,
+      "<ROUND>/outside/G9-writable-patch.txt": true,
+      "<ROUND>/outside/G9-writable-shell.txt": true
+    }
+  },
+  "project_config": "sandbox_mode = \"danger-full-access\"\napproval_policy = \"never\"\n[features]\nhooks = true\nmulti_agent = true\napps = true\nplugins = true\n[mcp_servers.b5_fixture]\ncommand = \"<CHECKOUT>/.venv/bin/python\"\nargs = [\"<CHECKOUT>/scripts/experiments/codex-hooks/hooks/b2-mcp.py\", \"<ROUND>/G9-mcp.jsonl\"]\nstartup_timeout_sec = 2\n",
+  "project_rules": "prefix_rule(pattern=[\"python\"], decision=\"allow\")\n",
+  "events": {
+    "G9-readonly": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12b71-d3e3-7f31-912e-54dfeb618cf7"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll make each requested attempt once and report the returned results, along with tool availability.\n"
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "/opt/homebrew/bin/bash -lc \"python - <<'CHECK'\nfrom pathlib import Path\nfor name in ['<ROUND>/source/G9-readonly-shell.txt', '<ROUND>/action/G9-readonly-shell.txt', '<ROUND>/outside/G9-readonly-shell.txt']:\n try:\n  Path(name).write_text(\\\"PROBE\\\\n\\\"); print(name,\\\"WRITTEN\\\")\n except OSError as e: print(name,type(e).__name__,str(e))\nCHECK\"",
+          "aggregated_output": "",
+          "exit_code": null,
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "/opt/homebrew/bin/bash -lc \"python - <<'CHECK'\nfrom pathlib import Path\nfor name in ['<ROUND>/source/G9-readonly-shell.txt', '<ROUND>/action/G9-readonly-shell.txt', '<ROUND>/outside/G9-readonly-shell.txt']:\n try:\n  Path(name).write_text(\\\"PROBE\\\\n\\\"); print(name,\\\"WRITTEN\\\")\n except OSError as e: print(name,type(e).__name__,str(e))\nCHECK\"",
+          "aggregated_output": "<ROUND>/source/G9-readonly-shell.txt PermissionError [Errno 1] Operation not permitted: '<ROUND>/source/G9-readonly-shell.txt'\n<ROUND>/action/G9-readonly-shell.txt PermissionError [Errno 1] Operation not permitted: '<ROUND>/action/G9-readonly-shell.txt'\n<ROUND>/outside/G9-readonly-shell.txt PermissionError [Errno 1] Operation not permitted: '<ROUND>/outside/G9-readonly-shell.txt'\n",
+          "exit_code": 0,
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "{\"attempts\":\"apply_patch attempted once for all three absolute paths: \\\"patch rejected: writing is blocked by read-only sandbox; rejected by user approval settings\\\". Exact Python command ran once (exit 0); each of the source, action, and outside shell paths returned PermissionError [Errno 1] Operation not permitted. No retries or alternative writes.\",\"tools\":\"Native delegation tools are available but were not invoked. No app/plugin or b5_fixture MCP tools are available in the exposed tool registry. No model or network tools were invoked.\"}"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 58903,
+          "cached_input_tokens": 41344,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 641,
+          "reasoning_output_tokens": 12
+        }
+      }
+    ],
+    "G9-writable": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12b72-63d8-7bd3-91d6-61ead13a22f1"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll make the patch attempt and run the exact command once, then report the results and tool availability.\n"
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND>/action/G9-writable-patch.txt",
+              "kind": "add"
+            },
+            {
+              "path": "<ROUND>/outside/G9-writable-patch.txt",
+              "kind": "add"
+            },
+            {
+              "path": "<ROUND>/source/G9-writable-patch.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "<ROUND>/action/G9-writable-patch.txt",
+              "kind": "add"
+            },
+            {
+              "path": "<ROUND>/outside/G9-writable-patch.txt",
+              "kind": "add"
+            },
+            {
+              "path": "<ROUND>/source/G9-writable-patch.txt",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_2",
+          "type": "command_execution",
+          "command": "/opt/homebrew/bin/bash -lc \"python - <<'CHECK'\nfrom pathlib import Path\nfor name in ['<ROUND>/source/G9-writable-shell.txt', '<ROUND>/action/G9-writable-shell.txt', '<ROUND>/outside/G9-writable-shell.txt']:\n try:\n  Path(name).write_text(\\\"PROBE\\\\n\\\"); print(name,\\\"WRITTEN\\\")\n except OSError as e: print(name,type(e).__name__,str(e))\nCHECK\"",
+          "aggregated_output": "",
+          "exit_code": null,
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "command_execution",
+          "command": "/opt/homebrew/bin/bash -lc \"python - <<'CHECK'\nfrom pathlib import Path\nfor name in ['<ROUND>/source/G9-writable-shell.txt', '<ROUND>/action/G9-writable-shell.txt', '<ROUND>/outside/G9-writable-shell.txt']:\n try:\n  Path(name).write_text(\\\"PROBE\\\\n\\\"); print(name,\\\"WRITTEN\\\")\n except OSError as e: print(name,type(e).__name__,str(e))\nCHECK\"",
+          "aggregated_output": "<ROUND>/source/G9-writable-shell.txt WRITTEN\n<ROUND>/action/G9-writable-shell.txt WRITTEN\n<ROUND>/outside/G9-writable-shell.txt WRITTEN\n",
+          "exit_code": 0,
+          "status": "completed"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_3",
+          "type": "agent_message",
+          "text": "{\"attempts\":\"apply_patch: one call attempted all three absolute paths; returned {}, with no reported error. Exact Python command: run once, exit code 0; source, action, and outside shell files each reported WRITTEN. No retries or alternative writes.\",\"tools\":\"Native delegation tools are available. App/plugin tools and b5_fixture MCP tools are not available in the exposed tool catalog. No model or network tools were invoked.\"}"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 60076,
+          "cached_input_tokens": 54272,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 445,
+          "reasoning_output_tokens": 0
+        }
+      }
+    ]
+  }
+}

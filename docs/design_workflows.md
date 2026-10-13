@@ -101,9 +101,22 @@ when it has a planning target or an explicit plan file; active additionally mean
 fresh in the action checkout. Conversation-backed Claude resumes and forks from the planner CWD, adds the absolute
 action checkout with `--add-dir`, and receives absolute action paths. Both paths expose only Read/Glob/Grep, disable MCP
 and executable customizations; inherited auth uses an auth-only settings projection. A pinned `codex` lane runs a fresh,
-read-only `codex exec` in the action checkout. Codex cannot resume the Claude planning session, so this arm requires an
-approved plan in `plan_override_path` (for example via `forge policy supervisor reload`) and receives that snapshot
-in-band. A missing plan or cold, stale, or unready Codex preflight fails open with a warning.
+read-only `codex exec` in the action checkout by default. Codex cannot resume the Claude planning session, so this arm
+requires an approved plan in `plan_override_path` (for example via `forge policy supervisor reload`) and receives that
+snapshot in-band. A missing plan or cold, stale, or unready Codex preflight fails open with a warning.
+
+An explicit `--source-runtime codex` instead selects native supervision through `native_source`. The shared Codex
+invoker receives a typed fork request, copied native source/ancestor prefixes, a fresh SQLite index, a protected verdict
+schema and the bounded prompt on stdin. Source discovery reuses the rollout resolver but rejects multiple matches. The
+immutable prefix hashes and event usage baseline belong to the live attempt. Native mode never uses verdict caching,
+cascade, shadow, sticky degradation, alternate reviewers or retries. Manual evaluation cannot supply a trusted native
+boundary and refuses. Existing fresh/resume requests keep their behavior.
+
+Separate complete native sources support host Claude/Codex PreToolUse. Shared IDs or recorded ancestry require host
+Codex Stop, a nonempty approved plan and a verified active-turn/final-answer boundary; unknown independence refuses.
+Every native Stop review retains B4's plan gate, elapsed budget and single attempt/correction journal. The explicit plan
+overrides historical instructions, and B3 feedback forwards only verified approved-plan quotations. Runtime/source/auth
+admission and operator recovery are specified in [native supervision](end-user/native_supervision.md).
 
 1. **Configure**:
    `forge policy supervisor set [<target>] --plan <file> [--runtime claude_code|codex] [--model <model>]`; target-only

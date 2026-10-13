@@ -1,0 +1,26 @@
+{
+  "closed_at": "2026-10-11T17:59:06.592497+00:00",
+  "total_starts": 60,
+  "api_starts": 3,
+  "fixture_processes_before_logout": 0,
+  "dedicated_reviewer_logout": "passed",
+  "source_fixture_logout": "passed",
+  "fixture_auth_files_absent": true,
+  "reviewer_lease_available": true,
+  "copied_product_inputs_removed": true,
+  "ordinary_auth_accessed_for_teardown": false,
+  "ordinary_settings": [
+    {
+      "path": "$USER_HOME/.codex/config.toml",
+      "initial_sha256": "cd78cbd52f8a7e35fb62c4145fee5e81b4862b58b4bc3422223bd8ad3f8114e0",
+      "current_sha256": "b7c9854236fceff3896cfcf3d2a6f821d2b8de15b35fdfa8f2680053f08011e6"
+    },
+    {
+      "path": "$USER_HOME/.codex/hooks.json",
+      "initial_sha256": null,
+      "current_sha256": null
+    }
+  ],
+  "ordinary_settings_qualification": "Config hash changed early in the gate for an unknown reason and was not restored. No whole-round settings-preservation claim.",
+  "retained": "Closed private synthetic sources, native captures and clean installed candidates retained for audit; all fixture login credentials removed."
+}

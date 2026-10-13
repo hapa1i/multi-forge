@@ -20,7 +20,7 @@ from forge.policy.types import FailMode
 from .config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 
 # Schema version for session state files.
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 INDEX_VERSION = 1
 
 # Mirror of forge.core.llm.types.ReasoningEffort. Kept inline so this foundational
@@ -212,6 +212,34 @@ class MemoryIntent:
     auto_update: MemoryWriterConfig | None = None
 
 
+@dataclass(frozen=True)
+class NativeSupervisorSource:
+    """Confirmed native input identity; the selected review prefix is attempt-owned."""
+
+    runtime: str
+    thread_id: str
+    home: str
+    rollout_path: str
+    source_cwd: str
+    header_digest: str
+    managed_session: str | None = None
+    managed_root: str | None = None
+
+    def __post_init__(self) -> None:
+        import re
+        from pathlib import Path
+        from uuid import UUID
+
+        if self.runtime != "codex" or str(UUID(self.thread_id)) != self.thread_id:
+            raise ValueError("Native supervisor source requires a full Codex thread ID")
+        if any(not Path(value).is_absolute() for value in (self.home, self.rollout_path, self.source_cwd)):
+            raise ValueError("Native supervisor source paths must be absolute")
+        if not re.fullmatch(r"[0-9a-f]{64}", self.header_digest):
+            raise ValueError("Native supervisor source requires a confirmed header digest")
+        if bool(self.managed_session) != bool(self.managed_root):
+            raise ValueError("Managed native source requires its session and Forge root")
+
+
 @dataclass
 class SupervisorConfig:
     """Semantic supervisor configuration.
@@ -224,6 +252,7 @@ class SupervisorConfig:
     review_trigger: str = "pre-tool-use"
     supervisor_model: str | None = None  # None preserves legacy runtime-selected model behavior.
     resume_id: str | None = None  # Claude session UUID, or a Forge session name resolved to a UUID at runtime
+    native_source: NativeSupervisorSource | None = None
     proxy: str | None = None  # Optional: proxy_id or template name for base_url lookup
     direct: bool = False  # When True, force direct Anthropic routing
     base_url: str | None = None  # Optional: explicit base_url override
@@ -252,7 +281,7 @@ class SupervisorConfig:
     @property
     def configured(self) -> bool:
         """Return whether either supported source is configured, even while suspended."""
-        return bool(self.resume_id or self.plan_override_path)
+        return bool(self.resume_id or self.native_source or self.plan_override_path)
 
     @property
     def active(self) -> bool:
@@ -276,8 +305,10 @@ class SupervisorConfig:
 
         if self.supervisor_effort is not None and self.supervisor_effort not in CODEX_EFFORT_LEVELS:
             raise ValueError("Invalid supervisor effort")
-        if self.auth_mode not in {"inherit", "subscription-only"}:
-            raise ValueError("Supervisor auth_mode must be inherit or subscription-only")
+        if self.auth_mode not in {"inherit", "subscription-only", "api"}:
+            raise ValueError("Supervisor auth_mode must be inherit, subscription-only or api")
+        if self.native_source and (self.resume_id or self.cascade or self.shadow_sample_rate or not self.fork_session):
+            raise ValueError("Native supervision requires an isolated fork without legacy resume, cascade or shadow")
         if self.checker_effort is not None and self.checker_effort not in _CHECKER_EFFORT_LEVELS:
             raise ValueError(
                 f"checker_effort must be one of {', '.join(_CHECKER_EFFORT_LEVELS)}, got {self.checker_effort!r}"

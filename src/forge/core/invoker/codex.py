@@ -31,6 +31,7 @@ from forge.core.invoker._lifecycle import (
     _record_worker_upstream,
     _status,
 )
+from forge.core.invoker.codex_fork import CodexForkRequest, fork_usage_delta
 from forge.core.invoker.codex_stream import parse_codex_jsonl_stream
 from forge.core.invoker.types import Attribution, HeadlessRequest, HeadlessResult
 from forge.core.reactive.env import (
@@ -100,7 +101,7 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
         ident: _Identity,
         hints: ParseHints,
     ) -> HeadlessResult:
-        stream = parse_codex_jsonl_stream(stdout)
+        stream = parse_codex_jsonl_stream(stdout, strict_usage=isinstance(request, CodexForkRequest))
         # Codex reports a failed turn in the JSONL stream, usually with EMPTY stderr; surface
         # the provider reason on stderr so a caller inspecting it sees why the turn failed.
         # Fall back to a generic line when the stream carried no (or an empty) error message,
@@ -108,6 +109,11 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
         effective_stderr = stderr
         if not effective_stderr and stream.is_error:
             effective_stderr = stream.error_message or "Codex turn failed (no provider error message)."
+        terminal = dict(
+            input_tokens=stream.input_tokens, output_tokens=stream.output_tokens, cached_tokens=stream.cached_tokens
+        )
+        fork = request if isinstance(request, CodexForkRequest) else None
+        usage = fork_usage_delta(fork.usage_baseline, terminal) if fork else terminal
         return HeadlessResult(
             label=request.label,
             stdout=stream.final_text,
@@ -115,9 +121,11 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
             returncode=returncode,
             duration_seconds=duration_seconds,
             cost_micro_usd=None,  # native runtime: no $ figure (direct to OpenAI)
-            input_tokens=stream.input_tokens,
-            output_tokens=stream.output_tokens,
-            cached_tokens=stream.cached_tokens,
+            input_tokens=usage["input_tokens"],
+            output_tokens=usage["output_tokens"],
+            cached_tokens=usage["cached_tokens"],
+            terminal_usage=terminal if fork else None,
+            inherited_usage=fork.usage_baseline.as_dict() if fork and fork.usage_baseline else None,
             # Parsed iff the stream yielded recognizable terminal events; a failed turn
             # (is_error) still parsed. An empty/garbage stream -> False, stdout "".
             envelope_parsed=bool(stream.final_text) or stream.input_tokens is not None or stream.is_error,

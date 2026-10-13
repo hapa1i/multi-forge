@@ -157,6 +157,7 @@ def supervisor_set(
     manifest: SessionState,
     target: str | None,
     policy_forge_root: str | None,
+    source_runtime: str | None = None,
     plan: str | Path | None = None,
     supervisor_proxy: str | None = None,
     supervisor_direct: bool = False,
@@ -181,6 +182,18 @@ def supervisor_set(
         checker_model=checker_model,
     )
     previous_sup = snapshot_supervisor_options(manifest)
+    native_source = None
+    if source_runtime is not None:
+        if source_runtime != "codex" or not target:
+            raise SupervisorInputError("--source-runtime codex requires an explicit native ID or managed source name")
+        from forge.core.runtime.codex_review_source import bind_source
+        from forge.session.exceptions import ForgeSessionError
+
+        try:
+            native_source = bind_source(target, forge_root=policy_forge_root)
+        except (OSError, ValueError, ForgeSessionError) as exc:
+            raise SupervisorTargetError(str(exc)) from exc
+        supervisor_effort = supervisor_effort or "low"
     selected_trigger = review_trigger or (previous_sup.review_trigger if previous_sup else "pre-tool-use")
     from forge.policy.semantic.identity import validate_stop_executor
     from forge.session.models import session_runtime
@@ -211,7 +224,7 @@ def supervisor_set(
     from forge.policy.semantic.identity import select_supervisor_lane, validate_reviewer
     from forge.session.consumer_lanes import read_bound_lane
 
-    if auth_mode == "subscription-only":
+    if auth_mode == "subscription-only" and not native_source:
         if supervisor_proxy:
             raise SupervisorInputError("Subscription-only supervision cannot use a proxy.")
         supervisor_direct = True
@@ -228,10 +241,11 @@ def supervisor_set(
             else None
         )
         selected_lane = lane_record or previous_lane or select_supervisor_lane()
-        selected_model = selected_lane.model if model or not target else None
+        selected_model = selected_lane.model if model or not target or native_source else None
         preview = SupervisorConfig(
             review_trigger=selected_trigger,
-            resume_id=target,
+            resume_id=None if native_source else target,
+            native_source=native_source,
             plan_override_path=plan_path,
             supervisor_model=selected_model,
             auth_mode=auth_mode,
@@ -255,6 +269,7 @@ def supervisor_set(
             old.auth_mode != auth_mode
             or old.supervisor_model != selected_model
             or old.supervisor_effort != supervisor_effort
+            or old.native_source != native_source
         )
         if (lane_record is not None and frozen != lane_record) or changed_options:
             raise SupervisorLaneFrozenError(frozen)
@@ -263,7 +278,9 @@ def supervisor_set(
 
     try:
         source_state = (
-            supervisor_semantic.validate_supervisor_target(target, forge_root=policy_forge_root) if target else manifest
+            supervisor_semantic.validate_supervisor_target(target, forge_root=policy_forge_root)
+            if target and not native_source
+            else manifest
         )
     except ValueError as e:
         raise SupervisorTargetError(str(e)) from e
@@ -278,7 +295,8 @@ def supervisor_set(
 
     sup_config = SupervisorConfig(
         review_trigger=selected_trigger,
-        resume_id=target,
+        resume_id=None if native_source else target,
+        native_source=native_source,
         forge_root=source_state.forge_root or policy_forge_root,
         plan_override_path=plan_path,
         auth_mode=auth_mode,
@@ -360,6 +378,10 @@ def supervisor_set(
         from forge.policy.semantic.identity import validate_sidecar_supervisor
 
         validate_sidecar_supervisor(validated_config, sidecar=_is_sidecar(manifest))
+        if validated_config.native_source:
+            from forge.policy.semantic.native_codex import validate_native_executor
+
+            validate_native_executor(validated_config, manifest)
         if validated_config.review_trigger == "stop":
             from forge.core.runtime.codex_turn_enrollment import require_for_launch
 
@@ -383,7 +405,7 @@ def supervisor_set(
 
             image = get_launch_preferences(manifest)[2] or get_runtime_config().sidecar_image
             require_sidecar_contract(image, schema_version=3 if selected_model else 2, reviewer=True)
-    except ValueError as exc:
+    except (OSError, ValueError) as exc:
         raise SupervisorInputError(str(exc)) from exc
 
     if supervisor_proxy:
@@ -409,6 +431,7 @@ def supervisor_set(
                 current_config != validated_config
                 or m.worktree != manifest.worktree
                 or m.forge_root != manifest.forge_root
+                or m.confirmed.codex != manifest.confirmed.codex
             ):
                 raise ValueError("Supervisor configuration changed during setup; repeat the set command")
         except ValueError as exc:
@@ -464,13 +487,17 @@ def supervisor_on(*, store: SessionStore, manifest: SessionState, lock_timeout_s
         raise SupervisorNotConfiguredError("No supervisor configured.")
 
     def _resume(m: SessionState) -> None:
+        from forge.policy.semantic.identity import validate_supervisor_transition
         from forge.session.overrides import delete_override
+
+        old = snapshot_supervisor_options(m)
 
         delete_override(m.overrides, "policy.supervisor.suspended")
         if m.intent.policy and m.intent.policy.supervisor:
             m.intent.policy.supervisor.suspended = False
+        validate_supervisor_transition(m, old, compute_effective_intent(m))
 
-    store.update(timeout_s=lock_timeout_s, mutate=_resume)
+    _update_ready_supervisor(store, manifest, _resume, lock_timeout_s=lock_timeout_s)
 
 
 def supervisor_remove(*, store: SessionStore, manifest: SessionState, lock_timeout_s: float = 5.0) -> None:
@@ -523,13 +550,17 @@ def supervisor_reload(
     def _set_plan(m: SessionState) -> None:
         if _is_sidecar(m):
             raise SupervisorInputError("Plan-file supervision requires a host executor.")
+        from forge.policy.semantic.identity import validate_supervisor_transition
         from forge.session.overrides import delete_override
+
+        old = snapshot_supervisor_options(m)
 
         delete_override(m.overrides, "policy.supervisor.plan_override_path")
         if m.intent.policy and m.intent.policy.supervisor:
             m.intent.policy.supervisor.plan_override_path = plan_path
+        validate_supervisor_transition(m, old, compute_effective_intent(m))
 
-    store.update(timeout_s=lock_timeout_s, mutate=_set_plan)
+    _update_ready_supervisor(store, manifest, _set_plan, lock_timeout_s=lock_timeout_s)
     return SupervisorReloadResult(plan_path=plan_path, source_desc=source_desc)
 
 
@@ -560,6 +591,8 @@ def supervisor_cascade(
         raise SupervisorInputError("Subscription-only supervision cannot enable the paid API checker.")
     if cascade_on and sup.review_trigger == "stop":
         raise SupervisorInputError("Stop supervision cannot enable cascade.")
+    if cascade_on and sup.native_source:
+        raise SupervisorInputError("Native supervision cannot enable cascade.")
 
     if not cascade_on:
 
@@ -589,6 +622,8 @@ def supervisor_cascade(
         if m.intent.policy and m.intent.policy.supervisor:
             if m.intent.policy.supervisor.review_trigger == "stop":
                 raise SupervisorInputError("Stop supervision cannot enable cascade.")
+            if m.intent.policy.supervisor.native_source:
+                raise SupervisorInputError("Native supervision cannot enable cascade.")
             if m.intent.policy.supervisor.auth_mode == "subscription-only":
                 raise SupervisorInputError("Subscription-only supervision cannot enable the paid API checker.")
             m.intent.policy.supervisor.cascade = True
@@ -625,6 +660,43 @@ def validate_supervisor_cascade_input(
         raise SupervisorInputError("Checker options only apply when enabling cascade (state 'on')")
 
     _validate_checker_model(checker_model)
+
+
+def _update_ready_supervisor(
+    store: SessionStore,
+    manifest: SessionState,
+    mutate: Callable[[SessionState], None],
+    *,
+    lock_timeout_s: float,
+) -> None:
+    """Preflight outside the lock, then publish only against the inspected state."""
+    from forge.core.reactive.reviewer_runtime import preflight_host_supervisor
+    from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
+    from forge.session.exceptions import ForgeSessionError
+
+    candidate = deepcopy(manifest)
+    try:
+        mutate(candidate)
+        config = snapshot_supervisor_options(candidate)
+        if config and config.native_source:
+            preflight_host_supervisor(candidate)
+        elif config and config.review_trigger == "stop":
+            # Preserve B4's enrollment gate without adding runtime/auth probes to
+            # ordinary on/reload operations. Native readiness is the B5 opt-in.
+            from forge.core.runtime.codex_turn_enrollment import require_for_launch
+
+            require_for_launch(cwd=candidate.worktree.path if candidate.worktree else candidate.forge_root)
+
+        def apply(current: SessionState) -> None:
+            if current != manifest:
+                raise ValueError("Session changed during supervisor readiness checks; repeat the command")
+            mutate(current)
+
+        store.update(timeout_s=lock_timeout_s, mutate=apply)
+    except (StateCorruptedError, StateUnreadableError):
+        raise  # Preserve the CLI's dedicated corrupt-state recovery diagnostic.
+    except (OSError, ValueError, ForgeSessionError) as exc:
+        raise SupervisorInputError(str(exc)) from exc
 
 
 def _validate_checker_model(checker_model: str | None) -> None:

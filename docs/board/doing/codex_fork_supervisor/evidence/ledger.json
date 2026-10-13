@@ -1,0 +1,3150 @@
+{
+  "count": 48,
+  "ceiling": 60,
+  "api_count": 3,
+  "authorization": {
+    "subscription_extra_usage_off_confirmed": true,
+    "api_starts_authorized": 4,
+    "authority": "User confirmation in this chat, 2026-10-11; short synthetic API seed, two forks and one retry"
+  },
+  "budget_revisions": [
+    {
+      "at": "2026-10-11T15:32:56.486380+00:00",
+      "starts_before": 47,
+      "before": {
+        "G0": 12,
+        "G14": 0
+      },
+      "after": {
+        "G0": 11,
+        "G14": 1
+      },
+      "total_ceiling": 60,
+      "api_ceiling": 4,
+      "product_slots_preserved": 12,
+      "reason": "Unused source setup slot reassigned before dispatch to exact Stop prefix with fresh SQLite state after the final R start failed on stale projection."
+    }
+  ],
+  "case_counts": {
+    "G0": 11,
+    "R": 11,
+    "G1": 2,
+    "G2": 2,
+    "G3": 2,
+    "G4": 1,
+    "G5": 2,
+    "G6": 2,
+    "G8": 2,
+    "G7": 2,
+    "G9": 2,
+    "G10": 1,
+    "G11": 2,
+    "G12": 4,
+    "G13": 1,
+    "G14": 1
+  },
+  "starts": [
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G0-trust",
+      "case": "G0",
+      "id": "7459f679563f4d159d1e4bcf9f07e764",
+      "model": "gpt-6.1-sol",
+      "pid": 72127,
+      "ppid": 72126,
+      "role": "executor",
+      "started_at": 1791728705.312504,
+      "invocation": {
+        "at": 1791728705.312607,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--sandbox",
+          "workspace-write",
+          "-C",
+          "<ROUND>/action"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "7459f679563f4d159d1e4bcf9f07e764",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 45.62302633300715,
+        "first_event_seconds": null,
+        "id": "7459f679563f4d159d1e4bcf9f07e764",
+        "returncode": 0,
+        "thread_ids": [],
+        "usage_events": []
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G0-enrollment",
+      "case": "G0",
+      "id": "b88f3df590a34e1983f30de7ae43cdf2",
+      "model": "runtime-default",
+      "pid": 73412,
+      "ppid": 73387,
+      "role": "executor",
+      "started_at": 1791728767.249256,
+      "invocation": {
+        "at": 1791728767.249333,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "doctor",
+          "--json"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "b88f3df590a34e1983f30de7ae43cdf2",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 5.68782116699731,
+        "first_event_seconds": null,
+        "id": "b88f3df590a34e1983f30de7ae43cdf2",
+        "returncode": 0,
+        "thread_ids": [],
+        "usage_events": []
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G0-enrollment",
+      "case": "G0",
+      "id": "487ad922003641768d1aed35c97addee",
+      "model": "runtime-default",
+      "pid": 73598,
+      "ppid": 73387,
+      "role": "executor",
+      "started_at": 1791728773.464958,
+      "invocation": {
+        "at": 1791728773.465029,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only"
+        ],
+        "cwd": "/private/tmp/forge-codex-enroll-dxzn0plz",
+        "id": "487ad922003641768d1aed35c97addee",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 15.57237958398764,
+        "first_event_seconds": 0.05657579199760221,
+        "id": "487ad922003641768d1aed35c97addee",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b5b-6971-71f2-9af8-f507c4500639"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 24576,
+            "input_tokens": 28480,
+            "output_tokens": 46,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G0-short-source",
+      "case": "G0",
+      "id": "c9c8d3b922b147899bc4e3f7e13a98a5",
+      "model": "gpt-6.1-sol",
+      "pid": 74244,
+      "ppid": 74242,
+      "role": "source",
+      "started_at": 1791728864.761059,
+      "invocation": {
+        "at": 1791728864.761151,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-o",
+          "<ROUND>/captures/G0-short-source/last.txt",
+          "-"
+        ],
+        "cwd": "<ROUND>/source",
+        "id": "c9c8d3b922b147899bc4e3f7e13a98a5",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 6.576509499995154,
+        "first_event_seconds": 0.09281970899610315,
+        "id": "c9c8d3b922b147899bc4e3f7e13a98a5",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 12288,
+            "input_tokens": 14258,
+            "output_tokens": 7,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "api-without-key-control",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/R-api-without-key",
+      "case": "R",
+      "id": "cb4a863e8e554779bd4c94ea96125165",
+      "model": "gpt-6.1-sol",
+      "pid": 74566,
+      "ppid": 74564,
+      "role": "reviewer",
+      "started_at": 1791728901.07763,
+      "invocation": {
+        "at": 1791728901.077724,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"api\"",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "Reply AUTH_FALLBACK_UNEXPECTED without calling any tools."
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "cb4a863e8e554779bd4c94ea96125165",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 5.835273374992539,
+        "first_event_seconds": 0.07386833299824502,
+        "id": "cb4a863e8e554779bd4c94ea96125165",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b5d-5bf0-71b0-b9e7-9d0f23c2c834"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 12288,
+            "input_tokens": 14197,
+            "output_tokens": 10,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "api-without-key-control",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/R-api-ephemeral-without-key",
+      "case": "R",
+      "id": "07b2bfb428ee4185a9bc4fa7eb66093e",
+      "model": "gpt-6.1-sol",
+      "pid": 74991,
+      "ppid": 74989,
+      "role": "reviewer",
+      "started_at": 1791729003.622459,
+      "invocation": {
+        "at": 1791729003.622529,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "-c",
+          "cli_auth_credentials_store=\"ephemeral\"",
+          "-c",
+          "forced_login_method=\"api\"",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "Reply AUTH_FALLBACK_UNEXPECTED without calling any tools."
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "07b2bfb428ee4185a9bc4fa7eb66093e",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 5.746700124989729,
+        "first_event_seconds": 0.09759524998662528,
+        "id": "07b2bfb428ee4185a9bc4fa7eb66093e",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b5e-ec8d-7ee2-9043-bb88352f72a8"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 12288,
+            "input_tokens": 14197,
+            "output_tokens": 10,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "api-without-key-control",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/R-api-exec-controls",
+      "case": "R",
+      "id": "0b33dd6e3a364e7fa9a734bbcde39113",
+      "model": "gpt-6.1-sol",
+      "pid": 75318,
+      "ppid": 75316,
+      "role": "reviewer",
+      "started_at": 1791729055.953262,
+      "invocation": {
+        "at": 1791729055.953335,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "-c",
+          "cli_auth_credentials_store=\"ephemeral\"",
+          "-c",
+          "forced_login_method=\"api\"",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "Reply AUTH_FALLBACK_UNEXPECTED without calling any tools."
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "0b33dd6e3a364e7fa9a734bbcde39113",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 17.828448624990415,
+        "first_event_seconds": 0.05845574999693781,
+        "id": "0b33dd6e3a364e7fa9a734bbcde39113",
+        "returncode": 1,
+        "thread_ids": [
+          "01a12b5f-b8e7-7541-832e-1a8145836e85"
+        ],
+        "usage_events": []
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G1-argv-control",
+      "case": "G1",
+      "id": "bb654d885d194ed5a8349f3b4f08b20d",
+      "model": "runtime-default",
+      "pid": 76004,
+      "ppid": 76002,
+      "role": "reviewer",
+      "started_at": 1791729103.990891,
+      "invocation": {
+        "at": 1791729103.990977,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G1-argv-control/last.txt",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "Return the exact planning marker and approved color from the inherited planning conversation. Read only README.md in the current working directory using the shell, and include its text as checkout_readme. Do not read any other files or change any files. Return the required JSON.\n"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "bb654d885d194ed5a8349f3b4f08b20d",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 12.76025116701203,
+        "first_event_seconds": 0.08349062500928994,
+        "id": "bb654d885d194ed5a8349f3b4f08b20d",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b60-74b2-7023-af34-057016e07745"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 26624,
+            "input_tokens": 43334,
+            "output_tokens": 120,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G1-stdin-model",
+      "case": "G1",
+      "id": "d2ac19ff2f874f85a105da359e01dc3e",
+      "model": "gpt-6.1-sol",
+      "pid": 76458,
+      "ppid": 76456,
+      "role": "reviewer",
+      "started_at": 1791729134.981892,
+      "invocation": {
+        "at": 1791729134.981973,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G1-stdin-model/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "d2ac19ff2f874f85a105da359e01dc3e",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 14.150458082993282,
+        "first_event_seconds": 0.04360366599576082,
+        "id": "d2ac19ff2f874f85a105da359e01dc3e",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b60-eda3-7963-8eb4-26e6996afac7"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 59008,
+            "input_tokens": 79457,
+            "output_tokens": 133,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "api-without-key-control",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/R-fork-api-without-key",
+      "case": "R",
+      "id": "df0d8f235bd84360b46dc73f0a685884",
+      "model": "gpt-6.1-sol",
+      "pid": 77101,
+      "ppid": 77099,
+      "role": "reviewer",
+      "started_at": 1791729162.19723,
+      "invocation": {
+        "at": 1791729162.1973069,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "-c",
+          "cli_auth_credentials_store=\"ephemeral\"",
+          "-c",
+          "forced_login_method=\"api\"",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-fork-api-without-key/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "df0d8f235bd84360b46dc73f0a685884",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 11.825032374996226,
+        "first_event_seconds": 0.07905854198907036,
+        "id": "df0d8f235bd84360b46dc73f0a685884",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b61-580a-76a3-9dc3-21bd34e008af"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 40960,
+            "input_tokens": 43334,
+            "output_tokens": 120,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G0-second-model-source",
+      "case": "G0",
+      "id": "eb5297dd28e247b28bb6d5bd9badea29",
+      "model": "gpt-6-sol",
+      "pid": 77585,
+      "ppid": 77583,
+      "role": "source",
+      "started_at": 1791729187.830923,
+      "invocation": {
+        "at": 1791729187.831009,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "-m",
+          "gpt-6-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-o",
+          "<ROUND>/captures/G0-second-model-source/last.txt",
+          "-"
+        ],
+        "cwd": "<ROUND>/source",
+        "id": "eb5297dd28e247b28bb6d5bd9badea29",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 8.283539374999236,
+        "first_event_seconds": 0.091967874992406,
+        "id": "eb5297dd28e247b28bb6d5bd9badea29",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b61-bc18-7ef3-ac58-f5e55c1b4adb"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 11776,
+            "input_tokens": 13743,
+            "output_tokens": 43,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "api-without-key-control",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/R-fork-leaf-api-control",
+      "case": "R",
+      "id": "49781d29f06b4732ac5bfe7a1b39bb8c",
+      "model": "gpt-6.1-sol",
+      "pid": 78099,
+      "ppid": 78097,
+      "role": "reviewer",
+      "started_at": 1791729232.293378,
+      "invocation": {
+        "at": 1791729232.2934752,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"ephemeral\"",
+          "-c",
+          "forced_login_method=\"api\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-fork-leaf-api-control/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "49781d29f06b4732ac5bfe7a1b39bb8c",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 17.23915687498811,
+        "first_event_seconds": 0.04795433300023433,
+        "id": "49781d29f06b4732ac5bfe7a1b39bb8c",
+        "returncode": 1,
+        "thread_ids": [
+          "01a12b62-69cd-7743-8166-f840e2723258"
+        ],
+        "usage_events": []
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G2-first-to-second",
+      "case": "G2",
+      "id": "be843143087543b3a3bfbd9308d9ba52",
+      "model": "gpt-6-sol",
+      "pid": 78656,
+      "ppid": 78654,
+      "role": "reviewer",
+      "started_at": 1791729268.744693,
+      "invocation": {
+        "at": 1791729268.744766,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G2-first-to-second/last.txt",
+          "-m",
+          "gpt-6-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "be843143087543b3a3bfbd9308d9ba52",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 7.36244679200172,
+        "first_event_seconds": 0.05427841699565761,
+        "id": "be843143087543b3a3bfbd9308d9ba52",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b62-f82d-75e0-b669-e448b1ba2c40"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 30464,
+            "input_tokens": 51184,
+            "output_tokens": 144,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "api",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G0-api-source",
+      "case": "G0",
+      "id": "8421e02968664e2f851124254d2fa503",
+      "model": "gpt-6.1-sol",
+      "pid": 78980,
+      "ppid": 78978,
+      "role": "source",
+      "started_at": 1791729294.994593,
+      "invocation": {
+        "at": 1791729294.9946911,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "-c",
+          "cli_auth_credentials_store=\"ephemeral\"",
+          "-c",
+          "forced_login_method=\"api\"",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "-o",
+          "<ROUND>/captures/G0-api-source/last.txt",
+          "-"
+        ],
+        "cwd": "<ROUND>/source",
+        "id": "8421e02968664e2f851124254d2fa503",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 9.191364749989589,
+        "first_event_seconds": 2.7134407499979716,
+        "id": "8421e02968664e2f851124254d2fa503",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b63-5ec2-77b3-a859-80404bd5f53e"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 13267,
+            "cached_input_tokens": 0,
+            "input_tokens": 13270,
+            "output_tokens": 7,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G2-second-to-first",
+      "case": "G2",
+      "id": "1ca5c4e1d0a8429db087f04683809ba2",
+      "model": "gpt-6.1-sol",
+      "pid": 79642,
+      "ppid": 79640,
+      "role": "reviewer",
+      "started_at": 1791729336.6454341,
+      "invocation": {
+        "at": 1791729336.645507,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G2-second-to-first/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b61-bc18-7ef3-ac58-f5e55c1b4adb",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "1ca5c4e1d0a8429db087f04683809ba2",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 12.308295625000028,
+        "first_event_seconds": 0.8959356249979464,
+        "id": "1ca5c4e1d0a8429db087f04683809ba2",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b64-049b-7753-abe8-8a276ed4d7b3"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 31744,
+            "input_tokens": 54076,
+            "output_tokens": 173,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "api",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G3-subscription-to-api",
+      "case": "G3",
+      "id": "ac9c7db4020f4ae0b66efec4defc509d",
+      "model": "gpt-6.1-sol",
+      "pid": 80083,
+      "ppid": 80081,
+      "role": "reviewer",
+      "started_at": 1791729359.889647,
+      "invocation": {
+        "at": 1791729359.889743,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"ephemeral\"",
+          "-c",
+          "forced_login_method=\"api\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G3-subscription-to-api/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "ac9c7db4020f4ae0b66efec4defc509d",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 6.93868449999718,
+        "first_event_seconds": 0.6924074159906013,
+        "id": "ac9c7db4020f4ae0b66efec4defc509d",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b64-5ebf-7872-ae64-13bb22607dfe"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 13851,
+            "cached_input_tokens": 26051,
+            "input_tokens": 41878,
+            "output_tokens": 120,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "api",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G4-model-and-auth",
+      "case": "G4",
+      "id": "05eeb1b07943460f93370aa18a7e7c30",
+      "model": "gpt-6.1-sol",
+      "pid": 80340,
+      "ppid": 80338,
+      "role": "reviewer",
+      "started_at": 1791729367.6742249,
+      "invocation": {
+        "at": 1791729367.674297,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"ephemeral\"",
+          "-c",
+          "forced_login_method=\"api\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G4-model-and-auth/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b61-bc18-7ef3-ac58-f5e55c1b4adb",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "05eeb1b07943460f93370aa18a7e7c30",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 5.5321557499992196,
+        "first_event_seconds": 0.040227042001788504,
+        "id": "05eeb1b07943460f93370aa18a7e7c30",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b64-7a98-7b12-b1ae-e3ac4474076a"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 17815,
+            "cached_input_tokens": 29486,
+            "input_tokens": 49274,
+            "output_tokens": 171,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G3-api-to-subscription",
+      "case": "G3",
+      "id": "b6aed4ce07fd496aab8c13b527b817a3",
+      "model": "gpt-6.1-sol",
+      "pid": 80655,
+      "ppid": 80653,
+      "role": "reviewer",
+      "started_at": 1791729408.026277,
+      "invocation": {
+        "at": 1791729408.026353,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G3-api-to-subscription/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b63-5ec2-77b3-a859-80404bd5f53e",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "b6aed4ce07fd496aab8c13b527b817a3",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 11.83988162499736,
+        "first_event_seconds": 1.026896499999566,
+        "id": "b6aed4ce07fd496aab8c13b527b817a3",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b65-1bf3-7a63-846a-0aba75a22c42"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 13267,
+            "cached_input_tokens": 15744,
+            "input_tokens": 45180,
+            "output_tokens": 121,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G0-long-source",
+      "case": "G0",
+      "id": "36f6e2ebd4314e069ee783c9e8511e94",
+      "model": "gpt-6.1-sol",
+      "pid": 81126,
+      "ppid": 81124,
+      "role": "source",
+      "started_at": 1791729459.514426,
+      "invocation": {
+        "at": 1791729459.5145118,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-o",
+          "<ROUND>/captures/G0-long-source/last.txt",
+          "-"
+        ],
+        "cwd": "<ROUND>/source",
+        "id": "36f6e2ebd4314e069ee783c9e8511e94",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 13.848702915987815,
+        "first_event_seconds": 0.11380795799777843,
+        "id": "36f6e2ebd4314e069ee783c9e8511e94",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --json --sandbox read-only -C <ROUND>/source -m gpt-6.1-sol -c model_reasoning_effort=\"low\" -o <ROUND>/captures/G0-long-source/last.txt -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b65-e16b-7753-8b13-1764cd34a007"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 174976,
+            "input_tokens": 325889,
+            "output_tokens": 61,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G5-long-first",
+      "case": "G5",
+      "id": "39737979029e442f870b09667783da03",
+      "model": "gpt-6.1-sol",
+      "pid": 81776,
+      "ppid": 81774,
+      "role": "reviewer",
+      "started_at": 1791729540.4352791,
+      "invocation": {
+        "at": 1791729540.4353778,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G5-long-first/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "39737979029e442f870b09667783da03",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 13.509456582993153,
+        "first_event_seconds": 0.09766374999890104,
+        "id": "39737979029e442f870b09667783da03",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G5-long-first/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --disable hooks 01a12b65-e16b-7753-8b13-1764cd34a007 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b67-1d9b-76a0-ab8f-cc4a4896fc5c"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 338048,
+            "input_tokens": 652507,
+            "output_tokens": 226,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G5-long-repeat",
+      "case": "G5",
+      "id": "e8deee69a8c24d2a9fed3f93d04c071c",
+      "model": "gpt-6.1-sol",
+      "pid": 82281,
+      "ppid": 82279,
+      "role": "reviewer",
+      "started_at": 1791729587.3597,
+      "invocation": {
+        "at": 1791729587.3597848,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G5-long-repeat/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "e8deee69a8c24d2a9fed3f93d04c071c",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 13.883703957995749,
+        "first_event_seconds": 0.07327937499212567,
+        "id": "e8deee69a8c24d2a9fed3f93d04c071c",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G5-long-repeat/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --disable hooks 01a12b65-e16b-7753-8b13-1764cd34a007 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b67-d4d3-7570-8bdf-c8793bd6853b"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 501120,
+            "input_tokens": 652507,
+            "output_tokens": 226,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G0-compacted-source",
+      "case": "G0",
+      "id": "8f116885e121408ab8e669e74faf817c",
+      "model": "gpt-6.1-sol",
+      "pid": 82867,
+      "ppid": 82865,
+      "role": "source",
+      "started_at": 1791729670.032696,
+      "invocation": {
+        "at": 1791729670.032783,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "resume",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-c",
+          "model_auto_compact_token_limit=32000",
+          "-o",
+          "<ROUND>/captures/G0-compacted-source/last.txt",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/source",
+        "id": "8f116885e121408ab8e669e74faf817c",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 35.89914449999924,
+        "first_event_seconds": 0.08158704200468492,
+        "id": "8f116885e121408ab8e669e74faf817c",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/source resume -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" -m gpt-6.1-sol -c model_reasoning_effort=\"low\" -c model_auto_compact_token_limit=32000 -o <ROUND>/captures/G0-compacted-source/last.txt 01a12b65-e16b-7753-8b13-1764cd34a007 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b65-e16b-7753-8b13-1764cd34a007"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 199552,
+            "input_tokens": 487296,
+            "output_tokens": 127,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": null,
+      "case": "R",
+      "id": "46bea08dbe1d46088cffd7b6f05373d2",
+      "model": "gpt-6.1-sol",
+      "pid": 83709,
+      "ppid": 83707,
+      "role": "reviewer",
+      "started_at": 1791729698.657228,
+      "invocation": {
+        "at": 1791729698.657312,
+        "codex_home": "<ROUND>/negative-synthetic-api-chatgpt",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "Reply AUTH_FALLBACK_UNEXPECTED without calling any tools."
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "46bea08dbe1d46088cffd7b6f05373d2",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 0.013742583003477193,
+        "first_event_seconds": null,
+        "id": "46bea08dbe1d46088cffd7b6f05373d2",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --json --sandbox read-only -C <ROUND>/action -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --disable hooks Reply AUTH_FALLBACK_UNEXPECTED without calling any tools.",
+        "returncode": 1,
+        "thread_ids": [],
+        "usage_events": []
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G6-compacted-first",
+      "case": "G6",
+      "id": "2845ee9c6c18432f8633da628cd8742d",
+      "model": "gpt-6.1-sol",
+      "pid": 84037,
+      "ppid": 84035,
+      "role": "reviewer",
+      "started_at": 1791729757.975059,
+      "invocation": {
+        "at": 1791729757.97515,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G6-compacted-first/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "2845ee9c6c18432f8633da628cd8742d",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 12.840799500001594,
+        "first_event_seconds": 0.0508730830042623,
+        "id": "2845ee9c6c18432f8633da628cd8742d",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G6-compacted-first/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --disable hooks 01a12b65-e16b-7753-8b13-1764cd34a007 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b6a-6f3a-7161-aca4-8d19b3c63901"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 292736,
+            "input_tokens": 649316,
+            "output_tokens": 297,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G6-compacted-repeat",
+      "case": "G6",
+      "id": "31e27143d1a6470096446f8c650fc906",
+      "model": "gpt-6.1-sol",
+      "pid": 84695,
+      "ppid": 84693,
+      "role": "reviewer",
+      "started_at": 1791729836.693963,
+      "invocation": {
+        "at": 1791729836.694161,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G6-compacted-repeat/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--disable",
+          "hooks",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "31e27143d1a6470096446f8c650fc906",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 13.701191166997887,
+        "first_event_seconds": 0.07399120899208356,
+        "id": "31e27143d1a6470096446f8c650fc906",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G6-compacted-repeat/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --disable hooks 01a12b65-e16b-7753-8b13-1764cd34a007 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b6b-a2c5-70c3-8924-a06711a59728"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 361088,
+            "input_tokens": 649314,
+            "output_tokens": 296,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G8-copied-prefix",
+      "case": "G8",
+      "id": "64525285f752415ea7cdb0628e3a1ee0",
+      "model": "gpt-6.1-sol",
+      "pid": 85455,
+      "ppid": 85453,
+      "role": "reviewer",
+      "started_at": 1791729921.969153,
+      "invocation": {
+        "at": 1791729921.969284,
+        "codex_home": "<ROUND>/copy-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G8-copied-prefix/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "64525285f752415ea7cdb0628e3a1ee0",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 11.5232430830074,
+        "first_event_seconds": 1.1828762080112938,
+        "id": "64525285f752415ea7cdb0628e3a1ee0",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G8-copied-prefix/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" 01a12b5c-ce1a-72c2-ad3f-05d75f3fba00 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b6c-f445-7951-8367-12e6f7ebedbc"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 39552,
+            "input_tokens": 44274,
+            "output_tokens": 120,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G7-identity-strip",
+      "case": "G7",
+      "id": "7e55c57278d44d78b400114ac493f25f",
+      "model": "gpt-6.1-sol",
+      "pid": 86528,
+      "ppid": 86526,
+      "role": "reviewer",
+      "started_at": 1791730133.981642,
+      "invocation": {
+        "at": 1791730133.981717,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G7-identity-strip/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "7e55c57278d44d78b400114ac493f25f",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 19.06365491700126,
+        "first_event_seconds": 0.06953504199918825,
+        "id": "7e55c57278d44d78b400114ac493f25f",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G7-identity-strip/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins 01a12b5c-ce1a-72c2-ad3f-05d75f3fba00 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b70-2c12-7ba0-8db6-557efabaa9c3"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 26496,
+            "input_tokens": 44544,
+            "output_tokens": 295,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G7-cwd-hook-child",
+      "case": "G7",
+      "id": "7bc74e3afcd1404db66b87457ffdd68a",
+      "model": "gpt-6.1-sol",
+      "pid": 87174,
+      "ppid": 87172,
+      "role": "reviewer",
+      "started_at": 1791730177.606218,
+      "invocation": {
+        "at": 1791730177.606315,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G7-cwd-hook-child/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "7bc74e3afcd1404db66b87457ffdd68a",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 14.782300915991073,
+        "first_event_seconds": 0.05112725000071805,
+        "id": "7bc74e3afcd1404db66b87457ffdd68a",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G7-cwd-hook-child/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins 01a12b5c-ce1a-72c2-ad3f-05d75f3fba00 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b70-d66d-7941-b9aa-f564be012c72"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 38656,
+            "input_tokens": 43377,
+            "output_tokens": 279,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G8-incomplete-tool",
+      "case": "G8",
+      "id": "cacce81d14ba4dec9c110ffa3a2a7ab6",
+      "model": "gpt-6.1-sol",
+      "pid": 87681,
+      "ppid": 87679,
+      "role": "reviewer",
+      "started_at": 1791730214.506481,
+      "invocation": {
+        "at": 1791730214.5065851,
+        "codex_home": "<ROUND>/copy-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G8-incomplete-tool/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "cacce81d14ba4dec9c110ffa3a2a7ab6",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 13.850219208005,
+        "first_event_seconds": 0.05983758300135378,
+        "id": "cacce81d14ba4dec9c110ffa3a2a7ab6",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G8-incomplete-tool/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins 01a12b65-e16b-7753-8b13-1764cd34a007 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b71-669e-7470-8c6d-299e00e8d332"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 163328,
+            "input_tokens": 327150,
+            "output_tokens": 183,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G9-readonly",
+      "case": "G9",
+      "id": "6417f68308df4c0a925709b353b4d225",
+      "model": "gpt-6.1-sol",
+      "pid": 88150,
+      "ppid": 88148,
+      "role": "reviewer",
+      "started_at": 1791730242.498132,
+      "invocation": {
+        "at": 1791730242.498199,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/write-schema.json",
+          "-o",
+          "<ROUND>/captures/G9-readonly/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "mcp_servers={}",
+          "-c",
+          "sandbox_mode=\"read-only\"",
+          "-c",
+          "approval_policy=\"never\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "6417f68308df4c0a925709b353b4d225",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 24.149280792000354,
+        "first_event_seconds": 0.04052837500057649,
+        "id": "6417f68308df4c0a925709b353b4d225",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/write-schema.json -o <ROUND>/captures/G9-readonly/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins -c mcp_servers={} -c sandbox_mode=\"read-only\" -c approval_policy=\"never\" 01a12b5c-ce1a-72c2-ad3f-05d75f3fba00 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b71-d3e3-7f31-912e-54dfeb618cf7"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 41344,
+            "input_tokens": 58903,
+            "output_tokens": 641,
+            "reasoning_output_tokens": 12
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G9-writable",
+      "case": "G9",
+      "id": "e2728803016d47e299eec42642007023",
+      "model": "gpt-6.1-sol",
+      "pid": 88874,
+      "ppid": 88872,
+      "role": "reviewer",
+      "started_at": 1791730279.3548238,
+      "invocation": {
+        "at": 1791730279.354902,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/write-schema.json",
+          "-o",
+          "<ROUND>/captures/G9-writable/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "mcp_servers={}",
+          "-c",
+          "sandbox_mode=\"workspace-write\"",
+          "-c",
+          "approval_policy=\"never\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "e2728803016d47e299eec42642007023",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 19.470674750002217,
+        "first_event_seconds": 0.03793204099929426,
+        "id": "e2728803016d47e299eec42642007023",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox workspace-write -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/write-schema.json -o <ROUND>/captures/G9-writable/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins -c mcp_servers={} -c sandbox_mode=\"workspace-write\" -c approval_policy=\"never\" 01a12b5c-ce1a-72c2-ad3f-05d75f3fba00 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b72-63d8-7bd3-91d6-61ead13a22f1"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 54272,
+            "input_tokens": 60076,
+            "output_tokens": 445,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G0-shared-fork",
+      "case": "G0",
+      "id": "e3aade00948e49d9ae72d6ae5ca3bf1f",
+      "model": "gpt-6.1-sol",
+      "pid": 89528,
+      "ppid": 89526,
+      "role": "source",
+      "started_at": 1791730327.572466,
+      "invocation": {
+        "at": 1791730327.5725372,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "multi_agent",
+          "-c",
+          "features.multi_agent=false",
+          "-c",
+          "features.multi_agent_v2=false",
+          "-c",
+          "agents.max_threads=1",
+          "-c",
+          "features.apps=false",
+          "-c",
+          "features.plugins=false",
+          "-c",
+          "features.hooks=false",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<CHECKOUT>",
+        "id": "e3aade00948e49d9ae72d6ae5ca3bf1f",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 9.905019666999578,
+        "first_event_seconds": 0.0770414169965079,
+        "id": "e3aade00948e49d9ae72d6ae5ca3bf1f",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/source fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ignore-user-config --ignore-rules --disable multi_agent -c features.multi_agent=false -c features.multi_agent_v2=false -c agents.max_threads=1 -c features.apps=false -c features.plugins=false -c features.hooks=false -m gpt-6.1-sol -c model_reasoning_effort=\"low\" 01a12b5c-ce1a-72c2-ad3f-05d75f3fba00 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b73-202d-7dd0-a058-f74ec9375dd2"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 39040,
+            "input_tokens": 43818,
+            "output_tokens": 76,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G10-current-plan",
+      "case": "G10",
+      "id": "0ec2142f4b5b481cb2ddf706dac724c7",
+      "model": "gpt-6.1-sol",
+      "pid": 90055,
+      "ppid": 90053,
+      "role": "reviewer",
+      "started_at": 1791730409.7553558,
+      "invocation": {
+        "at": 1791730409.7554328,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G10-current-plan/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "0ec2142f4b5b481cb2ddf706dac724c7",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 17.57278795799357,
+        "first_event_seconds": 0.036957582997274585,
+        "id": "0ec2142f4b5b481cb2ddf706dac724c7",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G10-current-plan/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins 01a12b5c-ce1a-72c2-ad3f-05d75f3fba00 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b74-6139-7a53-9fb7-0c9cefd622b6"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 52736,
+            "input_tokens": 57566,
+            "output_tokens": 184,
+            "reasoning_output_tokens": 29
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G11-shared-plan",
+      "case": "G11",
+      "id": "fa7661ce231a480a8ed5fd6555fb74c3",
+      "model": "gpt-6.1-sol",
+      "pid": 90656,
+      "ppid": 90654,
+      "role": "reviewer",
+      "started_at": 1791730458.6348212,
+      "invocation": {
+        "at": 1791730458.634908,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G11-shared-plan/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b73-202d-7dd0-a058-f74ec9375dd2",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "fa7661ce231a480a8ed5fd6555fb74c3",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 20.105720082996413,
+        "first_event_seconds": 0.05450320799718611,
+        "id": "fa7661ce231a480a8ed5fd6555fb74c3",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G11-shared-plan/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins -c agents.enabled=false 01a12b73-202d-7dd0-a058-f74ec9375dd2 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b75-2036-7c72-ac02-d67648caa201"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 67072,
+            "input_tokens": 86790,
+            "output_tokens": 365,
+            "reasoning_output_tokens": 13
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G12-pretool",
+      "case": "G12",
+      "id": "12e4a058680d46b6bd1cf2f861089820",
+      "model": "gpt-6.1-sol",
+      "pid": 91322,
+      "ppid": 91320,
+      "role": "executor",
+      "started_at": 1791730517.083742,
+      "invocation": {
+        "at": 1791730517.083981,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-C",
+          "<ROUND>/action",
+          "resume",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<CHECKOUT>",
+        "id": "12e4a058680d46b6bd1cf2f861089820",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 29.235038459009957,
+        "first_event_seconds": 0.07945225000730716,
+        "id": "12e4a058680d46b6bd1cf2f861089820",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox workspace-write -C <ROUND>/action resume -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" -m gpt-6.1-sol -c model_reasoning_effort=\"low\" 01a12b65-e16b-7753-8b13-1764cd34a007 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b65-e16b-7753-8b13-1764cd34a007"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 361088,
+            "input_tokens": 649771,
+            "output_tokens": 215,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G12-pretool-review",
+      "case": "G12",
+      "id": "915528fb19a54845900e04c3234b95cd",
+      "model": "gpt-6.1-sol",
+      "pid": 91705,
+      "ppid": 91701,
+      "role": "reviewer",
+      "started_at": 1791730527.299486,
+      "invocation": {
+        "at": 1791730527.299569,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G12-pretool-review/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "915528fb19a54845900e04c3234b95cd",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 12.712858166996739,
+        "first_event_seconds": 0.043367874997784384,
+        "id": "915528fb19a54845900e04c3234b95cd",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G12-pretool-review/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins -c agents.enabled=false 01a12b65-e16b-7753-8b13-1764cd34a007 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b76-2c67-7580-85c2-9d4a3417d134"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 279936,
+            "input_tokens": 648661,
+            "output_tokens": 308,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G12-stop",
+      "case": "G12",
+      "id": "ff12ec85bf66424c8ed899c35719d6d3",
+      "model": "gpt-6.1-sol",
+      "pid": 92660,
+      "ppid": 92658,
+      "role": "executor",
+      "started_at": 1791730560.3084679,
+      "invocation": {
+        "at": 1791730560.30855,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "-C",
+          "<ROUND>/action",
+          "resume",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<CHECKOUT>",
+        "id": "ff12ec85bf66424c8ed899c35719d6d3",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 34.50984487500682,
+        "first_event_seconds": 0.07797237500199117,
+        "id": "ff12ec85bf66424c8ed899c35719d6d3",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox workspace-write -C <ROUND>/action resume -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" -m gpt-6.1-sol -c model_reasoning_effort=\"low\" 01a12b65-e16b-7753-8b13-1764cd34a007 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b65-e16b-7753-8b13-1764cd34a007"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 523392,
+            "input_tokens": 812603,
+            "output_tokens": 298,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G12-stop-review",
+      "case": "G12",
+      "id": "7fe8198fa40f47d58c2b635340ab9a53",
+      "model": "gpt-6.1-sol",
+      "pid": 93207,
+      "ppid": 93204,
+      "role": "reviewer",
+      "started_at": 1791730576.216463,
+      "invocation": {
+        "at": 1791730576.2165592,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G12-stop-review/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "7fe8198fa40f47d58c2b635340ab9a53",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 15.613504749999265,
+        "first_event_seconds": 0.04170666700520087,
+        "id": "7fe8198fa40f47d58c2b635340ab9a53",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G12-stop-review/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins -c agents.enabled=false 01a12b65-e16b-7753-8b13-1764cd34a007 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b76-eb77-7780-aaed-773d9800f3a4"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 615296,
+            "input_tokens": 974583,
+            "output_tokens": 481,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G0-sibling-fork",
+      "case": "G0",
+      "id": "602f76ecea6b4c9eb7582a62a7c07536",
+      "model": "gpt-6.1-sol",
+      "pid": 94274,
+      "ppid": 94272,
+      "role": "source",
+      "started_at": 1791730646.398985,
+      "invocation": {
+        "at": 1791730646.3990998,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/source",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "features.hooks=false",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "Keep the inherited planning marker and approved plan. This sibling executor is SIBLING-EXECUTOR-B5. Reply READY without tools."
+        ],
+        "cwd": "<CHECKOUT>",
+        "id": "602f76ecea6b4c9eb7582a62a7c07536",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 5.852253333010594,
+        "first_event_seconds": 0.0951591670018388,
+        "id": "602f76ecea6b4c9eb7582a62a7c07536",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/source fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ignore-user-config --ignore-rules -c agents.enabled=false -c features.hooks=false -m gpt-6.1-sol -c model_reasoning_effort=\"low\" 01a12b5c-ce1a-72c2-ad3f-05d75f3fba00 Keep the inherited planning marker and approved plan. This sibling executor is SIBLING-EXECUTOR-B5. Reply READY without tools.",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b77-fda2-7b53-a435-ba7de8501d7e"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 12288,
+            "input_tokens": 27587,
+            "output_tokens": 12,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G13-native-owner-death",
+      "case": "G13",
+      "id": "905b746323224f8897292e6142c864d3",
+      "model": "gpt-6.1-sol",
+      "pid": 95492,
+      "ppid": 95490,
+      "role": "reviewer",
+      "started_at": 1791730747.4725308,
+      "invocation": {
+        "at": 1791730747.4726279,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G13-native-owner-death/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "905b746323224f8897292e6142c864d3",
+        "local_only": false
+      },
+      "outcome": {
+        "id": "905b746323224f8897292e6142c864d3",
+        "observation": "wrapper did not report an exit",
+        "outer_result": {
+          "codex_identity_unchanged": true,
+          "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "elapsed_seconds": 8.852353750000475,
+          "kill_escalation": [],
+          "owner": "5171c252dad34229b6e04396d665dae4",
+          "remaining": [],
+          "returncode": -9,
+          "survivors_before_sweep": [
+            {
+              "pgid": 95706,
+              "pid": 95706,
+              "ppid": 95498,
+              "started": "Sun Oct 11 16:59:13 2026    ",
+              "status": "Ss"
+            }
+          ]
+        },
+        "returncode": null
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/R-copy-missing-ancestor",
+      "case": "R",
+      "id": "2d0e465a43a24c3f969cdacd1665c110",
+      "model": "gpt-6.1-sol",
+      "pid": 95814,
+      "ppid": 95812,
+      "role": "reviewer",
+      "started_at": 1791730792.1679292,
+      "invocation": {
+        "at": 1791730792.1680498,
+        "codex_home": "<ROUND>/copy-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-copy-missing-ancestor/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b73-202d-7dd0-a058-f74ec9375dd2",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "2d0e465a43a24c3f969cdacd1665c110",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 0.475824624998495,
+        "first_event_seconds": null,
+        "id": "2d0e465a43a24c3f969cdacd1665c110",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/R-copy-missing-ancestor/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins -c agents.enabled=false 01a12b73-202d-7dd0-a058-f74ec9375dd2 -",
+        "returncode": 1,
+        "thread_ids": [],
+        "usage_events": []
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/R-native-legacy-exec-death",
+      "case": "R",
+      "id": "f7e7944ebf404283b1baaba4996998a8",
+      "model": "gpt-6.1-sol",
+      "pid": 95985,
+      "ppid": 95982,
+      "role": "reviewer",
+      "started_at": 1791730854.6861582,
+      "invocation": {
+        "at": 1791730854.686257,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-native-legacy-exec-death/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "features.unified_exec=false",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "f7e7944ebf404283b1baaba4996998a8",
+        "local_only": false
+      },
+      "outcome": {
+        "id": "f7e7944ebf404283b1baaba4996998a8",
+        "observation": "wrapper did not report an exit",
+        "outer_result": {
+          "codex_identity_unchanged": true,
+          "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "elapsed_seconds": 42.70867075001297,
+          "kill_escalation": [],
+          "owner": "990fb9a72f5441c4b4eb3583c52982d7",
+          "remaining": [],
+          "returncode": 124,
+          "survivors_before_sweep": []
+        },
+        "returncode": null
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G11-copied-lineage",
+      "case": "G11",
+      "id": "f5f0a8f416bb404482dacbbbe01c67fa",
+      "model": "gpt-6.1-sol",
+      "pid": 96875,
+      "ppid": 96868,
+      "role": "reviewer",
+      "started_at": 1791730886.367557,
+      "invocation": {
+        "at": 1791730886.367668,
+        "codex_home": "<ROUND>/copy-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G11-copied-lineage/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b73-202d-7dd0-a058-f74ec9375dd2",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "f5f0a8f416bb404482dacbbbe01c67fa",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 21.95390537500498,
+        "first_event_seconds": 0.8093516660010209,
+        "id": "f5f0a8f416bb404482dacbbbe01c67fa",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G11-copied-lineage/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins -c agents.enabled=false 01a12b73-202d-7dd0-a058-f74ec9375dd2 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b7b-a9fc-7453-92bb-43c401ac5fa2"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 79232,
+            "input_tokens": 88331,
+            "output_tokens": 446,
+            "reasoning_output_tokens": 19
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/R-native-cancel-first-death",
+      "case": "R",
+      "id": "a648e4f8d1284b338bc2196ae4830da5",
+      "model": "gpt-6.1-sol",
+      "pid": 98250,
+      "ppid": 98248,
+      "role": "reviewer",
+      "started_at": 1791731008.105909,
+      "invocation": {
+        "at": 1791731008.106004,
+        "codex_home": "<ROUND>/codex-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-native-cancel-first-death/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "a648e4f8d1284b338bc2196ae4830da5",
+        "local_only": false
+      },
+      "outcome": {
+        "id": "a648e4f8d1284b338bc2196ae4830da5",
+        "observation": "wrapper did not report an exit",
+        "outer_result": {
+          "codex_identity_unchanged": true,
+          "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+          "elapsed_seconds": 10.723599499993725,
+          "kill_escalation": [],
+          "owner": "e916ffef2fed4fbaa14b4c97722ec0c1",
+          "remaining": [],
+          "returncode": -9,
+          "survivors_before_sweep": []
+        },
+        "returncode": null
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/R-large-stdin-isolated",
+      "case": "R",
+      "id": "5412150d95a348708c6fb616eee22bae",
+      "model": "gpt-6.1-sol",
+      "pid": 2745,
+      "ppid": 2743,
+      "role": "reviewer",
+      "started_at": 1791731734.1078742,
+      "invocation": {
+        "at": 1791731734.107956,
+        "codex_home": "<ROUND>/copy-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-large-stdin-isolated/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "sandbox_mode=\"read-only\"",
+          "-c",
+          "approval_policy=\"never\"",
+          "-c",
+          "mcp_servers={}",
+          "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "5412150d95a348708c6fb616eee22bae",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 14.550987666996662,
+        "first_event_seconds": 1.14933062500495,
+        "id": "5412150d95a348708c6fb616eee22bae",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/R-large-stdin-isolated/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins -c agents.enabled=false -c sandbox_mode=\"read-only\" -c approval_policy=\"never\" -c mcp_servers={} 01a12b5c-ce1a-72c2-ad3f-05d75f3fba00 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b88-9ac9-7de2-8838-0f7cefe034e3"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 55040,
+            "input_tokens": 78058,
+            "output_tokens": 134,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G0-compacted-copy-usage",
+      "case": "G0",
+      "id": "e7dc7ad8012749258e32fd593cc8b505",
+      "model": "gpt-6.1-sol",
+      "pid": 4224,
+      "ppid": 4222,
+      "role": "source",
+      "started_at": 1791732039.8758268,
+      "invocation": {
+        "at": 1791732039.875915,
+        "codex_home": "<ROUND>/copy-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "features.apps=false",
+          "-c",
+          "features.plugins=false",
+          "-c",
+          "mcp_servers={}",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G0-compacted-copy-usage/last.txt",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<CHECKOUT>",
+        "id": "e7dc7ad8012749258e32fd593cc8b505",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 12.382896750001237,
+        "first_event_seconds": 1.0075475000048755,
+        "id": "e7dc7ad8012749258e32fd593cc8b505",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ignore-user-config --ignore-rules --disable hooks -c agents.enabled=false -c features.apps=false -c features.plugins=false -c mcp_servers={} -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G0-compacted-copy-usage/last.txt 01a12b65-e16b-7753-8b13-1764cd34a007 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b8d-4470-72d1-aa8a-8b223e89764e"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 604288,
+            "input_tokens": 974814,
+            "output_tokens": 461,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/R-copied-stop-boundary",
+      "case": "R",
+      "id": "a9e48fc5425f49f881cb329074bac6bd",
+      "model": "gpt-6.1-sol",
+      "pid": 6412,
+      "ppid": 6410,
+      "role": "reviewer",
+      "started_at": 1791732667.848447,
+      "invocation": {
+        "at": 1791732667.8485398,
+        "codex_home": "<ROUND>/copy-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/R-copied-stop-boundary/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "a9e48fc5425f49f881cb329074bac6bd",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 0.5035698749998119,
+        "first_event_seconds": null,
+        "id": "a9e48fc5425f49f881cb329074bac6bd",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/R-copied-stop-boundary/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins -c agents.enabled=false 01a12b65-e16b-7753-8b13-1764cd34a007 -",
+        "returncode": 1,
+        "thread_ids": [],
+        "usage_events": []
+      }
+    },
+    {
+      "auth_mode": "subscription-only",
+      "binary_sha256": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "capture": "<ROUND>/captures/G14-copied-stop-fresh-index",
+      "case": "G14",
+      "id": "3b96b1c04f624326a8f9478da3cb5a53",
+      "model": "gpt-6.1-sol",
+      "pid": 6754,
+      "ppid": 6752,
+      "role": "reviewer",
+      "started_at": 1791732815.615187,
+      "invocation": {
+        "at": 1791732815.61526,
+        "codex_home": "<ROUND>/copy-home",
+        "command": [
+          "<ROUND>/runtime/0.162.1/bin/codex",
+          "exec",
+          "--json",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<ROUND>/action",
+          "fork",
+          "-c",
+          "cli_auth_credentials_store=\"file\"",
+          "-c",
+          "forced_login_method=\"chatgpt\"",
+          "--ephemeral",
+          "--output-schema",
+          "<ROUND>/review-schema.json",
+          "-o",
+          "<ROUND>/captures/G14-copied-stop-fresh-index/last.txt",
+          "-m",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "--ignore-user-config",
+          "--ignore-rules",
+          "--disable",
+          "hooks",
+          "--disable",
+          "multi_agent",
+          "--disable",
+          "apps",
+          "--disable",
+          "plugins",
+          "-c",
+          "agents.enabled=false",
+          "-c",
+          "sqlite_home=\"<ROUND>/copy-indexes/G14-copied-stop-fresh-index\"",
+          "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "-"
+        ],
+        "cwd": "<ROUND>/action",
+        "id": "3b96b1c04f624326a8f9478da3cb5a53",
+        "local_only": false
+      },
+      "outcome": {
+        "elapsed_seconds": 14.192193458002293,
+        "first_event_seconds": 0.875333749994752,
+        "id": "3b96b1c04f624326a8f9478da3cb5a53",
+        "observed_process_argv": "<ROUND>/runtime/0.162.1/bin/codex exec --json --sandbox read-only -C <ROUND>/action fork -c cli_auth_credentials_store=\"file\" -c forced_login_method=\"chatgpt\" --ephemeral --output-schema <ROUND>/review-schema.json -o <ROUND>/captures/G14-copied-stop-fresh-index/last.txt -m gpt-6.1-sol -c model_reasoning_effort=\"low\" --ignore-user-config --ignore-rules --disable hooks --disable multi_agent --disable apps --disable plugins -c agents.enabled=false -c sqlite_home=\"<ROUND>/copy-indexes/G14-copied-stop-fresh-index\" 01a12b65-e16b-7753-8b13-1764cd34a007 -",
+        "returncode": 0,
+        "thread_ids": [
+          "01a12b99-1a58-7212-980f-9109751ac7f1"
+        ],
+        "usage_events": [
+          {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 615680,
+            "input_tokens": 975509,
+            "output_tokens": 477,
+            "reasoning_output_tokens": 0
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -21,6 +21,7 @@ from contextlib import contextmanager
 from typing import Any, Iterator
 
 TERMINATION_GRACE_SECONDS = 0.5
+INTERRUPTION_GRACE_SECONDS = 1.0
 _WATCHDOG_MODULE = "forge.core.reactive.watchdog"
 _TIMEOUT_EXIT = 124
 
@@ -59,11 +60,13 @@ def run_guarded(
     cwd: str | None,
     timeout: float,
     pass_fds: tuple[int, ...] = (),
+    cancel_before_kill: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     """Run under a parent-death watchdog with subprocess.run-compatible results."""
     if timeout <= 0:
         raise subprocess.TimeoutExpired(argv, timeout)
     deadline = time.monotonic() + timeout
+    cleanup_seconds = 2 * TERMINATION_GRACE_SECONDS + (INTERRUPTION_GRACE_SECONDS if cancel_before_kill else 0)
     control_read, control_write = os.pipe()
     watcher: subprocess.Popen[str] | None = None
     try:
@@ -89,9 +92,10 @@ def run_guarded(
                 "cwd": os.path.abspath(cwd) if cwd else os.getcwd(),
                 "deadline": deadline,
                 "pass_fds": pass_fds,
+                "cancel_before_kill": cancel_before_kill,
             }
         )
-        stdout, stderr = watcher.communicate(payload, timeout=timeout + 2 * TERMINATION_GRACE_SECONDS + 2)
+        stdout, stderr = watcher.communicate(payload, timeout=timeout + cleanup_seconds + 2)
         if watcher.returncode == _TIMEOUT_EXIT:
             raise subprocess.TimeoutExpired(argv, timeout, output=stdout, stderr=stderr)
         return subprocess.CompletedProcess(argv, watcher.returncode, stdout, stderr)
@@ -103,7 +107,7 @@ def run_guarded(
             os.close(control_read)
         if watcher is not None and watcher.poll() is None:
             try:
-                watcher.wait(timeout=2 * TERMINATION_GRACE_SECONDS + 2)
+                watcher.wait(timeout=cleanup_seconds + 2)
             except subprocess.TimeoutExpired:
                 # The independently armed anchor still bounds its reviewer group.
                 watcher.kill()
@@ -155,6 +159,11 @@ def _watch(control: int, payload: dict[str, Any]) -> int:
             # Do not poll/reap the anchor before the last signal. Even a crashed
             # anchor remains a zombie owned by us, retaining this group's identity.
             if not completed:
+                # Codex cancels detached tool hosts on INT. TERM alone can leave
+                # them alive outside the reviewer's process group.
+                if payload.get("cancel_before_kill"):
+                    _signal_group(anchor.pid, signal.SIGINT)
+                    time.sleep(INTERRUPTION_GRACE_SECONDS)
                 _signal_group(anchor.pid, signal.SIGTERM)
                 time.sleep(TERMINATION_GRACE_SECONDS)
             _signal_group(anchor.pid, signal.SIGKILL)
@@ -169,12 +178,26 @@ def _anchor(status: int, payload: dict[str, Any]) -> None:
     # Stay alive through TERM so the watcher's final group kill retains a live
     # anchor; the reviewer gets the normal default signal disposition on exec.
     signal.signal(signal.SIGTERM, lambda *_: None)
+    if payload.get("cancel_before_kill"):
+        signal.signal(signal.SIGINT, lambda *_: None)
     deadline = float(payload["deadline"])
 
     def expire() -> None:
+        if payload.get("cancel_before_kill"):
+            # The watcher may itself have died. Let Codex cancel detached tools
+            # before the independent anchor enforces its final group deadline.
+            _signal_group(os.getpid(), signal.SIGINT)
+            time.sleep(INTERRUPTION_GRACE_SECONDS)
+            _signal_group(os.getpid(), signal.SIGTERM)
+            time.sleep(TERMINATION_GRACE_SECONDS)
         _signal_group(os.getpid(), signal.SIGKILL)
 
-    timer = threading.Timer(max(0.0, deadline - time.monotonic()) + 2 * TERMINATION_GRACE_SECONDS, expire)
+    timer = threading.Timer(
+        max(0.0, deadline - time.monotonic())
+        + 2 * TERMINATION_GRACE_SECONDS
+        + (INTERRUPTION_GRACE_SECONDS if payload.get("cancel_before_kill") else 0),
+        expire,
+    )
     timer.daemon = True
     timer.start()
     try:

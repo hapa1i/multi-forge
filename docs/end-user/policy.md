@@ -232,8 +232,10 @@ is selectable (see [Supervisor runtime (lane)](#supervisor-runtime-lane) below).
 
 Configured in the session manifest under `policy.supervisor`:
 
-- `resume_id` — supervisor target (a Forge planning-session name or Claude session UUID). The Claude arm resumes it; the
-  Codex arm uses the resolved approved-plan snapshot in-band.
+- `resume_id` — legacy supervisor target (a Forge planning-session name or Claude session UUID). The Claude arm resumes
+  it; fresh Codex review uses the resolved approved-plan snapshot in-band.
+- `native_source` — runtime-qualified native Codex source selected with `--source-runtime codex`; see
+  [native supervision](native_supervision.md) for its dedicated login, supported histories and trigger restrictions.
 - `proxy` — proxy for supervisor LLM calls (optional, defaults to session proxy)
 - `timeout_seconds` — reviewer limit from 1 to 45 seconds (default: 45s), including auth and retries. Set at configure
   time with `forge policy supervisor set <target> --timeout N`, or adjust a live session with
@@ -245,10 +247,11 @@ plan. Low confidence or missing citations produce a warning instead. Timeouts, e
 result in a warning, not a block.
 
 **Picking a supervisor model.** With a planning target, Claude reads the planner's conversation via `--resume` and must
-locate and cite specific plan items. Plan-only Claude and all Codex reviews receive the approved snapshot in-band.
-Select the reviewer with `--model`; the requested selector and any observed runtime model are recorded separately. For
-per-family Claude-lane supervisor picks (including the Opus 4.6 vs 4.8 split, when to cross-route to Gemini for mid-long
-or multimodal planning sessions, and DeepSeek V4 Pro as a cost-efficient alternative), see
+locate and cite specific plan items. Plan-only Claude and fresh Codex reviews receive the approved snapshot in-band.
+Native Codex reviews fork selected native history, with an explicit plan taking precedence when supplied. Select the
+reviewer with `--model`; the requested selector and any observed runtime model are recorded separately. For per-family
+Claude-lane supervisor picks (including the Opus 4.6 vs 4.8 split, when to cross-route to Gemini for mid-long or
+multimodal planning sessions, and DeepSeek V4 Pro as a cost-efficient alternative), see
 [model_selection.md](model_selection.md).
 
 ### Review an approved plan file
@@ -299,8 +302,8 @@ requires `forge policy supervisor remove` followed by `set`. Legacy timeouts ove
 writes retain schema v2 compatibility; explicit model/auth fields require v3 and a matching sidecar image. Retain a
 pre-upgrade backup for downgrades. Old or incomplete shadow candidates finish unavailable without dispatch; complete v6
 candidates freeze source, effective model, effort, auth, and lane. Supervisor replacement preserves tuning overrides.
-`%policy` lifecycle commands work with these configurations, while new setup options belong to the terminal CLI;
-one-shot `evaluate -r` remains conversation-based.
+`%policy supervisor set` and lifecycle commands share the terminal setup operations; one-shot `evaluate -r` remains
+conversation-based and refuses native-source review.
 
 ### Review once at Codex Stop (opt-in)
 
@@ -321,11 +324,12 @@ forge policy supervisor set --session executor --plan ./approved-plan.md --model
 forge policy supervisor status --session executor --json
 ```
 
-The subscription-only route requires a verified direct Claude login and disabled account extra usage, as described
-above. The executor and reviewer are separate runtimes. Stop accepts the existing supported reviewer lanes; it does not
-add Codex planner-history lookup. A conversation-backed source must have an approved plan snapshot, which setup resolves
-and saves. Setup and reload resolve plan symlinks to their current target; changing the link later does not change the
-saved source. An unreadable or oversized plan makes the review unavailable.
+The plan-file subscription route above requires a verified direct Claude login and disabled account extra usage. Stop
+also supports [native Codex planning sources](native_supervision.md) through a dedicated reviewer login and explicit
+source selector. Every native Stop source requires `--plan`, including a separate completed thread. A legacy
+conversation-backed source must have an approved plan snapshot, which setup resolves and saves. Setup and reload resolve
+plan symlinks to their current target; changing the link later does not change the saved source. An unreadable or
+oversized plan makes the review unavailable.
 
 Omitting `--trigger` from `set` preserves the selected trigger; explicitly choose `pre-tool-use` to return to per-edit
 review. Configure the idle executor before its next explicit prompt. Switching modes, changing configuration, or

@@ -270,7 +270,12 @@ class _HeadlessLifecycleBase:
         and synchronous cancellation reap tool subprocesses spawned by the runtime.
         """
         start = time.monotonic()
+        if (request.pass_fds or request.cancel_before_kill) and request.watchdog_deadline is None:
+            raise ValueError("Retained leases and cancellation require a watchdog deadline")
         ident = _identity(request.env)
+        if request.run_identity is not None:
+            run_id, parent_id, root_id = request.run_identity
+            ident = _Identity(run_id=run_id, parent_run_id=parent_id, root_run_id=root_id)
         run_argv, hints = self._prepare_argv(request)
         proc: subprocess.Popen[str] | None = None
         try:
@@ -283,6 +288,8 @@ class _HeadlessLifecycleBase:
                     env=request.env,
                     cwd=request.cwd,
                     timeout=request.watchdog_deadline - time.monotonic(),
+                    pass_fds=request.pass_fds,
+                    cancel_before_kill=request.cancel_before_kill,
                 )
                 result = self._build_result(
                     request,
@@ -391,6 +398,10 @@ def run_grouped_parallel(
     """
     if not jobs:
         return []
+    if any(
+        request.watchdog_deadline is not None or request.pass_fds or request.cancel_before_kill for _, request in jobs
+    ):
+        raise ValueError("Guarded reviewers require a single invocation")
 
     # Thread-safe child tracking. cleanup_started closes cancellation races where
     # a worker is about to spawn, or has spawned but not yet registered, a child.

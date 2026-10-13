@@ -1,0 +1,49 @@
+{
+  "helper_sha256": "8374ec7d0a9ca4320a40940528f55086913de9389e679a9c901e8936600e2ae7",
+  "no_native_dispatch": true,
+  "cases": {
+    "short": {
+      "admitted": true,
+      "prefixes": [
+        {
+          "thread_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "bytes": 41450,
+          "sha256": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4"
+        }
+      ]
+    },
+    "shared-fork": {
+      "admitted": true,
+      "prefixes": [
+        {
+          "thread_id": "01a12b73-202d-7dd0-a058-f74ec9375dd2",
+          "bytes": 39099,
+          "sha256": "6b11e539e231921e954007ff83dadf5aef2eccd93b24b2669bbbd376216d0fe1"
+        },
+        {
+          "thread_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00",
+          "bytes": 41450,
+          "sha256": "fb916f045f037874d63e0521b145aab238ff878e1ebfdaac3175bbdcae0051a4"
+        }
+      ]
+    },
+    "compacted": {
+      "admitted": true,
+      "prefixes": [
+        {
+          "thread_id": "01a12b65-e16b-7753-8b13-1764cd34a007",
+          "bytes": 1827328,
+          "sha256": "a10b6d7c555d9c8ccd8d03689d53cb11b8a6206e67bb5dc9ed092270301c3999"
+        }
+      ]
+    },
+    "G12-pretool": {
+      "admitted": false,
+      "reason": "Unfinished native tool exchange"
+    },
+    "G12-stop": {
+      "admitted": true,
+      "sha256": "3c0c010a6663b38ced61a31f5af906d5fadd11c4dd3267849cfc8dcf1363fdf7"
+    }
+  }
+}

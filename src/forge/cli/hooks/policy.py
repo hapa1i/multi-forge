@@ -203,7 +203,7 @@ def register_supervisor_and_restore(engine: Any, effective: Any, manifest: Any) 
         # If the bound codex subscription lane exhausted earlier this session,
         # route around it to the default claude lane. The frozen codex binding is left intact
         # (still observable in `lane show`); only this run's dispatch lane is overridden to None.
-        if lane_record is not None and is_supervisor_degraded(manifest):
+        if lane_record is not None and is_supervisor_degraded(manifest) and not (sup_cfg and sup_cfg.native_source):
             from dataclasses import replace
 
             lane_record = None
@@ -390,7 +390,12 @@ def _persist_policy_decisions(
                 # guard and lock -- a concurrent remove/re-pin already changed read_bound_lane(m),
                 # dropping this write. ``to_lane`` is audit-only; routing never trusts it.
                 exhausted = _exhausted_supervisor_decision(entries)
-                if supervisor_lane is not None and supervisor_lane.runtime_id == "codex" and exhausted is not None:
+                if (
+                    supervisor_lane is not None
+                    and supervisor_lane.runtime_id == "codex"
+                    and exhausted is not None
+                    and not sup.native_source
+                ):
                     from forge.policy.semantic.supervisor import resolve_supervisor_lane
                     from forge.policy.supervisor_lane_degrade import (
                         set_supervisor_degrade,

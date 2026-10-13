@@ -1,0 +1,659 @@
+{
+  "G13-candidate-owner-complete": {
+    "stub-admission.json": {
+      "binary": "<ROUND>/stub-bin/claude",
+      "admitted": true,
+      "synthetic": true,
+      "provider_inference": false
+    },
+    "lifetime-result.json": {
+      "mode": "owner-death",
+      "owner_returncode": -9,
+      "survivors_before_outer_cleanup": []
+    },
+    "injected-signal.json": {
+      "target": {
+        "pid": 669,
+        "ppid": 527,
+        "pgid": 525,
+        "status": "R",
+        "started": "Sun Oct 11 17:08:14 2026    "
+      },
+      "signal": 9
+    },
+    "native_events": [],
+    "process_result": {
+      "returncode": 0,
+      "elapsed_seconds": 4.486970666999696,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "d83a060ff5de44c8b1c4a73f1625e684",
+      "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "codex_identity_unchanged": true
+    }
+  },
+  "G13-candidate-stub-cancel": {
+    "stub-admission.json": {
+      "binary": "<ROUND>/stub-bin/claude",
+      "admitted": true,
+      "synthetic": true,
+      "provider_inference": false
+    },
+    "lifetime-result.json": {
+      "mode": "cancel",
+      "owner_returncode": 130,
+      "survivors_before_outer_cleanup": []
+    },
+    "injected-signal.json": {
+      "target": {
+        "pid": 99783,
+        "ppid": 99729,
+        "pgid": 99727,
+        "status": "R",
+        "started": "Sun Oct 11 17:06:38 2026    "
+      },
+      "signal": 2
+    },
+    "native_events": [],
+    "process_result": {
+      "returncode": 0,
+      "elapsed_seconds": 4.342971249992843,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "854216524c244231bc39f4c7c061e4e2",
+      "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "codex_identity_unchanged": true
+    }
+  },
+  "G13-candidate-stub-owner-death": {
+    "stub-admission.json": {
+      "binary": "<ROUND>/stub-bin/claude",
+      "admitted": true,
+      "synthetic": true,
+      "provider_inference": false
+    },
+    "lifetime-result.json": {
+      "mode": "owner-death",
+      "owner_returncode": -9,
+      "survivors_before_outer_cleanup": []
+    },
+    "injected-signal.json": {
+      "target": {
+        "pid": 99930,
+        "ppid": 99878,
+        "pgid": 99876,
+        "status": "R",
+        "started": "Sun Oct 11 17:06:42 2026    "
+      },
+      "signal": 9
+    },
+    "native_events": [],
+    "process_result": {
+      "returncode": 0,
+      "elapsed_seconds": 7.599073124991264,
+      "survivors_before_sweep": [
+        {
+          "pid": 99944,
+          "ppid": 99930,
+          "pgid": 99944,
+          "status": "Rs",
+          "started": "Sun Oct 11 17:06:43 2026    "
+        },
+        {
+          "pid": 99946,
+          "ppid": 99944,
+          "pgid": 99946,
+          "status": "Ss",
+          "started": "Sun Oct 11 17:06:43 2026    "
+        }
+      ],
+      "kill_escalation": [
+        {
+          "pid": 99946,
+          "ppid": 99944,
+          "pgid": 99946,
+          "status": "Ss",
+          "started": "Sun Oct 11 17:06:43 2026    "
+        }
+      ],
+      "remaining": [],
+      "owner": "8df55434e5474e5593ffe3645ab582a9",
+      "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "codex_identity_unchanged": true
+    }
+  },
+  "G13-candidate-stub-timeout": {
+    "stub-admission.json": {
+      "binary": "<ROUND>/stub-bin/claude",
+      "admitted": true,
+      "synthetic": true,
+      "provider_inference": false
+    },
+    "invoker-result.json": {
+      "label": null,
+      "stdout": "",
+      "stderr": "",
+      "returncode": -1,
+      "duration_seconds": 3.5129535420128377,
+      "timed_out": true,
+      "cancelled": false,
+      "error": null,
+      "run_id": "run_2ce9edb57cf0",
+      "parent_run_id": null,
+      "root_run_id": "run_2ce9edb57cf0",
+      "cost_micro_usd": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "cached_tokens": null,
+      "envelope_parsed": false,
+      "runtime_is_error": false,
+      "runtime_session_id": null
+    },
+    "lifetime-result.json": {
+      "mode": "timeout",
+      "owner_returncode": 0,
+      "survivors_before_outer_cleanup": []
+    },
+    "native_events": [],
+    "process_result": {
+      "returncode": 0,
+      "elapsed_seconds": 5.839432334003504,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "83a536292023488dbf9290307922989f",
+      "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "codex_identity_unchanged": true
+    }
+  },
+  "G13-native-owner-death": {
+    "guard-start.json": {
+      "owner": {
+        "pid": 95483,
+        "ppid": 95481,
+        "pgid": 95481,
+        "status": "S",
+        "started": "Sun Oct 11 16:59:07 2026    "
+      },
+      "seconds": 40.0,
+      "at": 1791730747.161243
+    },
+    "fault-result.json": {
+      "injected": true,
+      "driver_returncode": 247
+    },
+    "injected-signal.json": {
+      "target": {
+        "pid": 95483,
+        "ppid": 95481,
+        "pgid": 95481,
+        "status": "S",
+        "started": "Sun Oct 11 16:59:07 2026    "
+      },
+      "signal": 9,
+      "after_native_tool_start": true,
+      "thread_ids": [
+        "01a12b79-8896-7d30-b79f-2dbf36c3a1ee"
+      ]
+    },
+    "native_events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12b79-8896-7d30-b79f-2dbf36c3a1ee"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll run `sleep 30` once, wait for completion, then return the retained values.\n"
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "/opt/homebrew/bin/bash -lc 'sleep 30'",
+          "aggregated_output": "",
+          "exit_code": null,
+          "status": "in_progress"
+        }
+      }
+    ],
+    "process_result": {
+      "returncode": -9,
+      "elapsed_seconds": 8.852353750000475,
+      "survivors_before_sweep": [
+        {
+          "pid": 95706,
+          "ppid": 95498,
+          "pgid": 95706,
+          "status": "Ss",
+          "started": "Sun Oct 11 16:59:13 2026    "
+        }
+      ],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "5171c252dad34229b6e04396d665dae4",
+      "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "codex_identity_unchanged": true
+    }
+  },
+  "G13-stub-absent": {
+    "stub-admission.json": {
+      "binary": "<ROUND>/stub-bin/claude",
+      "admitted": true,
+      "synthetic": true,
+      "provider_inference": false
+    },
+    "invoker-result.json": {
+      "label": null,
+      "stdout": "",
+      "stderr": "",
+      "returncode": 0,
+      "duration_seconds": 0.46229841699823737,
+      "timed_out": false,
+      "cancelled": false,
+      "error": null,
+      "run_id": "run_03849cb1ace5",
+      "parent_run_id": null,
+      "root_run_id": "run_03849cb1ace5",
+      "cost_micro_usd": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "cached_tokens": null,
+      "envelope_parsed": false,
+      "runtime_is_error": false,
+      "runtime_session_id": null
+    },
+    "lifetime-result.json": {
+      "mode": "absent",
+      "owner_returncode": 0,
+      "survivors_before_outer_cleanup": []
+    },
+    "native_events": [],
+    "process_result": {
+      "returncode": 0,
+      "elapsed_seconds": 2.5903843749983935,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "4479f43fe95747edbbbbf43750c02fc3",
+      "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "codex_identity_unchanged": true
+    }
+  },
+  "G13-stub-cancel": {
+    "stub-admission.json": {
+      "binary": "<ROUND>/stub-bin/claude",
+      "admitted": true,
+      "synthetic": true,
+      "provider_inference": false
+    },
+    "lifetime-result.json": {
+      "mode": "cancel",
+      "owner_returncode": 130,
+      "survivors_before_outer_cleanup": []
+    },
+    "injected-signal.json": {
+      "target": {
+        "pid": 94886,
+        "ppid": 94833,
+        "pgid": 94831,
+        "status": "R",
+        "started": "Sun Oct 11 16:58:29 2026    "
+      },
+      "signal": 2
+    },
+    "native_events": [],
+    "process_result": {
+      "returncode": 0,
+      "elapsed_seconds": 3.425596333996509,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "d8ef6820a22742cb950701be43428517",
+      "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "codex_identity_unchanged": true
+    }
+  },
+  "G13-stub-malformed": {
+    "stub-admission.json": {
+      "binary": "<ROUND>/stub-bin/claude",
+      "admitted": true,
+      "synthetic": true,
+      "provider_inference": false
+    },
+    "invoker-result.json": {
+      "label": null,
+      "stdout": "{broken",
+      "stderr": "",
+      "returncode": 0,
+      "duration_seconds": 0.510463416998391,
+      "timed_out": false,
+      "cancelled": false,
+      "error": null,
+      "run_id": "run_b908ec9bca27",
+      "parent_run_id": null,
+      "root_run_id": "run_b908ec9bca27",
+      "cost_micro_usd": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "cached_tokens": null,
+      "envelope_parsed": true,
+      "runtime_is_error": false,
+      "runtime_session_id": null
+    },
+    "lifetime-result.json": {
+      "mode": "malformed",
+      "owner_returncode": 0,
+      "survivors_before_outer_cleanup": []
+    },
+    "native_events": [],
+    "process_result": {
+      "returncode": 0,
+      "elapsed_seconds": 2.744728417004808,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "be4e81db64c04e5da7771ed2a50dd44c",
+      "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "codex_identity_unchanged": true
+    }
+  },
+  "G13-stub-owner-death": {
+    "stub-admission.json": {
+      "binary": "<ROUND>/stub-bin/claude",
+      "admitted": true,
+      "synthetic": true,
+      "provider_inference": false
+    },
+    "lifetime-result.json": {
+      "mode": "owner-death",
+      "owner_returncode": -9,
+      "survivors_before_outer_cleanup": []
+    },
+    "injected-signal.json": {
+      "target": {
+        "pid": 95046,
+        "ppid": 94960,
+        "pgid": 94958,
+        "status": "R",
+        "started": "Sun Oct 11 16:58:33 2026    "
+      },
+      "signal": 9
+    },
+    "native_events": [],
+    "process_result": {
+      "returncode": 0,
+      "elapsed_seconds": 3.4333486249961425,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "64da832d6afd4e859e089a3a07daefab",
+      "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "codex_identity_unchanged": true
+    }
+  },
+  "G13-stub-quota": {
+    "stub-admission.json": {
+      "binary": "<ROUND>/stub-bin/claude",
+      "admitted": true,
+      "synthetic": true,
+      "provider_inference": false
+    },
+    "invoker-result.json": {
+      "label": null,
+      "stdout": "",
+      "stderr": "synthetic quota exceeded",
+      "returncode": 0,
+      "duration_seconds": 0.4886767499992857,
+      "timed_out": false,
+      "cancelled": false,
+      "error": null,
+      "run_id": "run_4cf144905b16",
+      "parent_run_id": null,
+      "root_run_id": "run_4cf144905b16",
+      "cost_micro_usd": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "cached_tokens": null,
+      "envelope_parsed": true,
+      "runtime_is_error": true,
+      "runtime_session_id": null
+    },
+    "lifetime-result.json": {
+      "mode": "quota",
+      "owner_returncode": 0,
+      "survivors_before_outer_cleanup": []
+    },
+    "native_events": [],
+    "process_result": {
+      "returncode": 0,
+      "elapsed_seconds": 2.768279458003235,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "db194c9772304d27959dbcca6672bd22",
+      "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "codex_identity_unchanged": true
+    }
+  },
+  "G13-stub-timeout": {
+    "stub-admission.json": {
+      "binary": "<ROUND>/stub-bin/claude",
+      "admitted": true,
+      "synthetic": true,
+      "provider_inference": false
+    },
+    "invoker-result.json": {
+      "label": null,
+      "stdout": "",
+      "stderr": "",
+      "returncode": -1,
+      "duration_seconds": 2.516765416992712,
+      "timed_out": true,
+      "cancelled": false,
+      "error": null,
+      "run_id": "run_4787ae9ff9ee",
+      "parent_run_id": null,
+      "root_run_id": "run_4787ae9ff9ee",
+      "cost_micro_usd": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "cached_tokens": null,
+      "envelope_parsed": false,
+      "runtime_is_error": false,
+      "runtime_session_id": null
+    },
+    "lifetime-result.json": {
+      "mode": "timeout",
+      "owner_returncode": 0,
+      "survivors_before_outer_cleanup": []
+    },
+    "native_events": [],
+    "process_result": {
+      "returncode": 0,
+      "elapsed_seconds": 5.175039207999362,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "4f483586cd6049119fb86c033e2f9609",
+      "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "codex_identity_unchanged": true
+    }
+  },
+  "R-native-cancel-first-death": {
+    "guard-start.json": {
+      "owner": {
+        "pid": 98242,
+        "ppid": 98240,
+        "pgid": 98240,
+        "status": "S",
+        "started": "Sun Oct 11 17:03:27 2026    "
+      },
+      "seconds": 40.0,
+      "at": 1791731007.884392
+    },
+    "fault-result.json": {
+      "injected": true,
+      "driver_returncode": 247
+    },
+    "injected-signal.json": {
+      "target": {
+        "pid": 98242,
+        "ppid": 98240,
+        "pgid": 98240,
+        "status": "S",
+        "started": "Sun Oct 11 17:03:27 2026    "
+      },
+      "signal": 9,
+      "after_native_tool_start": true,
+      "thread_ids": [
+        "01a12b7d-82a2-7c20-9c9a-b111aedadf40"
+      ]
+    },
+    "owned-processes-before-kill.json": [
+      {
+        "pid": 98242,
+        "ppid": 98240,
+        "pgid": 98240,
+        "status": "S",
+        "started": "Sun Oct 11 17:03:27 2026    ",
+        "executable": "/opt/homebrew/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/Resources/Python.app/Contents/MacOS/Python"
+      },
+      {
+        "pid": 98247,
+        "ppid": 98242,
+        "pgid": 98247,
+        "status": "Ss",
+        "started": "Sun Oct 11 17:03:27 2026    ",
+        "executable": "/opt/homebrew/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/Resources/Python.app/Contents/MacOS/Python"
+      },
+      {
+        "pid": 98248,
+        "ppid": 98247,
+        "pgid": 98248,
+        "status": "Ss",
+        "started": "Sun Oct 11 17:03:27 2026    ",
+        "executable": "/opt/homebrew/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/Resources/Python.app/Contents/MacOS/Python"
+      },
+      {
+        "pid": 98250,
+        "ppid": 98248,
+        "pgid": 98248,
+        "status": "S",
+        "started": "Sun Oct 11 17:03:27 2026    ",
+        "executable": "/opt/homebrew/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/Resources/Python.app/Contents/MacOS/Python"
+      },
+      {
+        "pid": 98256,
+        "ppid": 98250,
+        "pgid": 98248,
+        "status": "S",
+        "started": "Sun Oct 11 17:03:28 2026    ",
+        "executable": "<ROUND>/runtime/0.162.1/bin/codex"
+      },
+      {
+        "pid": 98507,
+        "ppid": 98256,
+        "pgid": 98507,
+        "status": "S",
+        "started": "Sun Oct 11 17:03:35 2026    ",
+        "executable": "<ROUND>/runtime/0.162.1/bin/codex-code-mode-host"
+      },
+      {
+        "pid": 98510,
+        "ppid": 98256,
+        "pgid": 98510,
+        "status": "Ss",
+        "started": "Sun Oct 11 17:03:35 2026    ",
+        "executable": "sleep"
+      }
+    ],
+    "native_events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12b7d-82a2-7c20-9c9a-b111aedadf40"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I’ll run `sleep 30` once, wait for it to finish, then return the retained values.\n"
+        }
+      },
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "/opt/homebrew/bin/bash -lc 'sleep 30'",
+          "aggregated_output": "",
+          "exit_code": null,
+          "status": "in_progress"
+        }
+      }
+    ],
+    "process_result": {
+      "returncode": -9,
+      "elapsed_seconds": 10.723599499993725,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "e916ffef2fed4fbaa14b4c97722ec0c1",
+      "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "codex_identity_unchanged": true
+    }
+  },
+  "R-native-legacy-exec-death": {
+    "guard-start.json": {
+      "owner": {
+        "pid": 95975,
+        "ppid": 95973,
+        "pgid": 95973,
+        "status": "S",
+        "started": "Sun Oct 11 17:00:54 2026    "
+      },
+      "seconds": 40.0,
+      "at": 1791730854.398695
+    },
+    "guard-result.json": {
+      "returncode": 124,
+      "elapsed_seconds": 40.53732241700345
+    },
+    "fault-result.json": {
+      "injected": false,
+      "driver_returncode": 1
+    },
+    "native_events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a12b7b-2b57-7d62-9fa9-90fed12b2dae"
+      },
+      {
+        "type": "turn.started"
+      }
+    ],
+    "process_result": {
+      "returncode": 124,
+      "elapsed_seconds": 42.70867075001297,
+      "survivors_before_sweep": [],
+      "kill_escalation": [],
+      "remaining": [],
+      "owner": "990fb9a72f5441c4b4eb3583c52982d7",
+      "codex_sha256_after": "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0",
+      "codex_identity_unchanged": true
+    }
+  }
+}

@@ -4,6 +4,19 @@ Epic: [Codex supervisor](../../doing/epic_codex_supervisor/card.md). Member **B5
 [B1: plan-source/configuration contract](../../done/plan_file_supervision/card.md) and
 [B2: Codex runtime test round](../../done/codex_0160_validation/card.md).
 
+Status: PR #265 review fixes locally verified, 2026-10-12, on `codex/codex-fork-supervisor`, rebased onto `main` at
+`225ab3dd`. The user approved the [contract supplement](gate-decision.md) and [execution checklist](checklist.md). The
+[captures](evidence/README.md) now use 60/60 native starts and 3/4 authorized API starts. Installed allow/deny,
+shared-source Stop, source-only feedback and clean-wheel controls pass, along with aggregate unit, regression and
+pre-commit checks on `1b0f01cf`, whose five CI checks passed. The [review fixes](evidence/review-fixes.md) address
+executor admission, deadline-bounded subscription waiting, policy recovery, home aliases and CLI behavior without
+additional native starts. PR review and shipped-tree closeout remain.
+
+The revised checklist preserves B4's approved-plan requirement for native Stop, gates model/auth switching and
+long/compacted sources, and treats PreToolUse support as a measured scope decision. Native Stop product admission also
+depends on the shipped [global-ignore evidence fix](../../done/preserve_stop_global_ignores/card.md) and B5 composition
+checks; the fix merged through PR #264 before this rebase.
+
 ## Problem and outcome
 
 The current Codex reviewer receives a fresh prompt with a plan snapshot. For complex projects, allow an explicitly
@@ -49,7 +62,8 @@ boundary is proven selectable, this card must not imply a planning-only snapshot
   timeout/cancellation handling, no recursive hook calls and one attributed review event.
 - A real Codex integration test uses a planning-only sentinel to prove useful context survives the fork, while checking
   that no review content is appended to the planner. Repeat with a different executor checkout and a newer approved
-  plan. Record the exact tested CLI version and any compaction limits.
+  plan. Probe long and genuinely compacted sources, stdin prompt delivery, and different model/auth routes before
+  claiming support. Record the exact tested CLI version, latency, input/cached-token usage and retention limits.
 - Test planning and implementation in one thread, including later reasoning that contradicts the approved plan. Verify
   plan precedence, rejection when the required plan file is absent, reduced-independence reporting, source immutability
   and B2's observed concurrent-source limits. Preserve these qualifications when evaluating review quality.
@@ -60,8 +74,8 @@ boundary is proven selectable, this card must not imply a planning-only snapshot
 ## Boundary
 
 This extends semantic supervision, not native team orchestration or general session fork/resume. Broader Codex source
-capture remains with [codex_source_adapter](../codex_source_adapter/card.md); reuse shipped identity contracts without
-making this card depend on an unshipped transcript-import framework.
+capture remains with [codex_source_adapter](../../proposed/codex_source_adapter/card.md); reuse shipped identity
+contracts without making this card depend on an unshipped transcript-import framework.
 
 ## B2 handoff (2026-10-09)
 
@@ -73,4 +87,5 @@ context included later implementation reasoning, so it is not independent planni
 **Isolation blocker:** depth suppression made zero nested reviewer calls but still appended policy decisions and changed
 `confirmed_at` in the parent Forge manifest. B5 must isolate reviewer hook state rather than inherit the parent session
 markers unchanged. See [fork evidence](../../done/codex_0160_validation/evidence/forks.json) and
-[results](../../done/codex_0160_validation/evidence/README.md). This card remains proposed.
+[results](../../done/codex_0160_validation/evidence/README.md). The checklist carries this blocker into B5's runtime
+gate; activation does not establish isolation or safe concurrent-source support.
