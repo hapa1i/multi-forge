@@ -332,7 +332,9 @@ def _needs_codex_turn_hooks() -> bool:
             return False
         if supervisor.get("review_trigger", "pre-tool-use") == "pre-tool-use":
             return False
-        return bool(supervisor.get("resume_id") or supervisor.get("plan_override_path"))
+        return bool(
+            supervisor.get("resume_id") or supervisor.get("plan_override_path") or supervisor.get("native_source")
+        )
     except (OSError, ValueError, TypeError, KeyError, AttributeError, RuntimeError):
         return True
 

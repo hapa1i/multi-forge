@@ -16,7 +16,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
@@ -27,11 +27,17 @@ from forge.core.runtime.codex_review_source import (
     directory_fd,
     read_regular,
 )
+from forge.core.state import atomic_write_text
 
 MARKER = ".forge-codex-reviewer.json"
 INPUT_MARKER = ".forge-review-inputs"
 _BINARY_SHA256 = "74c6a6d263f40d65f99c27a815275f5b4ed0bcc2baecc396b4cf3255498bdfc0"
 _binary_cache: dict[tuple[Any, ...], str] = {}
+# B5's 27 successful native reviews took 5.5-24.1 s (median 13.7 s). A review that
+# waited for the shared login stops waiting once less than the median would remain;
+# starting later would mostly spend quota on a timeout. Uncontended reviews still
+# start with whatever budget they have.
+QUEUED_REVIEW_FLOOR_SECONDS = 13.7
 
 
 class ReviewerBusyError(ValueError):
@@ -72,17 +78,38 @@ def require_codex_fork_binary() -> str:
     path = Path(executable).resolve(strict=True)
     facts = path.stat()
     identity = (str(path), facts.st_dev, facts.st_ino, facts.st_size, facts.st_mtime_ns, facts.st_ctime_ns)
-    digest = _binary_cache.get(identity)
-    if digest is None:
-        with path.open("rb") as stream:
-            digest = hashlib.file_digest(stream, "sha256").hexdigest()
-        _binary_cache.clear()
-        _binary_cache[identity] = digest
+    digest = _binary_cache.get(identity) or _binary_digest(path, identity)
+    _binary_cache.clear()
+    _binary_cache[identity] = digest
     if digest != _BINARY_SHA256:
         raise ValueError(
             "Native Codex supervision requires the verified macOS Codex 0.162.1 executable; this binary is untested"
         )
     return str(path)
+
+
+def _binary_digest(path: Path, identity: tuple[Any, ...]) -> str:
+    """Hash the executable once per inode change instead of once per hook process.
+
+    This is version admission, not tamper-proofing: a same-user writer of
+    FORGE_HOME already controls the hook dispatcher. Replacing or rewriting the
+    binary changes its ctime, which user space cannot set, so the entry misses.
+    """
+    cache = get_forge_home() / "runtime" / "codex-fork-binary.json"
+    try:
+        saved = json.loads(read_regular(cache.resolve(strict=True), limit=4096))
+        if isinstance(saved, dict) and saved.get("identity") == list(identity) and isinstance(saved.get("sha256"), str):
+            return saved["sha256"]
+    except (OSError, ValueError):
+        pass  # Missing, foreign or malformed entries are recomputed.
+    with path.open("rb") as stream:
+        digest = hashlib.file_digest(stream, "sha256").hexdigest()
+    try:
+        cache.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        atomic_write_text(cache, json.dumps({"identity": list(identity), "sha256": digest}), mode=0o600)
+    except OSError:
+        pass  # The cache only avoids rehashing; admission already has the digest.
+    return digest
 
 
 def initialize_home(*, extra_usage_off: bool) -> Path:
@@ -131,26 +158,40 @@ def _ownership(home: Path) -> dict[str, Any]:
 def reviewer_lease(home: Path, *, deadline: float | None = None) -> Iterator[int]:
     """Do not unlock explicitly: inherited descriptors retain the lock after owner death."""
     _ownership(home)
+    with _lease_descriptor(home, deadline=deadline) as descriptor:
+        yield descriptor
+
+
+@contextmanager
+def _lease_descriptor(home: Path, *, deadline: float | None) -> Iterator[int]:
+    """Lock ``review.lock``; ``deadline`` bounds waiting, never an uncontended lock."""
     with directory_fd(home) as directory:
         descriptor = os.open("review.lock", os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
     try:
         facts = os.fstat(descriptor)
         if not stat.S_ISREG(facts.st_mode) or facts.st_nlink != 1 or facts.st_uid != os.getuid():
             raise ValueError("Invalid reviewer lease file")
+        contended = False
         while True:
-            if deadline is not None and time.monotonic() >= deadline:
-                raise ReviewerBusyError(
-                    "Review deadline exhausted waiting for the dedicated reviewer; retry after it completes"
-                )
             try:
                 fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break
             except BlockingIOError as exc:
+                contended = True
                 if deadline is None:
                     raise ReviewerBusyError(
                         "A native review or login owns the reviewer home; retry after it completes"
                     ) from exc
+                if time.monotonic() >= deadline:
+                    raise ReviewerBusyError(
+                        "Review deadline exhausted waiting for the dedicated reviewer; retry after it completes"
+                    ) from exc
                 time.sleep(min(0.05, max(0, deadline - time.monotonic())))
+        # The owner can release while a waiter oversleeps, making a late retry succeed.
+        if contended and deadline is not None and time.monotonic() >= deadline:
+            raise ReviewerBusyError(
+                "Review deadline exhausted waiting for the dedicated reviewer; retry after it completes"
+            )
         yield descriptor
     finally:
         os.close(descriptor)
@@ -269,7 +310,10 @@ def require_reviewer_auth(auth_mode: str) -> None:
 
 def require_source_account(selection: NativeSelection) -> None:
     """Compare locally without persisting or displaying account identifiers."""
-    home = reviewer_home()
+    _require_account_match(reviewer_home(), selection)
+
+
+def _require_account_match(home: Path, selection: NativeSelection) -> None:
     account = _account(home)
     if any(prefix.metadata["creator_account_id"] != account for prefix in selection.prefixes):
         raise ValueError("Reviewer login does not match the recorded source account")
@@ -282,31 +326,42 @@ def prepare_reviewer_home(
     """Stage only immutable selected ancestry, plus a fresh per-attempt native index."""
     binary = require_codex_fork_binary()
     temporary = None
-    if auth_mode == "api":
-        from forge.core.runtime.codex_preflight import codex_api_key_for_subprocess
-
-        key = codex_api_key_for_subprocess()
-        if not key:
-            raise ValueError("Native API review requires an explicit CODEX_API_KEY")
-        parent = reviewer_home().parent
-        parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        _clean_abandoned_api_homes(parent)
-        with directory_fd(parent):
-            temporary = Path(tempfile.mkdtemp(prefix="codex-api-", dir=parent))
-        home = temporary
-        (home / MARKER).write_text(json.dumps({"version": 1, "extra_usage_off_asserted": False}))
-        (home / "review.lock").touch(mode=0o600)
-    elif auth_mode == "subscription-only":
-        key = None
-        home = reviewer_home()
-    else:
-        raise ValueError("Unsupported native reviewer auth route")
+    marked = False
     try:
-        with reviewer_lease(home, deadline=deadline) as lease:
-            if auth_mode == "subscription-only":
-                account = _account(home)
-                if any(prefix.metadata["creator_account_id"] != account for prefix in selection.prefixes):
-                    raise ValueError("Reviewer login does not match the recorded source account")
+        with ExitStack() as stack:
+            if auth_mode == "api":
+                from forge.core.runtime.codex_preflight import (
+                    codex_api_key_for_subprocess,
+                )
+
+                key = codex_api_key_for_subprocess()
+                if not key:
+                    raise ValueError("Native API review requires an explicit CODEX_API_KEY")
+                parent = reviewer_home().parent
+                parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                _clean_abandoned_api_homes(parent)
+                with directory_fd(parent):
+                    temporary = Path(tempfile.mkdtemp(prefix="codex-api-", dir=parent))
+                home = temporary
+                # Lock before marking: cleanup claims only marked homes, so another
+                # process cannot collect this one between creation and its lease.
+                with directory_fd(home) as owned:
+                    flags = os.O_CREAT | os.O_EXCL | os.O_RDWR | os.O_NOFOLLOW
+                    os.close(os.open("review.lock", flags, 0o600, dir_fd=owned))
+                lease = stack.enter_context(_lease_descriptor(home, deadline=None))
+                with directory_fd(home) as owned:
+                    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+                    with os.fdopen(os.open(MARKER, flags, 0o600, dir_fd=owned), "w") as stream:
+                        json.dump({"version": 1, "extra_usage_off_asserted": False}, stream)
+                marked = True
+            elif auth_mode == "subscription-only":
+                key = None
+                home = reviewer_home()
+                wait_until = None if deadline is None else deadline - QUEUED_REVIEW_FLOOR_SECONDS
+                lease = stack.enter_context(reviewer_lease(home, deadline=wait_until))
+                _require_account_match(home, selection)
+            else:
+                raise ValueError("Unsupported native reviewer auth route")
             _clean_inputs(home)
             for name in ("sessions", "review-index"):
                 path = home / name
@@ -346,10 +401,15 @@ def prepare_reviewer_home(
             # or removal happens on hook death; the next lease holder recovers it.
     finally:
         if temporary is not None:
-            # A crashed watcher can return before the independent anchor expires.
-            # Reacquire on a new description before removing even ephemeral input.
             try:
-                with reviewer_lease(temporary):
+                if marked:
+                    # A crashed watcher can return before the independent anchor expires.
+                    # Reacquire on a new description before removing even ephemeral input.
+                    with reviewer_lease(temporary):
+                        with directory_fd(temporary.parent) as parent_fd:
+                            shutil.rmtree(temporary.name, dir_fd=parent_fd)
+                else:
+                    # Never marked, so never launched or claimable by cleanup.
                     with directory_fd(temporary.parent) as parent_fd:
                         shutil.rmtree(temporary.name, dir_fd=parent_fd)
             except (OSError, ValueError):

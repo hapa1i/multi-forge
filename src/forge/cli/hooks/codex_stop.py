@@ -111,7 +111,7 @@ def resolve_context(data: dict[str, Any]) -> tuple[stop_review.TurnContext, Sess
         sup,
         read_bound_lane(state, SUPERVISOR_CONSUMER),
         store.review_identity(create=True) or "",
-        native_boundary=boundary_from_hook(data),
+        native_boundary=boundary_from_hook(data, admitted=True) if sup.native_source else None,
     )
     return context, store
 

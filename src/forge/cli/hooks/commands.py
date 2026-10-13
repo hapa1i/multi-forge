@@ -1510,7 +1510,8 @@ def codex_policy_check() -> None:
         operation="codex-policy-check",
     )
 
-    contexts = CodexHookAdapter().build_contexts(data, tool_name, manifest)
+    native_review = bool(has_supervisor and sup and sup.native_source)
+    contexts = CodexHookAdapter(native_review=native_review).build_contexts(data, tool_name, manifest)
     if not contexts:
         # Covers malformed patches, delete-only patches, and non-dict tool_input.
         print(

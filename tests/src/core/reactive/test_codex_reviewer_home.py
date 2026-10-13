@@ -179,3 +179,41 @@ def test_binary_replacement_invalidates_admission(tmp_path, monkeypatch):
     monkeypatch.setattr(reviewer.sys, "platform", "linux")
     with pytest.raises(ValueError, match="macOS"):
         reviewer.require_codex_fork_binary()
+
+
+def test_admitted_digest_is_reused_across_processes_until_the_inode_changes(tmp_path, monkeypatch):
+    import hashlib
+
+    executable = tmp_path / "codex"
+    executable.write_bytes(b"verified fixture executable")
+    monkeypatch.setattr(reviewer.sys, "platform", "darwin")
+    monkeypatch.setattr(reviewer.shutil, "which", lambda _: str(executable))
+    monkeypatch.setattr(reviewer, "_BINARY_SHA256", hashlib.sha256(executable.read_bytes()).hexdigest())
+    reviewer._binary_cache.clear()
+    assert reviewer.require_codex_fork_binary() == str(executable)
+
+    reviewer._binary_cache.clear()  # A later one-shot hook process.
+    original = reviewer.hashlib.file_digest
+    monkeypatch.setattr(reviewer.hashlib, "file_digest", lambda *a, **kw: pytest.fail("Unchanged binary rehashed"))
+    assert reviewer.require_codex_fork_binary() == str(executable)
+
+    monkeypatch.setattr(reviewer.hashlib, "file_digest", original)
+    executable.write_bytes(b"changed fixture executable!")  # Same size; ctime and mtime move.
+    reviewer._binary_cache.clear()
+    with pytest.raises(ValueError, match="untested"):
+        reviewer.require_codex_fork_binary()
+
+
+def test_malformed_digest_cache_is_recomputed(tmp_path, monkeypatch):
+    import hashlib
+
+    executable = tmp_path / "codex"
+    executable.write_bytes(b"verified fixture executable")
+    monkeypatch.setattr(reviewer.sys, "platform", "darwin")
+    monkeypatch.setattr(reviewer.shutil, "which", lambda _: str(executable))
+    monkeypatch.setattr(reviewer, "_BINARY_SHA256", hashlib.sha256(executable.read_bytes()).hexdigest())
+    cache = reviewer.get_forge_home() / "runtime" / "codex-fork-binary.json"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text("{not json")
+    reviewer._binary_cache.clear()
+    assert reviewer.require_codex_fork_binary() == str(executable)

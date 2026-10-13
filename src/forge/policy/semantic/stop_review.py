@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Callable
 from uuid import UUID, uuid4
 
-from forge.core.runtime.codex_review_source import NativeReviewBoundary
+from forge.core.native_review_types import NativeReviewBoundary
 from forge.core.state import utc_timestamp_z
 from forge.policy.semantic import turn_evidence
 from forge.policy.semantic.deadline import review_scope

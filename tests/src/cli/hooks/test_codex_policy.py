@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from forge.cli.hooks.codex_policy import CodexHookAdapter, CodexHookResponder
 from forge.policy.types import CompositeDecision, PolicyDecision, Violation
 
@@ -140,6 +142,36 @@ class TestCodexHookAdapter:
         payload = _payload("apply_patch", "ignored", cwd=str(tmp_path))
         payload["tool_input"] = {"command": 42}
         assert CodexHookAdapter().build_contexts(payload, "apply_patch", _make_manifest()) == []
+
+    def test_executor_boundary_is_derived_only_for_native_review(self, tmp_path: Path, monkeypatch) -> None:
+        # Deriving the boundary spawns an admission process probe; ordinary checks skip it.
+        from forge.core.native_review_types import NativeReviewBoundary
+        from forge.core.runtime import codex_review_source
+
+        payload = _payload("apply_patch", _patch("*** Add File: src/x.py", "+x = 1"), cwd=str(tmp_path))
+        monkeypatch.setattr(
+            codex_review_source, "boundary_from_hook", lambda *a, **kw: pytest.fail("Probe without native review")
+        )
+        assert CodexHookAdapter().build_contexts(payload, "apply_patch", _make_manifest())[0].native_boundary is None
+
+        boundary = NativeReviewBoundary("thread", "turn", "/transcript", "PreToolUse")
+        monkeypatch.setattr(codex_review_source, "boundary_from_hook", lambda *a, **kw: boundary)
+        contexts = CodexHookAdapter(native_review=True).build_contexts(payload, "apply_patch", _make_manifest())
+        assert contexts[0].native_boundary == boundary
+
+    def test_admitted_stop_caller_does_not_repeat_the_process_probe(self, monkeypatch) -> None:
+        from forge.core.runtime import codex_feedback
+        from forge.core.runtime.codex_review_source import boundary_from_hook
+
+        monkeypatch.setattr(codex_feedback, "stop_review_supported", lambda env: pytest.fail("Repeated ps probe"))
+        payload = {
+            "session_id": "01900000-0000-7000-8000-000000000001",
+            "turn_id": "01900001-0000-7000-8000-000000000001",
+            "transcript_path": "/tmp/rollout.jsonl",
+            "hook_event_name": "Stop",
+        }
+        boundary = boundary_from_hook(payload, admitted=True)
+        assert boundary is not None and boundary.event == "Stop"
 
 
 def _deny_result() -> CompositeDecision:

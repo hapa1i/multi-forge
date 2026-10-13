@@ -461,9 +461,11 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
     if sup.native_source:
         from dataclasses import asdict
 
+        from forge.core.native_review_types import native_billing_mode
+
         data["native_source"] = asdict(sup.native_source)
         data["verdict_cache"] = "disabled"
-        data["billing_mode"] = "api" if sup.auth_mode == "api" else "subscription_quota"
+        data["billing_mode"] = native_billing_mode(sup.auth_mode)
     if sup.review_trigger == "stop":
         from forge.policy.semantic.stop_review import status as stop_status
 

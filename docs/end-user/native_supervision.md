@@ -45,10 +45,11 @@ credentials. The flag records your assertion about extra usage; Forge cannot ver
 local readiness check without inference and exposes no credentials or account IDs.
 
 All subscription reviewers sharing this Forge home serialize their use of that store. Reviews wait for its lease within
-their existing review deadline; waiting reduces the time left for inference. An expired wait records unavailable review
-without starting a model. Readiness checks do not require the lease, and status distinguishes `ready` from `busy`.
-Login/logout refuse while the store is busy and advise retrying after completion. The lease survives hook death until
-reviewer cleanup completes. Do not delete its lock file to bypass contention.
+their existing review deadline; waiting reduces the time left for inference. A waiting review gives up once less than a
+typical review time (about 14 seconds) would remain, so it does not spend quota on a run likely to time out. An expired
+wait records unavailable review without starting a model. Readiness checks do not require the lease, and status
+distinguishes `ready` from `busy`. Login/logout refuse while the store is busy and advise retrying after completion. The
+lease survives hook death until reviewer cleanup completes. Do not delete its lock file to bypass contention.
 
 ```bash
 forge policy supervisor auth logout --runtime codex

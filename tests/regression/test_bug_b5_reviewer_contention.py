@@ -3,6 +3,7 @@
 import subprocess
 import sys
 import time
+from contextlib import ExitStack
 
 import pytest
 from click.testing import CliRunner
@@ -55,7 +56,8 @@ def test_queued_review_acquires_after_other_process_releases(owned):
             child.wait()
 
 
-def test_queue_expiry_preserves_active_inputs_and_never_asks_for_login(owned, selection):
+def test_queue_expiry_preserves_active_inputs_and_never_asks_for_login(owned, selection, monkeypatch):
+    monkeypatch.setattr(reviewer, "QUEUED_REVIEW_FLOOR_SECONDS", 0.0)  # Exercise a timed wait.
     with reviewer.prepare_reviewer_home(selection, auth_mode="subscription-only") as active:
         index = active.sqlite_home / "active.sqlite"
         index.write_text("active reviewer")
@@ -74,3 +76,48 @@ def test_login_reports_busy_without_starting_a_second_native_process(owned, monk
     with reviewer.reviewer_lease(owned):
         with pytest.raises(reviewer.ReviewerBusyError, match="retry after"):
             reviewer.auth_login(extra_usage_off=True)
+
+
+def test_queued_review_stops_waiting_before_too_little_budget_remains(owned, selection, monkeypatch):
+    """A waiter that acquired the login with seconds left would spend quota on a timeout."""
+    monkeypatch.setattr(reviewer, "QUEUED_REVIEW_FLOOR_SECONDS", 1.0)
+    with reviewer.prepare_reviewer_home(selection, auth_mode="subscription-only"):
+        started = time.monotonic()
+        with pytest.raises(reviewer.ReviewerBusyError, match="deadline exhausted"):
+            with reviewer.prepare_reviewer_home(selection, auth_mode="subscription-only", deadline=started + 1.2):
+                pytest.fail("A queued review must keep the floor for its own inference")
+        assert 0.15 <= time.monotonic() - started < 0.9
+
+
+def test_uncontended_review_starts_even_below_the_queue_floor(owned, selection):
+    deadline = time.monotonic() + 0.5
+    assert deadline - time.monotonic() < reviewer.QUEUED_REVIEW_FLOOR_SECONDS
+    with reviewer.prepare_reviewer_home(selection, auth_mode="subscription-only", deadline=deadline) as prepared:
+        assert reviewer.verify_selected_inputs(prepared.home, selection)
+
+
+@pytest.mark.parametrize("wake_time", [100.125, 101.0])
+def test_release_during_final_wait_does_not_bypass_cutoff(owned, selection, monkeypatch, wake_time):
+    now = [100.0]
+    monkeypatch.setattr(reviewer, "QUEUED_REVIEW_FLOOR_SECONDS", 1.0)
+    monkeypatch.setattr(reviewer.time, "monotonic", lambda: now[0])
+    with ExitStack() as holder:
+        active = holder.enter_context(reviewer.prepare_reviewer_home(selection, auth_mode="subscription-only"))
+        index = active.sqlite_home / "active.sqlite"
+        index.write_text("previous reviewer")
+
+        def release_during_sleep(seconds):
+            holder.close()
+            now[0] = wake_time
+
+        monkeypatch.setattr(reviewer.time, "sleep", release_during_sleep)
+        deadline = 100.125 + reviewer.QUEUED_REVIEW_FLOOR_SECONDS
+        with pytest.raises(reviewer.ReviewerBusyError, match="deadline exhausted"):
+            with reviewer.prepare_reviewer_home(selection, auth_mode="subscription-only", deadline=deadline):
+                pytest.fail("A late successful retry must not stage another review")
+        assert index.read_text() == "previous reviewer"
+        assert reviewer.verify_selected_inputs(active.home, selection)
+
+    # Refusing a late acquisition must also release the newly acquired descriptor.
+    with reviewer.reviewer_lease(owned):
+        pass

@@ -43,6 +43,11 @@ class CodexHookAdapter:
 
     ORIGIN = "codex"
 
+    def __init__(self, *, native_review: bool = False) -> None:
+        # Only native review consumes the executor boundary; deriving it spawns a
+        # process probe, which ordinary policy checks must not pay per edit.
+        self._native_review = native_review
+
     def build_contexts(self, payload: dict[str, Any], tool_name: str, manifest: Any) -> list[ActionContext]:
         """Build per-file ``ActionContext``s from a Codex PreToolUse payload ([] if unbuildable)."""
         if tool_name != "apply_patch":
@@ -64,9 +69,11 @@ class CodexHookAdapter:
         cwd = Path(payload_cwd) if isinstance(payload_cwd, str) and payload_cwd else Path(os.getcwd())
         cwd = cwd.resolve()
 
-        from forge.core.runtime.codex_review_source import boundary_from_hook
+        boundary = None
+        if self._native_review:
+            from forge.core.runtime.codex_review_source import boundary_from_hook
 
-        boundary = boundary_from_hook(payload)
+            boundary = boundary_from_hook(payload)
         return [
             replace(self._context_for_op(op, cwd, manifest), native_boundary=boundary)
             for op in ops

@@ -11,6 +11,7 @@ from typing import Any, Callable
 from forge.core.invoker.codex import CodexHeadlessInvoker
 from forge.core.invoker.codex_fork import prepare_codex_fork_request
 from forge.core.invoker.types import Attribution, HeadlessResult
+from forge.core.native_review_types import native_billing_mode
 from forge.core.reactive.codex_reviewer_home import (
     prepare_reviewer_home,
     require_reviewer_auth,
@@ -135,7 +136,7 @@ def dispatch_native(
             model=config.supervisor_model,
             effort=config.supervisor_effort,
             auth_mode=config.auth_mode,
-            billing_mode="api" if config.auth_mode == "api" else "subscription_quota",
+            billing_mode=native_billing_mode(config.auth_mode),
             native_boundary=(
                 {
                     "thread_id": context.native_boundary.thread_id,
@@ -152,7 +153,7 @@ def dispatch_native(
             session=context.session_name,
             runtime="codex",
             operation=None,
-            billing_mode="api" if config.auth_mode == "api" else "subscription_quota",
+            billing_mode=native_billing_mode(config.auth_mode),
         )
         request = prepare_codex_fork_request(
             binary=prepared.binary,

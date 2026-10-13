@@ -157,13 +157,16 @@ run, launcher and provider-routing identities are removed; usage attribution tra
 invoker. Hooks, rules, agents, plugins and apps are disabled, with a read-only action checkout. Each attempt copies only
 the selected root/one-generation ancestry and starts a fresh native index. A real file lock is inherited by watchdog and
 anchor; explicit unlock is forbidden because hook death must not release another process's input. Cleanup acquires the
-lease before removing marked artifacts. API orphan recovery skips active, unmarked and unsafe homes.
+lease before removing marked artifacts. API orphan recovery skips active, unmarked and unsafe homes. A new API home is
+leased before it is marked, so recovery cannot claim it before launch; setup failure before marking removes it directly.
 
-Subscription attempts queue for that lease within the existing absolute review deadline; expiry starts no reviewer and
-does not suggest reauthentication. Readiness and account comparison do not take the lease; dispatch rechecks both while
-holding it. Auth status reports readiness separately from a busy store. Login/logout remain exclusive and refuse while
-busy. Operator-selected Forge/Codex roots are canonicalized before descriptor walks, which still refuse symlinks inside
-owned stores. The single independently obtained login and its refresh ownership remain unchanged.
+Subscription attempts queue for that lease within the existing absolute review deadline, but a contended wait stops once
+less than `QUEUED_REVIEW_FLOOR_SECONDS` (the B5 native median) would remain; an uncontended lease starts with any
+remaining budget. Expiry starts no reviewer and does not suggest reauthentication. Readiness and account comparison do
+not take the lease; dispatch rechecks both while holding it. Auth status reports readiness separately from a busy store.
+Login/logout remain exclusive and refuse while busy. Operator-selected Forge/Codex roots are canonicalized before
+descriptor walks, which still refuse symlinks inside owned stores. The single independently obtained login and its
+refresh ownership remain unchanged.
 
 The shared watchdog's opt-in native cancellation sends SIGINT, waits one second, sends TERM, then escalates to KILL
 after half a second. The independent anchor also cancels when the watcher dies. Legacy cancellation remains unchanged.

@@ -897,10 +897,29 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
     # Click's eager help callback writes to stdout. Hook stdout is one JSON
     # response, so render help into that response without running the callback.
     if "--help" in argv and "--" not in argv[: argv.index("--help")]:
-        from forge.cli.policy import supervisor_set as set_command
+        direct_help = {
+            "off": ("off", "Suspend the current session's supervisor, preserving its configuration."),
+            "on": ("on", "Resume the current session's suspended supervisor."),
+            "remove": ("remove", "Remove the current session's supervisor configuration."),
+            "reload": ("reload [path]", "Reload the approved plan from path, or resolve the latest approved plan."),
+            "cascade": ("cascade on|off", "Enable or disable the current supervisor's tier-1 plan check."),
+        }
+        if cmd in direct_help:
+            usage, description = direct_help[cmd]
+            _block(f"Usage: %policy supervisor {usage}\n\n{description}\n\nOptions:\n  --help  Show this message.")
+        else:
+            from copy import copy
 
-        with click.Context(set_command, info_name="%policy supervisor set") as help_context:
-            _block(set_command.get_help(help_context))
+            from forge.cli.policy import supervisor_set as set_command
+
+            command = copy(set_command)
+            command.params = [param for param in command.params if param.name != "session_name"]
+            with click.Context(command, info_name="%policy supervisor set") as help_context:
+                _block(command.get_help(help_context))
+        return
+
+    if cmd in {"off", "on", "remove"} and len(argv) != 1:
+        _block(f"Usage: %policy supervisor {cmd}")
         return
 
     # %policy supervisor off — suspend

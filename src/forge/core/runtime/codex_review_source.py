@@ -300,11 +300,14 @@ def select_source(
     return NativeSelection(prefixes, baseline, independence, maximum_input)
 
 
-def boundary_from_hook(payload: dict[str, Any]) -> NativeReviewBoundary | None:
-    """Accept payload identity only from the version-admitted managed executor."""
+def boundary_from_hook(payload: dict[str, Any], *, admitted: bool = False) -> NativeReviewBoundary | None:
+    """Accept payload identity only from the version-admitted managed executor.
+
+    ``admitted`` skips a repeated process probe when the caller already passed it.
+    """
     from forge.core.runtime.codex_feedback import stop_review_supported
 
-    if not stop_review_supported(os.environ):
+    if not admitted and not stop_review_supported(os.environ):
         return None
     fields = [
         value
