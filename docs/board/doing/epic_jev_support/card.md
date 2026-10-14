@@ -36,6 +36,10 @@ Selected next: A2 establishes the first policy consumer and exercises warning de
 Its [checklist](../jev_rule_pack/checklist.md) owns implementation, rule-quality gates and new data/spend decisions.
 This is a single-card branch; A2 does not make plan-alignment decisions for A3.
 
+The separately proposed [Claude feedback-permissions fix](../../proposed/claude_policy_feedback_permissions/card.md)
+gates A2's Claude delivery acceptance. It affects existing policy users and ships independently; it is not an extra Jev
+member or a shared implementation batch.
+
 ## Shared contract
 
 - OpenRouter first: `POST /api/alpha/decisions`, with `provider.zdr: true` on every attempt. Fail rather than retry
@@ -52,7 +56,9 @@ This is a single-card branch; A2 does not make plan-alignment decisions for A3.
 - Keep action choice in the policy consumer. A2 warns only; A3 allows only validated covered cases and otherwise
   escalates. Deterministic denials retain priority. A rule's source citation and evidence of a violation are separate.
 - Cache and audit identity include canonical action/state, rule/question/plan version, route/model and decision rule.
-  Record Jev attempts and any reviewer escalation separately, including retries and sampled audits.
+  Record Jev attempts and any reviewer escalation separately, including retries and sampled audits. A2 proposes an
+  optional explicit evaluation `RunIdentity` on A1's `judge()` so consumers do not reuse the whole interactive run as
+  one invocation. Reconcile the extension with A3 and preserve existing caller/schema compatibility.
 - Paid calls require explicit opt-in. Probes start with synthetic data, bounded requests and a declared budget; ordinary
   tests use fixtures. Do not automatically send repository history to a new provider.
 

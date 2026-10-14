@@ -5,6 +5,9 @@ Epic: [Jev support](../epic_jev_support/card.md). Member **A2**. Depends on
 [B3: warnings Codex can see](../../done/codex_policy_warnings/card.md), shipped through PR #262 and closed on
 2026-10-11.
 
+Claude delivery also requires the separately reviewed
+[feedback-permissions fix](../../proposed/claude_policy_feedback_permissions/card.md), currently proposed.
+
 Status: **doing**, activated 2026-10-14 for checklist planning on `codex/jev-rule-pack`, based on `main` at `f7ce7a9a`
 after A1's closeout. The [execution checklist](checklist.md) records the proposed integration, evaluation gates and
 outstanding decisions. Implementation and paid evaluation have not started.
@@ -32,7 +35,12 @@ stable rule citations, action evidence and semantic correctness.
   model, input identity and evaluated excerpt; mark insufficient evidence explicitly. Jev does not generate free-form
   justifications, and a selected rule citation alone does not prove a violation.
 - Register the new policy type through the existing engine/configuration contract with atomic validation of bad pack
-  settings. Respect per-session activation, deadlines, cache identity and A1's paid opt-in/ZDR requirements.
+  settings. Require an explicit acknowledgment of API cost and repository-data sharing. The 2026-10-14 user decision
+  requires a new acknowledgment in every fork, fresh-resume or relaunch child; same-session resume retains it. Raw
+  overrides and inherited configuration cannot supply consent. Respect the existing hook deadline, cache identity and
+  A1's ZDR requirements.
+- Run A2 after existing policy checks finish for the whole action. An already blocked action makes no Jev request;
+  otherwise use only the remaining shared hook budget, with the bounded A2 stage specified in the checklist.
 - Return non-blocking warnings only. Service failure or malformed/incomplete evidence must not introduce a new Jev
   denial or unresolved `needs_review`; display an unavailable-check diagnostic. Existing independent denials remain
   intact. This card does not invoke a supervisor, even when one is configured.
@@ -47,12 +55,16 @@ stable rule citations, action evidence and semantic correctness.
 
 ## Acceptance and validation
 
-- Use a labeled historical-diff corpus with compliant examples and violations, held-out changes, rule versions and
-  reconstructed context. Evaluate per-rule false positives and misses, insufficient evidence, calibration, pack-wide
-  warning frequency, latency and API cost against existing deterministic checks. Human adjudication supplies labels;
-  merged history and another model's verdict are not automatic ground truth.
+- Establish corpus feasibility before selecting the first rule. Reconstruct historical changes into the Write/Edit or
+  apply_patch actions the hook sees, with documented assumptions. Include constructed positives when needed, labeled and
+  measured separately; any native transcript cohort requires its own data decision. Keep originating changes and
+  mutation families within one calibration/held-out split. Evaluate per-rule false positives and misses, insufficient
+  evidence, calibration, pack-wide warning frequency, latency and API cost against existing deterministic checks. Human
+  adjudication supplies labels; merged history and another model's verdict are not automatic ground truth.
 - Unit/regression tests cover pack validation, applicability, deterministic-policy coexistence, batched answer mapping,
-  multi-file attribution, stale cache, incomplete state, injected instructions and timeout/malformed-result warnings.
+  multi-file attribution, consent/override boundaries, blocked-action suppression, stale cache, incomplete state,
+  injected instructions and consumer-specific timeout/malformed-result diagnostics. Evaluation runs need distinct
+  identities and bounded audit artifacts outside the session manifest.
 - Targeted hook integration tests with `policy_summary_feedback` enabled prove the actual rule/evidence warning reaches
   the model and the action remains allowed. With it disabled, assert absent model feedback, retained operator/audit
   diagnostics and the same action outcome. Cover Claude and B3's Codex path. Use client fixtures for ordinary tests; any

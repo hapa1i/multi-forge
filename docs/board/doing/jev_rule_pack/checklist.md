@@ -26,6 +26,9 @@ behavior. This card does not adjudicate plan alignment, change Stop review, or c
 | [`policy.engine`](../../../../src/forge/policy/engine.py)                                                                             | Atomic registration and warning composition  |
 | [`deterministic.registry`](../../../../src/forge/policy/deterministic/registry.py)                                                    | Current bundle vocabulary/factory            |
 | [`ops.policy`](../../../../src/forge/core/ops/policy.py)                                                                              | Shared terminal/direct activation            |
+| [`session.manager`](../../../../src/forge/session/manager.py), [`overrides`](../../../../src/forge/session/overrides.py)              | Session-bound acknowledgment and derivation  |
+| [`semantic.deadline`](../../../../src/forge/policy/semantic/deadline.py)                                                              | Existing shared hook budget                  |
+| [`reactive.env`](../../../../src/forge/core/reactive/env.py)                                                                          | Evaluation run ancestry                      |
 | [`ActionContext`](../../../../src/forge/policy/types.py), [`action_identity`](../../../../src/forge/policy/action_identity.py)        | Evidence coverage and cache identity         |
 | [`Claude adapter`](../../../../src/forge/cli/hooks/policy.py), [`Codex adapter`](../../../../src/forge/cli/hooks/codex_policy.py)     | Native action normalization                  |
 | [`hook commands`](../../../../src/forge/cli/hooks/commands.py), [`policy CLI`](../../../../src/forge/cli/policy.py)                   | Action lifetime and evaluation orchestration |
@@ -46,32 +49,59 @@ ZDR, a 30,000-byte serialized request screen, optional cost, observed answer var
 Its default permits two attempts; A2 will explicitly request one. The measurements do not establish decision quality or
 a safe hook timeout. Keep the existing downstream v2/usage v1 schemas and `core_llm` route.
 
+Review at `de7009d7` confirmed that derived sessions copy policy intent, relaunch also copies overrides, and raw
+`policy`, `policy.bundles` and `policy.bundle_config` overrides pass key validation. **User decision, 2026-10-14:**
+every derived session needs a fresh acknowledgment of paid repository-data sharing. Resuming the same session retains
+its acknowledgment. Configuration inheritance alone cannot authorize dispatch.
+
+Both policy hooks already use `hook_review_budget`: 55 seconds shared across context loading, files and review stages,
+with five seconds reserved before the 60-second native timeout. A1 reads run identity from the environment; its emitter
+already accepts an explicit `RunIdentity`. Consumer invocation accounting needs a small extension to `judge()`.
+
+## Separate prerequisite: Claude feedback permissions
+
+The [Claude feedback permissions card](../../proposed/claude_policy_feedback_permissions/card.md) owns removal of the
+shared responder's explicit allow, regression coverage for all policy users, native Claude receipt/permission evidence
+and its own change-log entry/PR. This affects TDD, coding standards and supervisors without Jev. A2's Claude delivery
+gate depends on that fix; do not bury it in the warning formatter or claim B3's Codex trial proves Claude behavior.
+Offline A2 work can proceed while the prerequisite remains proposed.
+
 ## Slice 1: reviewed rules and offline evaluation contract
 
 - [ ] Establish `src/forge/policy/rule_pack/` as the proposed home for pack definitions, evidence preparation and the
   warning policy. Use `jev_rule_pack` as the explicit bundle name. Keep pack semantics separate from the transport and
   from the plan supervisor; no general rule-authoring framework or new vendor SDK.
-- [ ] Start with one reviewed semantic rule for compatibility wrappers, expanding only if the same evidence contract
-  supports another rule. Give each rule a stable ID, version, authoritative source, intent, applicability, required
-  context, atomic question and complete Noul true/false criteria. Version the pack and decision rule separately.
+- [ ] Check corpus feasibility before selecting the first rule. Compatibility wrappers are a candidate, not a committed
+  rule: count independently labeled positive/negative changes in each proposed split. Marker/delegation searches cannot
+  count unmarked semantic violations. Choose another bounded rule or narrow the quality claim if natural evidence is too
+  sparse. Give admitted rules stable IDs/versions, sources, intent, applicability, required context and atomic Noul
+  questions with complete true/false criteria; version the pack and decision rule separately.
 - [ ] Bind the candidate to [coding standards §5](../../../developer/coding_standards.md#5-interface-changes), including
   justified exceptions and surface distinctions. A missing marker comment is not itself a violation. Define positive,
   compliant and insufficient-context examples before coding; exclude rules whose required facts the hook cannot supply.
 - [ ] Define the consumer outcomes: not applicable, evaluated without a warning, warning, uncertain and unavailable.
   Only a covered, valid answer can support an assessed outcome. Give uncertainty and unavailable evidence visible fixed
   diagnostics without inventing a violation, model justification, denial or review request.
-- [ ] Build a local corpus manifest from candidate historical changes, with source revisions, reconstructed action
-  context, rule versions and labels supplied by human adjudication. Include compliant wrappers, justified exceptions,
-  missing context, injected instructions, multilingual comments and changes the deterministic baseline misses.
+- [ ] Build a local corpus manifest with source revisions, rule versions and human-adjudicated labels. Reconstruct
+  hook-shaped actions: full proposed Write content, Edit old/new strings with replacement semantics, and bounded Codex
+  apply_patch envelopes. Record each reconstruction assumption; exclude PR-level context unavailable at the hook. Keep
+  CLI whole-diff metrics separate. Native transcript actions are an optional cohort requiring separate selection,
+  sanitization and data authorization; do not inspect or upload transcripts merely because they exist.
+- [ ] Include constructed positives and counterexamples where history is sparse, with explicit provenance and separate
+  metrics. Cover legitimate adapters/decorators, justified exceptions, missing context, injections and multilingual
+  comments. Constructed cases test behavior but do not establish real-world prevalence, precision or warning burden.
 - [ ] Split calibration and held-out examples by originating change before tuning; keep sibling hunks and repeated
-  variants together. Record disagreements and exclusions. Merged history and another model's verdict are not labels.
+  variants together; group constructed mutations by seed/template family too. Do not split one import commit's hunks to
+  manufacture independent positives. Record disagreements, exclusions and empty strata. Merged history and another
+  model's verdict are not labels.
 - [ ] Declare minimum sample counts, per-rule false-positive/miss limits, coverage floor and pack-wide warning-rate
   ceiling before looking at held-out results. Choose thresholds on calibration data, not a transferred probability of
   0.8. Record uncertainty intervals and the response to a failed gate: revise/re-evaluate, narrow scope or stop
   shipping.
 - [ ] Add a dry-run/fixture-first evaluation harness under `scripts/experiments/jev/`, with tests flat in
-  `tests/src/scripts/` using `tests.fixtures.codex_probe.load_script`. Store corpus methodology, manifests, labels and
-  eventual sanitized results under this card's `evidence/`; keep fake transports in tests/the harness.
+  `tests/src/scripts/`. Follow A1's path-based loader in `tests/src/scripts/test_jev_probe.py`; the existing
+  `codex_probe.load_script` is fixed to `codex-hooks/`. Store methodology, manifests, labels and sanitized results under
+  this card's `evidence/`; keep fake transports in tests/the harness.
 
 **Decision gate:** review the initial rule and required context before wiring it into hooks. Numeric quality gates and
 human labels are still outstanding; record them in `evidence/evaluation-plan.md` before live evaluation. Offline work
@@ -79,9 +109,14 @@ may proceed with clearly provisional examples. The A1 captures are transport fix
 
 ## Slice 2: complete action evidence and bounded dispatch
 
-- [ ] Add a small action-scoped preparation seam shared by hooks and the explicit CLI check. Collect the whole native
-  action before legacy presentation truncation, while retaining deterministic per-file evaluation and test-first order.
-  A prepared result maps each question back to its rule and file; per-file policy calls do not dispatch again.
+- [ ] Add a small action-scoped preparation seam shared by hooks and the explicit CLI check. Retain a bounded complete
+  action envelope before legacy presentation truncation. Run existing policies/resolvers once per file in their current
+  test-first order, then compose the whole action before A2 dispatch. Register A2 as an explicit deferred warning phase,
+  not another eager regular policy. Merge its attributed decisions/state without rerunning earlier policies.
+- [ ] Skip A2 entirely when any file already denies or leaves unresolved `needs_review`, including an independent
+  supervisor denial. Record `skipped_blocked`, zero attempts and no assessed verdict. For a multi-file atomic patch, an
+  otherwise clean first file cannot trigger Jev before a later denial is known. Preserve existing audit and state
+  persistence rules; the skip must not suppress a blocking diagnostic or imply that A2 reviewed the action.
 - [ ] Represent full action identity, evaluated evidence identity, file/path attribution and completeness separately.
   For Claude, preserve Write content and Edit old/new text plus replacement semantics. For Codex/CLI patches, retain
   file boundaries, rename metadata and the relevant hunks. Never treat a truncated prefix or a fingerprint as coverage.
@@ -91,13 +126,15 @@ may proceed with clearly provisional examples. The A1 captures are transport fix
 - [ ] Batch all applicable file/rule questions over one bounded state. The first implementation permits at most one
   physical Jev request per native action, `max_attempts=1`, with no automatic splitting. If the complete eligible batch
   exceeds A1 admission, send nothing and identify the uncovered action; no silent subset of files or rules.
-- [ ] Set and document a positive consumer timeout and upper bound before implementation, allowing hook preparation,
-  persistence and any independently configured supervisor to finish within the registered hook timeout. Start one
-  monotonic action deadline before preparation; enforce the remaining allowance through credentials and dispatch. No
-  budget restarts per file, per rule or on a cache miss. Insufficient remaining time means no request.
+- [ ] Reuse `hook_review_budget` through `review_deadline`/`review_scope`; do not start a second hook deadline. A2 runs
+  after existing reviews and uses only their remaining allowance. Set a conservative five-second A2 stage default and
+  maximum, including A2 preparation, credentials and I/O; this is a product limit, not a measured latency guarantee. It
+  can only shorten the shared 55-second window. No remaining allowance means no dispatch; no reset per file/rule. Give
+  an explicit CLI check its own bounded scope using the same stage limit.
 - [ ] Bridge the synchronous entry point to A1's async client once per action. Keep loop ownership explicit, propagate
-  cancellation and release resources; do not wrap A1 in the text-completion interface or introduce nested event loops.
-  Exercise deadline exhaustion before dispatch and during I/O through injected clock/transport fixtures.
+  cancellation and release resources. Follow `SyncAdapter._check_no_running_loop` before creating a coroutine, without
+  using its text-completion API. Exercise an already-running loop, exhausted shared budget and expiry during I/O through
+  clock/transport fixtures; no thread escape or nested event loop may extend the deadline.
 - [ ] Treat state text as data. Fixed rule instructions and immutable IDs cannot be replaced by comments, filenames or
   content in the action. Validate exact question coverage and file/rule mapping before composing any warning.
 - [ ] Convert A1 errors and unexpected consumer evaluation failures into bounded unavailable diagnostics even under
@@ -105,18 +142,34 @@ may proceed with clearly provisional examples. The A1 captures are transport fix
   clean assessment; a missing response or malformed answer cannot populate the clean-result cache.
 
 **Admission gate:** fixtures must prove whole-action coverage and the physical request limit before any hook inference.
-The exact timeout is a consumer choice, not an A1 latency guarantee. If coexistence cannot fit the existing hook budget,
-skip A2 visibly for that action rather than extending the hook or changing the independent reviewer contract.
+The stage limit is a consumer choice, not an A1 latency guarantee. Running A2 last preserves the existing reviewer
+budget; it may reduce A2 coverage on slow reviews. Report that skip without extending the hook or relabeling completed
+independent reviews as unavailable. Measure the coverage/latency tradeoff in the evaluation.
 
 ## Slice 3: activation, cache and audit
 
-- [ ] Generalize bundle registration at `policy/registry.py` if needed, delegating existing deterministic bundles to
+- [ ] Add a new `src/forge/policy/registry.py` if needed to generalize registration, delegating deterministic bundles to
   their current implementations. Update engine construction, CLI list/choices and `core/ops/policy.py` together.
   Validate all bundle names, config owners, pack versions and field types before registering anything; reject unknown
   settings.
-- [ ] Persist opt-in through session policy intent and the existing terminal/direct activation owner. Ordinary sessions,
-  existing `coding_standards`, supervisor setup, list/status and imports remain zero-inference paths. Explicit
-  `forge policy check --bundle jev_rule_pack` must clearly disclose its paid behavior and use the same bounded runner.
+- [ ] Extend the shared terminal/direct activation owner with an explicit acknowledgment, proposed
+  `--acknowledge-paid-data-sharing`: disclose API charges and that supplied repository action content goes to OpenRouter
+  and its selected TypeSafe provider with ZDR required. Persist a versioned acknowledgment bound to the target session
+  instance and admitted provider/data scope. No interactive prompt inside a hook. A one-shot
+  `forge policy check --bundle jev_rule_pack` requires its own acknowledgment and does not enable future session calls.
+- [ ] Keep A2 disabled in fork, fresh-resume and relaunch children until their own acknowledgment. Strip inherited A2
+  activation/acknowledgment from both intent and overrides, retaining other policy configuration. Bind validation to
+  session identity/creation as well as project scope so copied grants cannot activate another instance. Cover every
+  child-creation path, including native/transfer/rewind variants; reopening the same Forge session instance retains a
+  matching grant only when no child is created. Missing/stale acknowledgments produce zero calls and operator recovery.
+- [ ] Guard raw overrides by parsed value and effective result: reject unvalidated Jev activation or acknowledgment
+  through `policy.bundles`, `policy.bundle_config`, parent `policy` objects, dotted paths or wildcard expansion,
+  directing the operator to the validating activation command. Preserve unrelated policy overrides. Independently
+  validate the acknowledgment before dispatch so inherited/stale settings or hand-edited bundle lists alone cannot
+  authorize a call.
+- [ ] Ordinary sessions, existing `coding_standards`, supervisor setup, list/status and imports remain zero-Jev paths.
+  Existing manifests without the new acknowledgment remain readable and disabled for A2; document strict session-schema
+  compatibility. Revocation and scope changes invalidate the grant before the next dispatch.
 - [ ] Define the finite supported config fields and defaults, including model/pack version, timeout and cache TTL;
   reject invalid values atomically. Keep evaluated thresholds in the versioned decision rule. Preserve the shared
   activation contract for the explicitly supplied bundle set and unrelated intent; never enable it across sessions.
@@ -129,13 +182,20 @@ skip A2 visibly for that action rather than extending the hook or changing the i
 - [ ] Cache reuse must reproduce the attributed outcome without a new provider attempt or charge. Do not cache
   unavailable/partial results as clean; observed answer variance prevents claiming fresh inference is deterministic.
   Preserve Codex's existing rule that a denied atomic patch does not advance policy state.
-- [ ] Add the bounded rule-evaluation record missing from today's decision serializer: raw typed answer/distribution,
-  requested/resolved model, rule/source version, action/evidence identity, assessed excerpt, coverage, outcome and
-  attempt IDs. Preserve old audit readability and make local evidence inspectable through session show. A source
-  citation is separate from proof of a violation; do not fabricate supervisor `VerifiedCitation` objects.
-- [ ] Link attempt/run identity to existing hook/session telemetry and identify this consumer through A1's command
-  field. Keep known/unknown cost, cached assessments, actual attempts and independent reviewer calls distinct. Reuse
-  existing telemetry schemas; no raw source text in usage records and no parallel billing ledger.
+- [ ] Keep new A2 data in each persisted decision entry at or below 4 KiB of encoded JSON, including summaries and
+  references; the existing 100-entry log must not embed 30-KB excerpts. Store full evaluated evidence and raw typed
+  answers in content-addressed local artifacts outside the manifest lock. Record model, rule/source, action/evidence
+  identity, coverage, outcome and attempt/run IDs; bound artifact size/count/retention and make missing artifacts
+  inspectable without inventing evidence. Persist only bounded metadata/references in cache state too, without duplicate
+  excerpts. Add deletion/reset ownership and old-audit readability to the design.
+- [ ] Expose an optional explicit `RunIdentity` on A1's `judge()` while retaining its environment fallback for current
+  callers. Mint one child run via `derive_child_run_identity` per uncached A2 batch, retaining parent/root ancestry;
+  pass it without mutating global environment. A1 already threads identity into `emit_attempt`. Join policy audit to
+  that same run and distinguish cached assessments, skipped actions, attempts and independent reviewer calls.
+- [ ] Use A1's consumer command field and existing telemetry schemas. Two actual evaluations in one session must appear
+  as two verb invocations, while retries share their evaluation run and retain distinct request IDs. A cache hit makes
+  no new provider invocation. Reconcile the API change with the epic/A3 before merge; no raw source in usage records or
+  parallel billing ledger. Rule citations and assessed evidence remain separate; no fabricated `VerifiedCitation`.
 - [ ] Run the focused policy/CLI and telemetry integration checks during this slice. Confirm trace show/explain, costs
   by model/verb and session activity agree on injected attempts, with no synthetic proxy traffic or double charge.
 
@@ -145,11 +205,22 @@ skip A2 visibly for that action rather than extending the hook or changing the i
   `violations` for denials. Fixed rule text may use `provenance=policy`; action excerpts remain attributed input data.
   Do not turn a Jev probability into a verified quotation, free-form explanation or ground-truth assertion.
 - [ ] Extend Claude's formatter so `policy_summary_feedback=on` includes bounded rule text/intent, source and assessed
-  action evidence in `additionalContext`. Define its output bound and omission notices. Remove explicit allow from this
-  warning path so feedback cannot override the runtime's normal permission handling.
+  action evidence in `additionalContext`. Define its output bound and omission notices. Consume the separately shipped
+  permission fix; A2 must not reintroduce an explicit allow or silently change every existing policy's permissions.
+- [ ] Extend feedback classification with A2-owned diagnostics for missing acknowledgment/auth, insufficient action
+  evidence, uncertainty, exhausted budget, transport/response failure and skipped blocked actions. Keep
+  `evidence_unavailable` reserved for persistence failure. Say which rule-pack check was unavailable without calling
+  other policy reviews unreviewed. Use distinct codes such as `jev_insufficient_evidence`, `jev_auth_unavailable` and
+  `jev_deadline`; test mixed A2 failure plus successful supervisor review.
+- [ ] Render owner-specific operator recovery and inspection: `forge auth login -c openrouter` only for relevant auth
+  failures; `forge telemetry trace show <request_id>` only when an attempted request has that ID; session/audit
+  inspection for local refusal or missing context. Replace the unconditional supervisor-status footer for A2-only
+  output. Model context contains the assessment scope, not operator recovery commands in source-only mode.
 - [ ] Feed the existing B3 Codex renderer, retaining its audience budgets, provenance rules, source-only preference and
   executor admission. Keep inspection commands in operator output under source-only; never introduce a new explicit
-  `permissionDecision=allow`. Count omissions rather than silently dropping findings.
+  `permissionDecision=allow`. Policy-authored findings already bypass B3's plan-quotation branch; preserve that path and
+  keep legacy/unattributed A2 warnings from acquiring reviewer wording or fabricated quotations. Count omissions rather
+  than silently dropping findings.
 - [ ] With feedback off, suppress allowed-action model context while retaining substantive operator diagnostics and
   audit. Unknown/unsupported Codex executors retain B3's existing channel restrictions. Clean A2 results add no warning;
   unavailable assessments cannot be labeled aligned. Do not change unrelated supervisor summaries.
@@ -163,8 +234,8 @@ skip A2 visibly for that action rather than extending the hook or changing the i
 ## Slice 5: authorized quality evaluation and release decision
 
 - [ ] Prepare the exact evaluation manifest after offline checks pass: approved corpus selection/sanitization, payload
-  hashes, versions, calibration/held-out split, repetitions, timeout, maximum physical requests and dated price
-  assumptions. Include all controls and retries in the bound; the proposed first pass disables retries.
+  hashes, source cohorts, reconstruction recipes, versions, calibration/held-out split, repetitions, timeout, maximum
+  physical requests and dated price assumptions. Include all controls and retries; the first pass disables retries.
 - [ ] Obtain explicit data-sharing and paid-run authorization for that manifest. A1's four-request and 25-request
   approvals are exhausted and do not authorize repository data. Use an isolated `FORGE_HOME`, clear cached runtime
   configuration and copy no user telemetry/session history into it.
@@ -173,7 +244,9 @@ skip A2 visibly for that action rather than extending the hook or changing the i
   attempts and stop rather than silently repeating them under the same allowance.
 - [ ] Report per-rule confusion counts, false-positive/miss rates, calibration, coverage/uncertainty, aggregate warning
   frequency, sample counts, latency and reported cost against the deterministic baseline on the same corpus. Separate
-  tune/held-out results and repeated-input variability; do not tune against the held-out set and still call it held out.
+  historical, transcript-derived and constructed cohorts, including tune/held-out results and repeated-input
+  variability. Empty positive strata cannot pass a miss-rate gate; do not tune against the held-out set and still call
+  it held out.
 - [ ] Apply the predeclared quality gates. Publish a supported-rule/context matrix and failures in `evidence/`; remove
   or narrow rules that fail, with a fresh evaluation when needed. Offline transport/formatter tests alone cannot close
   this acceptance gate. A later opted-in warning trial remains separately authorized and cannot imply quota savings.
@@ -182,22 +255,28 @@ skip A2 visibly for that action rather than extending the hook or changing the i
 
 Paths under `tests/src/policy/rule_pack/` and the A2 harness/integration test names below are planned additions.
 
-| Test               | Fixture                                      | Assertion                                          | Test file                                                                             |
-| ------------------ | -------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Atomic activation  | Unknown pack/field; invalid timeout          | No partial engine or intent write                  | `tests/src/core/ops/test_policy_ops.py`; `tests/src/policy/test_engine.py`            |
-| Rule semantics     | Wrapper, exception, missing context          | Versioned applicability; explicit coverage         | `tests/src/policy/rule_pack/test_definitions.py`                                      |
-| Evidence integrity | Long Edit; rename; multi-file patch          | Full identity and declared evaluated scope         | `tests/src/policy/rule_pack/test_evidence.py`                                         |
-| Batch limit        | Several files/rules; oversized batch         | One request, or zero with unavailable result       | `tests/src/policy/rule_pack/test_runner.py`                                           |
-| Deadline/failure   | Expired clock; 402/413/524; malformed answer | No retry or Jev block; retained attempt usage      | `tests/src/policy/rule_pack/test_runner.py`                                           |
-| Injection          | Instructions in content/path/comment         | Fixed questions and attribution preserved          | `tests/src/policy/rule_pack/test_evidence.py`                                         |
-| Composition        | Warning/error plus TDD deny or supervisor    | Denial preserved; no A2 escalation                 | `tests/src/policy/test_engine.py`; `tests/src/cli/hooks/test_policy_check_cascade.py` |
-| Cache/audit        | Same action; changed rule/model/hidden tail  | Correct reuse/invalidation; inspectable evidence   | `tests/src/policy/rule_pack/test_policy.py`                                           |
-| Auth/defaults      | No key; disabled pack; environment/file keys | Actionable unavailable result; no incidental calls | `tests/src/policy/rule_pack/test_runner.py`                                           |
-| Claude feedback    | Finding/unavailable; feedback on/off         | Bounded content or operator/audit only             | `tests/src/cli/hooks/test_policy_feedback.py`                                         |
-| Codex feedback     | Multi-file; source-only; unadmitted executor | B3 bounds and permissions preserved                | `tests/src/cli/hooks/test_codex_policy_feedback.py`                                   |
-| CLI parity         | File/diff; terminal/direct activation        | Same pack vocabulary and content-source rules      | `tests/integration/cli/test_policy_cli_contract_integration.py`                       |
-| Hook accounting    | Injected success/cache/failure in a session  | One attempt joins trace/cost/activity              | `tests/integration/core/test_jev_rule_pack.py`                                        |
-| Evaluation         | Labeled/split corpus; bounded manifest       | Reproducible metrics; dry-run makes no calls       | `tests/src/scripts/test_jev_rule_pack_eval.py`                                        |
+| Test               | Fixture                                                    | Assertion                                                 | Test file                                                                                                   |
+| ------------------ | ---------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Atomic activation  | Unknown pack/field; invalid timeout                        | No partial engine or intent write                         | `tests/src/core/ops/test_policy_ops.py`; `tests/src/policy/test_engine.py`                                  |
+| Acknowledgment     | Fork/fresh-resume/relaunch; same-session resume            | New children disabled; same instance retained             | `tests/src/session/test_manager_integration.py`; new `tests/regression/test_bug_jev_consent_inheritance.py` |
+| Override bypass    | Parent/dotted/wildcard policy edits; copied grant          | No grant creation or unauthorized dispatch                | `tests/src/session/test_overrides.py`; `tests/src/core/ops/test_policy_ops.py`                              |
+| Rule semantics     | Wrapper, exception, missing context                        | Versioned applicability; explicit coverage                | `tests/src/policy/rule_pack/test_definitions.py`                                                            |
+| Evidence integrity | Long Edit; rename; multi-file patch                        | Full identity and declared evaluated scope                | `tests/src/policy/rule_pack/test_evidence.py`                                                               |
+| Batch limit        | Several files/rules; oversized batch                       | One request, or zero with unavailable result              | `tests/src/policy/rule_pack/test_runner.py`                                                                 |
+| Deadline/failure   | Expired clock; 402/413/524; malformed answer               | No retry or Jev block; retained attempt usage             | `tests/src/policy/rule_pack/test_runner.py`                                                                 |
+| Shared budget      | 45-second reviewer; exhausted 55-second hook; running loop | A2 runs last, at most five seconds; no deadline extension | `tests/src/policy/rule_pack/test_runner.py`; `tests/src/cli/hooks/test_policy_check_cascade.py`             |
+| Injection          | Instructions in content/path/comment                       | Fixed questions and attribution preserved                 | `tests/src/policy/rule_pack/test_evidence.py`                                                               |
+| Composition        | Warning/error plus TDD deny or supervisor                  | Denial preserved; no A2 escalation                        | `tests/src/policy/test_engine.py`; `tests/src/cli/hooks/test_policy_check_cascade.py`                       |
+| Blocked action     | Literal compat marker; later-file deny; reviewer denial    | Zero Jev attempts for the entire action                   | `tests/src/policy/rule_pack/test_runner.py`; `tests/src/cli/hooks/test_codex_policy_check.py`               |
+| Cache/audit        | Same action; changed rule/model/hidden tail                | Correct reuse/invalidation; inspectable evidence          | `tests/src/policy/rule_pack/test_policy.py`                                                                 |
+| Audit size         | 100 near-limit inputs; missing artifact                    | A2 entry at most 4 KiB; explicit evidence availability    | `tests/src/policy/rule_pack/test_policy.py`                                                                 |
+| Auth/defaults      | No key; disabled pack; environment/file keys               | Actionable unavailable result; no incidental calls        | `tests/src/policy/rule_pack/test_runner.py`                                                                 |
+| Claude feedback    | Finding/unavailable; feedback on/off                       | Bounded content or operator/audit only                    | `tests/src/cli/hooks/test_policy_feedback.py`                                                               |
+| Codex feedback     | Multi-file; source-only; unadmitted executor               | B3 bounds and permissions preserved                       | `tests/src/cli/hooks/test_codex_policy_feedback.py`                                                         |
+| Diagnostic owner   | Jev timeout/insufficient input plus completed supervisor   | Accurate A2 scope/recovery; no false plan notice          | `tests/src/cli/hooks/test_codex_policy_feedback.py`; `tests/src/cli/hooks/test_policy_feedback.py`          |
+| CLI parity         | File/diff; terminal/direct activation                      | Same pack vocabulary and content-source rules             | `tests/integration/cli/test_policy_cli_contract_integration.py`                                             |
+| Hook accounting    | Two evaluations, cache hit and failed attempt              | Distinct evaluation runs; unchanged ancestry/schema       | `tests/integration/core/test_jev_rule_pack.py`; `tests/src/core/judgments/test_usage.py`                    |
+| Evaluation         | Historical/constructed hook actions; empty positive split  | Separate metrics; no leakage or unsupported quality pass  | `tests/src/scripts/test_jev_rule_pack_eval.py`                                                              |
 
 ## Verification and documentation
 
@@ -205,8 +284,9 @@ Paths under `tests/src/policy/rule_pack/` and the A2 harness/integration test na
   shared activation and CLI tests. Add a regression for each discovered bug; ordinary tests use injected transports.
 - [ ] Run relevant hook and CLI integrations through `./scripts/test-integration.sh`, including
   `tests/integration/docker/test_policy_hooks.py`, `tests/integration/cli/test_policy_cli_contract_integration.py` and
-  the new injected-client accounting integration. Use `PYTHON_DOTENV_DISABLED=1` for the no-`.env` checks. Do not
-  accidentally launch credential-backed native tests as ordinary fixture tests.
+  the new injected-client accounting integration. Extend `tests/integration/docker/test_session_lifecycle.py` for
+  derived-session acknowledgment and retained ordinary policy inheritance. Use `PYTHON_DOTENV_DISABLED=1` for the
+  no-`.env` checks. Do not accidentally launch credential-backed native tests as ordinary fixture tests.
 - [ ] Verify the authorized native Claude/Codex warning paths with feedback on/off, supported executor enrollment and
   the evidence-inspection commands. Record runtime versions, exact request/quota limits and observed delivery. Reuse
   B3's probe conventions without assuming its TDD/stub evidence proves A2's formatter output.
@@ -215,11 +295,13 @@ Paths under `tests/src/policy/rule_pack/` and the A2 harness/integration test na
   stay on stdout, diagnostics on stderr; keep `tests/src/cli/test_output_streams.py` coverage for changed read surfaces.
 - [ ] Sync `docs/design_workflows.md` for the first-class rule pack, action preparation, composition and state
   ownership; `docs/design_session_execution.md` for hook delivery/budgets; and runtime/telemetry design for consumer
-  admission and audit links. Update `docs/design.md` if registry/operation ownership changes.
+  admission, explicit A1 run identity and bounded evidence storage. Update session design for acknowledgment
+  inheritance, plus `docs/design.md` if registry/operation ownership changes. Sync both consumers at the epic handoff.
 - [ ] Update `docs/end-user/policy.md`, `docs/end-user/config.md`, `docs/end-user/authentication.md`,
   `docs/cli_reference.md` and runtime-config help with explicit paid opt-in, model/pack support, timeout/cache behavior,
-  unavailable diagnostics, feedback settings and inspection. Update installation guidance if credentials/resources or
-  extension delivery changes. Normative docs describe only implemented behavior.
+  data-sharing acknowledgment, derived-session behavior, unavailable diagnostics, feedback settings and inspection.
+  Update installation guidance if credentials/resources or extension delivery changes. Normative docs describe only
+  implemented behavior.
 - [ ] Build and smoke a clean wheel if rule definitions become package resources or this changes bundled extensions,
   installer/runtime assets or packaging. Pure Python policy additions alone do not trigger that requirement.
 - [ ] Run `make test-unit`, `make test-regression`, full `make pre-commit`, Markdown link/file-size checks and
@@ -239,6 +321,12 @@ Paths under `tests/src/policy/rule_pack/` and the A2 harness/integration test na
 
 ## Planning verification
 
-2026-10-14: `make pre-commit-md`, the Markdown link audit for 677 sources and `git diff --check` passed with the
-activation links and checklist staged. No implementation, human-label adjudication, native trial or paid Jev evaluation
-is claimed by this planning checkpoint.
+2026-10-14 initial activation: `make pre-commit-md`, the Markdown link audit for 677 sources and `git diff --check`
+passed at `de7009d7`. The review revision verified inheritance/override behavior, shared deadlines, feedback ownership,
+run accounting and loader paths against that head. Marker/delegation history searches are candidate discovery, not
+human-adjudicated counts of semantic violations. A2 is not the first OpenRouter action-data consumer: the existing plan
+checker already sends supplied action evidence. The new acknowledgment must disclose that data flow explicitly.
+
+Review revision, 2026-10-14: `make pre-commit-md`, the Markdown link audit for 678 sources and `git diff --check`
+passed. No implementation, human-label adjudication, native trial or paid Jev evaluation is claimed by this planning
+checkpoint.

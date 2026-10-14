@@ -27,6 +27,10 @@ decision quality nor quota savings has been evaluated.
 A2 is not an A3 dependency. Neither member's quality evidence validates the other. A valid live ZDR-required Decisions
 request gates consumer availability, even when offline transport is ready.
 
+A2's Claude delivery gate also needs the independent
+[feedback-permissions fix](../../proposed/claude_policy_feedback_permissions/card.md). It remains proposed, outside this
+epic's membership; A2's offline work can continue without a shared branch.
+
 ## Gate 1: shared transport handoff
 
 - [x] Review A1's early capture outcome before it finalizes retries, telemetry and estimator assumptions. Record a
@@ -63,6 +67,11 @@ thresholds and any reviewer reserve; A1 supplies no decision-quality or quota-sa
 warning delivery before A3's review-skipping decisions. The [A2 checklist](../jev_rule_pack/checklist.md) owns
 whole-action coverage, bounded dispatch, warning provenance and quality/data gates. A2's calibration and held-out
 acceptance criteria still need review before evaluation; its quality evidence cannot validate A3.
+
+Review handoff, 2026-10-14: A2 owns the user's decision to require a new paid/data-sharing acknowledgment in every
+derived session, and runs after existing whole-action checks inside the established hook deadline. Its planned A1
+`judge()` extension accepts explicit evaluation run identity; Gate 2 must reconcile that API, run ancestry and audit
+storage with A3 before merge. The [A2 checklist](../jev_rule_pack/checklist.md) owns the fixtures and numeric limits.
 
 ## Coordination acceptance
 
