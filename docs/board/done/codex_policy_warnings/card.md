@@ -19,7 +19,7 @@ Codex on an allowed action using the response shape B2 proves reaches model cont
 warnings through tested PreToolUse `systemMessage` behavior; UI/event-stream delivery and model context are separate
 channels.
 
-This enables [Jev rule-pack warnings](../../proposed/jev_rule_pack/card.md) in Codex, but is independently useful for
+This enables [Jev rule-pack warnings](../../doing/jev_rule_pack/card.md) in Codex, but is independently useful for
 existing policy warnings and degraded supervisor outcomes. Ordinary warning delivery needs no supervisor or Jev call.
 The optional source-only mode validates supervisor quotations against B1's immutable reviewed plan snapshot before the
 warning conversion loses citation structure.

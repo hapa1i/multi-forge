@@ -1,9 +1,13 @@
 # Jev rule pack, warnings only
 
-Epic: [Jev support](../../doing/epic_jev_support/card.md). Member **A2**. Depends on
+Epic: [Jev support](../epic_jev_support/card.md). Member **A2**. Depends on
 [A1: Jev client and probes](../../done/jev_client_probes/card.md). Codex-visible delivery also depends on
 [B3: warnings Codex can see](../../done/codex_policy_warnings/card.md), shipped through PR #262 and closed on
-2026-10-11. This card remains proposed.
+2026-10-11.
+
+Status: **doing**, activated 2026-10-14 for checklist planning on `codex/jev-rule-pack`, based on `main` at `f7ce7a9a`
+after A1's closeout. The [execution checklist](checklist.md) records the proposed integration, evaluation gates and
+outstanding decisions. Implementation and paid evaluation have not started.
 
 ## Problem and outcome
 
@@ -13,8 +17,8 @@ warnings. It works without a plan or supervisor and provides measurable evidence
 block actions.
 
 [Workflow design §1.1](../../../design_workflows.md#11-deterministic-policy-forge-policy) motivates this use. The
-[research](../../doing/epic_jev_support/research.md#rule-packs-backed-by-jev-fixed-semantic-checks) explains the
-boundary between stable rule citations, action evidence and semantic correctness.
+[research](../epic_jev_support/research.md#rule-packs-backed-by-jev-fixed-semantic-checks) explains the boundary between
+stable rule citations, action evidence and semantic correctness.
 
 ## Scope
 
@@ -60,7 +64,7 @@ boundary between stable rule citations, action evidence and semantic correctness
 
 Direct blocking and escalation of fixed-rule findings are deferred. The existing plan supervisor cannot adjudicate rule
 findings merely because it is configured; that extension would need an explicit rule/evidence handoff.
-[A3](../jev_cascade/card.md) is plan-check cascade work, not a shortcut around that requirement.
+[A3](../../proposed/jev_cascade/card.md) is plan-check cascade work, not a shortcut around that requirement.
 
 ## B3 formatter handoff (2026-10-10)
 

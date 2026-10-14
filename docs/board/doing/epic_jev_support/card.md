@@ -2,7 +2,8 @@
 
 Status: **doing**, activated 2026-10-14 with A1. The [coordination checklist](checklist.md) tracks member gates and
 handoffs. A1 shipped through [PR #268](https://github.com/hapa1i/multi-forge/pull/268), merged as `9778007a` on
-2026-10-14. A2 and A3 remain proposed pending separate activation.
+2026-10-14. A2 is now active for checklist planning on `codex/jev-rule-pack`, based on the A1 closeout at `f7ce7a9a`. A3
+remains proposed.
 
 ## Problem and outcome
 
@@ -23,13 +24,17 @@ reported cost for the captured shapes; quota savings and decision quality remain
 | ID  | Card                                                                  | Independently shippable outcome                                               | Depends on                        |
 | --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------- |
 | A1  | [Jev client and probes](../../done/jev_client_probes/card.md)         | Typed OpenRouter transport and reproducible contract/latency/billing evidence | None                              |
-| A2  | [Jev rule pack, warnings only](../../proposed/jev_rule_pack/card.md)  | Opt-in semantic policy type over fixed atomic rules                           | A1; B3 for Codex-visible warnings |
+| A2  | [Jev rule pack, warnings only](../jev_rule_pack/card.md)              | Opt-in semantic policy type over fixed atomic rules                           | A1; B3 for Codex-visible warnings |
 | A3  | [Jev as the cascade's first tier](../../proposed/jev_cascade/card.md) | Validated covered allows avoid a Claude review; other cases escalate          | A1, B1                            |
 
 [B1](../../done/plan_file_supervision/card.md) and [B3](../../done/codex_policy_warnings/card.md) belong to the separate
 [Codex supervisor epic](../../done/epic_codex_supervisor/card.md). A2 and A3 can proceed independently after their
 prerequisites; A2's fixed-rule quality evidence does not validate A3's plan-alignment questions. Cards use separate
 execution branches when activated.
+
+Selected next: A2 establishes the first policy consumer and exercises warning delivery against A1's shipped boundary.
+Its [checklist](../jev_rule_pack/checklist.md) owns implementation, rule-quality gates and new data/spend decisions.
+This is a single-card branch; A2 does not make plan-alignment decisions for A3.
 
 ## Shared contract
 
