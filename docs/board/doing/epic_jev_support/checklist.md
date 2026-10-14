@@ -69,9 +69,11 @@ whole-action coverage, bounded dispatch, warning provenance and quality/data gat
 acceptance criteria still need review before evaluation; its quality evidence cannot validate A3.
 
 Review handoff, 2026-10-14: A2 owns the user's decision to require a new paid/data-sharing acknowledgment in every
-derived session, and runs after existing whole-action checks inside the established hook deadline. Its planned A1
-`judge()` extension accepts explicit evaluation run identity; Gate 2 must reconcile that API, run ancestry and audit
-storage with A3 before merge. The [A2 checklist](../jev_rule_pack/checklist.md) owns the fixtures and numeric limits.
+derived session, and runs after existing whole-action checks inside the established hook deadline. A2's A1 extension now
+accepts `judge(run_identity=...)` with the ambient fallback retained. Five offline telemetry integrations verify
+distinct evaluations, retry identity and run ancestry; A2's dispatch/cache integration remains pending. Gate 2 must
+reconcile that API, run ancestry and audit storage with A3 before merge. The
+[A2 checklist](../jev_rule_pack/checklist.md) owns the fixtures and numeric limits.
 
 ## Coordination acceptance
 

@@ -10,7 +10,8 @@ Claude delivery also requires the separately reviewed
 
 Status: **doing**, activated 2026-10-14 for checklist planning on `codex/jev-rule-pack`, based on `main` at `f7ce7a9a`
 after A1's closeout. The [execution checklist](checklist.md) records the proposed integration, evaluation gates and
-outstanding decisions. Implementation and paid evaluation have not started.
+outstanding decisions. Offline execution started on 2026-10-14 with the explicit evaluation-identity extension;
+rule/context review remains open and no paid A2 evaluation has run.
 
 ## Problem and outcome
 

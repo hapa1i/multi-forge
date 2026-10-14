@@ -2,10 +2,11 @@
 
 ## Current focus
 
-Planning only. A2 is active on `codex/jev-rule-pack`, based on `main` at `f7ce7a9a45f2e208d0fd72c74454750f4fd30e1f`
-after A1's closeout on 2026-10-14. No A2 implementation or paid evaluation has run. The [card](card.md) owns scope; the
-[epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed and will use a separate
-execution branch.
+Execution started on 2026-10-14. A2 is active on `codex/jev-rule-pack`, based on `main` at
+`f7ce7a9a45f2e208d0fd72c74454750f4fd30e1f` after A1's closeout. The A1 explicit evaluation-identity extension is
+implemented; rule/context review still precedes hook wiring. No paid A2 evaluation has run. The [card](card.md) owns
+scope; the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed and will use a
+separate execution branch.
 
 Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
 never introduce a Jev denial or `needs_review`. An independently configured policy or supervisor retains its existing
@@ -318,6 +319,15 @@ Paths under `tests/src/policy/rule_pack/` and the A2 harness/integration test na
   finish design/end-user sync, add the completed-work change-log entry and propose durable notes for human review.
 - [ ] Move A2 to `done/` only when its acceptance gates are satisfied and the code is merged; repoint inbound links and
   update the epic's next-member decision.
+
+## Execution evidence
+
+2026-10-14: `make deps` passed. A1 now accepts `judge(run_identity=...)`, retaining the environment fallback for
+existing callers. The client suite passed 53 offline tests. The required no-`.env` integration command,
+`PYTHON_DOTENV_DISABLED=1 ./scripts/test-integration.sh tests/integration/core/judgments/test_observability.py`, passed
+five tests, including two evaluations in one interactive run: four distinct attempts, two verb invocations, unchanged
+environment and retained parent/root ancestry. The harness warned about missing `GEMINI_API_KEY`; these five tests use
+an injected transport and passed without it. A2 child-run creation and cache behavior remain pending.
 
 ## Planning verification
 
