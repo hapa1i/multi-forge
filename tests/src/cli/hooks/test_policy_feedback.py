@@ -297,7 +297,7 @@ class TestPolicyCheckFeedback:
         data = _extract_json(output)
         assert data is not None
         assert "hookSpecificOutput" in data
-        assert data["hookSpecificOutput"]["permissionDecision"] == "allow"
+        assert "permissionDecision" not in data["hookSpecificOutput"]
         assert "additionalContext" in data["hookSpecificOutput"]
         assert "aligned" in data["hookSpecificOutput"]["additionalContext"]
 

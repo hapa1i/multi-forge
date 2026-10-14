@@ -1330,7 +1330,7 @@ def policy_check() -> None:
     source_label = _derive_policy_source_label(result, effective)
 
     # Serialize the decision into Claude's PreToolUse wire contract (block message,
-    # exit codes, allow JSON); the [forge] summary/warning overlay below is telemetry.
+    # exit codes, feedback JSON); the [forge] summary/warning overlay below is telemetry.
     responder = ClaudeHookResponder()
 
     if result.final_decision == "deny":

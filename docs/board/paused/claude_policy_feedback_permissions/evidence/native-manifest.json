@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "harness_sha256": "6270ead5f37daf7391c0a6ea541edf21fad799926479c329ec4fc838e588aacb",
+  "responder_sha256": "829dfc08a85848b0aae21a7dba6bbd59eb44c0c496705d01a7e3a9476cc33167",
+  "cli_version": "2.1.296",
+  "model": "claude-haiku-4-5-20251001",
+  "billing": "Anthropic API key; canonical api.anthropic.com; no subscription or gateway fallback",
+  "cases": [
+    {
+      "id": "write-allow-on",
+      "tool": "Write",
+      "feedback": true,
+      "allow_rule": true,
+      "canary": "forge-context-e179fdb16f6b39e1d2527afc",
+      "prompt": "Use Write once to create fixture.txt containing exactly `value = 1` followed by a newline. Do not retry or use another tool if permission is denied. After the attempt, report whether it succeeded and repeat any FORGE_CONTEXT_TOKEN received in hook context, or say NO_CONTEXT_TOKEN if none was received. Do not inspect other files."
+    },
+    {
+      "id": "write-manual-on",
+      "tool": "Write",
+      "feedback": true,
+      "allow_rule": false,
+      "canary": "forge-context-8b5dabc9b0af6dd757341822",
+      "prompt": "Use Write once to create fixture.txt containing exactly `value = 1` followed by a newline. Do not retry or use another tool if permission is denied. After the attempt, report whether it succeeded and repeat any FORGE_CONTEXT_TOKEN received in hook context, or say NO_CONTEXT_TOKEN if none was received. Do not inspect other files."
+    },
+    {
+      "id": "write-allow-off",
+      "tool": "Write",
+      "feedback": false,
+      "allow_rule": true,
+      "canary": "forge-context-dc3f8f9d51332d09f1cca7c3",
+      "prompt": "Use Write once to create fixture.txt containing exactly `value = 1` followed by a newline. Do not retry or use another tool if permission is denied. After the attempt, report whether it succeeded and repeat any FORGE_CONTEXT_TOKEN received in hook context, or say NO_CONTEXT_TOKEN if none was received. Do not inspect other files."
+    },
+    {
+      "id": "write-manual-off",
+      "tool": "Write",
+      "feedback": false,
+      "allow_rule": false,
+      "canary": "forge-context-8277ba6bd5286fcf1b5ad8b7",
+      "prompt": "Use Write once to create fixture.txt containing exactly `value = 1` followed by a newline. Do not retry or use another tool if permission is denied. After the attempt, report whether it succeeded and repeat any FORGE_CONTEXT_TOKEN received in hook context, or say NO_CONTEXT_TOKEN if none was received. Do not inspect other files."
+    },
+    {
+      "id": "edit-allow-on",
+      "tool": "Edit",
+      "feedback": true,
+      "allow_rule": true,
+      "canary": "forge-context-bd7c9287ee0879af57b84880",
+      "prompt": "Read fixture.txt once, then use Edit once to replace `value = 0` with `value = 1`. Do not retry or use another tool if permission is denied. After the attempt, report whether it succeeded and repeat any FORGE_CONTEXT_TOKEN received in hook context, or say NO_CONTEXT_TOKEN if none was received. Do not inspect other files."
+    },
+    {
+      "id": "edit-manual-on",
+      "tool": "Edit",
+      "feedback": true,
+      "allow_rule": false,
+      "canary": "forge-context-97803626380dada93b6e568b",
+      "prompt": "Read fixture.txt once, then use Edit once to replace `value = 0` with `value = 1`. Do not retry or use another tool if permission is denied. After the attempt, report whether it succeeded and repeat any FORGE_CONTEXT_TOKEN received in hook context, or say NO_CONTEXT_TOKEN if none was received. Do not inspect other files."
+    },
+    {
+      "id": "edit-allow-off",
+      "tool": "Edit",
+      "feedback": false,
+      "allow_rule": true,
+      "canary": "forge-context-035d617149e26d32a68025a9",
+      "prompt": "Read fixture.txt once, then use Edit once to replace `value = 0` with `value = 1`. Do not retry or use another tool if permission is denied. After the attempt, report whether it succeeded and repeat any FORGE_CONTEXT_TOKEN received in hook context, or say NO_CONTEXT_TOKEN if none was received. Do not inspect other files."
+    },
+    {
+      "id": "edit-manual-off",
+      "tool": "Edit",
+      "feedback": false,
+      "allow_rule": false,
+      "canary": "forge-context-f4f8292554085f169cc43bba",
+      "prompt": "Read fixture.txt once, then use Edit once to replace `value = 0` with `value = 1`. Do not retry or use another tool if permission is denied. After the attempt, report whether it succeeded and repeat any FORGE_CONTEXT_TOKEN received in hook context, or say NO_CONTEXT_TOKEN if none was received. Do not inspect other files."
+    }
+  ],
+  "max_invocations": 8,
+  "max_agentic_turns_per_invocation": 4,
+  "max_admitted_mutations_per_invocation": 1,
+  "cli_budget_usd_per_invocation": 0.1,
+  "planning_budget_usd": 0.8,
+  "wall_seconds_per_invocation": 90,
+  "data": "fixed synthetic prompts and fixture.txt only; no repository content or transcripts",
+  "isolation": "new output directory; separate workspace, HOME, Claude config and Forge home for every case",
+  "permissions": "manual mode, permission-prompts=none; explicit allow-rule controls; no bypass mode",
+  "limits": "Agentic-turn and CLI budget limits do not guarantee physical HTTP request counts or the invoice."
+}

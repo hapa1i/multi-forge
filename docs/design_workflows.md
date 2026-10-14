@@ -191,7 +191,9 @@ audit. Clean allows are silent. A warning uses bare PreToolUse `additionalContex
 top-level `systemMessage` for the operator, subject to the executor admission in
 [session execution](design_session_execution.md#i3-codex-operational-guards-probe-churn-enrollment).
 `policy_summary_feedback=off` suppresses allowed-action model context, retaining blocking reasons, substantive operator
-notices, and audit. Claude keeps its count-summary behavior.
+notices, and audit. Claude keeps its count-summary behavior, emitted as `additionalContext` without a permission
+decision. A successful policy check does not approve the native tool permission request; Claude's configured rules and
+mode still apply. Denying and unresolved policy decisions retain stderr plus exit 2.
 
 Warning findings have their own structured field, separate from blocking violations. Permissive TDD and low-confidence
 supervisor findings preserve attribution, intent, citations, evidence, and fixes without changing denial thresholds,

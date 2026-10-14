@@ -95,7 +95,6 @@ class TestAllowFeedback:
         assert out == {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
-                "permissionDecision": "allow",
                 "additionalContext": "Forge policy: ok",
             }
         }

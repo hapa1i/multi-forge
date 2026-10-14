@@ -75,10 +75,10 @@
       "tokens": 22776
     },
     "docs/design_workflows.md": {
-      "sha256": "0c0bbcc5e458839bf35fb874f54da6c8d855a9767172a0b7c7f447d013a7f368",
+      "sha256": "dd0b4d59c53c3db17946be719415a84f14754d9b9fc9024e8453cbfd41290cac",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 26290
+      "tokens": 26368
     },
     "docs/end-user/proxy.md": {
       "sha256": "d3dce0e2c3691b5c6aae439caa9d40685d171c8c4b176d5e7fc79f2f53160719",

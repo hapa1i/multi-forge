@@ -257,6 +257,11 @@ class TestPolicyCheckDocker:
 
         assert exit_code == 0, f"Expected allow (exit 0), got {exit_code}. stderr: {stderr}"
 
+        feedback = json.loads(stdout)["hookSpecificOutput"]
+        assert feedback["hookEventName"] == "PreToolUse"
+        assert feedback["additionalContext"]
+        assert "permissionDecision" not in feedback
+
         manifest = read_manifest(policy_workspace)
         assert manifest["confirmed"]["policy"] is not None, "Policy state should be set"
         policy_states = manifest["confirmed"]["policy"].get("policy_states", {})
