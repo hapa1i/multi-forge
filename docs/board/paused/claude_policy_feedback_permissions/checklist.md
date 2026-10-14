@@ -16,8 +16,9 @@ unverified; no native inference has run.
   policy-summary paths use it, including ordinary deterministic policies.
 - [x] Remove that field while retaining `hookEventName` and `additionalContext`. Keep block exits and feedback-off
   behavior unchanged; do not replace approval with `ask`, `defer` or another permission decision.
-- [x] Pass focused responder/feedback tests and the regression matrix for Write/Edit, TDD/coding-standards/supervisor
-  outcomes, clean/warning/unavailable/deny/unresolved-review, and feedback on/off. Verify operator output and audit.
+- [x] Pass focused responder/feedback tests and the 20-case regression matrix for Write/Edit, injected
+  clean/warning/unavailable/deny/unresolved-review outcomes, and feedback on/off. Verify operator output and audit. The
+  matrix mocks engine results and does not cover individual policy evaluation or supervisor registration.
 - [x] Pass fixture-backed hook integrations through `./scripts/test-integration.sh`; assert emitted context and absence
   of native permission approval on a real hook subprocess. This proves serialization, not model receipt.
 
@@ -49,6 +50,8 @@ unverified; no native inference has run.
 2026-10-14: focused responder/feedback tests and the new permission regression matrix passed 110 tests. The first run
 exposed an incorrect test expectation for unresolved review: the hook correctly retains its existing standard review
 message rather than the fixture's violation text. The assertion was corrected; the blocking behavior was not changed.
+The original 60-case matrix repeated the same mocked path under three policy IDs; its supervisor label did not establish
+supervisor registration or evaluation coverage. The 2026-10-15 review correction removes that redundant dimension.
 
 `PYTHON_DOTENV_DISABLED=1 ./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py` passed all 28
 tests, including emitted context without a native permission decision in an actual hook subprocess. The harness warned
@@ -66,3 +69,14 @@ deselected), `make test-regression` (1,914 passed), full `make pre-commit` and b
 changes and a stale provider token count for the edited workflow design; formatting and the required cache refresh
 resolved both. The Markdown link check initially ran before the new card was staged; it passed against the final
 candidate Git state.
+
+2026-10-15 review corrections: moved the Claude feedback paragraph from Codex Stop to Hook handlers and documented the
+Read-hygiene input-correction exception, including its lack of installation ownership checks. The simplified matrix
+contains 20 distinct tool/outcome/feedback combinations. Focused verification passed 54 tests:
+
+- `uv run pytest tests/src/cli/hooks/test_policy_feedback.py tests/regression/test_bug_claude_policy_feedback_permissions.py -q`:
+  46 passed.
+- `uv run pytest tests/src/cli/hooks/test_responder.py -q`: eight passed.
+
+This update changes documentation and tests only. The production responder and native-trial manifest are unchanged; no
+native inference ran, and the native evidence gate remains open.

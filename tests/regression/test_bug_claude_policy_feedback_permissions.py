@@ -1,4 +1,4 @@
-"""Policy feedback must never approve a native Claude permission request."""
+"""Injected policy outcomes must not approve a native Claude permission request."""
 
 import json
 from unittest.mock import MagicMock, patch
@@ -16,13 +16,12 @@ from tests.fixtures.session_state import publish_session
 pytestmark = pytest.mark.regression
 
 
-@pytest.mark.parametrize(
-    "policy_id", ["tdd.tests-before-impl", "coding_standards.no-backward-compat", "semantic.supervisor"]
-)
 @pytest.mark.parametrize("outcome", ["clean", "warning", "unavailable", "deny", "needs_review"])
 @pytest.mark.parametrize("feedback", ["on", "off"])
 @pytest.mark.parametrize("tool", ["Write", "Edit"])
-def test_policy_outcomes_preserve_native_permissions(tmp_path, monkeypatch, policy_id, outcome, feedback, tool):
+def test_policy_outcomes_preserve_native_permissions(tmp_path, monkeypatch, outcome, feedback, tool):
+    """Cover shared response/audit behavior, not policy evaluation or supervisor registration."""
+    policy_id = "coding_standards.no-backward-compat"
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("FORGE_SESSION", "feedback-test")
     state = create_session_state("feedback-test", worktree_path=str(tmp_path))

@@ -29,9 +29,11 @@ behavior for Codex.
   `defer`. Keep denying/unresolved-review behavior and summary on/off semantics intact; do not introduce a new bypass
   setting or make Jev activation the condition for correct permissions.
 - Add `tests/regression/test_bug_claude_policy_feedback_permissions.py` and extend
-  `tests/src/cli/hooks/test_policy_feedback.py` for TDD, coding standards and supervisor clean/warning/failure outcomes.
-  Assert context remains present when enabled, no permission decision is emitted, feedback-off suppresses model context
-  and denials retain their existing output/exit behavior.
+  `tests/src/cli/hooks/test_policy_feedback.py` for Write/Edit with injected clean, warning, unavailable, deny and
+  unresolved-review results. Assert context remains present when enabled, no permission decision is emitted,
+  feedback-off suppresses model context and denials retain their existing output/exit behavior. The matrix exercises the
+  shared response/audit path with a mocked engine; it does not establish individual policy evaluation or supervisor
+  registration coverage.
 - Run fixture-backed hook integrations through `./scripts/test-integration.sh`. Prepare a separate quota-bounded native
   Claude trial with synthetic Write/Edit actions, recorded CLI version and permission configuration. Verify both model
   receipt and the native permission flow in default mode, with a configured allow rule/mode as a control. Do not use a
@@ -48,3 +50,10 @@ behavior for Codex.
 
 No Jev client, rule-pack evaluation, new policy verdict, Codex wire change or supervisor scheduling change belongs here.
 A2 can continue offline work but must consume a verified fix before claiming its Claude feedback acceptance.
+
+The [Read-hygiene hook](../../../../src/forge/cli/hooks/read_hygiene.py) remains a deliberate exception to native
+permission separation: when correcting a matching Read with `offset`, `limit` or `pages`, it returns
+`permissionDecision: "allow"` alongside `updatedInput` containing only `file_path`. Its match is based on the path, not
+installation ownership: it requires `/skills/<name>/resources/` in the path, an immediate parent named `resources`, and
+a `code.md`/`docs.md` basename or supported hyphenated variant. Such paths can match anywhere on disk. This card leaves
+that input-correction behavior and its matcher unchanged; it removes approval only from Write/Edit policy feedback.

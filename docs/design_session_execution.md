@@ -32,6 +32,12 @@ The guarantee ends at a functioning delivered handler response. Runtime non-deli
 startup/execution failure, and a runtime discarding malformed output remain fail-open seams. This is not OS-level
 immutability or an authorship/admission attestation.
 
+Claude policy feedback uses `hookSpecificOutput.additionalContext` with `hookEventName=PreToolUse` and no
+`permissionDecision`. The native permission gate remains separate from Forge's policy verdict. Turning
+`policy_summary_feedback` off removes that model-context emission; operator warnings, audit and policy blocks remain.
+The [permission-feedback card](board/paused/claude_policy_feedback_permissions/checklist.md) tracks native receipt and
+permission evidence independently of B3's Codex admission.
+
 **Deployment model:** Forge installs hook **settings only** (no scripts in `.claude/`). Runtime hook registrations are
 user-scoped and contain the literal absolute dispatcher command `<forge-home>/bin/forge-hook <name>`; project/local
 installs do not write hook blocks. The hidden hook-handler surface remains `forge hook <name>`, so runtime + deps live
@@ -404,12 +410,6 @@ proves Stop inactive; uncertain manifests and enrollment probes still reach the 
 
 See the [B4 evidence and limits](board/done/codex_stop_review/evidence/README.md) and
 [user configuration contract](end-user/policy.md#review-once-at-codex-stop-opt-in).
-
-Claude policy feedback uses `hookSpecificOutput.additionalContext` with `hookEventName=PreToolUse` and no
-`permissionDecision`. The native permission gate remains separate from Forge's policy verdict. Turning
-`policy_summary_feedback` off removes that model-context emission; operator warnings, audit and policy blocks remain.
-The [permission-feedback card](board/paused/claude_policy_feedback_permissions/checklist.md) tracks native receipt and
-permission evidence independently of B3's Codex admission.
 
 ### I.3 Codex operational guards (probe-churn + enrollment)
 
