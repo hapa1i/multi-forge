@@ -4,7 +4,8 @@
 
 Execution started 2026-10-14 on `codex/claude-policy-feedback-permissions`, based on `main` at `f7ce7a9a`, in a separate
 managed worktree. This is A2's independent prerequisite; it does not add Jev behavior or change the epic's membership.
-The [card](card.md) owns the acceptance contract. Native inference has not been authorized or run.
+The [card](card.md) owns the acceptance contract. [PR #269](https://github.com/hapa1i/multi-forge/pull/269) is open in
+draft. Native inference has not been authorized or run.
 
 ## Response and fixtures
 
@@ -34,11 +35,10 @@ The [card](card.md) owns the acceptance contract. Native inference has not been 
   behavior for existing policy users.
 - [ ] Add the change-log entry when verified and merged.
 - [x] Pass aggregate unit, regression, full pre-commit, board/link and file-size checks on this branch.
-- [ ] Open the separate PR with passing checks and any native-evidence gap visible. Keep it unmerged until acceptance is
+- [x] Open the separate PR with passing checks and any native-evidence gap visible. Keep it unmerged until acceptance is
   satisfied. Attach the PR to this task.
 - [ ] After merge, record the final head and native evidence, move the card to `done/`, repoint links and reconcile A2's
-  references. The A2 branch currently carries the original proposed card, so its later integration must remove that
-  duplicate rather than retain two board states.
+  references. A2 must consume this card from its independent branch and retain one board state when integrating it.
 
 ## Execution evidence
 
@@ -56,8 +56,9 @@ driver passed 16 offline tests, including refusal of altered manifests, syntheti
 homes, redacted saved output and stopping/reaping after a timeout or native failure. These fixtures do not claim a
 native result; the eight-case API trial still needs its own explicit approval.
 
-Aggregate verification passed: `make test-unit` (10,923 passed; 117 integration tests deselected),
-`make test-regression` (1,914 passed), full `make pre-commit` and both staged/working-tree `git diff --check`. The final
-driver-specific run passed all 16 tests. Full pre-commit initially caught formatter changes and a stale provider token
-count for the edited workflow design; formatting and the required cache refresh resolved both. The Markdown link check
-initially ran before the new card was staged; it passed against the final candidate Git state.
+Implementation commit: `a281be33`. Aggregate verification passed: `make test-unit` (10,923 passed; 117 integration tests
+deselected), `make test-regression` (1,914 passed), full `make pre-commit` and both staged/working-tree
+`git diff --check`. The final driver-specific run passed all 16 tests. Full pre-commit initially caught formatter
+changes and a stale provider token count for the edited workflow design; formatting and the required cache refresh
+resolved both. The Markdown link check initially ran before the new card was staged; it passed against the final
+candidate Git state.
