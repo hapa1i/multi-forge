@@ -1,7 +1,8 @@
 # Epic: Jev support
 
 Status: **doing**, activated 2026-10-14 with A1. The [coordination checklist](checklist.md) tracks member gates and
-handoffs. Implementation has not started; A2 and A3 remain proposed.
+handoffs. A1 is implemented in [PR #268](https://github.com/hapa1i/multi-forge/pull/268), awaiting review and merge; A2
+and A3 remain proposed.
 
 ## Problem and outcome
 
@@ -13,8 +14,9 @@ chat model.
 The primary economic objective is protecting Claude subscription quota on projects where the user accepts Jev's API
 cost. Everyday supervision must incur no API spend, so Jev is explicitly opt-in. Warning-only packs do not by themselves
 avoid Claude calls. The [research](research.md) records pricing, schema differences, model limitations and the measured
-absence of configured supervisors/policy enforcement across 78 local session manifests. No quota saving, latency or
-decision-quality result has been measured.
+absence of configured supervisors/policy enforcement across 78 local session manifests. A1's
+[synthetic measurements](../jev_client_probes/evidence/2026-10-14/report.md) establish transport latency and reported
+cost for the captured shapes; quota savings and decision quality remain unmeasured.
 
 ## Members and dependencies
 

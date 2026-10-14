@@ -110,6 +110,11 @@ the [report](evidence/2026-10-14/report.md).
 Honor valid `Retry-After` within the same deadline; do not wait or dispatch beyond it. A retryable status does not prove
 the preceding attempt was free. Keep local pre-dispatch rejection separate from a provider-reported error.
 
+`JudgmentError.attempts` is empty for an initial local rejection. Each attempted transport call has its own record;
+`status_code` identifies an observed HTTP response, and its absence does not prove that nothing was billed. Unexpected
+attempt failures become `internal_error`, never successful telemetry or an automatic retry. These existing fields
+distinguish local refusal, attempted I/O and provider response without a second dispatch flag.
+
 ## Slice 3: compatible usage and operator visibility
 
 - [x] Implement a small Decisions-specific emission adapter through existing telemetry owners. Explicitly map
@@ -181,17 +186,18 @@ These controls apply to the early capture and later measurement runs. No paid ru
 tests in `tests/src/scripts/test_jev_probe.py`, following the script-loading pattern in `tests/fixtures/codex_probe.py`;
 that existing loader is hard-coded to Codex scripts, so it is not directly reusable.
 
-| Test                   | Fixture                                                                 | Assertion                                                         | Test file                                                                               |
-| ---------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Typed boundary         | Captured and constructed Choice/Noul/Score                              | Preserved values; exact IDs/types                                 | `tests/src/core/judgments/test_types.py`                                                |
-| Invalid answers        | Bad IDs/labels/legends/counts/probabilities                             | No judgment; valid usage retained                                 | `tests/src/core/judgments/test_openrouter.py`                                           |
-| Input admission        | State plus criteria; varied encodings; provider 413                     | Whole-input estimate; zero local-reject dispatches; no 413 retry  | `tests/src/core/judgments/test_budget.py`                                               |
-| Auth / URL / ZDR       | Env/file/ignored-env; custom bases; false ZDR                           | Existing precedence; valid route; ZDR every attempt               | `tests/src/core/judgments/test_openrouter.py`                                           |
-| Deadline / statuses    | 400/401/402/403/404/413; 429/500/502/503/524/529; cancellation          | Status policy; exact attempts; one deadline                       | `tests/src/core/judgments/test_openrouter.py`                                           |
-| Usage / trace identity | Decisions token names; zero/null cost; retry                            | Correct tokens/cost; nonempty local IDs                           | `tests/src/core/judgments/test_usage.py`                                                |
-| History compatibility  | Existing v2 plus Jev records; baseline strict readers                   | Old history retained; new records accepted; no double count       | `tests/src/core/judgments/test_usage.py`; `tests/src/core/telemetry/test_downstream.py` |
-| Operator visibility    | Isolated home/run; trace opt-in on/off                                  | Lookup by request ID; matching trace/cost/activity                | `tests/integration/core/judgments/test_observability.py`                                |
-| Probe controls         | Dry-run with keys; cap exhausted; unexpected cost; secret-bearing error | Zero default calls; bounded live calls; redacted isolated capture | `tests/src/scripts/test_jev_probe.py`                                                   |
+| Test                   | Fixture                                                                 | Assertion                                                         | Test file                                                                                        |
+| ---------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Typed boundary         | Captured and constructed Choice/Noul/Score                              | Preserved values; exact IDs/types                                 | `tests/src/core/judgments/test_types.py`                                                         |
+| Invalid answers        | Bad IDs/labels/legends/counts/probabilities                             | No judgment; valid usage retained                                 | `tests/src/core/judgments/test_openrouter.py`                                                    |
+| Input admission        | State plus criteria; varied encodings                                   | Whole-input byte screen                                           | `tests/src/core/judgments/test_budget.py`                                                        |
+| Size refusal           | Attribution exceeds cap; provider 413                                   | Zero local-reject dispatches; no 413 retry                        | `tests/src/core/judgments/test_openrouter.py`                                                    |
+| Auth / URL / ZDR       | Env/file/ignored-env; custom bases; false ZDR                           | Existing precedence; valid route; ZDR every attempt               | `tests/src/core/judgments/test_openrouter.py`                                                    |
+| Deadline / statuses    | 400/401/402/403/404/413; 429/500/502/503/524/529; cancellation          | Status policy; exact attempts; one deadline                       | `tests/src/core/judgments/test_openrouter.py`                                                    |
+| Usage / trace identity | Decisions token names; zero/null cost; retry                            | Correct tokens/cost; nonempty local IDs                           | `tests/src/core/judgments/test_usage.py`                                                         |
+| History compatibility  | Existing v2 plus Jev records; baseline strict readers                   | Old history retained; new records accepted; no double count       | `tests/src/core/judgments/test_usage.py`; existing `tests/src/core/telemetry/test_downstream.py` |
+| Operator visibility    | Isolated home/run; trace opt-in on/off                                  | Lookup by request ID; matching trace/cost/activity                | `tests/integration/core/judgments/test_observability.py`                                         |
+| Probe controls         | Dry-run with keys; cap exhausted; unexpected cost; secret-bearing error | Zero default calls; bounded live calls; redacted isolated capture | `tests/src/scripts/test_jev_probe.py`                                                            |
 
 ## Verification and documentation
 
@@ -207,7 +213,8 @@ that existing loader is hard-coded to Codex scripts, so it is not directly reusa
 - [x] Sync `docs/design.md`, `docs/design_runtime.md` and `docs/design_telemetry.md` as ownership/data flow ship. Add
   Jev to the direct-OpenRouter ZDR owners in `docs/design_installation.md` section 3.6.2. Update
   `docs/end-user/authentication.md` for credentials/readiness and opt-in API spend; distinguish client readiness from
-  unshipped policy consumers. Document repository-only probe usage in the harness README.
+  unshipped policy consumers. Update `docs/end-user/proxy.md` and `docs/cli_reference.md` for direct reported costs in
+  the unfiltered spend view. Document repository-only probe usage in the harness README.
 - [x] Verify imports and an externally injected offline transport without `provider-check` dependencies. If packaging
   configuration, bundled assets or resource loading changes, run `make build` and a clean-wheel smoke under the repo
   release rules. A new pure-Python module alone does not make that packaging gate mandatory; fixture code is never
@@ -232,7 +239,7 @@ that existing loader is hard-coded to Codex scripts, so it is not directly reusa
 standalone Markdown link audit passed for 673 sources, including the new evidence index. Implementation had not started
 at that planning checkpoint.
 
-## Implementation verification — 2026-10-14
+## Initial implementation verification — 2026-10-14
 
 - Final `make test-unit`: 10,908 passed, 117 integration-marked tests deselected. `make test-regression`: 1,843 passed.
   The new client/harness subset accounts for 103 offline tests.
@@ -253,3 +260,26 @@ at that planning checkpoint.
 Planning is committed as `bde11e5f`; implementation is `04f3c01d`, the tested code head.
 [PR #268](https://github.com/hapa1i/multi-forge/pull/268) is open against `main`. This handoff record is a docs-only
 follow-up. Neither A1 nor the epic closes before review and merge.
+
+## PR review verification — 2026-10-14
+
+Review fixes are committed as `0d6b923c`. The [replay record](evidence/2026-10-14/replay.json) identifies matching
+source hashes for that code head. All 27 saved successes pass answer/accounting validation; the malformed and over-limit
+controls retain their distinct failure kinds. No further paid inference ran.
+
+- `make test-unit`: 10,910 passed, 117 integration-marked tests deselected. `make test-regression`: 1,854 passed.
+- Focused client/harness/review regressions: 116 passed, including deeply nested JSON, unexpected transport/cleanup
+  errors, extended size-error detail and cached-config isolation. Failed attempts retain valid reported usage and do not
+  retry. Local nested-input rejection dispatches nothing.
+- `PYTHON_DOTENV_DISABLED=1 ./scripts/test-integration.sh tests/integration/core/judgments/test_observability.py`: four
+  passed. A separate session-end assertion confirmed the cached grouping flag was restored after all four cases.
+- Full `make pre-commit` passed. The documentation follow-up also passed `make pre-commit-md` and `git diff --check`.
+
+The report now distinguishes historical capture code from offline replay, records answer variance and separates early
+cost from measurement-ledger totals. Cost guidance includes direct attempts without calling Jev the first direct-cost
+producer; existing Claude paths already support reported direct cost. The `core_llm` route compatibility choice remains
+unchanged.
+
+Retry/deadline policy remains conservative. Three-sample latency measurements do not establish a minimum safe retry
+window, and arbitrary deadline ceilings would constrain callers without a supported limit. Consumer admission at Gate 1
+still owns its monotonic deadline and reviewer reserve. A1 and the epic remain `doing` pending review and merge.

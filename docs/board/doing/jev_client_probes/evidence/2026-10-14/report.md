@@ -9,13 +9,23 @@ transport readiness for A1; A2/A3 remain proposed and have no decision-quality o
 The user approved the exact [four-request early manifest](../early-manifest.json), then the
 [25-request measurement manifest](../measurement-manifest.json). Their planning budgets were $0.01 and $0.05,
 respectively. Exactly 29 physical requests ran, with retries disabled. Inputs were fixed synthetic text only.
-Credentials resolved read-only through the existing owner; every run used a fresh isolated `FORGE_HOME`. No sessions,
-configuration or telemetry were copied from the user's home. Offline harness tests also compare the original home before
-and after execution.
+Credentials resolved read-only through the existing owner; every run wrote telemetry to a fresh isolated `FORGE_HOME`.
+No sessions, configuration files or telemetry were copied from the user's home. However, credential resolution cached
+the original home's runtime config, so these historical captures inherited its provider-trace settings. Approved-payload
+comparison prevented unapproved attribution fields from being dispatched. The revised runner clears that cache after
+switching homes; offline regression coverage verifies a previously enabled grouping setting is no longer inherited and
+the original home's files remain unchanged. No further paid requests were run for this correction.
 
 Captures retain the then-current Git revision/dirty state; measurement captures additionally record implementation
 hashes. The source-artifact hashes identify original runner files, before retained JSON formatting and account-ID
 redaction. `resumed_from_sha256` refers to those original bytes. Provider response IDs remain intact.
+
+All live captures ran with uncommitted implementation changes over `bde11e5f`, before the final fixes and formatting.
+Their recorded implementation hashes therefore differ from the PR code. The [offline replay record](replay.json)
+identifies the exact source hashes checked after review: all 27 successful responses pass the current answer validator
+and accounting checks; the malformed and over-limit HTTP 400 responses classify as `validation` and `payload_too_large`.
+Replay uses the saved payloads and responses without inference. Historical timings and failure flags still describe the
+original capture code, not the revised client.
 
 - [Early interrupted capture](early-interrupted.json): one successful provider response; a capture-wrapper compression
   bug caused a local transport failure. The wrapper was fixed and an offline reproduction added.
@@ -39,9 +49,9 @@ tested offline. [TypeSafe's Score contract](https://docs.typesafe.ai/primitives/
 limits the scale to ten levels; the client admits 2–10.
 
 The 120,234-byte wire control returned HTTP 400 containing `detail.error_type=max_tokens_exceeded`, not the documented
-413\. The client recognizes this exact structured wrapper as `payload_too_large`; other 400 responses remain validation
-failures. Neither is retried. The ordinary 30,000-byte guard was never weakened: only the harness replaced the approved
-control payload at the transport boundary.
+413\. The client recognizes this structured error type as `payload_too_large`, tolerating additional detail fields; other
+400 responses remain validation failures. Neither is retried. The ordinary 30,000-byte guard was never weakened: only
+the harness replaced the approved control payload at the transport boundary.
 
 ## Latency and size
 
@@ -70,12 +80,21 @@ screen. `tiktoken` is not a runtime requirement for this client.
 The same state with one versus three questions used 577 versus 674 input tokens per request, with reported costs
 $0.000024234 versus $0.000028308. This is evidence for these exact shapes, not a general linear billing rule.
 
+## Answer repeatability
+
+Identical serialized payloads did not always produce identical answers. The three Unicode Noul responses were 0.38, 0.35
+and 0.33. For `shared-three`, Score confidence was 0.95, 0.98 and 0.97; its reported score stayed at 0.99 while the
+distribution changed. The accompanying damage Noul response was 0.12, 0.14 and 0.12. Each shape's repeats have the same
+payload SHA-256 in the manifest. These samples establish observed variance, not calibration or decision quality.
+Consumer evaluations must account for repeat variance near thresholds; identical cache identity does not imply a
+deterministic fresh answer.
+
 ## Accounting and operator visibility
 
-The early successes reported $0.000039816. The 24 measurement successes reported $0.001747494. Neither HTTP 400 control
-returned usage or cost; both remain unknown, not zero-cost claims. Reported successful cost matched the dated catalog
-input price of $0.042 per million tokens, with output free. A post-response check cannot guarantee an invoice cap.
-[Catalog source](https://openrouter.ai/api/v1/endpoints/zdr).
+The early successes reported $0.000039816. The 24 measurement successes reported $0.001747494, for $0.00178731 across
+all 27 successes. Neither HTTP 400 control returned usage or cost; both remain unknown, not zero-cost claims. Reported
+successful cost matched the dated catalog input price of $0.042 per million tokens, with output free. A post-response
+check cannot guarantee an invoice cap. [Catalog source](https://openrouter.ai/api/v1/endpoints/zdr).
 
 The measurement ledgers contain 25 downstream attempts and 25 usage events across the two isolated homes. Trace list,
 show and explain found every local request ID. Cost by-model/by-verb reported 24 known-cost attempts plus one unknown;

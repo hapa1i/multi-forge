@@ -858,10 +858,14 @@ Streaming conversion failures retain their existing in-band SSE error contract.
 
 ## Cost tracking and spend caps
 
-Proxy request costs are logged as downstream telemetry under `~/.forge/telemetry/downstream/`. Legacy
+Proxy and direct request costs are logged as downstream telemetry under `~/.forge/telemetry/downstream/`. Legacy
 `~/.forge/costs/requests/` files may exist from older installs; Forge no longer reads, writes, or cleans them -- delete
 them manually if present. New request spend writes to downstream records, and the by-verb view joins those records to
 run ids instead of writing verb snapshot files.
+
+Without a proxy filter, `forge telemetry costs show` includes reported direct costs such as Jev attempts, whose records
+have `proxy_id: null`. Supplying a proxy ID limits the view to that proxy. A direct Jev attempt with session/run
+attribution also contributes to the session's `forge +$Y` total; the downstream cost and usage event count once.
 
 If you upgrade across a backend-identity telemetry break, older downstream records are skipped rather than reattributed
 under the new backend-instance contract. `forge telemetry costs show --json` reports `skipped_legacy_schema`, and the
@@ -893,13 +897,13 @@ running proxy keeps its cost totals **and** cap counters in memory until restart
 header, snapshot, and `forge telemetry costs show` figures do not zero until you restart it (`forge proxy stop <id>`
 then `forge proxy start <id>`).
 
-> **Per-session view:** `forge telemetry costs show` is the authoritative, **proxy-scoped** dollar view. The status-line
-> `cost` segment shows the interactive Claude session's proxy-reported `~$`, scoped by subtracting the proxy total
-> captured at session launch. For a **session-scoped** rollup of what Forge did — supervisor checks (including failed
-> ones), tokens, and *reported-or-estimated* cost (best-effort, may be partial) — use
+> **Per-session view:** `forge telemetry costs show` is the authoritative reported dollar view, optionally filtered by
+> proxy. The status-line `cost` segment shows the interactive Claude session's proxy-reported `~$`, scoped by
+> subtracting the proxy total captured at session launch. For a **session-scoped** rollup of what Forge did — supervisor
+> checks (including failed ones), tokens, and *reported-or-estimated* cost (best-effort, may be partial) — use
 > [`forge telemetry activity [session]`](session.md#what-a-session-did-forge-telemetry-activity--session-end-summary).
-> The views are complementary: spend is billed per proxy; activity is attributed per session; the status line is live
-> and best-effort for the current interactive launch.
+> The views are complementary: costs follow provider requests; activity is attributed per session; the status line is
+> live and best-effort for the current interactive launch.
 
 ### Which surface answers which question?
 
@@ -910,7 +914,7 @@ best-effort verb-snapshot estimates):
 
 | Surface                                | Question it answers                               | Scope                                                                   | Cost provenance                                                                 |
 | -------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `forge telemetry costs show`           | "What did this proxy actually spend?"             | one proxy's request log (proxy-scoped)                                  | reported `$` or `unavailable`; **authoritative** spend view                     |
+| `forge telemetry costs show [id]`      | "What cost did the provider report?"              | all downstream requests, or the selected proxy                          | reported `$` or `unavailable`; **authoritative** spend view                     |
 | `forge telemetry activity [session]`   | "What did Forge's automation do this session?"    | one Forge session — operation outcomes + model calls joined by run tree | reported-or-estimated `$`, best-effort attribution                              |
 | status-line `cost` segment             | "What is my Claude session costing / quota left?" | one interactive launch; proxy mode subtracts the proxy launch baseline  | Claude's reported cost/quota, or proxy-reported `~$`; never recomputed by Forge |
 | status-line `forge +$Y` (`forge_cost`) | "What did Forge add on top of my session?"        | one Forge session, **excluding** the main interactive harness           | reported-or-nothing (subscription/OAuth → nothing)                              |
