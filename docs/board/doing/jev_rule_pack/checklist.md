@@ -4,7 +4,8 @@
 
 Execution started on 2026-10-14. A2 is active on `codex/jev-rule-pack`, based on `main` at
 `f7ce7a9a45f2e208d0fd72c74454750f4fd30e1f` after A1's closeout. The A1 explicit evaluation-identity extension is
-implemented, along with session consent/inheritance and raw-override guards. The
+implemented, along with session consent/inheritance and raw-override guards, in draft
+[PR #270](https://github.com/hapa1i/multi-forge/pull/270). The
 [initial rule/context proposal](evidence/initial-rule-review.md) is awaiting review before hook wiring. No paid A2
 evaluation has run. The [card](card.md) owns scope; the [epic checklist](../epic_jev_support/checklist.md) owns
 sequencing. A3 remains proposed and will use a separate execution branch.
@@ -62,11 +63,14 @@ already accepts an explicit `RunIdentity`. Consumer invocation accounting needs 
 
 ## Separate prerequisite: Claude feedback permissions
 
-The [Claude feedback permissions card](../../proposed/claude_policy_feedback_permissions/card.md) owns removal of the
-shared responder's explicit allow, regression coverage for all policy users, native Claude receipt/permission evidence
-and its own change-log entry/PR. This affects TDD, coding standards and supervisors without Jev. A2's Claude delivery
-gate depends on that fix; do not bury it in the warning formatter or claim B3's Codex trial proves Claude behavior.
-Offline A2 work can proceed while the prerequisite remains proposed.
+The [Claude feedback permissions prerequisite, PR #269](https://github.com/hapa1i/multi-forge/pull/269), owns removal of
+the shared responder's explicit allow, regression coverage for all policy users, native Claude receipt/permission
+evidence and its own change-log entry/PR. This affects TDD, coding standards and supervisors without Jev. A2's Claude
+delivery gate depends on that fix; do not bury it in the warning formatter or claim B3's Codex trial proves Claude
+behavior. It is implemented on `codex/claude-policy-feedback-permissions`, with focused, aggregate and hook integration
+checks passing. Its eight-case synthetic native trial is prepared but awaits separate API-spend approval. A2's offline
+work can continue. Consume the independent card and reconcile these PR links when integrating the merged fix; the
+original proposal is removed from this branch so it cannot create a duplicate board state.
 
 ## Slice 1: reviewed rules and offline evaluation contract
 
@@ -318,8 +322,10 @@ Paths under `tests/src/policy/rule_pack/` and the A2 harness/integration test na
   telemetry verification. Record unsupported contexts and any unsatisfied gate explicitly.
 - [ ] Reconcile shared cache/audit and A1 contract changes with the epic/A3; A2 results do not validate A3 plan
   alignment. Keep the epic active and A3 unactivated unless separately selected.
-- [ ] Open the A2 PR with concise scope, limitations and actual validation. After review/merge, record the merged head,
-  finish design/end-user sync, add the completed-work change-log entry and propose durable notes for human review.
+- [x] Open the draft A2 PR with concise implemented scope, limitations, actual validation and outstanding acceptance
+  gates. [PR #270](https://github.com/hapa1i/multi-forge/pull/270) is attached to this task.
+- [ ] After review/merge, record the merged head, finish design/end-user sync, add the completed-work change-log entry
+  and propose durable notes for human review.
 - [ ] Move A2 to `done/` only when its acceptance gates are satisfied and the code is merged; repoint inbound links and
   update the epic's next-member decision.
 
@@ -337,6 +343,10 @@ helpers now bind the existing bundle-config acknowledgment to the session instan
 schema bump. The raw override guards cover parent objects, bundle/config writes, wildcard expansion, effective
 activation and resets that would uncover old intent. Disabling through raw overrides revokes both grant layers. These
 are preparatory guards; the validating activation command, rule registry and dispatch remain unimplemented.
+
+The consent foundation is committed as `1a029213`. The independent Claude permission fix is committed as `a281be33` on
+its own branch, in draft [PR #269](https://github.com/hapa1i/multi-forge/pull/269). The initial rule/context choice,
+human labels and native trial approval remain open; no A2 quality or native-delivery result is claimed by either draft.
 
 The focused consent/override/CLI tests and inheritance/direct-command regressions passed 165 tests. Docker integration
 passed all six derivation paths (same-directory fork, new worktree, existing worktree, native resume, transfer resume

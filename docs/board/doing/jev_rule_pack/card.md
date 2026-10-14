@@ -6,13 +6,15 @@ Epic: [Jev support](../epic_jev_support/card.md). Member **A2**. Depends on
 2026-10-11.
 
 Claude delivery also requires the separately reviewed
-[feedback-permissions fix](../../proposed/claude_policy_feedback_permissions/card.md), currently proposed.
+[feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), implemented separately and awaiting
+native evidence before merge.
 
-Status: **doing**, activated 2026-10-14 for checklist planning on `codex/jev-rule-pack`, based on `main` at `f7ce7a9a`
-after A1's closeout. The [execution checklist](checklist.md) records the proposed integration, evaluation gates and
-outstanding decisions. Offline execution started on 2026-10-14 with explicit evaluation identity and session consent
-boundaries. The [initial rule/context proposal](evidence/initial-rule-review.md) remains open; no paid A2 evaluation has
-run and the bundle is not yet registered for activation.
+Status: **doing**, activated 2026-10-14 on `codex/jev-rule-pack`, based on `main` at `f7ce7a9a` after A1's closeout. The
+[execution checklist](checklist.md) records the proposed integration, evaluation gates and outstanding decisions.
+Offline execution started on 2026-10-14 with explicit evaluation identity and session consent boundaries. The
+[initial rule/context proposal](evidence/initial-rule-review.md) remains open; no paid A2 evaluation has run and the
+bundle is not yet registered for activation. Draft [PR #270](https://github.com/hapa1i/multi-forge/pull/270) contains
+the completed foundations and tracks this card's remaining execution.
 
 ## Problem and outcome
 

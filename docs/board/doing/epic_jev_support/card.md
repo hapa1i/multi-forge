@@ -2,8 +2,8 @@
 
 Status: **doing**, activated 2026-10-14 with A1. The [coordination checklist](checklist.md) tracks member gates and
 handoffs. A1 shipped through [PR #268](https://github.com/hapa1i/multi-forge/pull/268), merged as `9778007a` on
-2026-10-14. A2 is now active for checklist planning on `codex/jev-rule-pack`, based on the A1 closeout at `f7ce7a9a`. A3
-remains proposed.
+2026-10-14. A2 is now executing on `codex/jev-rule-pack`, based on the A1 closeout at `f7ce7a9a`, with its foundations
+in draft [PR #270](https://github.com/hapa1i/multi-forge/pull/270). A3 remains proposed.
 
 ## Problem and outcome
 
@@ -36,9 +36,9 @@ Selected next: A2 establishes the first policy consumer and exercises warning de
 Its [checklist](../jev_rule_pack/checklist.md) owns implementation, rule-quality gates and new data/spend decisions.
 This is a single-card branch; A2 does not make plan-alignment decisions for A3.
 
-The separately proposed [Claude feedback-permissions fix](../../proposed/claude_policy_feedback_permissions/card.md)
-gates A2's Claude delivery acceptance. It affects existing policy users and ships independently; it is not an extra Jev
-member or a shared implementation batch.
+The independent [Claude feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), gates A2's
+Claude delivery acceptance. Its fixture checks pass; the native trial awaits approval. It affects existing policy users
+and ships independently, outside the Jev membership and branch.
 
 ## Shared contract
 

@@ -2,12 +2,13 @@
 
 ## Current focus
 
-Plan [A2: warnings-only rule pack](../jev_rule_pack/checklist.md) on `codex/jev-rule-pack`, based on `main` at
+Execute [A2: warnings-only rule pack](../jev_rule_pack/checklist.md) on `codex/jev-rule-pack`, based on `main` at
 `f7ce7a9a` after A1's closeout on 2026-10-14. [A1](../../done/jev_client_probes/card.md) shipped through
 [PR #268](https://github.com/hapa1i/multi-forge/pull/268) at `9778007a`. The epic stays active with one selected member.
 A1's [evidence report](../../done/jev_client_probes/evidence/2026-10-14/report.md) records successful ZDR-required
-routing, latency, accounting and limitations. A2 implementation has not started and A3 remains proposed; neither
-decision quality nor quota savings has been evaluated.
+routing, latency, accounting and limitations. A2's session-consent and explicit evaluation-identity foundations are in
+draft [PR #270](https://github.com/hapa1i/multi-forge/pull/270); rule/context review and quality evaluation remain open.
+A3 remains proposed. Neither decision quality nor quota savings has been evaluated.
 
 ## Activation and sequence
 
@@ -28,8 +29,8 @@ A2 is not an A3 dependency. Neither member's quality evidence validates the othe
 request gates consumer availability, even when offline transport is ready.
 
 A2's Claude delivery gate also needs the independent
-[feedback-permissions fix](../../proposed/claude_policy_feedback_permissions/card.md). It remains proposed, outside this
-epic's membership; A2's offline work can continue without a shared branch.
+[feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269). It is implemented on its own branch
+and remains draft pending native evidence, outside this epic's membership. A2's offline work can continue separately.
 
 ## Gate 1: shared transport handoff
 
