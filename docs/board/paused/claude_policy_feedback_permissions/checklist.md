@@ -2,10 +2,13 @@
 
 ## Current focus
 
+Paused on 2026-10-15 after the user chose to skip paid native testing and keep PR #269 in draft.
+
 Execution started 2026-10-14 on `codex/claude-policy-feedback-permissions`, based on `main` at `f7ce7a9a`, in a separate
 managed worktree. This is A2's independent prerequisite; it does not add Jev behavior or change the epic's membership.
 The [card](card.md) owns the acceptance contract. [PR #269](https://github.com/hapa1i/multi-forge/pull/269) is open in
-draft. Native inference has not been authorized or run.
+draft. On 2026-10-15 the user chose to skip paid native testing and keep the PR in draft. Native receipt remains
+unverified; no native inference has run.
 
 ## Response and fixtures
 
@@ -23,7 +26,8 @@ draft. Native inference has not been authorized or run.
 - [x] Read the local CLI version/help without inference: Claude Code `2.1.296` on 2026-10-14.
 - [x] Prepare synthetic Write/Edit inputs, isolated configuration and hook capture under `evidence/`. Record selected
   authentication/billing route, model, exact commands, turn/tool limits, wall deadline and cleanup ownership.
-- [ ] Obtain explicit approval for the bounded native trial. Existing A1 approvals do not cover it.
+- [x] Record the user decision: skip paid native testing and keep PR #269 in draft (2026-10-15). Do not run the prepared
+  trial or substitute another paid/native route. A later trial requires a new explicit request and approval.
 - [ ] Observe default-mode permission handling and model receipt of an authored marker in `additionalContext`, without
   explicit hook approval. Use an explicit allow rule/mode as a control; bypass mode cannot prove default permissions.
 - [ ] Compare feedback off: absent model context, retained diagnostics/audit and unchanged native permission behavior.
@@ -54,7 +58,7 @@ was run. Native receipt and permission evidence remain pending.
 The [native trial plan](evidence/native-plan.md) and [exact manifest](evidence/native-manifest.json) are prepared. The
 driver passed 16 offline tests, including refusal of altered manifests, synthetic output/permission validation, separate
 homes, redacted saved output and stopping/reaping after a timeout or native failure. These fixtures do not claim a
-native result; the eight-case API trial still needs its own explicit approval.
+native result. The user subsequently chose to skip the eight-case API trial; the evidence gate remains open.
 
 Implementation commit: `a281be33`. Aggregate verification passed: `make test-unit` (10,923 passed; 117 integration tests
 deselected), `make test-regression` (1,914 passed), full `make pre-commit` and both staged/working-tree

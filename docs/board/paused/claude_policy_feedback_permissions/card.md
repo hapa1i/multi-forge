@@ -1,9 +1,11 @@
 # Preserve Claude permissions in policy feedback
 
-Status: **doing**, activated 2026-10-14 on `codex/claude-policy-feedback-permissions`, based on `main` at `f7ce7a9a`.
-Identified during the [A2 rule-pack](../../proposed/jev_rule_pack/card.md) review. This is an independent fix and a
-prerequisite for A2's Claude warning-delivery gate, outside the Jev epic's membership. Its [checklist](checklist.md)
-tracks fixture validation and the outstanding native trial before A2 consumes the changed responder.
+Status: **paused** on 2026-10-15 at the native evidence gate; activated 2026-10-14 on
+`codex/claude-policy-feedback-permissions`, based on `main` at `f7ce7a9a`. Identified during the
+[A2 rule-pack](../../proposed/jev_rule_pack/card.md) review. This is an independent fix and a prerequisite for A2's
+Claude warning-delivery gate, outside the Jev epic's membership. Its [checklist](checklist.md) tracks fixture validation
+and the native evidence gap before A2 consumes the changed responder. On 2026-10-15 the user chose to skip paid native
+testing and keep [PR #269](https://github.com/hapa1i/multi-forge/pull/269) in draft.
 
 ## Problem and outcome
 
@@ -33,7 +35,8 @@ behavior for Codex.
 - Run fixture-backed hook integrations through `./scripts/test-integration.sh`. Prepare a separate quota-bounded native
   Claude trial with synthetic Write/Edit actions, recorded CLI version and permission configuration. Verify both model
   receipt and the native permission flow in default mode, with a configured allow rule/mode as a control. Do not use a
-  bypass-permissions trial to claim default-mode behavior. Native spend/quota authorization remains outstanding.
+  bypass-permissions trial to claim default-mode behavior. The user chose to skip the prepared paid trial; this
+  acceptance gate remains unsatisfied.
 - Record the observed behavior under this card's `evidence/`. A response-shape unit test or stderr capture does not
   establish native delivery. If context-only feedback fails on an admitted runtime, record that limitation and keep the
   A2 delivery gate open rather than silently restoring blanket permission approval.

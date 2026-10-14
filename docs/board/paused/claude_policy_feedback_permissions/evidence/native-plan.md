@@ -1,6 +1,7 @@
 # Native Claude permission/context trial
 
-Status: prepared for approval, not run. No existing Jev/A1 authorization applies.
+Status: **not run; skipped by user decision on 2026-10-15**. Keep PR #269 in draft. Preserve this manifest as an
+unexecuted proposal; it is not an active approval request or permission to use another paid/native route.
 
 ## Exact scope
 
@@ -53,11 +54,11 @@ results will establish receipt on this binary.
 
 ## Approval and execution
 
-After offline checks pass and this exact manifest is approved:
+Only if the user later requests this trial and explicitly approves its revalidated scope and budget:
 
 ```bash
 uv run python scripts/experiments/claude-hooks/policy-feedback.py \
-  --run docs/board/doing/claude_policy_feedback_permissions/evidence/native-manifest.json \
+  --run docs/board/paused/claude_policy_feedback_permissions/evidence/native-manifest.json \
   --output /private/tmp/forge-claude-policy-feedback-20261014
 ```
 

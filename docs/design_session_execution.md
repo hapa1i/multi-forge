@@ -408,7 +408,7 @@ See the [B4 evidence and limits](board/done/codex_stop_review/evidence/README.md
 Claude policy feedback uses `hookSpecificOutput.additionalContext` with `hookEventName=PreToolUse` and no
 `permissionDecision`. The native permission gate remains separate from Forge's policy verdict. Turning
 `policy_summary_feedback` off removes that model-context emission; operator warnings, audit and policy blocks remain.
-The [permission-feedback card](board/doing/claude_policy_feedback_permissions/checklist.md) tracks native receipt and
+The [permission-feedback card](board/paused/claude_policy_feedback_permissions/checklist.md) tracks native receipt and
 permission evidence independently of B3's Codex admission.
 
 ### I.3 Codex operational guards (probe-churn + enrollment)
