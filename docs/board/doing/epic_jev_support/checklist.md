@@ -5,7 +5,8 @@
 Coordinate [A1: client and probes](../jev_client_probes/card.md), active since 2026-10-14 on `codex/jev-client-probes`
 from `main` at `1ae9667d` (`v1.1.0`). This branch owns A1 and epic coordination, not an A1–A3 implementation batch.
 
-A1's implementation and approved synthetic captures are complete and under PR verification. Its
+A1's implementation and approved synthetic captures are complete in
+[PR #268](https://github.com/hapa1i/multi-forge/pull/268), awaiting review and merge. Its
 [evidence report](../jev_client_probes/evidence/2026-10-14/report.md) records successful ZDR-required routing, latency,
 accounting and limitations. A2/A3 remain proposed; neither decision quality nor quota savings has been evaluated.
 

@@ -2,8 +2,9 @@
 
 ## Current focus
 
-A1 is implemented and verified, with PR publication next on `codex/jev-client-probes`, based on `main` at `1ae9667d`
-(`v1.1.0`). The [Jev epic checklist](../epic_jev_support/checklist.md) owns downstream sequencing.
+A1 is implemented and verified in [PR #268](https://github.com/hapa1i/multi-forge/pull/268), awaiting review on
+`codex/jev-client-probes`, based on `main` at `1ae9667d` (`v1.1.0`). The
+[Jev epic checklist](../epic_jev_support/checklist.md) owns downstream sequencing.
 
 The user approved four early synthetic requests and then 25 measurement requests; all 29 physical requests are accounted
 for in the [evidence report](evidence/2026-10-14/report.md). ZDR-required Choice/Noul/Score routing succeeded. Live
@@ -249,5 +250,6 @@ at that planning checkpoint.
 - Live CLI readback: all 25 measurement request IDs found; cost joins, missing cost and proxy-metrics isolation passed.
   See [operator evidence](evidence/2026-10-14/observability.json).
 
-Planning is committed as `bde11e5f`. Implementation commit and PR link follow here; neither A1 nor the epic is being
-closed before merge.
+Planning is committed as `bde11e5f`; implementation is `04f3c01d`, the tested code head.
+[PR #268](https://github.com/hapa1i/multi-forge/pull/268) is open against `main`. This handoff record is a docs-only
+follow-up. Neither A1 nor the epic closes before review and merge.
