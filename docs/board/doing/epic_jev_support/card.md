@@ -2,8 +2,8 @@
 
 Status: **doing**, activated 2026-10-14 with A1. The [coordination checklist](checklist.md) tracks member gates and
 handoffs. A1 shipped through [PR #268](https://github.com/hapa1i/multi-forge/pull/268), merged as `9778007a` on
-2026-10-14. A2 is now executing on `codex/jev-rule-pack`, based on the A1 closeout at `f7ce7a9a`, with its foundations
-in draft [PR #270](https://github.com/hapa1i/multi-forge/pull/270). A3 remains proposed.
+2026-10-14. A2 is now executing on `codex/jev-rule-pack`, rebased onto `main` at `18b5670e`, with its foundations in
+draft [PR #270](https://github.com/hapa1i/multi-forge/pull/270). A3 remains proposed.
 
 ## Problem and outcome
 
@@ -36,10 +36,10 @@ Selected next: A2 establishes the first policy consumer and exercises warning de
 Its [checklist](../jev_rule_pack/checklist.md) owns implementation, rule-quality gates and new data/spend decisions.
 This is a single-card branch; A2 does not make plan-alignment decisions for A3.
 
-The independent [Claude feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), gates A2's
-Claude delivery acceptance. Its fixture checks pass, but the user chose on 2026-10-15 to skip paid native testing and
-keep that PR in draft. The prerequisite card is paused at its native evidence gate, outside the Jev membership and
-branch.
+The independent [Claude feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), shipped as
+`e9c144eb` and is included in A2's rebased branch. Its
+[closeout](../../done/claude_policy_feedback_permissions/checklist.md#merged-closeout) records the decision to merge
+with native testing skipped. It remains outside this epic's membership, and A2's native delivery gate stays open.
 
 ## Shared contract
 

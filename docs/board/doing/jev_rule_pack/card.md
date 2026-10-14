@@ -5,13 +5,15 @@ Epic: [Jev support](../epic_jev_support/card.md). Member **A2**. Depends on
 [B3: warnings Codex can see](../../done/codex_policy_warnings/card.md), shipped through PR #262 and closed on
 2026-10-11.
 
-Claude delivery also requires the separately reviewed
-[feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), implemented separately and awaiting
-native evidence before merge. The user chose on 2026-10-15 to skip paid native testing and keep that PR in draft.
+The independent [feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), shipped as
+`e9c144eb` and is included in this branch. Its
+[closeout](../../done/claude_policy_feedback_permissions/checklist.md#merged-closeout) records the user's decision to
+merge with paid native testing skipped. A2 still needs its own native warning-delivery evidence.
 
-Status: **doing**, activated 2026-10-14 on `codex/jev-rule-pack`, based on `main` at `f7ce7a9a` after A1's closeout. The
-[execution checklist](checklist.md) records the proposed integration, evaluation gates and outstanding decisions.
-Offline execution started on 2026-10-14 with explicit evaluation identity and session consent boundaries. The
+Status: **doing**, activated 2026-10-14 on `codex/jev-rule-pack` from `main` at `f7ce7a9a` after A1's closeout, and
+rebased onto `18b5670e` on 2026-10-15 after the permission fix's closeout. The [execution checklist](checklist.md)
+records the proposed integration, evaluation gates and outstanding decisions. Offline execution started on 2026-10-14
+with explicit evaluation identity and session consent boundaries. The
 [wrapper evidence contract](evidence/initial-rule-review.md) follows the user's 2026-10-15 choice to keep broader
 wrappers. It now has 14 constructed hook-shaped examples and an offline preparation harness, with human labels and
 quality gates still open. No paid A2 evaluation has run and the bundle is not yet registered for activation. Draft

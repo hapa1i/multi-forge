@@ -2,14 +2,14 @@
 
 ## Current focus
 
-Execute [A2: warnings-only rule pack](../jev_rule_pack/checklist.md) on `codex/jev-rule-pack`, based on `main` at
-`f7ce7a9a` after A1's closeout on 2026-10-14. [A1](../../done/jev_client_probes/card.md) shipped through
-[PR #268](https://github.com/hapa1i/multi-forge/pull/268) at `9778007a`. The epic stays active with one selected member.
-A1's [evidence report](../../done/jev_client_probes/evidence/2026-10-14/report.md) records successful ZDR-required
-routing, latency, accounting and limitations. A2's session-consent and explicit evaluation-identity foundations are in
-draft [PR #270](https://github.com/hapa1i/multi-forge/pull/270); the user selected broader wrappers on 2026-10-15. Its
-revised evidence contract and provisional corpus do not yet establish quality. A3 remains proposed. Neither decision
-quality nor quota savings has been evaluated.
+Execute [A2: warnings-only rule pack](../jev_rule_pack/checklist.md) on `codex/jev-rule-pack`, rebased onto `main` at
+`18b5670e` after the Claude permission fix's closeout on 2026-10-15. [A1](../../done/jev_client_probes/card.md) shipped
+through [PR #268](https://github.com/hapa1i/multi-forge/pull/268) at `9778007a`. The epic stays active with one selected
+member. A1's [evidence report](../../done/jev_client_probes/evidence/2026-10-14/report.md) records successful
+ZDR-required routing, latency, accounting and limitations. A2's session-consent and explicit evaluation-identity
+foundations are in draft [PR #270](https://github.com/hapa1i/multi-forge/pull/270); the user selected broader wrappers
+on 2026-10-15. Its revised evidence contract and provisional corpus do not yet establish quality. A3 remains proposed.
+Neither decision quality nor quota savings has been evaluated.
 
 ## Activation and sequence
 
@@ -29,10 +29,10 @@ quality nor quota savings has been evaluated.
 A2 is not an A3 dependency. Neither member's quality evidence validates the other. A valid live ZDR-required Decisions
 request gates consumer availability, even when offline transport is ready.
 
-A2's Claude delivery gate also needs the independent
-[feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269). It is implemented on its own branch
-and remains draft with its card paused after the user chose on 2026-10-15 to skip paid native testing. The native
-evidence gate stays open, outside this epic's membership. A2's offline work can continue separately.
+A2 now includes the independent [feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269),
+merged as `e9c144eb`. Its [closeout](../../done/claude_policy_feedback_permissions/checklist.md#merged-closeout) records
+the user's decision to merge with paid native testing skipped. The fix is outside this epic's membership; A2's native
+warning-delivery evidence remains its own open gate.
 
 ## Gate 1: shared transport handoff
 

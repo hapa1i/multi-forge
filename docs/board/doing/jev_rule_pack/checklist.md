@@ -2,10 +2,10 @@
 
 ## Current focus
 
-Execution started on 2026-10-14. A2 is active on `codex/jev-rule-pack`, based on `main` at
-`f7ce7a9a45f2e208d0fd72c74454750f4fd30e1f` after A1's closeout. The A1 explicit evaluation-identity extension is
-implemented, along with session consent/inheritance and raw-override guards, in draft
-[PR #270](https://github.com/hapa1i/multi-forge/pull/270). The
+Execution started on 2026-10-14. A2 is active on `codex/jev-rule-pack`, originally based on `main` at
+`f7ce7a9a45f2e208d0fd72c74454750f4fd30e1f` after A1's closeout and rebased onto `18b5670e` on 2026-10-15 after the
+Claude permission fix's closeout. The A1 explicit evaluation-identity extension is implemented, along with session
+consent/inheritance and raw-override guards, in draft [PR #270](https://github.com/hapa1i/multi-forge/pull/270). The
 [wrapper evidence contract](evidence/initial-rule-review.md) now keeps broader wrappers under the user's 2026-10-15
 decision. Offline preparation covers 14 constructed, unadjudicated hook actions. Human labels, thresholds and real scope
 fact resolution remain open before hook wiring/evaluation. No paid A2 evaluation has run. The [card](card.md) owns
@@ -65,15 +65,16 @@ already accepts an explicit `RunIdentity`. Consumer invocation accounting needs 
 
 ## Separate prerequisite: Claude feedback permissions
 
-The [Claude feedback permissions prerequisite, PR #269](https://github.com/hapa1i/multi-forge/pull/269), owns removal of
-the shared responder's explicit allow, regression coverage for all policy users, native Claude receipt/permission
-evidence and its own change-log entry/PR. This affects TDD, coding standards and supervisors without Jev. A2's Claude
-delivery gate depends on that fix; do not bury it in the warning formatter or claim B3's Codex trial proves Claude
-behavior. It is implemented on `codex/claude-policy-feedback-permissions`, with focused, aggregate and hook integration
-checks passing. On 2026-10-15 the user chose to skip paid native testing and keep that PR in draft; its card is paused
-at the unverified native gate. A2's offline work can continue without running that trial or substituting another native
-route. Consume the independent card and reconcile these PR links when integrating the merged fix; the original proposal
-is removed from this branch so it cannot create a duplicate board state.
+The [Claude feedback permissions prerequisite, PR #269](https://github.com/hapa1i/multi-forge/pull/269), merged as
+`e9c144eb`; its [closeout](../../done/claude_policy_feedback_permissions/checklist.md#merged-closeout) is on `main` at
+`18b5670e`. This branch includes both through the 2026-10-15 rebase. The fix removes the shared responder's explicit
+allow for all policy users. Its regression matrix covers injected outcomes through the shared response/audit path,
+without claiming individual policy evaluation or supervisor registration coverage. Read-hygiene retains its documented
+input-correction exception.
+
+The user authorized merge after choosing to skip paid native testing. Native Claude receipt/permission evidence remains
+absent; B3's Codex trial does not prove it. A2's native warning-delivery gate stays open, and this rebase authorizes no
+native trial or paid Jev request. Keep only the merged `done/` card when consuming this prerequisite.
 
 ## Slice 1: reviewed rules and offline evaluation contract
 
@@ -355,16 +356,16 @@ five tests, including two evaluations in one interactive run: four distinct atte
 environment and retained parent/root ancestry. The harness warned about missing `GEMINI_API_KEY`; these five tests use
 an injected transport and passed without it. A2 child-run creation and cache behavior remain pending.
 
-The explicit-identity change is committed as `e0d02ed4`; full `make pre-commit` passed before committing. Consent
-helpers now bind the existing bundle-config acknowledgment to the session instance and settings without a manifest
-schema bump. The raw override guards cover parent objects, bundle/config writes, wildcard expansion, effective
+The explicit-identity change was originally committed as `e0d02ed4`; full `make pre-commit` passed before committing.
+Consent helpers now bind the existing bundle-config acknowledgment to the session instance and settings without a
+manifest schema bump. The raw override guards cover parent objects, bundle/config writes, wildcard expansion, effective
 activation and resets that would uncover old intent. Disabling through raw overrides revokes both grant layers. These
 are preparatory guards; the validating activation command, rule registry and dispatch remain unimplemented.
 
-The consent foundation is committed as `1a029213`. The independent Claude permission fix is committed as `a281be33` on
-its own branch, in draft [PR #269](https://github.com/hapa1i/multi-forge/pull/269). On 2026-10-15 the user selected
-broader wrappers and chose to skip paid native testing. Human labels and quality gates remain open; no A2 quality or
-native-delivery result is claimed by either draft.
+The consent foundation was originally committed as `1a029213`. The independent Claude permission fix began at `a281be33`
+and later merged through [PR #269](https://github.com/hapa1i/multi-forge/pull/269) as `e9c144eb`. On 2026-10-15 the user
+selected broader wrappers and chose to skip paid native testing. Human labels and quality gates remain open; neither the
+A2 draft nor the merged permission fix establishes native delivery.
 
 The focused consent/override/CLI tests and inheritance/direct-command regressions passed 165 tests. Docker integration
 passed all six derivation paths (same-directory fork, new worktree, existing worktree, native resume, transfer resume
@@ -388,10 +389,18 @@ annotations, preserves complete supplied inputs or rejects oversized requests, a
 `uv run pytest tests/src/scripts/test_jev_rule_pack_eval.py tests/src/scripts/test_jev_probe.py -q` passed 32 tests. The
 [preparation report](evidence/wrapper-preparation.json) records request hashes and sizes with zero dispatches and
 quality acceptance false. Host-owned fact resolution, human labels, numeric gates, prediction/metric evaluation and hook
-wiring remain unimplemented; the permission prerequisite stays draft and paused.
+wiring remain unimplemented.
 
 Full `make pre-commit`, the reproducible offline preparation report and `git diff --check` pass for this update. No
 runtime policy code changed in this update; the aggregate and integration results above apply to the foundations.
+
+2026-10-15 rebase: all six A2 commits rebased without conflicts onto `main` at `18b5670e`, including the merged Claude
+permission fix and its closeout. The A2 diff under `src/`, `tests/` and `scripts/` is byte-for-byte unchanged from the
+previous PR head, `f5d57f1d`. The focused consent, override, judgment, feedback and probe suites passed 318 tests. The
+no-`.env` integration rerun passed all 43 selected judgment-observability, session-derivation, policy CLI and
+policy-hook tests, using injected responses and fixture runtimes. Full `make pre-commit` passed, and the offline
+preparation report reproduced exactly. The follow-up reconciles prerequisite links and status; no paid/native test ran,
+and quality and native-delivery gates remain open.
 
 ## Planning verification
 
