@@ -1,0 +1,76 @@
+[
+  {
+    "run_directory": "jev-measurement-20261014-01",
+    "downstream_attempts": 24,
+    "usage_events": 24,
+    "costs": {
+      "period": "all",
+      "proxy_id": null,
+      "total_cost_micros": 1746,
+      "total_cost_usd": 0.001746,
+      "total_requests": 24,
+      "reported_requests": 24,
+      "unavailable_requests": 0,
+      "skipped_legacy_schema": 0,
+      "interactive_cost_micros": 0,
+      "by_verb": {
+        "jev": {
+          "cost_micros": 1746,
+          "reported": true,
+          "request_count": 24,
+          "invocations": 1
+        }
+      },
+      "by_model": {
+        "typesafe/jev-1.13-20260917": {
+          "cost_micros": 1746,
+          "reported": true,
+          "input_tokens": 41607,
+          "output_tokens": 1776,
+          "requests": 24
+        }
+      }
+    },
+    "trace_lookup_and_explain_passed": 24,
+    "fake_proxy_metrics": false,
+    "failed_attempts": 1,
+    "commands_checked": 53
+  },
+  {
+    "run_directory": "jev-measurement-20261014-02",
+    "downstream_attempts": 1,
+    "usage_events": 1,
+    "costs": {
+      "period": "all",
+      "proxy_id": null,
+      "total_cost_micros": 0,
+      "total_cost_usd": 0.0,
+      "total_requests": 1,
+      "reported_requests": 0,
+      "unavailable_requests": 1,
+      "skipped_legacy_schema": 0,
+      "interactive_cost_micros": 0,
+      "by_verb": {
+        "jev": {
+          "cost_micros": 0,
+          "reported": false,
+          "request_count": 1,
+          "invocations": 1
+        }
+      },
+      "by_model": {
+        "typesafe/jev-1.13": {
+          "cost_micros": 0,
+          "reported": false,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "requests": 1
+        }
+      }
+    },
+    "trace_lookup_and_explain_passed": 1,
+    "fake_proxy_metrics": false,
+    "failed_attempts": 1,
+    "commands_checked": 7
+  }
+]

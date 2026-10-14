@@ -107,6 +107,17 @@ withheld.
 (stored API key, agent identity, or ChatGPT tokens). A ChatGPT login therefore needs no `codex-api` entry and is
 reported as subscription quota.
 
+### Jev Decisions credentials
+
+The Jev client uses the existing OpenRouter credential: `forge auth login -c openrouter`, or `OPENROUTER_API_KEY`.
+Environment-first resolution and `auth_ignore_env` apply normally. A configured key establishes authentication
+readiness; the selected model must also accept a Decisions request with ZDR required. Forge always sends
+`provider.zdr: true` for Jev, including retries. Proxy ZDR opt-outs do not apply.
+
+Jev requests incur OpenRouter API spend. The repository's [probe harness](../../scripts/experiments/jev/README.md)
+prints a dry-run manifest by default and requires explicit approval for a bounded live run. This client does not
+activate Jev policy rules or the supervisor cascade. Missing reported cost remains unknown in telemetry.
+
 ### Anthropic API key disambiguation
 
 `anthropic-api` is for Forge subprocess auth (pay-per-token API key). It is **NOT**:

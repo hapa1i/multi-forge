@@ -5,9 +5,9 @@
 Coordinate [A1: client and probes](../jev_client_probes/card.md), active since 2026-10-14 on `codex/jev-client-probes`
 from `main` at `1ae9667d` (`v1.1.0`). This branch owns A1 and epic coordination, not an A1–A3 implementation batch.
 
-Implementation and live probes have not started. A1 now prepares a minimal transport and early synthetic capture before
-finalizing the larger client. Its [run controls](../jev_client_probes/checklist.md#probe-run-controls) require a
-separate bounded paid-run decision. No latency, billing, decision-quality or quota-saving result is established.
+A1's implementation and approved synthetic captures are complete and under PR verification. Its
+[evidence report](../jev_client_probes/evidence/2026-10-14/report.md) records successful ZDR-required routing, latency,
+accounting and limitations. A2/A3 remain proposed; neither decision quality nor quota savings has been evaluated.
 
 ## Activation and sequence
 
@@ -29,7 +29,7 @@ request gates consumer availability, even when offline transport is ready.
 
 ## Gate 1: shared transport handoff
 
-- [ ] Review A1's early capture outcome before it finalizes retries, telemetry and estimator assumptions. Record a
+- [x] Review A1's early capture outcome before it finalizes retries, telemetry and estimator assumptions. Record a
   failed/unavailable capture as a blocker or an explicit provisional-work decision; never as verified readiness.
 - [ ] Accept the typed boundary, size/error contract and caller-owned deadline against the epic's shared contract.
   Confirm A2 can distinguish unavailable judgments and A3 can reserve time for its reviewer.
@@ -80,4 +80,5 @@ Member checklists own behavior-level fixtures and tests. The epic verifies their
 ## Planning verification
 
 2026-10-14: initial activation and the review revisions passed `make pre-commit-md` and `git diff --check`. The final
-standalone Markdown link audit passed for 673 sources. Implementation and live-provider evidence remain open in A1.
+standalone Markdown link audit passed for 673 sources. That planning checkpoint preceded the A1 implementation and
+capture evidence linked above.

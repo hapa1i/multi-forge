@@ -2,13 +2,13 @@
 
 ## Current focus
 
-Prepare the minimal transport and early contract capture for the [card](card.md). Activated 2026-10-14 on
-`codex/jev-client-probes`, based on `main` at `1ae9667d` (`v1.1.0`). The
-[Jev epic checklist](../epic_jev_support/checklist.md) owns downstream sequencing.
+A1 is implemented and verified, with PR publication next on `codex/jev-client-probes`, based on `main` at `1ae9667d`
+(`v1.1.0`). The [Jev epic checklist](../epic_jev_support/checklist.md) owns downstream sequencing.
 
-Implementation and live probes have not started. Slice 1 establishes a small request path and a separately authorized
-synthetic capture before finalizing retries, telemetry or estimator calibration. A2/A3, Direct TypeSafe, its SDK and Jev
-Router remain outside A1. See [run controls](#probe-run-controls) for the pending paid-run decision.
+The user approved four early synthetic requests and then 25 measurement requests; all 29 physical requests are accounted
+for in the [evidence report](evidence/2026-10-14/report.md). ZDR-required Choice/Noul/Score routing succeeded. Live
+captures corrected score-rounding tolerance and the provider's HTTP 400 size-error wrapper. A2/A3, Direct TypeSafe, its
+SDK and Jev Router remain outside A1. Review/merge and consumer selection remain open.
 
 ## Verified starting points
 
@@ -46,56 +46,56 @@ literals.
 
 ## Slice 1: minimal transport and early capture
 
-- [ ] Settle the small typed interface and ownership. Proposed home: `src/forge/core/judgments/`, with an async `httpx`
+- [x] Settle the small typed interface and ownership. Proposed home: `src/forge/core/judgments/`, with an async `httpx`
   adapter and mirrored unit tests. Keep test payloads and fake transports in `tests/fixtures/jev/` or the harness;
   callers inject an `httpx` transport. Do not add a vendor SDK or a completion adapter.
-- [ ] Record the dated wire contract and provisional documentation-derived fixtures for Choice, Noul and Score. Include
+- [x] Record the dated wire contract and provisional documentation-derived fixtures for Choice, Noul and Score. Include
   complete Noul true/false criteria, required/optional response fields, distributions, identity and usage. Keep consumer
   thresholds outside the adapter and preserve requested versus resolved model identity.
-- [ ] Implement the minimum dispatch path: existing credential chain, canonical/custom URL validation, attribution
+- [x] Implement the minimum dispatch path: existing credential chain, canonical/custom URL validation, attribution
   headers, option merging followed by authoritative `provider.zdr: true`, one attempt, hard timeout and resource
   cleanup. Test no-`.env` resolution, environment/file precedence, `auth_ignore_env`, missing-key diagnostics, wrong
   bases and caller `zdr: false` without network calls. Pin an explicit model, not a moving `latest` alias.
-- [ ] Create the minimal `scripts/experiments/jev/` harness with a README and zero-network fixture/dry-run default.
+- [x] Create the minimal `scripts/experiments/jev/` harness with a README and zero-network fixture/dry-run default.
   Reuse that dispatch path. Apply the run controls below before any live request; retain bounded sanitized responses
   even if the provisional answer parser rejects them. A synthetic-only malformed-wire control may bypass local question
   validation, but never auth, ZDR, timeout, redaction or the request cap.
-- [ ] Prepare the early run manifest: one small synthetic request per question type plus one malformed request, at most
+- [x] Prepare the early run manifest: one small synthetic request per question type plus one malformed request, at most
   four physical requests, retries disabled. Record exact payloads/hashes, selected model, per-request timeout, current
   price assumptions, estimated total cost and isolated `FORGE_HOME`. Size-boundary probes belong to slice 4.
-- [ ] Obtain explicit authorization for the prepared manifest, then capture the four cases or stop early on failed
+- [x] Obtain explicit authorization for the prepared manifest, then capture the four cases or stop early on failed
   auth/routing or a run-control breach. Retain returned model/provider, IDs, tokens, cost and error shapes. A failed
   typed success or unavailable ZDR route is a failed/inconclusive gate, not permission to weaken retention.
-- [ ] Promote sanitized real responses into regression fixtures, keeping their capture provenance distinct from
+- [x] Promote sanitized real responses into regression fixtures, keeping their capture provenance distinct from
   documentation examples and constructed malformed cases. Reconcile schema disagreements before finalizing validation
   and accounting. Small captures establish observed shapes, not exhaustive correctness, latency or tokenizer accuracy.
 
-**Early evidence gate:** paid capture is not yet authorized. Offline scaffolding may proceed, but fixtures and contract
-assumptions remain provisional until the capture is reconciled. Before completing slices 2–3, record either that
-evidence or an explicit decision to continue provisionally; unavailable capture must not quietly become verified
-readiness. No valid ZDR-required route means A2/A3 remain unavailable.
+**Early evidence gate:** passed after the approved four-request capture and offline replay. All three typed shapes
+succeeded with ZDR required. The capture wrapper's decompression defect was fixed without repeating the first request;
+its original local failure remains in evidence. Later measurement corrections and remaining limitations are recorded in
+the [report](evidence/2026-10-14/report.md).
 
 ## Slice 2: validation, size admission and bounded retries
 
-- [ ] Validate supported question types, unique/nonempty IDs, Choice labels, complete Noul criteria and ordered Score
+- [x] Validate supported question types, unique/nonempty IDs, Choice labels, complete Noul criteria and ordered Score
   criteria. Validate exact answer coverage and type correspondence; reject invalid labels/legends, malformed counts,
   non-finite/out-of-range probabilities and missing required fields. Record numeric tolerances; do not invent or
   silently renormalize distributions. Preserve absent optional metadata as unknown.
-- [ ] Define typed failures with status and sanitized diagnostics: local validation, auth/permission, insufficient
+- [x] Define typed failures with status and sanitized diagnostics: local validation, auth/permission, insufficient
   credit, unsupported route, payload too large, rate limit, provider overload, ambiguous timeout, transport and invalid
   response. A documented 404 alone does not prove a ZDR refusal; retain provider details without guessing the cause.
-- [ ] Enforce an input admission policy over serialized state, all questions and criteria, with reserved headroom below
+- [x] Enforce an input admission policy over serialized state, all questions and criteria, with reserved headroom below
   the 32,000-token prompt ceiling. `tiktoken` is only in the `provider-check` dependency group, and no verified Jev
   tokenizer is available. Start with a documented conservative serialized UTF-8 byte cap; do not claim that byte count
   proves the exact provider token count or silently add a runtime tokenizer dependency.
-- [ ] Use early counts to check assumptions, then calibrate any less restrictive ratio on slice 4's varied request
+- [x] Use early counts to check assumptions, then calibrate any less restrictive ratio on slice 4's varied request
   shapes, including non-English text, code and many criteria. Keep the limit provisional until that evidence exists;
   provider 413 remains an explicit failure even below the local estimate. Never truncate, split or omit evidence
   silently, and never retry the same oversized payload.
-- [ ] Accept a caller-owned absolute monotonic deadline. Bound credential work, I/O and backoff by remaining time;
+- [x] Accept a caller-owned absolute monotonic deadline. Bound credential work, I/O and backoff by remaining time;
   propagate cancellation and close resources. Zero remaining time means zero dispatches. A3 reserves reviewer time
   before invoking this client; retries never reset the deadline.
-- [ ] Implement the status policy below with a physical-attempt limit and bounded backoff. Every attempt still requires
+- [x] Implement the status policy below with a physical-attempt limit and bounded backoff. Every attempt still requires
   ZDR. Preserve independently valid usage and IDs on failed/invalid-answer responses; a retry must not erase potentially
   billed evidence. Unknown statuses default to a visible failure without automatic retry.
 
@@ -111,22 +111,22 @@ the preceding attempt was free. Keep local pre-dispatch rejection separate from 
 
 ## Slice 3: compatible usage and operator visibility
 
-- [ ] Implement a small Decisions-specific emission adapter through existing telemetry owners. Explicitly map
+- [x] Implement a small Decisions-specific emission adapter through existing telemetry owners. Explicitly map
   `input_tokens`/`output_tokens` and valid reported cost; preserve existing completion callers. Keep downstream schema
   v2 and usage schema v1, including their existing field sets and literals. No parallel ledger or history migration.
-- [ ] Mint a nonempty local `request_id` and distinct `downstream_event_id` per physical attempt; group logical retries
+- [x] Mint a nonempty local `request_id` and distinct `downstream_event_id` per physical attempt; group logical retries
   through run identity. Record requested/resolved model, selected provider and returned provider IDs separately. Supply
   the existing source/backend attribution needed by cost readers; do not invent a proxy or session.
-- [ ] Use existing `reporter="openrouter"`, `request_mode="non_streaming"` and `confidence="reported"` when cost is
+- [x] Use existing `reporter="openrouter"`, `request_mode="non_streaming"` and `confidence="reported"` when cost is
   present, otherwise `confidence="unavailable"`. Populate cost and provider-trace cost fields consistently; convert to
   established monetary units with tested rounding. Explicit zero and absent cost differ; model confidence is separate.
-- [ ] Use the existing usage `route="core_llm"` for the direct Forge HTTP invocation channel. Identify Jev through
+- [x] Use the existing usage `route="core_llm"` for the direct Forge HTTP invocation channel. Identify Jev through
   existing command/model/provider fields, not a new route literal. Document that compatibility choice without making the
   typed client implement `LLMClient`; verify baseline readers accept emitted records.
-- [ ] Establish standalone probe run identity through existing ownership. Check with and without a managed session; keep
+- [x] Establish standalone probe run identity through existing ownership. Check with and without a managed session; keep
   attempts, logical runs and future reviewer escalations distinguishable. Duplicate writes for an attempt count once,
   while retries remain separate. Preserve previously stored v2 cost/trace records alongside new Jev records.
-- [ ] Exercise trace list/show/explain, cost by-model/by-verb and activity in an isolated `FORGE_HOME`. Assert token
+- [x] Exercise trace list/show/explain, cost by-model/by-verb and activity in an isolated `FORGE_HOME`. Assert token
   mapping, request-ID lookup, null/known costs and retry counts. Existing proxy metrics must not gain fake Jev traffic;
   document which surfaces apply without a session. Run focused integration tests during this slice and sync telemetry
   design as the accounting change lands.
@@ -135,33 +135,33 @@ the preceding attempt was free. Keep local pre-dispatch rejection separate from 
 
 These controls apply to the early capture and later measurement runs. No paid run is authorized by this checklist.
 
-- [ ] Require an explicit live flag and an authorized fixed manifest: endpoint/model, fixture hashes, request shapes,
+- [x] Require an explicit live flag and an authorized fixed manifest: endpoint/model, fixture hashes, request shapes,
   repetition counts, deadlines, retry policy, maximum physical requests and dated pricing assumptions. Count all retries
   and control probes; reject dynamic unbounded fan-out.
-- [ ] Use a static per-run cost estimate and a hard physical-request counter, not per-attempt cost reservations. For
+- [x] Use a static per-run cost estimate and a hard physical-request counter, not per-attempt cost reservations. For
   ordinary single-question requests, `N * 32,000 * input_price` is a conservative planning estimate under the catalog's
   input/output pricing assumptions. Validate those assumptions first; give multi-question and over-limit controls
   separate estimates rather than treating 32,000 as a proven maximum billed input for every shape.
-- [ ] Stop on reported cost above the manifest's per-request allowance, unexpected billed usage/model identity or
+- [x] Stop on reported cost above the manifest's per-request allowance, unexpected billed usage/model identity or
   changed pricing assumptions. Retain missing cost as unknown. A post-response check cannot undo a charge, and a static
   estimate is not a guaranteed invoice cap; do not advertise it as one.
-- [ ] Use an isolated `FORGE_HOME` for all live attempts and copy no existing telemetry or sessions into it. Resolve
+- [x] Use an isolated `FORGE_HOME` for all live attempts and copy no existing telemetry or sessions into it. Resolve
   credentials read-only through the existing owner; provide only the required secret to the isolated process, never the
   full credentials file. Verify no real-home telemetry/configuration mutation.
-- [ ] Retain sanitized evidence under this card's `evidence/`: manifests, capture records, provenance, results and
+- [x] Retain sanitized evidence under this card's `evidence/`: manifests, capture records, provenance, results and
   verification. Link promoted test fixtures back to the capture. Keep secrets/raw private data out of both locations;
   use synthetic state first. Repository examples require a separate explicit data decision.
 
 ## Slice 4: size, latency and accounting measurements
 
-- [ ] Expand the harness and obtain authorization for the full manifest after the early gate. Reuse the production
+- [x] Expand the harness and obtain authorization for the full manifest after the early gate. Reuse the production
   adapter and verify final telemetry emission alongside capture records. Ordinary tests remain offline.
-- [ ] Run the matrix below, recording explicit unsupported/inconclusive results. A deliberately over-limit wire probe
+- [x] Run the matrix below, recording explicit unsupported/inconclusive results. A deliberately over-limit wire probe
   needs its own payload size and cost estimate; do not weaken the production admission guard to run it.
-- [ ] Report end-to-end p50/p95 by shape with sample counts and percentile method, plus failures, timeouts and retry
+- [x] Report end-to-end p50/p95 by shape with sample counts and percentile method, plus failures, timeouts and retry
   overhead. Compare reported usage for one versus many questions over the same state without assuming linear billing.
   These measurements are not an SLA or evidence of decision quality.
-- [ ] Finalize size-admission assumptions and document their empirical limits. Retain route/model/provider identity,
+- [x] Finalize size-admission assumptions and document their empirical limits. Retain route/model/provider identity,
   available IDs/usage/cost and the public catalog date. Transported attribution is not recognized attribution, and
   catalog membership or a successful ZDR request does not prove internal retention practices.
 
@@ -176,9 +176,9 @@ These controls apply to the early capture and later measurement runs. No paid ru
 
 ## Acceptance tests
 
-New `core/judgments` paths are proposed; confirm them in slice 1. Transport fakes and payloads stay outside production
-code. Put harness tests in `tests/src/scripts/test_jev_probe.py`, following the script-loading pattern in
-`tests/fixtures/codex_probe.py`; that existing loader is hard-coded to Codex scripts, so it is not directly reusable.
+`core/judgments` owns the implemented boundary. Transport fakes and payloads stay outside production code. Put harness
+tests in `tests/src/scripts/test_jev_probe.py`, following the script-loading pattern in `tests/fixtures/codex_probe.py`;
+that existing loader is hard-coded to Codex scripts, so it is not directly reusable.
 
 | Test                   | Fixture                                                                 | Assertion                                                         | Test file                                                                               |
 | ---------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -194,31 +194,31 @@ code. Put harness tests in `tests/src/scripts/test_jev_probe.py`, following the 
 
 ## Verification and documentation
 
-- [ ] Run `make deps`, focused unit tests and affected regression tests. Preserve credential, usage-ledger and CLI
+- [x] Run `make deps`, focused unit tests and affected regression tests. Preserve credential, usage-ledger and CLI
   trace/cost/activity regression coverage. Add a named regression reproduction for any existing bug fixed.
-- [ ] Run
+- [x] Run
   `PYTHON_DOTENV_DISABLED=1 ./scripts/test-integration.sh tests/integration/core/judgments/test_observability.py` after
   adding that fixture-based file. Include affected existing auth/trace/cost integrations when shared owners change;
   select deterministic cases explicitly to avoid paid inference in fixture gates.
-- [ ] Verify `forge telemetry trace list|show|explain`, `forge telemetry costs show --by-model|--by-verb`,
+- [x] Verify `forge telemetry trace list|show|explain`, `forge telemetry costs show --by-model|--by-verb`,
   `forge telemetry activity` and `forge proxy metrics --json` against isolated evidence. Extend output-stream tests if a
   CLI leaf changes; exposing this internal client does not itself require a new leaf.
-- [ ] Sync `docs/design.md`, `docs/design_runtime.md` and `docs/design_telemetry.md` as ownership/data flow ship. Add
+- [x] Sync `docs/design.md`, `docs/design_runtime.md` and `docs/design_telemetry.md` as ownership/data flow ship. Add
   Jev to the direct-OpenRouter ZDR owners in `docs/design_installation.md` section 3.6.2. Update
   `docs/end-user/authentication.md` for credentials/readiness and opt-in API spend; distinguish client readiness from
   unshipped policy consumers. Document repository-only probe usage in the harness README.
-- [ ] Verify imports and an externally injected offline transport without `provider-check` dependencies. If packaging
+- [x] Verify imports and an externally injected offline transport without `provider-check` dependencies. If packaging
   configuration, bundled assets or resource loading changes, run `make build` and a clean-wheel smoke under the repo
   release rules. A new pure-Python module alone does not make that packaging gate mandatory; fixture code is never
   shipped to support the smoke.
-- [ ] Run `make test-unit`, `make test-regression` and `make pre-commit` on the final implementation head, plus board
+- [x] Run `make test-unit`, `make test-regression` and `make pre-commit` on the final implementation head, plus board
   links. Record commands, outcomes and non-passing cases; rerun affected checks after subsequent changes.
 
 ## Closeout and handoff
 
-- [ ] Retain contract, limits, sanitized captures/manifests, measurement results, telemetry compatibility evidence and
+- [x] Retain contract, limits, sanitized captures/manifests, measurement results, telemetry compatibility evidence and
   unresolved behavior under `evidence/`. Consumers must distinguish unusable judgments from unsupported routing.
-- [ ] Review A1's acceptance evidence and the epic's Gate 1. Record live ZDR readiness explicitly; an unexecuted capture
+- [x] Review A1's acceptance evidence and the epic's Gate 1. Record live ZDR readiness explicitly; an unexecuted capture
   is not a pass. Preserve any consumer dependency blocker even if offline transport work is useful independently.
 - [ ] Record reviewed PR, tested head and merge evidence; add the completed-work change-log entry. Promote durable
   lessons to implementation notes only after human review.
@@ -228,5 +228,26 @@ code. Put harness tests in `tests/src/scripts/test_jev_probe.py`, following the 
 ## Planning verification
 
 2026-10-14: initial activation and the review revisions passed `make pre-commit-md` and `git diff --check`. The final
-standalone Markdown link audit passed for 673 sources, including the new evidence index. No implementation tests or live
-Jev calls have run.
+standalone Markdown link audit passed for 673 sources, including the new evidence index. Implementation had not started
+at that planning checkpoint.
+
+## Implementation verification — 2026-10-14
+
+- Final `make test-unit`: 10,908 passed, 117 integration-marked tests deselected. `make test-regression`: 1,843 passed.
+  The new client/harness subset accounts for 103 offline tests.
+- Final `make pre-commit`: passed, including mypy, pyright, formatting, secrets, size limits and links. Standalone
+  Markdown audit: 676 sources passed. `git diff --check` and staged whitespace checks passed.
+- `PYTHON_DOTENV_DISABLED=1 ./scripts/test-integration.sh tests/integration/core/judgments/test_observability.py`: four
+  cases passed (managed/standalone, grouping on/off). The harness rebuilt Docker images. Its missing-Gemini-key warning
+  does not affect these fixture-based tests; no Gemini inference was requested.
+- Import and injected transport smoke passed with `tiktoken`, Anthropic and `google.genai` deliberately unavailable; the
+  existing runtime OpenAI dependency remained available. No packaging configuration, bundled assets, resources or
+  dependency changes require a clean-wheel gate.
+- Initial `make test-unit`: 10,899 passed, 117 deselected, two documentation-state failures. New linked files were not
+  staged yet, and changed design docs needed token-cache refresh. Staging the new targets and refreshing the three
+  design-doc counts fixed both; the full rerun passed.
+- Live CLI readback: all 25 measurement request IDs found; cost joins, missing cost and proxy-metrics isolation passed.
+  See [operator evidence](evidence/2026-10-14/observability.json).
+
+Planning is committed as `bde11e5f`. Implementation commit and PR link follow here; neither A1 nor the epic is being
+closed before merge.

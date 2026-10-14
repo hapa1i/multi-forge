@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-10-14T15:19:58.009197+00:00",
+  "updated_at": "2026-10-14T15:19:58.708701+00:00",
+  "revision": "bde11e5f4a5e915fb0b7459ee2c37e3eb888a8ab",
+  "dirty": true,
+  "manifest": {
+    "schema_version": 1,
+    "stage": "early",
+    "endpoint": "https://openrouter.ai/api/alpha/decisions",
+    "model": "typesafe/jev-1.13",
+    "requests": [
+      {
+        "label": "choice",
+        "payload": {
+          "model": "typesafe/jev-1.13",
+          "state": "A support ticket reports that the checkout button does nothing.",
+          "questions": {
+            "check": {
+              "instructions": "Which team owns this ticket?",
+              "type": "choice",
+              "criteria": {
+                "payments": "Checkout and payment failures",
+                "account": "Login and profile failures"
+              }
+            }
+          },
+          "provider": {
+            "zdr": true
+          }
+        },
+        "sha256": "9c0800b059b0a4ca7919ce9f62d38d986b1191c4d851e40c5e4de17fa2112ba2",
+        "expected_status": 200
+      },
+      {
+        "label": "noul",
+        "payload": {
+          "model": "typesafe/jev-1.13",
+          "state": "The package arrived broken and the customer requests a replacement.",
+          "questions": {
+            "check": {
+              "instructions": "Is the customer reporting damage?",
+              "type": "noul",
+              "criteria": {
+                "true": "The item arrived damaged",
+                "false": "The item arrived intact"
+              }
+            }
+          },
+          "provider": {
+            "zdr": true
+          }
+        },
+        "sha256": "34b4cef4e63c21af9ba53bc54601692f2bcf0248702aea71d1ba505229d60bc9",
+        "expected_status": 200
+      },
+      {
+        "label": "score",
+        "payload": {
+          "model": "typesafe/jev-1.13",
+          "state": "One customer cannot complete a purchase; the service is available to everyone else.",
+          "questions": {
+            "check": {
+              "instructions": "How urgent is this incident?",
+              "type": "score",
+              "criteria": [
+                "Cosmetic issue",
+                "One customer blocked",
+                "Service-wide outage"
+              ]
+            }
+          },
+          "provider": {
+            "zdr": true
+          }
+        },
+        "sha256": "71f106329af0981f699afb89000da364fda7f5f5faf23d6da11118fe7d8209c8",
+        "expected_status": 200
+      },
+      {
+        "label": "malformed",
+        "payload": {
+          "model": "typesafe/jev-1.13",
+          "state": "Synthetic schema rejection control.",
+          "questions": [],
+          "provider": {
+            "zdr": true
+          }
+        },
+        "sha256": "2573351395a149ffa92868266805c71f65250501224c6ced2b2c701ab49cbf5a",
+        "expected_status": 400
+      }
+    ],
+    "max_physical_requests": 4,
+    "attempts_per_request": 1,
+    "deadline_seconds": 30,
+    "price_date": "2026-10-14",
+    "input_usd_per_token": 4.2e-08,
+    "output_usd_per_token": 0,
+    "estimated_max_usd": 0.005376,
+    "per_request_allowance_usd": 0.001344,
+    "budget_usd": 0.01,
+    "data": "fixed synthetic examples only",
+    "forge_home": "new isolated directory under output"
+  },
+  "physical_requests": 1,
+  "results": [
+    {
+      "label": "choice",
+      "error": "transport",
+      "physical_requests": 1,
+      "responses": [
+        {
+          "status": 200,
+          "latency_ms": 629.8680000036256,
+          "body": {
+            "model": "typesafe/jev-1.13-20260917",
+            "answers": {
+              "check": {
+                "type": "choice",
+                "choice": "payments",
+                "probabilities": {
+                  "payments": 1,
+                  "account": 0
+                },
+                "confidence": 1
+              }
+            },
+            "usage": {
+              "input_tokens": 323,
+              "output_tokens": 31,
+              "cost": 1.3566e-05
+            },
+            "id": "gen-dec-1791991198-Tua3XrtqBwQqQNQGiXLC",
+            "provider": "TypeSafe"
+          }
+        }
+      ]
+    }
+  ],
+  "source_artifact_sha256": "2e94358d53473e5f1973f1552a109d1a4e0ad266a9fefe55983a326b378d889e"
+}

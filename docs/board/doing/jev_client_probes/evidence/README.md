@@ -1,7 +1,8 @@
 # A1 evidence
 
-No Jev inference requests have run. No paid capture or measurement budget is authorized. The
-[execution checklist](../checklist.md) distinguishes documentation checks, offline fixtures and later live evidence.
+The user approved four early and 25 measurement requests on 2026-10-14. All 29 are accounted for in the
+[results and limitations](2026-10-14/report.md). ZDR-required routing succeeded for all three typed question shapes. The
+[execution checklist](../checklist.md) retains verification and review/merge work.
 
 ## Review verification
 

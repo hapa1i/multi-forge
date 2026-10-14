@@ -1,0 +1,7 @@
+{
+  "error": {
+    "message": "[\n  {\n    \"expected\": \"record\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"questions\"\n    ],\n    \"message\": \"Invalid input: expected record, received array\"\n  }\n]",
+    "code": 400
+  },
+  "user_id": "[REDACTED]"
+}

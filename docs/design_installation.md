@@ -28,8 +28,8 @@ Canonical configuration ownership, credentials, extension, scope, merge, registr
 
 - **Proxy-owned**: tier→model mappings, provider/base_url, default hyperparams (`reasoning_effort`, `temperature`,
   `verbosity`, `thinking_budget_tokens`), and direct-OpenRouter-proxy ZDR settings; LiteLLM has no ZDR surface.
-- **Forge-owned direct OpenRouter calls**: plan checking and transfer/rewind curation always require ZDR; proxy opt-outs
-  do not apply.
+- **Forge-owned direct OpenRouter calls**: plan checking, transfer/rewind curation and Jev Decisions always require ZDR;
+  proxy opt-outs do not apply.
 - **Session-owned**: policy/TDD mode, memory/artifacts, `forge_root`, `checkout_root`, `relative_path`, and session
   metadata.
 - **Consumer-lane binding** (epic consumer_lanes/T1b, T6a): `intent.consumer_lanes.<consumer>` is the *requested* lane

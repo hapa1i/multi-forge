@@ -4,7 +4,8 @@ Epic: [Jev support](../epic_jev_support/card.md). Member **A1**. No new-card dep
 evidence consumed by A2 and A3.
 
 Status: **doing**, activated 2026-10-14 on `codex/jev-client-probes` from `main` at `1ae9667d` (`v1.1.0`). The
-[execution checklist](checklist.md) is the current cursor. Implementation and live probes have not started.
+[execution checklist](checklist.md) is the current cursor. Implementation and 29 approved synthetic requests are
+complete; review and merge remain open. See the [results](evidence/2026-10-14/report.md).
 
 ## Problem and outcome
 

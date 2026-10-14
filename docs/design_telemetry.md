@@ -6,6 +6,26 @@ Canonical status, spend, audit, usage-attribution, and provider-lifecycle contra
 
 ## Telemetry contracts
 
+### Jev Decisions attempts
+
+`core.judgments.usage` maps Decisions `input_tokens`, `output_tokens` and optional reported USD cost into the existing
+downstream v2 and usage v1 records. Both schemas and their closed vocabularies remain unchanged. Each physical attempt
+has a distinct local request ID and downstream event ID; retries share the caller's run identity. Requested/resolved
+models, selected provider and the provider response ID remain separate. Cost converts to integer micro-USD with half-up
+rounding; explicit zero is reported, missing cost is unavailable. Valid accounting fields survive invalid answers or
+other invalid accounting fields.
+
+Records use `reporter="openrouter"`, `request_mode="non_streaming"` and cost confidence `reported` or `unavailable`. The
+usage route `core_llm` denotes Forge's direct HTTP invocation channel for compatibility with existing readers; judgments
+do not implement the completion protocol. Command defaults to `jev` and may identify a future consumer. Only the
+canonical OpenRouter endpoint proves API billing; custom gateways retain unknown billing mode.
+
+The client emits once per attempt. Downstream readers merge duplicate event IDs, keeping cost totals stable while
+distinct retries count separately. Usage events require ambient run identity; standalone calls still write downstream
+evidence without inventing a run, session or proxy. The probe harness establishes its own root run. Trace list/show/
+explain and cost by-model work without a managed session; by-verb needs run attribution, and session activity needs
+session attribution. Proxy metrics contain no synthetic Jev proxy. Existing v2 history remains readable.
+
 ### 3.14 Cost tracking and spend caps
 
 Forge records model-call evidence in a unified downstream telemetry plane under `~/.forge/telemetry/downstream/`. Legacy
