@@ -1,7 +1,8 @@
 # Native Claude permission/context trial
 
-Status: **not run; skipped by user decision on 2026-10-15**. Keep PR #269 in draft. Preserve this manifest as an
-unexecuted proposal; it is not an active approval request or permission to use another paid/native route.
+Status: **not run; skipped by user decision on 2026-10-15**. The user subsequently authorized merging PR #269 with this
+evidence gap. Preserve the manifest as an unexecuted proposal; merge authorization is not permission to run it or use
+another paid/native route. A2's native warning-delivery acceptance remains separate and unverified.
 
 ## Exact scope
 
@@ -58,7 +59,7 @@ Only if the user later requests this trial and explicitly approves its revalidat
 
 ```bash
 uv run python scripts/experiments/claude-hooks/policy-feedback.py \
-  --run docs/board/paused/claude_policy_feedback_permissions/evidence/native-manifest.json \
+  --run docs/board/done/claude_policy_feedback_permissions/evidence/native-manifest.json \
   --output /private/tmp/forge-claude-policy-feedback-20261014
 ```
 

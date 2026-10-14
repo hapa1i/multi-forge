@@ -7,6 +7,20 @@ Older entries are retained verbatim in [2026-08-18](archive/change_log_2026-08-1
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-15
+
+### Preserve Claude permissions in policy feedback
+
+**Goal**: Keep Write/Edit policy feedback from granting native Claude permission.
+
+**Key changes**: Removed explicit approval from the shared feedback response while preserving context, blocks and audit;
+documented Read-hygiene's existing input-correction exception and bounded the regression coverage claim.
+
+**Verification**: [PR #269](https://github.com/hapa1i/multi-forge/pull/269) merged as `e9c144eb` with CI passing; 54
+focused tests, 28 fixture-backed hook integrations and full pre-commit passed. The user authorized merge with paid
+native testing skipped; native receipt and permission handling remain unverified. See the
+[closeout](done/claude_policy_feedback_permissions/checklist.md#merged-closeout).
+
 ## 2026-10-14
 
 ### Ship the typed Jev Decisions client

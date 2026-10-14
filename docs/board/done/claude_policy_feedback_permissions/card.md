@@ -1,18 +1,19 @@
 # Preserve Claude permissions in policy feedback
 
-Status: **paused** on 2026-10-15 at the native evidence gate; activated 2026-10-14 on
-`codex/claude-policy-feedback-permissions`, based on `main` at `f7ce7a9a`. Identified during the
-[A2 rule-pack](../../proposed/jev_rule_pack/card.md) review. This is an independent fix and a prerequisite for A2's
-Claude warning-delivery gate, outside the Jev epic's membership. Its [checklist](checklist.md) tracks fixture validation
-and the native evidence gap before A2 consumes the changed responder. On 2026-10-15 the user chose to skip paid native
-testing and keep [PR #269](https://github.com/hapa1i/multi-forge/pull/269) in draft.
+Status: **done** on 2026-10-15. [PR #269](https://github.com/hapa1i/multi-forge/pull/269) merged as `e9c144eb` after the
+user authorized merge with the paid native trial still skipped. The implementation is fixture-verified; native context
+receipt and permission handling remain unverified. See the [merged closeout](checklist.md#merged-closeout).
+
+Activated 2026-10-14 on `codex/claude-policy-feedback-permissions`, based on `main` at `f7ce7a9a`. Identified during the
+[A2 rule-pack](../../proposed/jev_rule_pack/card.md) review. This independent fix is outside the Jev epic's membership;
+A2 must establish its own native warning-delivery evidence before claiming that acceptance.
 
 ## Problem and outcome
 
-[`ClaudeHookResponder.allow_feedback`](../../../../src/forge/cli/hooks/policy.py) includes `permissionDecision: "allow"`
-with `additionalContext`. The shared [policy hook](../../../../src/forge/cli/hooks/commands.py) calls it for allowed
-Write/Edit actions whenever `policy_summary_feedback=on`, including TDD, coding-standards and supervisor sessions
-without Jev.
+Previously, [`ClaudeHookResponder.allow_feedback`](../../../../src/forge/cli/hooks/policy.py) included
+`permissionDecision: "allow"` with `additionalContext`. The shared
+[policy hook](../../../../src/forge/cli/hooks/commands.py) calls it for allowed Write/Edit actions whenever
+`policy_summary_feedback=on`, including TDD, coding-standards and supervisor sessions without Jev.
 
 Claude's [official hook contract](https://code.claude.com/docs/en/hooks#pretooluse-decision-control), checked
 2026-10-14, says explicit allow skips the permission prompt subject to native exceptions and deny/ask rules. Omitting
@@ -37,8 +38,8 @@ behavior for Codex.
 - Run fixture-backed hook integrations through `./scripts/test-integration.sh`. Prepare a separate quota-bounded native
   Claude trial with synthetic Write/Edit actions, recorded CLI version and permission configuration. Verify both model
   receipt and the native permission flow in default mode, with a configured allow rule/mode as a control. Do not use a
-  bypass-permissions trial to claim default-mode behavior. The user chose to skip the prepared paid trial; this
-  acceptance gate remains unsatisfied.
+  bypass-permissions trial to claim default-mode behavior. The user chose to skip the prepared paid trial; this native
+  evidence remains absent and was explicitly deferred from this fix's merge acceptance.
 - Record the observed behavior under this card's `evidence/`. A response-shape unit test or stderr capture does not
   establish native delivery. If context-only feedback fails on an admitted runtime, record that limitation and keep the
   A2 delivery gate open rather than silently restoring blanket permission approval.
@@ -49,7 +50,7 @@ behavior for Codex.
 ## Boundary
 
 No Jev client, rule-pack evaluation, new policy verdict, Codex wire change or supervisor scheduling change belongs here.
-A2 can continue offline work but must consume a verified fix before claiming its Claude feedback acceptance.
+A2 can consume the merged responder but must establish native receipt before claiming its Claude feedback acceptance.
 
 The [Read-hygiene hook](../../../../src/forge/cli/hooks/read_hygiene.py) remains a deliberate exception to native
 permission separation: when correcting a matching Read with `offset`, `limit` or `pages`, it returns

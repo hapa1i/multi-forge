@@ -1,19 +1,20 @@
 # Claude policy feedback permissions checklist
 
-## Current focus
+## Final status
 
-Paused on 2026-10-15 after the user chose to skip paid native testing and keep PR #269 in draft.
+[PR #269](https://github.com/hapa1i/multi-forge/pull/269) merged on 2026-10-15 as `e9c144eb`, from reviewed head
+`c9a7a0a5`. The user authorized merge after choosing to skip paid native testing. That instruction superseded the draft
+hold; it supplies no native delivery evidence. Native context receipt and permission handling remain unverified, and
+A2's native warning-delivery gate stays open. No native inference ran.
 
 Execution started 2026-10-14 on `codex/claude-policy-feedback-permissions`, based on `main` at `f7ce7a9a`, in a separate
 managed worktree. This is A2's independent prerequisite; it does not add Jev behavior or change the epic's membership.
-The [card](card.md) owns the acceptance contract. [PR #269](https://github.com/hapa1i/multi-forge/pull/269) is open in
-draft. On 2026-10-15 the user chose to skip paid native testing and keep the PR in draft. Native receipt remains
-unverified; no native inference has run.
+The [card](card.md) owns the acceptance contract, with the native trial deferred by the user's merge decision.
 
 ## Response and fixtures
 
-- [x] Verify the shared Claude responder emits unconditional `permissionDecision: "allow"` and that all allowed
-  policy-summary paths use it, including ordinary deterministic policies.
+- [x] Confirm the original shared Claude responder emitted unconditional `permissionDecision: "allow"` and that all
+  allowed policy-summary paths use it, including ordinary deterministic policies.
 - [x] Remove that field while retaining `hookEventName` and `additionalContext`. Keep block exits and feedback-off
   behavior unchanged; do not replace approval with `ask`, `defer` or another permission decision.
 - [x] Pass focused responder/feedback tests and the 20-case regression matrix for Write/Edit, injected
@@ -22,28 +23,34 @@ unverified; no native inference has run.
 - [x] Pass fixture-backed hook integrations through `./scripts/test-integration.sh`; assert emitted context and absence
   of native permission approval on a real hook subprocess. This proves serialization, not model receipt.
 
-## Native receipt and permissions
+## Native receipt and permissions: deferred
 
 - [x] Read the local CLI version/help without inference: Claude Code `2.1.296` on 2026-10-14.
 - [x] Prepare synthetic Write/Edit inputs, isolated configuration and hook capture under `evidence/`. Record selected
   authentication/billing route, model, exact commands, turn/tool limits, wall deadline and cleanup ownership.
-- [x] Record the user decision: skip paid native testing and keep PR #269 in draft (2026-10-15). Do not run the prepared
-  trial or substitute another paid/native route. A later trial requires a new explicit request and approval.
-- [ ] Observe default-mode permission handling and model receipt of an authored marker in `additionalContext`, without
-  explicit hook approval. Use an explicit allow rule/mode as a control; bypass mode cannot prove default permissions.
-- [ ] Compare feedback off: absent model context, retained diagnostics/audit and unchanged native permission behavior.
-- [ ] Record failures and runtime limitations. Never restore blanket approval to make a trial pass.
+- [x] Record both user decisions on 2026-10-15: skip paid native testing, then merge PR #269. The latter supersedes the
+  draft hold without authorizing the trial or another native route. Any later trial needs its own explicit
+  authorization.
+
+The following observations were deferred, not passed:
+
+- Default-mode permission handling and model receipt of an authored `additionalContext` marker without explicit hook
+  approval, with an explicit allow rule/mode as a control. Bypass mode cannot prove default permissions.
+- Feedback off: absent model context, retained diagnostics/audit and unchanged native permission behavior.
+- Native failures and runtime limitations. No native result is available, and blanket approval must not be restored to
+  make a later trial pass. A2 owns its remaining native warning-delivery acceptance.
 
 ## Verification and closeout
 
 - [x] Sync workflow/session-execution design and end-user policy guidance, explicitly describing the changed permission
   behavior for existing policy users.
-- [ ] Add the change-log entry when verified and merged.
+- [x] Add the change-log entry with the merge evidence and the deferred native verification made explicit.
 - [x] Pass aggregate unit, regression, full pre-commit, board/link and file-size checks on this branch.
-- [x] Open the separate PR with passing checks and any native-evidence gap visible. Keep it unmerged until acceptance is
-  satisfied. Attach the PR to this task.
-- [ ] After merge, record the final head and native evidence, move the card to `done/`, repoint links and reconcile A2's
-  references. A2 must consume this card from its independent branch and retain one board state when integrating it.
+- [x] Open the separate PR with passing checks and the native-evidence gap visible; merge only after the user's explicit
+  instruction to proceed with that gap. Attach the PR to this task.
+- [x] Record the final head and native-evidence limit, move the card to `done/` and repoint merged-tree inbound links.
+  A2's separate branch must consume the merged card without recreating the former paused copy; its native gate remains
+  separate from this implementation closeout.
 
 ## Execution evidence
 
@@ -80,3 +87,17 @@ contains 20 distinct tool/outcome/feedback combinations. Focused verification pa
 
 This update changes documentation and tests only. The production responder and native-trial manifest are unchanged; no
 native inference ran, and the native evidence gate remains open.
+
+## Merged closeout
+
+2026-10-15: PR #269 merged as `e9c144ebbb0c873086041b40a498f91f26d1ca8e` from reviewed head
+`c9a7a0a5b13bf7be96275811c22edeae4dda7dd0`. The merge tree matches the reviewed head. GitHub's pre-commit, test and both
+CodeQL analysis checks passed; the aggregate CodeQL result was neutral and accepted by the check summary.
+
+The user authorized merge with native verification still skipped. The shared responder, policy output and audit paths
+have fixture evidence; actual native context receipt and permission handling are unverified. The retained trial is an
+unexecuted proposal, and this closeout authorizes no inference or additional data sharing. A2 still needs its native
+warning-delivery evidence.
+
+Moved this card to `done/`, updated the design link and change log, and preserved the exact native manifest. Closeout
+verification uses Markdown, link, file-size and whitespace checks; no runtime behavior changed after the reviewed head.
