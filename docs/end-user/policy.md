@@ -33,6 +33,10 @@ Or from within a Claude Code session (no terminal needed):
 
 ---
 
+Jev rule-pack activation is still under development. `forge session set` and `reset` cannot opt a session into paid Jev
+checks; copied settings in a fork or fresh-resume/relaunch child do not carry permission to share repository action
+content. Ordinary policy bundles keep their existing behavior. No Jev request is made by the consent preparation alone.
+
 ## How policies work
 
 Passing a Forge policy check leaves Claude's normal permission rules in charge. Policy summaries no longer send an

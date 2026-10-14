@@ -65,6 +65,15 @@ evidence launches in place, even though `session start --no-launch` may have pre
 derive a new child session with context assembly. `--force` against an active, resumable session launches a lineage
 child instead of attaching a second process to that conversation.
 
+The reserved `jev_rule_pack` bundle has session-bound paid-data consent. Derivation removes its bundle selection and
+configuration from inherited intent and overrides; relaunch copies overrides before applying that filter. Other policy
+bundles, supervisors and unrelated overrides retain their existing inheritance. The acknowledgment binds project,
+worktree, session name/creation and exact pack settings, so a copied grant does not enable another session instance. It
+fits inside the existing `policy.bundle_config` mapping without adding a strict manifest field or raising its schema
+version. Raw set/reset paths cannot activate a paid configuration, and disabling it through raw overrides revokes both
+intent and override grants. The validating Jev activation/dispatch surfaces remain under development; this boundary does
+not register a runnable bundle or authorize a network call.
+
 The session file has three sections:
 
 > Schema is intentionally strict: unknown fields and unknown override keys are rejected.

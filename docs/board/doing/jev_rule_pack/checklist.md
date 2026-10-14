@@ -4,9 +4,10 @@
 
 Execution started on 2026-10-14. A2 is active on `codex/jev-rule-pack`, based on `main` at
 `f7ce7a9a45f2e208d0fd72c74454750f4fd30e1f` after A1's closeout. The A1 explicit evaluation-identity extension is
-implemented; rule/context review still precedes hook wiring. No paid A2 evaluation has run. The [card](card.md) owns
-scope; the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed and will use a
-separate execution branch.
+implemented, along with session consent/inheritance and raw-override guards. The
+[initial rule/context proposal](evidence/initial-rule-review.md) is awaiting review before hook wiring. No paid A2
+evaluation has run. The [card](card.md) owns scope; the [epic checklist](../epic_jev_support/checklist.md) owns
+sequencing. A3 remains proposed and will use a separate execution branch.
 
 Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
 never introduce a Jev denial or `needs_review`. An independently configured policy or supervisor retains its existing
@@ -175,8 +176,10 @@ independent reviews as unavailable. Measure the coverage/latency tradeoff in the
   reject invalid values atomically. Keep evaluated thresholds in the versioned decision rule. Preserve the shared
   activation contract for the explicitly supplied bundle set and unrelated intent; never enable it across sessions.
 - [ ] Use the existing credential chain with environment/file precedence and `auth_ignore_env`; verify missing auth and
-  no-`.env` behavior offline. Every physical attempt retains mandatory ZDR. Disabled/not-applicable/local-refusal paths
-  make no network request; no direct TypeSafe or subscription fallback.
+  no-`.env` behavior offline. Resolve and check the effective Decisions URL against the acknowledged endpoint before
+  sending any action: A1 supports custom gateway bases, but the current acknowledgment covers canonical OpenRouter only.
+  A changed credential/base-URL setting must not silently widen that scope. Every physical attempt retains mandatory
+  ZDR. Disabled/not-applicable/local-refusal paths make no network request; no direct TypeSafe or subscription fallback.
 - [ ] Key cached validated results by session, canonical full action, exact evidence/coverage, pack/rule/question
   versions, endpoint/requested model and decision-rule version. Retain resolved model identity and declare how model
   drift expires reuse. Bound TTL/entries and invalidate stale/malformed entries without losing independent policy state.
@@ -328,6 +331,24 @@ existing callers. The client suite passed 53 offline tests. The required no-`.en
 five tests, including two evaluations in one interactive run: four distinct attempts, two verb invocations, unchanged
 environment and retained parent/root ancestry. The harness warned about missing `GEMINI_API_KEY`; these five tests use
 an injected transport and passed without it. A2 child-run creation and cache behavior remain pending.
+
+The explicit-identity change is committed as `e0d02ed4`; full `make pre-commit` passed before committing. Consent
+helpers now bind the existing bundle-config acknowledgment to the session instance and settings without a manifest
+schema bump. The raw override guards cover parent objects, bundle/config writes, wildcard expansion, effective
+activation and resets that would uncover old intent. Disabling through raw overrides revokes both grant layers. These
+are preparatory guards; the validating activation command, rule registry and dispatch remain unimplemented.
+
+The focused consent/override/CLI tests and inheritance/direct-command regressions passed 165 tests. Docker integration
+passed all six derivation paths (same-directory fork, new worktree, existing worktree, native resume, transfer resume
+and relaunch), plus four policy CLI contract tests. The first integration run exposed a missing project-enrollment step
+in the existing-worktree fixture; a later run caught an import cycle introduced while moving a consent import. Both were
+fixed, and the final ten-test run passed. Rewind-specific orchestration and native delivery remain open acceptance
+items.
+
+Aggregate checks for this consent foundation passed: `make test-unit` (10,947 passed, 117 integration tests deselected),
+`make test-regression` (1,855 passed), and the existing policy hook integrations (28 passed). Combined with the five
+judgment-observability and ten lifecycle/CLI integrations above, 43 selected integration tests passed with no live
+inference. These results do not satisfy the remaining rule-quality or native-delivery gates.
 
 ## Planning verification
 

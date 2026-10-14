@@ -313,14 +313,25 @@ def set_override(overrides: dict[str, Any], key: str, value: Any) -> None:
         key: Dot-notation path or wildcard pattern (e.g., "agent", "proxy.*").
         value: The value to set.
     """
+    from forge.policy.rule_pack.consent import reject_raw_activation
+
     if "*" in key:
         expanded = expand_wildcard(key)
         if "launch.runtime" in expanded:
             _reject_launch_runtime_override(key)
+        try:
+            for path in expanded:
+                reject_raw_activation(path, value)
+        except ValueError as exc:
+            raise InvalidOverrideKeyError(key, str(exc)) from exc
         for path in expanded:
             _set_path(overrides, path.split("."), value)
         return
 
+    try:
+        reject_raw_activation(key, value)
+    except ValueError as exc:
+        raise InvalidOverrideKeyError(key, str(exc)) from exc
     parts = validate_key(key)
     if key == "launch" and isinstance(value, dict):
         if "runtime" in value:
