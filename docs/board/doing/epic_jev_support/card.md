@@ -1,6 +1,8 @@
 # Epic: Jev support
 
-Status: proposed. Scope drafted 2026-10-06; implementation has not started.
+Status: **doing**, activated 2026-10-14 with A1. The [coordination checklist](checklist.md) tracks member gates and
+handoffs. A1 is implemented in [PR #268](https://github.com/hapa1i/multi-forge/pull/268), awaiting review and merge; A2
+and A3 remain proposed.
 
 ## Problem and outcome
 
@@ -12,16 +14,17 @@ chat model.
 The primary economic objective is protecting Claude subscription quota on projects where the user accepts Jev's API
 cost. Everyday supervision must incur no API spend, so Jev is explicitly opt-in. Warning-only packs do not by themselves
 avoid Claude calls. The [research](research.md) records pricing, schema differences, model limitations and the measured
-absence of configured supervisors/policy enforcement across 78 local session manifests. No quota saving, latency or
-decision-quality result has been measured.
+absence of configured supervisors/policy enforcement across 78 local session manifests. A1's
+[synthetic measurements](../jev_client_probes/evidence/2026-10-14/report.md) establish transport latency and reported
+cost for the captured shapes; quota savings and decision quality remain unmeasured.
 
 ## Members and dependencies
 
-| ID  | Card                                                      | Independently shippable outcome                                               | Depends on                        |
-| --- | --------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------- |
-| A1  | [Jev client and probes](../jev_client_probes/card.md)     | Typed OpenRouter transport and reproducible contract/latency/billing evidence | None                              |
-| A2  | [Jev rule pack, warnings only](../jev_rule_pack/card.md)  | Opt-in semantic policy type over fixed atomic rules                           | A1; B3 for Codex-visible warnings |
-| A3  | [Jev as the cascade's first tier](../jev_cascade/card.md) | Validated covered allows avoid a Claude review; other cases escalate          | A1, B1                            |
+| ID  | Card                                                                  | Independently shippable outcome                                               | Depends on                        |
+| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------- |
+| A1  | [Jev client and probes](../jev_client_probes/card.md)                 | Typed OpenRouter transport and reproducible contract/latency/billing evidence | None                              |
+| A2  | [Jev rule pack, warnings only](../../proposed/jev_rule_pack/card.md)  | Opt-in semantic policy type over fixed atomic rules                           | A1; B3 for Codex-visible warnings |
+| A3  | [Jev as the cascade's first tier](../../proposed/jev_cascade/card.md) | Validated covered allows avoid a Claude review; other cases escalate          | A1, B1                            |
 
 [B1](../../done/plan_file_supervision/card.md) and [B3](../../done/codex_policy_warnings/card.md) belong to the separate
 [Codex supervisor epic](../../done/epic_codex_supervisor/card.md). A2 and A3 can proceed independently after their
@@ -53,14 +56,15 @@ execution branches when activated.
 Direct TypeSafe remains an intended later access path. Its distinct System One transport and limits are documented in
 the research, but implementation is outside these three cards; the epic does not claim both routes at closeout.
 Standalone Jev blocking, team classification, search and memory selection remain research avenues.
-[Jev Router](../jev_router/card.md) stays a separate card because it chooses a generative model and reasoning effort,
-with different routing and identity contracts. Codex runtime supervision is owned by its own epic.
+[Jev Router](../../proposed/jev_router/card.md) stays a separate card because it chooses a generative model and
+reasoning effort, with different routing and identity contracts. Codex runtime supervision is owned by its own epic.
 
 ## Completion evidence
 
-A1 must establish the usable route contract and measure latency, request size and multi-question accounting. A2 must
-show useful, visible warnings with a labeled per-rule evaluation. A3 must demonstrate avoided Claude calls at an
-acceptable measured false-allow rate, including hard cases, failures, evidence gaps and real escalation.
+A1 begins with a small authorized synthetic capture after the minimal transport, then establishes the usable route
+contract and measures latency, request size and multi-question accounting. A2 must show useful, visible warnings with a
+labeled per-rule evaluation. A3 must demonstrate avoided Claude calls at an acceptable measured false-allow rate,
+including hard cases, failures, evidence gaps and real escalation.
 
 Report calls avoided, reviewer model/tokens, latency, warning burden and escalation rate alongside Jev's reported API
 cost. Record quota measurements only when usable provider evidence exists; tokens are not an exact quota conversion.

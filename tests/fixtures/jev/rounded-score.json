@@ -1,0 +1,40 @@
+{
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+    "damage": {
+      "type": "noul",
+      "noul": 0.12
+    },
+    "owner": {
+      "type": "choice",
+      "choice": "payments",
+      "probabilities": {
+        "payments": 1,
+        "account": 0
+      },
+      "confidence": 1
+    },
+    "urgency": {
+      "type": "score",
+      "score": 0.99,
+      "legend": {
+        "0": "Cosmetic issue",
+        "1": "One customer blocked",
+        "2": "Service-wide outage"
+      },
+      "probabilities": {
+        "0": 0.02,
+        "1": 0.98,
+        "2": 0
+      },
+      "confidence": 0.97
+    }
+  },
+  "usage": {
+    "input_tokens": 674,
+    "output_tokens": 62,
+    "cost": 2.8308e-05
+  },
+  "id": "gen-dec-1791991739-OnBMivGeedGbUnaVudND",
+  "provider": "TypeSafe"
+}

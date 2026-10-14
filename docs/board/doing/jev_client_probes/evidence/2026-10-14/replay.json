@@ -1,0 +1,179 @@
+{
+  "replayed_at": "2026-10-14T16:48:08.587055+00:00",
+  "base_revision": "cdb2e6bab356e9b8ac805afde455f28eac2e2858",
+  "dirty": true,
+  "source_sha256": {
+    "src/forge/core/judgments/__init__.py": "6c3e20f457a523ce44c52b030a29c79f6e27ca546b2c106b7c3708b846b50723",
+    "src/forge/core/judgments/openrouter.py": "c035afbb508da58ca742c6bdc2ac61df1c1e00fd789eca324a6cc824d25faf60",
+    "src/forge/core/judgments/types.py": "a7ffc22043778716a5c306ddbe7d9b9a878b85abecd1ff12e4df88cf0934a345",
+    "src/forge/core/judgments/usage.py": "8e0973971164bc26910b238bba78297d8729f20251b6a915f49ce4c7a540d23f",
+    "scripts/experiments/jev/probe.py": "3484e7df5954b6712bf8eefe371d2cd8ae14fdba58fce04981f65c36282e0600",
+    "tests/src/scripts/test_jev_probe.py": "c9a7172362579911d5ff052435981452b43d99470c639d01ae8ff1c582b5fd4a"
+  },
+  "verification_command": ".venv/bin/pytest tests/src/scripts/test_jev_probe.py -k retained_capture_contract -q",
+  "scope": "Saved response validation, structured HTTP classification and accounting checks; no credential resolution or network calls.",
+  "captures": [
+    {
+      "file": "early-capture.json",
+      "sha256": "be04350a1f19753948d5b23ee02d3fc859dd2104dcdfc09144e51b33736a6ed2",
+      "validated_successes": 3,
+      "results": [
+        {
+          "label": "choice",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "noul",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "score",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "malformed",
+          "status": 400,
+          "outcome": "validation"
+        }
+      ]
+    },
+    {
+      "file": "measurement-capture.json",
+      "sha256": "2c4a9285638c63070ecd1591ed3058cfde774b9adc3d9d795090a26551c49139",
+      "validated_successes": 24,
+      "results": [
+        {
+          "label": "small-1",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "small-2",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "small-3",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "medium-1",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "medium-2",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "medium-3",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "near-budget-1",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "near-budget-2",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "near-budget-3",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "unicode-1",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "unicode-2",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "unicode-3",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "code-1",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "code-2",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "code-3",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "many-criteria-1",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "many-criteria-2",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "many-criteria-3",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "shared-one-1",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "shared-one-2",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "shared-one-3",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "shared-three-1",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "shared-three-2",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "shared-three-3",
+          "status": 200,
+          "outcome": "validated"
+        },
+        {
+          "label": "over-limit-1",
+          "status": 400,
+          "outcome": "payload_too_large"
+        }
+      ]
+    }
+  ],
+  "verified_revision": "0d6b923c91f48ee38596872b5d9fa16dacf9a91d",
+  "verified_at": "2026-10-14T16:56:08.455458+00:00",
+  "verification_result": "2 passed, 13 deselected"
+}

@@ -677,6 +677,11 @@ Running `claude` directly bypasses both paths; neither proxy routing nor session
 
 ## E. Shared LLM Client (`src/forge/core/llm/`)
 
+Typed judgments live in the sibling `core.judgments` capability. Its OpenRouter Decisions adapter reuses credentials and
+telemetry owners, while exposing Choice/Noul/Score results independently of `LLMClient`. See the
+[judgment transport contract](design_runtime.md#typed-judgments) and
+[accounting mapping](design_telemetry.md#jev-decisions-attempts).
+
 `get_client()` returns `LiteLLMClient` for `litellm_remote`/`litellm_local` and `OpenRouterClient` for explicit
 `provider="openrouter"`. Both use OpenAI-compatible endpoints; native `AnthropicClient` remains deferred.
 

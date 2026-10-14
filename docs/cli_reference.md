@@ -340,10 +340,11 @@ values are not wrapped or interpreted as terminal markup.
 
 ### Telemetry
 
-`forge telemetry` groups operator observability surfaces: per-session activity, proxy-scoped cost telemetry, and local
-provider traces. `activity` is best-effort per-session attribution; `costs show` is the authoritative proxy-scoped spend
-view. JSON output from activity/cost views includes `skipped_legacy_schema` when older downstream telemetry was fenced
-from the current backend-instance schema instead of reattributed.
+`forge telemetry` groups operator observability surfaces: per-session activity, reported request costs, and local
+provider traces. `activity` is best-effort per-session attribution; `costs show` is the authoritative reported spend
+view, including direct requests such as Jev unless a proxy ID filters them out. JSON output from activity/cost views
+includes `skipped_legacy_schema` when older downstream telemetry was fenced from the current backend-instance schema
+instead of reattributed.
 
 | Command                                      | Purpose                                                                                                                    |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |

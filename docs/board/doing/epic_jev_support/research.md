@@ -9,7 +9,7 @@ Claude. Direct TypeSafe remains a later access path; standalone Jev enforcement 
 existing `httpx`, a conservative 32,000-token total request budget and explicit yes/no criteria. Both policy consumers
 need atomic questions and calibrated decision rules; plan checking also needs decomposition and coverage. Codex
 supervision has a [separate epic](../../done/epic_codex_supervisor/card.md). Jev Router remains separate work in its
-[own card](../jev_router/card.md).
+[own card](../../proposed/jev_router/card.md).
 
 ## Initial assessment
 
@@ -300,31 +300,31 @@ The live [team handlers](../../../../src/forge/policy/team/handlers.py) classify
 [classification prompts](../../../../src/forge/policy/team/prompts.py) mostly see teammate/team names and, for
 completion, the task subject. A different classifier cannot infer implementation quality from absent evidence.
 
-The existing [team supervisor plan-context proposal](../team_supervisor_plan_context/card.md) is related context work.
-Separately, `core/reactive/tagger.py` defines a generic tagging helper, but the inspected checkout has no production
-caller; changing it alone would not improve a live path.
+The existing [team supervisor plan-context proposal](../../proposed/team_supervisor_plan_context/card.md) is related
+context work. Separately, `core/reactive/tagger.py` defines a generic tagging helper, but the inspected checkout has no
+production caller; changing it alone would not improve a live path.
 
 ### Search and transfer selection: useful without generation
 
 Forge's [search engine](../../../../src/forge/search/engine.py) ranks transcript documents with local BM25. Jev could
 score a bounded shortlist for relevance while retaining document identity and the original search results as fallback.
 This adds remote disclosure, latency, and cost to a currently local operation. The
-[semantic-search proposal](../semantic_search/card.md) already considers local retrieval and optional reranking; its
-scope should be reconciled before choosing another search direction.
+[semantic-search proposal](../../proposed/semantic_search/card.md) already considers local retrieval and optional
+reranking; its scope should be reconciled before choosing another search direction.
 
 For transfer and memory, judgments could select relevant source excerpts or flag candidate decisions for review. The
 existing [transfer curation](../../../../src/forge/session/transfer.py) and [memory writer](../../../design_memory.md)
 still own prose generation and publication. A Jev answer cannot create an evidence reference: source IDs and existing
 citation checks would remain attached to the actual input excerpts. The
-[windowed curation proposal](../windowed_incremental_curation/card.md) is relevant to bounded inputs, but is not shipped
-infrastructure that this research can assume.
+[windowed curation proposal](../../proposed/windowed_incremental_curation/card.md) is relevant to bounded inputs, but is
+not shipped infrastructure that this research can assume.
 
 ### Review triage: prioritize within explicit bounds
 
 Judgments could help prioritize review questions or select specialist attention. They should operate within the caller's
 requested coverage and deterministic budget rather than silently deciding that requested review is unnecessary. The
-[adaptive-review proposal](../adaptive_review_behavior/card.md) already covers budgeted review behavior. An integration
-would need to distinguish prioritization from permission to omit a check.
+[adaptive-review proposal](../../proposed/adaptive_review_behavior/card.md) already covers budgeted review behavior. An
+integration would need to distinguish prioritization from permission to omit a check.
 
 ### Jev Router: separate card
 
@@ -335,7 +335,7 @@ resulting pool returns 404. An inclusion list therefore cannot be treated as a s
 metadata exposes resolved models and routing fallback information.
 [Router behavior](https://openrouter.ai/docs/guides/routing/routers/jev-router)
 
-This belongs in the [Jev Router card](../jev_router/card.md), outside this epic. Forge's shipped
+This belongs in the [Jev Router card](../../proposed/jev_router/card.md), outside this epic. Forge's shipped
 [launch-effort change](../../done/session_launch_effort/card.md) gives explicit client effort precedence on opted-in
 translated requests and clamps it against the mapped model. Per-request router effort selection creates an unresolved
 precedence and capability conflict with that contract; the router docs do not establish what happens to an explicit
@@ -378,10 +378,11 @@ own design. [Effort resolution](../../../../src/forge/proxy/reasoning.py),
 ## Selected cards and remaining design avenues
 
 The draft scope is [A1: client and probes](../jev_client_probes/card.md),
-[A2: warning-only rule packs](../jev_rule_pack/card.md), and [A3: cascade](../jev_cascade/card.md). A2 needs
-[B3](../../done/codex_policy_warnings/card.md) for Codex-visible warnings; A3 needs
-[B1](../../done/plan_file_supervision/card.md) for fresh plan-file Claude supervision. Those cards belong to the
-separate Codex supervisor epic. The broader avenues below remain research context, not additional committed members.
+[A2: warning-only rule packs](../../proposed/jev_rule_pack/card.md), and
+[A3: cascade](../../proposed/jev_cascade/card.md). A2 needs [B3](../../done/codex_policy_warnings/card.md) for
+Codex-visible warnings; A3 needs [B1](../../done/plan_file_supervision/card.md) for fresh plan-file Claude supervision.
+Those cards belong to the separate Codex supervisor epic. The broader avenues below remain research context, not
+additional committed members.
 
 | Avenue                           | Main purpose                                   | First useful evidence                          |
 | -------------------------------- | ---------------------------------------------- | ---------------------------------------------- |

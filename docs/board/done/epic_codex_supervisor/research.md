@@ -259,7 +259,7 @@ plane. Per-session `forge telemetry activity <session> --period all` can expose 
 classification, but its cost attribution is best-effort. An actual account charge needs provider billing evidence; no
 such account history was inspected here.
 
-Jev requests are separately API-billed. Its [epic](../../proposed/epic_jev_support/card.md) is opt-in on projects where
+Jev requests are separately API-billed. Its [epic](../../doing/epic_jev_support/card.md) is opt-in on projects where
 that spend is accepted. The cascade can preserve Claude quota only when it actually avoids a Claude call; warning-only
 rule packs do not establish that saving. Measure avoided calls, model/tokens, review quality and latency. Record quota
 usage only where the provider exposes usable evidence, alongside Jev's reported cost.

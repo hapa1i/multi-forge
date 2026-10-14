@@ -1,7 +1,7 @@
 # Jev rule pack, warnings only
 
-Epic: [Jev support](../epic_jev_support/card.md). Member **A2**. Depends on
-[A1: Jev client and probes](../jev_client_probes/card.md). Codex-visible delivery also depends on
+Epic: [Jev support](../../doing/epic_jev_support/card.md). Member **A2**. Depends on
+[A1: Jev client and probes](../../doing/jev_client_probes/card.md). Codex-visible delivery also depends on
 [B3: warnings Codex can see](../../done/codex_policy_warnings/card.md), shipped through PR #262 and closed on
 2026-10-11. This card remains proposed.
 
@@ -13,8 +13,8 @@ warnings. It works without a plan or supervisor and provides measurable evidence
 block actions.
 
 [Workflow design §1.1](../../../design_workflows.md#11-deterministic-policy-forge-policy) motivates this use. The
-[research](../epic_jev_support/research.md#rule-packs-backed-by-jev-fixed-semantic-checks) explains the boundary between
-stable rule citations, action evidence and semantic correctness.
+[research](../../doing/epic_jev_support/research.md#rule-packs-backed-by-jev-fixed-semantic-checks) explains the
+boundary between stable rule citations, action evidence and semantic correctness.
 
 ## Scope
 
