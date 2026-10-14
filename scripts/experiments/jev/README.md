@@ -49,5 +49,5 @@ The synthetic malformed/over-limit controls replace the wire payload in the harn
 production client's auth, mandatory ZDR, deadline and telemetry. The normal production byte guard remains intact.
 
 Use this harness from a development checkout. Retain sanitized evidence under
-[the A1 card](../../../docs/board/doing/jev_client_probes/evidence/README.md). Ordinary tests inject `httpx` transports
+[the A1 card](../../../docs/board/done/jev_client_probes/evidence/README.md). Ordinary tests inject `httpx` transports
 and never call Jev; no fixture transport ships in `src/forge`.

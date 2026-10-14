@@ -2,13 +2,12 @@
 
 ## Current focus
 
-Coordinate [A1: client and probes](../jev_client_probes/card.md), active since 2026-10-14 on `codex/jev-client-probes`
-from `main` at `1ae9667d` (`v1.1.0`). This branch owns A1 and epic coordination, not an A1–A3 implementation batch.
-
-A1's implementation and approved synthetic captures are complete in
-[PR #268](https://github.com/hapa1i/multi-forge/pull/268), awaiting review and merge. Its
-[evidence report](../jev_client_probes/evidence/2026-10-14/report.md) records successful ZDR-required routing, latency,
-accounting and limitations. A2/A3 remain proposed; neither decision quality nor quota savings has been evaluated.
+Close out [A1: client and probes](../../done/jev_client_probes/card.md), shipped through
+[PR #268](https://github.com/hapa1i/multi-forge/pull/268) at `9778007a` on 2026-10-14, and select the next member. The
+epic stays active; this is not an A1–A3 implementation batch. A1's
+[evidence report](../../done/jev_client_probes/evidence/2026-10-14/report.md) records successful ZDR-required routing,
+latency, accounting and limitations. A2/A3 remain proposed; neither decision quality nor quota savings has been
+evaluated.
 
 ## Activation and sequence
 
@@ -21,7 +20,7 @@ accounting and limitations. A2/A3 remain proposed; neither decision quality nor 
 
 | Member                                     | Lane     | Prerequisites  | Acceptance owner                                                          |
 | ------------------------------------------ | -------- | -------------- | ------------------------------------------------------------------------- |
-| [A1](../jev_client_probes/card.md)         | Doing    | None           | [A1 checklist](../jev_client_probes/checklist.md#acceptance-tests)        |
+| [A1](../../done/jev_client_probes/card.md) | Done     | None           | [A1 closeout](../../done/jev_client_probes/checklist.md#merged-closeout)  |
 | [A2](../../proposed/jev_rule_pack/card.md) | Proposed | A1; shipped B3 | [A2 card](../../proposed/jev_rule_pack/card.md#acceptance-and-validation) |
 | [A3](../../proposed/jev_cascade/card.md)   | Proposed | A1; shipped B1 | [A3 card](../../proposed/jev_cascade/card.md#acceptance-and-validation)   |
 
@@ -32,12 +31,18 @@ request gates consumer availability, even when offline transport is ready.
 
 - [x] Review A1's early capture outcome before it finalizes retries, telemetry and estimator assumptions. Record a
   failed/unavailable capture as a blocker or an explicit provisional-work decision; never as verified readiness.
-- [ ] Accept the typed boundary, size/error contract and caller-owned deadline against the epic's shared contract.
+- [x] Accept the typed boundary, size/error contract and caller-owned deadline against the epic's shared contract.
   Confirm A2 can distinguish unavailable judgments and A3 can reserve time for its reviewer.
-- [ ] Accept the telemetry handoff, including Decisions token/cost mapping, usable trace IDs, distinct attempts and
+- [x] Accept the telemetry handoff, including Decisions token/cost mapping, usable trace IDs, distinct attempts and
   preservation of existing v2 history. Link A1's evidence rather than maintaining a second transport test list here.
-- [ ] Record A1's merged head, supported route/model, ZDR readiness and measured limitations. Carry unresolved
+- [x] Record A1's merged head, supported route/model, ZDR readiness and measured limitations. Carry unresolved
   constraints into any consumer activation; unavailable ZDR routing blocks A2/A3 availability.
+
+Gate 1 evidence: [A1 merged closeout](../../done/jev_client_probes/checklist.md#merged-closeout), with all five PR
+checks passing and unchanged production code at merge. The supported route is OpenRouter Decisions with ZDR required;
+the captured model resolves to `typesafe/jev-1.13-20260917`. Consumers inherit conservative size admission, distinct
+local/attempt/provider outcomes, unknown missing cost and observed answer variance. They still own deadlines, quality
+thresholds and any reviewer reserve; A1 supplies no decision-quality or quota-saving evidence.
 
 ## Gate 2: consumer activation and drift control
 

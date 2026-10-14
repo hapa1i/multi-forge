@@ -1,7 +1,7 @@
 # Jev as the cascade's first tier
 
 Epic: [Jev support](../../doing/epic_jev_support/card.md). Member **A3**. Depends on
-[A1: Jev client and probes](../../doing/jev_client_probes/card.md) and
+[A1: Jev client and probes](../../done/jev_client_probes/card.md) and
 [B1: plan-file Claude supervision](../../done/plan_file_supervision/card.md). A2 is not a dependency.
 
 ## Problem and outcome

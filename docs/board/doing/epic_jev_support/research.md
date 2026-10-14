@@ -377,7 +377,7 @@ own design. [Effort resolution](../../../../src/forge/proxy/reasoning.py),
 
 ## Selected cards and remaining design avenues
 
-The draft scope is [A1: client and probes](../jev_client_probes/card.md),
+The draft scope is [A1: client and probes](../../done/jev_client_probes/card.md),
 [A2: warning-only rule packs](../../proposed/jev_rule_pack/card.md), and
 [A3: cascade](../../proposed/jev_cascade/card.md). A2 needs [B3](../../done/codex_policy_warnings/card.md) for
 Codex-visible warnings; A3 needs [B1](../../done/plan_file_supervision/card.md) for fresh plan-file Claude supervision.

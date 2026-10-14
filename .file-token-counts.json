@@ -51,10 +51,10 @@
       "tokens": 37015
     },
     "docs/board/impl_notes/runtime_telemetry.md": {
-      "sha256": "93d8f7baf724b1eeec9060117b1db389c004e3a3e5bedb9cbfb25c3feee17995",
+      "sha256": "5a284be0126d71a7792d60bf82cde76d0613c12e9279c1385d9137e6dd87cb71",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 20618
+      "tokens": 21164
     },
     "docs/design.md": {
       "sha256": "f0bd625c4385ab454fcd41b57c0ce6684e57b5f1a3d916df5d17d41a630b4e41",

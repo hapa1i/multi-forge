@@ -7,6 +7,26 @@ Older entries are retained verbatim in [2026-08-18](archive/change_log_2026-08-1
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-14
+
+### Ship the typed Jev Decisions client
+
+**Goal**: Establish a shared typed judgment transport and measured contract before adding Jev policy consumers.
+
+**Key changes**:
+
+- Added Choice/Noul/Score validation, mandatory ZDR, conservative byte admission, caller-owned deadlines and bounded
+  retries. Invalid answers and unexpected attempt failures retain independently valid usage without reporting success.
+- Mapped Decisions tokens, reported cost and request IDs into existing telemetry schemas; preserved old history, unknown
+  cost and per-attempt attribution. Kept fixture transports outside the package.
+- Retained 29 authorized synthetic requests, latency/accounting evidence, answer variance and offline replay provenance.
+  Closed A1 while keeping the Jev epic and its unimplemented consumers separate.
+
+**Verification**: [PR #268](https://github.com/hapa1i/multi-forge/pull/268) merged as `9778007a`, identical to reviewed
+head `d02627ab`, with all five GitHub checks passing. The PR passed 10,910 unit tests, 1,854 regressions, four targeted
+integrations and full pre-commit. Closeout checks and supported limits are recorded in the
+[A1 closeout](done/jev_client_probes/checklist.md#merged-closeout). No closeout inference ran.
+
 ## 2026-10-13
 
 ### Adopt Gemini 4 Argon defaults

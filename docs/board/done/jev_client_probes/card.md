@@ -1,25 +1,26 @@
 # Jev client and test scripts: OpenRouter Decisions
 
-Epic: [Jev support](../epic_jev_support/card.md). Member **A1**. No new-card dependencies. Provides the client and
-evidence consumed by A2 and A3.
+Epic: [Jev support](../../doing/epic_jev_support/card.md). Member **A1**. No new-card dependencies. Provides the client
+and evidence consumed by A2 and A3.
 
-Status: **doing**, activated 2026-10-14 on `codex/jev-client-probes` from `main` at `1ae9667d` (`v1.1.0`). The
-[execution checklist](checklist.md) is the current cursor. Implementation and 29 approved synthetic requests are
-complete; review and merge remain open. See the [results](evidence/2026-10-14/report.md).
+Status: **done**, shipped 2026-10-14 through [PR #268](https://github.com/hapa1i/multi-forge/pull/268), merged as
+`9778007a`. The [merged closeout](checklist.md#merged-closeout) records verification and the
+[results](evidence/2026-10-14/report.md) account for all 29 approved synthetic requests. The Jev epic remains active;
+A2/A3 are separate consumers.
 
 ## Problem and outcome
 
-Forge has no typed Jev transport. OpenRouter's Decisions API is alpha, and there is no measured Forge latency or
-multi-question cost baseline. Add a thin client over existing `httpx` and reproducible scripts in
-`scripts/experiments/jev/` to establish the route contract before policy consumers rely on it.
+Before A1, Forge had no typed Jev transport or measured latency/multi-question cost baseline. OpenRouter's Decisions API
+is alpha. This card added a thin client over existing `httpx` and reproducible scripts in `scripts/experiments/jev/` to
+establish the route contract before policy consumers rely on it.
 
-Use the [research](../epic_jev_support/research.md#access-paths-and-their-implications) as the starting evidence, not as
-a substitute for live probes. Vendor speed claims do not establish this deployment's p50/p95 latency.
+Use the [research](../../doing/epic_jev_support/research.md#access-paths-and-their-implications) as the starting
+evidence, not as a substitute for live probes. Vendor speed claims do not establish this deployment's p50/p95 latency.
 
 Start with the minimal credential, URL, ZDR and timeout path, then a separately authorized small synthetic capture.
 Reconcile those responses before finalizing retries, telemetry and estimator assumptions; the larger latency and
-accounting matrix follows later. The [evidence index](evidence/README.md) distinguishes public documentation from future
-live results.
+accounting matrix follows later. The [evidence index](evidence/README.md) distinguishes public documentation from live
+results.
 
 ## Scope
 
@@ -32,9 +33,10 @@ live results.
 - Emit complete true/false criteria for Noul and validate supported question/result types, IDs, probabilities, counts
   and required fields. Reject invalid or mismatched answers. Preserve raw probabilities and distinguish model confidence
   from telemetry measurement confidence.
-- Enforce a conservative 32,000-token total request budget with estimation headroom. Own timeout, bounded retries,
-  rate-limit handling and total deadline. Attribute physical attempts and returned usage/cost through existing telemetry
-  conventions; absent cost remains unknown.
+- Screen requests at 30,000 serialized bytes below the documented 32,000-token prompt ceiling, without claiming exact
+  token counting or guaranteed provider admission. Own timeout, bounded retries, rate-limit handling and total deadline.
+  Attribute physical attempts and returned usage/cost through existing telemetry conventions; absent cost remains
+  unknown.
 - Build opt-in probes for authentication, schema errors, ZDR-only routing/refusal, context boundaries, one versus many
   questions over fixed state, rate limits, retry behavior, and latency by request size/question count. Inspect returned
   provider identity and public catalog evidence; do not claim an API response proves an internal retention practice.

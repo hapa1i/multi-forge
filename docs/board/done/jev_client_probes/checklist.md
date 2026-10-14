@@ -2,14 +2,14 @@
 
 ## Current focus
 
-A1 is implemented and verified in [PR #268](https://github.com/hapa1i/multi-forge/pull/268), awaiting review on
-`codex/jev-client-probes`, based on `main` at `1ae9667d` (`v1.1.0`). The
-[Jev epic checklist](../epic_jev_support/checklist.md) owns downstream sequencing.
+A1 is **done** after [PR #268](https://github.com/hapa1i/multi-forge/pull/268) merged as `9778007a` on 2026-10-14.
+Execution used `codex/jev-client-probes`, based on `main` at `1ae9667d` (`v1.1.0`). The
+[Jev epic checklist](../../doing/epic_jev_support/checklist.md) owns downstream sequencing.
 
 The user approved four early synthetic requests and then 25 measurement requests; all 29 physical requests are accounted
 for in the [evidence report](evidence/2026-10-14/report.md). ZDR-required Choice/Noul/Score routing succeeded. Live
 captures corrected score-rounding tolerance and the provider's HTTP 400 size-error wrapper. A2/A3, Direct TypeSafe, its
-SDK and Jev Router remain outside A1. Review/merge and consumer selection remain open.
+SDK and Jev Router remain outside A1. Consumer selection belongs to the active epic.
 
 ## Verified starting points
 
@@ -228,9 +228,9 @@ that existing loader is hard-coded to Codex scripts, so it is not directly reusa
   unresolved behavior under `evidence/`. Consumers must distinguish unusable judgments from unsupported routing.
 - [x] Review A1's acceptance evidence and the epic's Gate 1. Record live ZDR readiness explicitly; an unexecuted capture
   is not a pass. Preserve any consumer dependency blocker even if offline transport work is useful independently.
-- [ ] Record reviewed PR, tested head and merge evidence; add the completed-work change-log entry. Promote durable
+- [x] Record reviewed PR, tested head and merge evidence; add the completed-work change-log entry. Promote durable
   lessons to implementation notes only after human review.
-- [ ] Move A1 to `done/` only when shipped and verified. Repoint links and record the epic handoff; keep the epic active
+- [x] Move A1 to `done/` only when shipped and verified. Repoint links and record the epic handoff; keep the epic active
   and select A2 or A3 separately.
 
 ## Planning verification
@@ -258,8 +258,8 @@ at that planning checkpoint.
   See [operator evidence](evidence/2026-10-14/observability.json).
 
 Planning is committed as `bde11e5f`; implementation is `04f3c01d`, the tested code head.
-[PR #268](https://github.com/hapa1i/multi-forge/pull/268) is open against `main`. This handoff record is a docs-only
-follow-up. Neither A1 nor the epic closes before review and merge.
+[PR #268](https://github.com/hapa1i/multi-forge/pull/268) was opened against `main`, followed by a docs-only handoff.
+The merged closeout below supersedes that review checkpoint.
 
 ## PR review verification — 2026-10-14
 
@@ -282,4 +282,27 @@ unchanged.
 
 Retry/deadline policy remains conservative. Three-sample latency measurements do not establish a minimum safe retry
 window, and arbitrary deadline ceilings would constrain callers without a supported limit. Consumer admission at Gate 1
-still owns its monotonic deadline and reviewer reserve. A1 and the epic remain `doing` pending review and merge.
+still owns its monotonic deadline and reviewer reserve. The epic remains active after A1's merge.
+
+## Merged closeout
+
+[PR #268](https://github.com/hapa1i/multi-forge/pull/268) merged on 2026-10-14 as
+`9778007a281e896c12758e8df95cd08af2869d24`. Its tree is identical to reviewed head
+`d02627ab60cf8eb8557d9420e70b9939e7638769`; GitHub pre-commit, tests, both CodeQL analyses and the CodeQL check all
+passed. The tested runtime fix is `0d6b923c`; the final PR commit changes documentation only.
+
+The PR passed 10,910 unit tests, 1,854 regressions, four targeted integrations and full pre-commit. Closeout passed all
+116 focused client/harness/regression cases after moving evidence to `done/`, full `make pre-commit`, the Markdown link
+audit for 676 sources and `git diff --check`. The replay test's fixture path follows the card move; historical
+capture/replay hashes still identify their recorded source revisions. No production behavior changed or paid inference
+ran during closeout.
+
+Runtime, telemetry, installation, authentication and cost guidance describe the shipped transport and accounting.
+Reviewed invariants are retained in the [runtime/telemetry notes](../../impl_notes/runtime_telemetry.md), and completion
+is recorded in the [change log](../../change_log.md#2026-10-14).
+
+Handoff: OpenRouter Decisions supports the three typed question shapes with ZDR required, default requested model
+`typesafe/jev-1.13` and captured resolved model `typesafe/jev-1.13-20260917`. Preserve the 30,000-byte screen, unknown
+cost on both HTTP 400 controls, measured answer variance and caller-owned deadline. Captures prove transport readiness,
+not decision quality, guaranteed latency or quota savings. A2/A3 require separate activation and data/spend decisions;
+the epic remains `doing`.

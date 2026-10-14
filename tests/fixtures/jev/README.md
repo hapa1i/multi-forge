@@ -8,5 +8,5 @@ These JSON responses were captured from OpenRouter Decisions with synthetic stat
 - `over-limit.json`: the separate 120,234-byte wire control; HTTP 400 with `max_tokens_exceeded`.
 
 The malformed response's account `user_id` is redacted. Provider response IDs remain for provenance. See
-[the A1 evidence](../../../docs/board/doing/jev_client_probes/evidence/README.md) for manifests, interruptions and full
+[the A1 evidence](../../../docs/board/done/jev_client_probes/evidence/README.md) for manifests, interruptions and full
 captures. Constructed malformed and boundary cases live in tests and are not presented as captured provider behavior.

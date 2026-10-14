@@ -144,7 +144,7 @@ async def test_manifest_mutation_refuses_before_credentials(probe, monkeypatch, 
 def test_retained_capture_contract(probe, stage, successes, refusal):
     from forge.core.judgments.openrouter import status_failure
 
-    evidence = Path(__file__).resolve().parents[3] / "docs/board/doing/jev_client_probes/evidence/2026-10-14"
+    evidence = Path(__file__).resolve().parents[3] / "docs/board/done/jev_client_probes/evidence/2026-10-14"
     capture = json.loads((evidence / f"{stage}-capture.json").read_text())
     classes = {"choice": probe.ChoiceQuestion, "noul": probe.NoulQuestion, "score": probe.ScoreQuestion}
     outcomes = []

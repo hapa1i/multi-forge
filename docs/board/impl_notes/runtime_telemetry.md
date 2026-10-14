@@ -8,6 +8,25 @@ Durable routing, backend, consumer, proxy, policy, and telemetry decisions.
 
 ## Notes
 
+### Typed judgments preserve failure and accounting independently (jev_client_probes, shipped 2026-10-14)
+
+- Decisions responses use `input_tokens`/`output_tokens` and may report cost independently of answer validity. Preserve
+  usable accounting on invalid judgments; mark success only after answer validation and response cleanup. A response
+  byte cap does not prevent JSON nesting failures.
+- Keep Jev on the existing downstream v2 and usage v1 fields and `core_llm` route. A downstream version bump fences
+  older history; new fields or route literals also break strict readers. Direct reported cost participates in unfiltered
+  costs and attributed session totals, with one charge per physical attempt.
+- Switching `FORGE_HOME` does not clear cached runtime config. Resolve credentials first, then clear the cache when
+  isolating a probe; otherwise the original home's provider-grouping preferences can survive the switch.
+- Model probability, reported billing confidence and decision quality are separate. Repeated identical Jev inputs
+  varied, and independent two-decimal score/probability rounding requires bounded validation tolerance. Consumer
+  thresholds and cache identity need their own evaluation; successful routing is not that evaluation.
+
+Sources: [reviewed closeout](../done/jev_client_probes/checklist.md#merged-closeout),
+[typed boundary](../../design_runtime.md#typed-judgments),
+[failure regression](../../../tests/regression/test_bug_268_jev_failed_attempts.py), and
+[probe isolation regression](../../../tests/regression/test_bug_268_jev_probe_config.py).
+
 ### Model upgrades must verify route selection, loaded deployments, and termination (gemini_4_argon, shipped 2026-10-13)
 
 - Exercise the real planner with only the intended provider credential. Matching route coverage does not prove that the

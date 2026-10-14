@@ -109,5 +109,5 @@ quota effects remain outside A1.
 
 ## Verification
 
-Final command results and PR handoff are recorded in the [A1 checklist](../../checklist.md). The epic remains active; A1
-moves to done only after review and merge.
+Final command results and merge evidence are recorded in the [A1 closeout](../../checklist.md#merged-closeout). A1
+shipped through PR #268 on 2026-10-14; the epic remains active for its consumers.
