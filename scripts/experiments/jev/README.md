@@ -23,7 +23,8 @@ PYTHON_DOTENV_DISABLED=1 uv run python scripts/experiments/jev/probe.py \
 
 The output directory must not exist. Credentials resolve through Forge's environment/file owner before the runner
 creates an isolated `FORGE_HOME` there. Only resolved OpenRouter credentials are carried forward; no credentials file,
-session or historical telemetry is copied. Captures omit headers and redact keys and the account `user_id`. A hard
+session or historical telemetry is copied. The runner clears cached runtime config after switching homes so grouping and
+retention use the isolated home's defaults. Captures omit headers and redact keys and the account `user_id`. A hard
 counter includes control requests. Unexpected status, unusable answers, changed model/pricing or excessive reported cost
 stop the run; a post-response check cannot undo a charge. Missing cost stays unknown.
 
@@ -31,6 +32,13 @@ stop the run; a post-response check cannot undo a charge. Missing cost stays unk
 end-to-end client calls, including cached credential lookup and local telemetry. Initial credential resolution and
 manifest preparation are excluded. With three samples, p95 is the maximum; these numbers are not an SLA. Raw interrupted
 results remain unchanged when a local parser fix later admits them.
+
+Replay the retained early and measurement captures against the current answer validator, HTTP error classifier and
+accounting checks without resolving credentials or making requests:
+
+```bash
+uv run pytest tests/src/scripts/test_jev_probe.py -k retained_capture_contract
+```
 
 To continue an interrupted capture after fixing a local parser/transport defect, use a new output directory and
 `--resume <prior-capture.json>`. The runner checks the exact manifest, each completed response and its accounting, then

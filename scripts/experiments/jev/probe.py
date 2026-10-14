@@ -36,6 +36,7 @@ from forge.core.judgments.types import JudgmentResponse, Question, validate_answ
 from forge.core.llm.credentials import CredentialManager
 from forge.core.llm.errors import NoApiKeyError
 from forge.core.reactive.env import new_root_run_identity
+from forge.runtime_config import reset_runtime_config
 
 ENDPOINT = "https://openrouter.ai/api/alpha/decisions"
 PRICE_PER_TOKEN = 0.000000042
@@ -382,6 +383,8 @@ async def run_live(plan: dict[str, Any], output: Path, *, resume: Path | None = 
     isolated = output / "forge-home"
     isolated.mkdir(mode=0o700)
     os.environ["FORGE_HOME"] = str(isolated.resolve())
+    # Credential resolution may have cached the original home's provider-trace settings.
+    reset_runtime_config()
     os.environ.update(new_root_run_identity().as_env())
     for name in ("FORGE_SESSION", "FORGE_PARENT_RUN_ID"):
         os.environ.pop(name, None)

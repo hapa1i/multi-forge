@@ -9,35 +9,6 @@ entry point retains proxy/backend lifecycle, model catalogs, configuration, and 
 
 ## Runtime and routing contracts
 
-### Typed judgments
-
-`core.judgments.OpenRouterJudgmentClient` sends Choice, Noul and Score questions to OpenRouter Decisions through
-`httpx`. Callers supply state, named typed questions and an absolute monotonic deadline. Credentials resolve through
-`CredentialManager`; `/api/v1` bases map explicitly to `/api/alpha/decisions`, retaining custom gateway prefixes.
-Unsupported base paths fail before dispatch. Redirects are disabled, remote bases require HTTPS, and caller provider
-options cannot override `zdr: true`. The default model is `typesafe/jev-1.13`; requested and returned model IDs remain
-separate. There is no direct TypeSafe fallback.
-
-The client snapshots the request and admits at most 30,000 serialized UTF-8 bytes, including attribution fields. This
-conservative screen leaves room below the documented 32,000-token prompt ceiling; it is not an exact tokenizer or a
-proof of provider admission. Oversized input is rejected without truncation. Responses are bounded to 256,000 bytes.
-Answer IDs, types, labels, legends, finite probabilities and counts are validated. Score accepts 2–10 ordered criteria.
-A captured score/probability discrepancy is consistent with independent two-decimal rounding: distribution sums allow
-0.005 per entry, and weighted scores allow `0.005 * (1 + sum(level indices))`, plus floating-point epsilon. Values are
-preserved, never normalized. These are empirical rounding allowances; consumer thresholds and quality evaluation belong
-to the caller.
-
-The default permits two physical attempts; callers may choose 1–5. Only 429/500/502/503/529 receive automatic retries,
-using valid `Retry-After` or exponential backoff from 0.25 seconds, capped at 2 seconds. Credentials, I/O and backoff
-share the caller deadline. HTTP 524, transport timeouts and cancellations are potentially billed; they never trigger an
-automatic retry. Permanent statuses, unknown statuses and unusable answers fail visibly. Every dispatched attempt
-retains independently valid usage and identity, including failed answers. External cancellation propagates after
-resource cleanup and attempt recording.
-
-The [repository probe harness](../scripts/experiments/jev/README.md) defaults to a synthetic dry-run manifest. Live
-captures require an explicit bounded approval and an isolated Forge home. A1 supplies transport and evidence only; Jev
-policy and cascade consumers are separate work.
-
 #### 3.6.3 Proxy lifecycle UX
 
 **Implemented:**
@@ -182,6 +153,38 @@ tier word is visible).
 
 This applies to tier selection *within* a resolved proxy. Which proxy a subprocess uses is decided by the resolution
 chain (§3.6.12).
+
+### Typed judgments
+
+`core.judgments.OpenRouterJudgmentClient` sends Choice, Noul and Score questions to OpenRouter Decisions through
+`httpx`. Callers supply state, named typed questions and an absolute monotonic deadline. Credentials resolve through
+`CredentialManager`; `/api/v1` bases map explicitly to `/api/alpha/decisions`, retaining custom gateway prefixes.
+Unsupported base paths fail before dispatch. Redirects are disabled, remote bases require HTTPS, and caller provider
+options cannot override `zdr: true`. The default model is `typesafe/jev-1.13`; requested and returned model IDs remain
+separate. There is no direct TypeSafe fallback.
+
+The client snapshots the request and admits at most 30,000 serialized UTF-8 bytes, including attribution fields. This
+conservative screen leaves room below the documented 32,000-token prompt ceiling; it is not an exact tokenizer or a
+proof of provider admission. Oversized input is rejected without truncation. Responses are bounded to 256,000 bytes.
+Answer IDs, types, labels, legends, finite probabilities and counts are validated. Score accepts 2–10 ordered criteria.
+A captured score/probability discrepancy is consistent with independent two-decimal rounding: distribution sums allow
+0.005 per entry, and weighted scores allow `0.005 * (1 + sum(level indices))`, plus floating-point epsilon. Values are
+preserved, never normalized. These are empirical rounding allowances; consumer thresholds and quality evaluation belong
+to the caller.
+
+The default permits two physical attempts; callers may choose 1–5. Only 429/500/502/503/529 receive automatic retries,
+using valid `Retry-After` or exponential backoff from 0.25 seconds, capped at 2 seconds. Credentials, I/O and backoff
+share the caller deadline. HTTP 524, transport timeouts and cancellations are potentially billed; they never trigger an
+automatic retry. Permanent statuses, unknown statuses and unusable answers fail visibly. Every dispatched attempt
+retains independently valid usage and identity, including failed answers. External cancellation propagates after
+resource cleanup and attempt recording. Deeply nested JSON is an unusable response, and unexpected client errors become
+non-retryable `internal_error` failures. Success is recorded only after answer validation and response cleanup. Initial
+local rejections have no attempts; attempted I/O without an HTTP status remains distinct from a provider response and is
+not proof of zero billing.
+
+The [repository probe harness](../scripts/experiments/jev/README.md) defaults to a synthetic dry-run manifest. Live
+captures require an explicit bounded approval and an isolated Forge home. A1 supplies transport and evidence only; Jev
+policy and cascade consumers are separate work.
 
 ## 7. Isolation and Proxy Modes
 

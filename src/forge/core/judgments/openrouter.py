@@ -128,6 +128,10 @@ class OpenRouterJudgmentClient:
         except TimeoutError:
             kind = "ambiguous_timeout" if attempts and attempts[-1].failure == "ambiguous_timeout" else "deadline"
             raise JudgmentError(kind, "Judgment deadline expired", attempts=tuple(attempts)) from None
+        except Exception:
+            raise JudgmentError(
+                "internal_error", "Judgment client failed unexpectedly", attempts=tuple(attempts)
+            ) from None
         raise AssertionError("bounded judgment loop must return or fail")
 
     async def _attempt(
@@ -147,7 +151,7 @@ class OpenRouterJudgmentClient:
         request_id = mint_request_id()
         started = time.monotonic()
         status: int | None = None
-        failure: str | None = None
+        failure: str | None = "internal_error"
         body: Any = None
         response = None
         delay = None
@@ -173,16 +177,21 @@ class OpenRouterJudgmentClient:
                         raise JudgmentError("invalid_response", "Judgment response exceeds the byte limit")
                 try:
                     body = json.loads(chunks, object_pairs_hook=_unique_object)
-                except (ValueError, UnicodeError):
+                except (ValueError, UnicodeError, RecursionError):
                     body = None
-                failure = status_failure(status, body)
-                if failure is None:
+                status_error = status_failure(status, body)
+                if status_error is not None:
+                    failure = status_error
+                else:
                     try:
                         candidate = JudgmentResponse.model_validate(body)
                         validate_answers(candidate, questions)
                         response = candidate
                     except ValueError:
                         failure = "invalid_response"
+            # A validated body is successful only after the response stream closes cleanly.
+            if response is not None:
+                failure = None
         except asyncio.CancelledError:
             failure = "ambiguous_timeout" if time.monotonic() >= deadline else "cancelled"
             raise
@@ -192,6 +201,9 @@ class OpenRouterJudgmentClient:
             failure = "transport"
         except JudgmentError as exc:
             failure = exc.kind
+        except Exception:
+            # Unknown failures must neither look successful nor become retryable provider errors.
+            failure = "internal_error"
         finally:
             attempt = JudgmentAttempt(
                 request_id,
@@ -297,14 +309,17 @@ def build_payload(
         "questions": question_data,
         "provider": {**(provider_options or {}), "zdr": True},
     }
-    return json.loads(encode_payload(payload))
+    try:
+        return json.loads(encode_payload(payload))
+    except RecursionError:
+        raise JudgmentError("validation", "Judgment input exceeds the JSON nesting limit") from None
 
 
 def encode_payload(payload: dict[str, Any]) -> bytes:
     """Screen the actual wire envelope, including optional attribution, before dispatch."""
     try:
         encoded = json.dumps(payload, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, RecursionError):
         raise JudgmentError("validation", "Judgment state and options must contain finite JSON values") from None
     if len(encoded) > MAX_INPUT_BYTES:
         raise JudgmentError(
@@ -323,9 +338,10 @@ def status_failure(status: int, body: Any = None) -> str | None:
         if isinstance(message, str) and message.startswith("HTTP 400: "):
             try:
                 detail = json.loads(message.removeprefix("HTTP 400: "), object_pairs_hook=_unique_object)
-            except ValueError:
+            except (ValueError, RecursionError):
                 detail = None
-            if isinstance(detail, dict) and detail.get("detail") == {"error_type": "max_tokens_exceeded"}:
+            inner = detail.get("detail") if isinstance(detail, dict) else None
+            if isinstance(inner, dict) and inner.get("error_type") == "max_tokens_exceeded":
                 return "payload_too_large"
     return (
         None

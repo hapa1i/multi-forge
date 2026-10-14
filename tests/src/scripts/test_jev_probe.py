@@ -136,3 +136,29 @@ async def test_manifest_mutation_refuses_before_credentials(probe, monkeypatch, 
     monkeypatch.setattr(probe.CredentialManager, "default", lambda: pytest.fail("No credentials allowed"))
     with pytest.raises(ValueError, match="Manifest differs"):
         await probe.run_live(plan, tmp_path / "capture")
+
+
+@pytest.mark.parametrize(
+    "stage,successes,refusal", [("early", 3, "validation"), ("measurement", 24, "payload_too_large")]
+)
+def test_retained_capture_contract(probe, stage, successes, refusal):
+    from forge.core.judgments.openrouter import status_failure
+
+    evidence = Path(__file__).resolve().parents[3] / "docs/board/doing/jev_client_probes/evidence/2026-10-14"
+    capture = json.loads((evidence / f"{stage}-capture.json").read_text())
+    classes = {"choice": probe.ChoiceQuestion, "noul": probe.NoulQuestion, "score": probe.ScoreQuestion}
+    outcomes = []
+    assert capture["physical_requests"] == len(capture["results"]) == successes + 1
+    for entry, result in zip(capture["manifest"]["requests"], capture["results"]):
+        assert len(result["responses"]) == result["physical_requests"] == 1
+        response = result["responses"][0]
+        failure = status_failure(response["status"], response["body"])
+        if failure is None:
+            questions = {
+                key: classes[value["type"]].model_validate(value)
+                for key, value in entry["payload"]["questions"].items()
+            }
+            probe.validate_answers(probe.JudgmentResponse.model_validate(response["body"]), questions)
+            assert probe.check_response(response["body"], capture["manifest"], entry) is None
+        outcomes.append(failure)
+    assert outcomes == [None] * successes + [refusal]

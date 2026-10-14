@@ -36,7 +36,7 @@ def test_attempts_visible_without_fake_proxy(tmp_path, monkeypatch, managed, gro
         monkeypatch.setenv("FORGE_SESSION", "jev-test")
     from forge.runtime_config import get_runtime_config
 
-    get_runtime_config().provider_trace.inject_provider_user = grouping
+    monkeypatch.setattr(get_runtime_config().provider_trace, "inject_provider_user", grouping)
     requests = []
 
     def handler(request):
