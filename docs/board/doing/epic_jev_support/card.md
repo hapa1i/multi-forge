@@ -37,8 +37,9 @@ Its [checklist](../jev_rule_pack/checklist.md) owns implementation, rule-quality
 This is a single-card branch; A2 does not make plan-alignment decisions for A3.
 
 The independent [Claude feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), gates A2's
-Claude delivery acceptance. Its fixture checks pass; the native trial awaits approval. It affects existing policy users
-and ships independently, outside the Jev membership and branch.
+Claude delivery acceptance. Its fixture checks pass, but the user chose on 2026-10-15 to skip paid native testing and
+keep that PR in draft. The prerequisite card is paused at its native evidence gate, outside the Jev membership and
+branch.
 
 ## Shared contract
 

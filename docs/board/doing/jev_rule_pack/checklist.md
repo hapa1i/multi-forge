@@ -6,9 +6,11 @@ Execution started on 2026-10-14. A2 is active on `codex/jev-rule-pack`, based on
 `f7ce7a9a45f2e208d0fd72c74454750f4fd30e1f` after A1's closeout. The A1 explicit evaluation-identity extension is
 implemented, along with session consent/inheritance and raw-override guards, in draft
 [PR #270](https://github.com/hapa1i/multi-forge/pull/270). The
-[initial rule/context proposal](evidence/initial-rule-review.md) is awaiting review before hook wiring. No paid A2
-evaluation has run. The [card](card.md) owns scope; the [epic checklist](../epic_jev_support/checklist.md) owns
-sequencing. A3 remains proposed and will use a separate execution branch.
+[wrapper evidence contract](evidence/initial-rule-review.md) now keeps broader wrappers under the user's 2026-10-15
+decision. Offline preparation covers 14 constructed, unadjudicated hook actions. Human labels, thresholds and real scope
+fact resolution remain open before hook wiring/evaluation. No paid A2 evaluation has run. The [card](card.md) owns
+scope; the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed and will use a
+separate execution branch.
 
 Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
 never introduce a Jev denial or `needs_review`. An independently configured policy or supervisor retains its existing
@@ -68,21 +70,25 @@ the shared responder's explicit allow, regression coverage for all policy users,
 evidence and its own change-log entry/PR. This affects TDD, coding standards and supervisors without Jev. A2's Claude
 delivery gate depends on that fix; do not bury it in the warning formatter or claim B3's Codex trial proves Claude
 behavior. It is implemented on `codex/claude-policy-feedback-permissions`, with focused, aggregate and hook integration
-checks passing. Its eight-case synthetic native trial is prepared but awaits separate API-spend approval. A2's offline
-work can continue. Consume the independent card and reconcile these PR links when integrating the merged fix; the
-original proposal is removed from this branch so it cannot create a duplicate board state.
+checks passing. On 2026-10-15 the user chose to skip paid native testing and keep that PR in draft; its card is paused
+at the unverified native gate. A2's offline work can continue without running that trial or substituting another native
+route. Consume the independent card and reconcile these PR links when integrating the merged fix; the original proposal
+is removed from this branch so it cannot create a duplicate board state.
 
 ## Slice 1: reviewed rules and offline evaluation contract
 
 - [ ] Establish `src/forge/policy/rule_pack/` as the proposed home for pack definitions, evidence preparation and the
   warning policy. Use `jev_rule_pack` as the explicit bundle name. Keep pack semantics separate from the transport and
   from the plan supervisor; no general rule-authoring framework or new vendor SDK.
-- [ ] Check corpus feasibility before selecting the first rule. Compatibility wrappers are a candidate, not a committed
-  rule: count independently labeled positive/negative changes in each proposed split. Marker/delegation searches cannot
-  count unmarked semantic violations. Choose another bounded rule or narrow the quality claim if natural evidence is too
-  sparse. Give admitted rules stable IDs/versions, sources, intent, applicability, required context and atomic Noul
-  questions with complete true/false criteria; version the pack and decision rule separately.
-- [ ] Bind the candidate to [coding standards §5](../../../developer/coding_standards.md#5-interface-changes), including
+- [x] Record the user-selected family: broader compatibility wrappers, including module functions, methods, aliases,
+  decorators and callbacks; do not impose the rejected local-helper-only scope. Revise the
+  [evidence contract](evidence/initial-rule-review.md) to separate compatibility retention, independent boundary
+  responsibilities and trusted surface/exception facts. A warning does not establish that deletion is safe.
+- [ ] Establish corpus feasibility for this family: count independently human-labeled positive/negative changes in each
+  split. Marker/delegation searches cannot count unmarked semantic violations. Narrow the quality claim if natural
+  evidence is sparse. Finalize rule/pack/decision versions, applicability and atomic Noul questions before runtime
+  admission; the offline draft questions and 14 proposed labels are not acceptance evidence.
+- [x] Bind the candidate to [coding standards §5](../../../developer/coding_standards.md#5-interface-changes), including
   justified exceptions and surface distinctions. A missing marker comment is not itself a violation. Define positive,
   compliant and insufficient-context examples before coding; exclude rules whose required facts the hook cannot supply.
 - [ ] Define the consumer outcomes: not applicable, evaluated without a warning, warning, uncertain and unavailable.
@@ -109,9 +115,16 @@ original proposal is removed from this branch so it cannot create a duplicate bo
   `codex_probe.load_script` is fixed to `codex-hooks/`. Store methodology, manifests, labels and sanitized results under
   this card's `evidence/`; keep fake transports in tests/the harness.
 
-**Decision gate:** review the initial rule and required context before wiring it into hooks. Numeric quality gates and
-human labels are still outstanding; record them in `evidence/evaluation-plan.md` before live evaluation. Offline work
-may proceed with clearly provisional examples. The A1 captures are transport fixtures, not A2 quality evidence.
+The preparation stage is implemented in `scripts/experiments/jev/rule-pack-eval.py`: it validates native action shapes,
+keeps source families in one split, binds adjudications to evidence, excludes labels from model inputs and builds
+size-checked A1 payloads without dispatch. It has no live mode, predictions or quality verdict. Response evaluation and
+metrics remain open under the harness item above.
+
+**Decision gate:** the broader family is selected. Implement and verify the revised evidence contract, including the
+host-owned origin of surface/exception facts, before hook wiring; do not populate those facts from action comments or
+infer absent interfaces. Numeric quality gates and human labels are outstanding; record them in
+`evidence/evaluation-plan.md` before live evaluation. Offline work may proceed with clearly provisional examples. The A1
+captures are transport fixtures, not A2 quality evidence.
 
 ## Slice 2: complete action evidence and bounded dispatch
 
@@ -129,6 +142,10 @@ may proceed with clearly provisional examples. The A1 captures are transport fix
 - [ ] Admit only the rule's declared evidence scope. Missing context, unsupported/binary/combined patches, unsafe paths,
   ambiguity and oversized actions produce explicit unavailable coverage. Record deletions and other non-applicable
   operations as such; do not count them as reviewed. Do not read arbitrary repository files to fill gaps implicitly.
+- [ ] Resolve surface/exception facts from an attributed host-owned policy/evidence source and bind their exact content
+  to the evaluated evidence identity. Unknown public stability or exception status is unavailable; approved exceptions
+  make this prohibition inapplicable. The fixture corpus's invented scope facts are not a production source. Broader
+  wrapper support does not authorize repository crawling or an undisclosed expansion beyond supplied action evidence.
 - [ ] Batch all applicable file/rule questions over one bounded state. The first implementation permits at most one
   physical Jev request per native action, `max_attempts=1`, with no automatic splitting. If the complete eligible batch
   exceeds A1 admission, send nothing and identify the uncovered action; no silent subset of files or rules.
@@ -345,8 +362,9 @@ activation and resets that would uncover old intent. Disabling through raw overr
 are preparatory guards; the validating activation command, rule registry and dispatch remain unimplemented.
 
 The consent foundation is committed as `1a029213`. The independent Claude permission fix is committed as `a281be33` on
-its own branch, in draft [PR #269](https://github.com/hapa1i/multi-forge/pull/269). The initial rule/context choice,
-human labels and native trial approval remain open; no A2 quality or native-delivery result is claimed by either draft.
+its own branch, in draft [PR #269](https://github.com/hapa1i/multi-forge/pull/269). On 2026-10-15 the user selected
+broader wrappers and chose to skip paid native testing. Human labels and quality gates remain open; no A2 quality or
+native-delivery result is claimed by either draft.
 
 The focused consent/override/CLI tests and inheritance/direct-command regressions passed 165 tests. Docker integration
 passed all six derivation paths (same-directory fork, new worktree, existing worktree, native resume, transfer resume
@@ -359,6 +377,21 @@ Aggregate checks for this consent foundation passed: `make test-unit` (10,947 pa
 `make test-regression` (1,855 passed), and the existing policy hook integrations (28 passed). Combined with the five
 judgment-observability and ten lifecycle/CLI integrations above, 43 selected integration tests passed with no live
 inference. These results do not satisfy the remaining rule-quality or native-delivery gates.
+
+2026-10-15: the user selected broader wrappers and declined the paid Claude native trial. The revised evidence contract
+separates compatibility retention from required boundary behavior, admits module/method/callback/alias candidates, and
+requires attributed surface/exception facts. No local-helper-only restriction or safe-deletion claim remains.
+
+The offline preparation harness validates 14 constructed cases in nine source families (nine calibration, five
+held-out), all unadjudicated. It keeps labels outside model state, rejects split leakage and stale rule/evidence
+annotations, preserves complete supplied inputs or rejects oversized requests, and has no live mode.
+`uv run pytest tests/src/scripts/test_jev_rule_pack_eval.py tests/src/scripts/test_jev_probe.py -q` passed 32 tests. The
+[preparation report](evidence/wrapper-preparation.json) records request hashes and sizes with zero dispatches and
+quality acceptance false. Host-owned fact resolution, human labels, numeric gates, prediction/metric evaluation and hook
+wiring remain unimplemented; the permission prerequisite stays draft and paused.
+
+Full `make pre-commit`, the reproducible offline preparation report and `git diff --check` pass for this update. No
+runtime policy code changed in this update; the aggregate and integration results above apply to the foundations.
 
 ## Planning verification
 

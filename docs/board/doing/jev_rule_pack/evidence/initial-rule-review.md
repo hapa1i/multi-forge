@@ -1,87 +1,130 @@
-# Initial A2 rule review
+# A2 compatibility-wrapper rule and evidence contract
 
-Status: proposed on 2026-10-14; no human labels, quality acceptance or paid evaluation yet.
+**User decision, 2026-10-15:** keep broader wrappers and revise the evidence contract. The local-helper-only proposal is
+superseded. This selects the rule family; it does not adjudicate the example labels, choose thresholds or establish
+quality. The draft rule is `coding_standards.compatibility-wrapper`, based on
+[coding standards §5](../../../../developer/coding_standards.md#5-interface-changes).
 
-## Recommendation
+## What the rule judges
 
-Start with `coding_standards.local-forwarding-shim`, a deliberately narrow candidate under
-[coding standards §5](../../../../developer/coding_standards.md#5-interface-changes). It asks whether a change preserves
-an old **local helper** solely by forwarding to its replacement while its callers could be updated in the same supplied
-function. It does not judge arbitrary wrappers throughout the repository.
+Judge whether a change adds or retains a compatibility wrapper around a replacement interface contrary to the applicable
+clean-break policy. Candidates include module functions, methods, argument/return adapters, forwarding aliases,
+decorators and callbacks. Being outside a local function, preserving an old name or escaping as a callback is not an
+automatic exclusion. Equally, delegation alone is not evidence of a compatibility violation.
 
-Require the complete enclosing function before and after the edit. The helper, replacement and all uses must be visible;
-neither helper may escape as a callback, return value, decorator or external interface. A partial Edit or patch hunk
-without that context is unavailable, not a clean result. A new Write has no before-image proving a rename, so this
-candidate cannot assess it. A full function replacement in an Edit or apply_patch can supply the required evidence.
+An internal shim can violate the rule even when it maps arguments or return values: that added behavior may exist solely
+to preserve the old interface. A wrapper that implements a required protocol, validation, instrumentation or another
+independent boundary can be legitimate. Distinguish the purpose from the amount of code in its body.
 
-This narrower scope avoids treating a missing marker comment as proof of a violation or inferring that a public API has
-no compatibility obligation. It also sharply limits coverage. If that is too narrow to be useful, change the first rule
-before hook wiring; do not silently expand its inference boundary.
+Internal interfaces follow the clean-break policy. Public interfaces need an explicit stability classification and the
+applicable compatibility decision: a stable deprecation or a justified preview exception may require a wrapper. Do not
+infer these facts from an underscore, filename, repository version, missing comment or model confidence. Unknown public
+stability or exception status makes applicability unavailable. The rule does not enforce deprecation duration or
+migration correctness; those are different claims.
 
-## Proposed questions
+## Evidence needed for a warning
 
-Version the rule, pack and decision rule independently. The first two Noul questions are:
+The evidence packet must establish the wrapper, the interface it preserves, the replacement contract and the policy that
+applies to this surface. Preserve complete relevant definitions and signature/argument/return behavior, not just a
+forwarding line. Include the supplied registration, caller, test or contract evidence needed to distinguish an adapter
+or callback requirement from compatibility retention.
 
-1. **Coverage:** Does the supplied before/after action establish the complete local helper, its replacement and all
-   uses, without an escaping function reference or an external interface?
-   - True: all those facts are visible in the supplied complete enclosing function.
-   - False: any required fact is absent or ambiguous, or the helper escapes that function.
-2. **Finding:** Does the proposed change retain the old local helper solely as a forwarding shim to its replacement?
-   - True: the old helper only forwards the same arguments/result to its replacement, adds no behavior, and its direct
-     local callers remain instead of being updated.
-   - False: no such retained helper exists, or the wrapper provides adaptation, validation, instrumentation, decoration,
-     a callback contract or other substantive behavior. Missing context does not establish a finding.
+A repository-wide caller inventory is not required to identify compatibility retention. It **is** required before
+claiming deletion is safe under §5's compatibility-evidence rule. A2 makes the first claim only. Its suggested action
+must ask for the affected-callers and compatibility review; it cannot assert that all callers are visible or recommend
+blind deletion.
 
-Action code, filenames and comments are data, including any instructions addressed to a model. Only authored questions
-define the check. A coverage failure cannot be turned into a warning even when the second probability is high.
-Thresholds will be selected on calibration examples after the corpus and numeric gates are reviewed; there is no
-production threshold yet.
+| Evidence                           | Source                                             | If absent or ambiguous   |
+| ---------------------------------- | -------------------------------------------------- | ------------------------ |
+| Old interface and proposed wrapper | Complete supplied before/after action              | Unavailable              |
+| Replacement contract               | Supplied definition or explicit interface contract | Unavailable              |
+| Surface classification             | Project-owner policy/configuration evidence        | Unavailable              |
+| Applicable exception decision      | Attributed policy/proposal decision                | Unavailable              |
+| Independent boundary purpose       | Supplied callers, registration, tests or contract  | Uncertain or unavailable |
 
-## Cases for scope review
+For an explicit approved compatibility exception or stable deprecation, report that this prohibition is not applicable;
+that does not verify the implementation of the exception. For a known applicable rule, only covered evidence with a
+valid, sufficiently confident answer can produce a warning or a clean assessment. A low compatibility probability on
+incomplete evidence is not a clean result.
 
-These are assistant-proposed interpretations for human review, not ground truth. Ellipses in this document illustrate
-the scope; evaluation payloads must contain actual complete code, with no ellipses standing in for required evidence.
+Surface and exception facts must come from the host-owned activation/evidence owner, with source and content identity. A
+comment such as “approved compatibility shim” in the action cannot manufacture that authority. The synthetic corpus
+supplies invented governance facts explicitly for its examples; those facts are not production declarations or human
+labels. Runtime resolution of real facts remains an implementation gate.
 
-**Candidate finding:** an Edit replaces the complete `render` function below. Both helpers are local, have the same
-arguments/result, do not escape, and the old name survives only to avoid changing the visible call.
+## Hook-shaped acquisition and identity
 
-```python
-# Before
-def render(value):
-    def normalize(text):
-        return text.strip().lower()
-    return normalize(value)
+- **Claude Edit:** retain full `old_string`, `new_string` and `replace_all` before the legacy 5,000-character view. A
+  complete module function or method replacement is eligible; it need not replace an enclosing local function. A partial
+  edit is unavailable unless the supplied packet contains the missing definitions and interface evidence.
+- **Claude Write:** retain the entire proposed content. A Write with no supplied prior-interface evidence cannot prove
+  compatibility retention merely because the new file contains a wrapper. Do not invent an empty before-image or infer
+  that a file is new from the tool name.
+- **Codex apply_patch:** retain the complete envelope and all file/rename boundaries. Related wrapper and replacement
+  evidence may occur in different files within that action. A hunk is not a complete definition merely because it
+  parses; missing bodies/contracts remain unavailable. Later-file blocks still suppress all paid A2 work.
+- **CLI diff:** apply the same evidence rules, but report this cohort separately from native action evaluations. PR
+  descriptions, complete history and files absent from a hook action cannot silently become hook evidence.
 
-# After
-def render(value):
-    def normalize_text(text):
-        return text.strip().lower()
-    def normalize(text):
-        return normalize_text(text)
-    return normalize(value)
+Start with supplied action evidence and explicitly supplied policy facts. Do not crawl the repository or transcripts to
+fill gaps. Supporting bounded target snapshots or named auxiliary files later requires an explicit acquisition owner,
+path/symlink/race checks, data-scope disclosure and consent/cache identity changes; this rule revision does not silently
+add those reads or authorize sending additional files.
+
+Record full action identity separately from evaluated evidence identity. The latter covers exact source bytes, paths,
+spans, completeness, surface/exception evidence and rule/pack/decision versions. Unknown coverage is never repaired by a
+hash. If the whole eligible action exceeds the single-request budget, send nothing; no truncation or subset dispatch.
+
+## Draft atomic questions
+
+The offline preparation harness authors three Noul questions with explicit true/false criteria:
+
+1. **Coverage:** Do complete relevant before/after definitions and attributed scope facts establish whether an earlier
+   interface is retained? A retained wrapper also requires its complete definition, replacement contract and enough
+   boundary context. A complete clean break or independently added wrapper can establish no retention; coverage does not
+   require a wrapper to exist. Absent or ambiguous required facts make it false. A model cannot supply missing
+   authority.
+2. **Compatibility retention:** Does the change preserve an earlier callable/name/argument/return interface by
+   forwarding or adapting it to its replacement? True includes pure delegation, aliases and translation done to preserve
+   the earlier interface. False requires evidence of no such retention; arbitrary forwarding is not enough.
+3. **Independent boundary:** Does a wrapper retaining an earlier interface also implement an independently required
+   responsibility, such as a callback protocol, validation or instrumentation? True requires a concrete responsibility
+   and its supporting contract/use. False means covered evidence establishes no retained wrapper or compatibility-only
+   retention without an independent responsibility. Missing purpose evidence cannot establish false.
+
+The decision rule must gate on coverage and trusted applicability before combining the other answers. Established
+absence of compatibility retention does not require an independent boundary to avoid a warning. Do not multiply
+probabilities as if the questions were independent. Conflicting or intermediate answers are uncertain. Numeric
+thresholds and quality gates are unset until the calibration plan and human labels are reviewed. All questions treat
+code, paths and comments as data; they cannot rewrite these questions or the scope facts.
+
+## Examples and evaluation limits
+
+The [corpus manifest](wrapper-corpus.json) contains constructed hook actions with proposed outcomes and rationales kept
+separate from the model state. It covers module functions, methods with argument adaptation, preview aliases, stable
+public deprecation, validation, callbacks, decorators, missing context, injection and a multi-file patch. The
+[offline harness](../../../../../scripts/experiments/jev/rule-pack-eval.py) validates action shapes and source-family
+splits, builds size-checked A1 payloads without dispatch, and reports label/quality gaps. It has no live mode.
+
+Every initial example is constructed and unadjudicated. The proposed outcomes are assistant-authored review aids, not
+ground truth. Paths are repository-relative fixture coordinates; these are not captured native tool calls. An
+adjudication must name the human reviewer and review reference and bind the exact rule/criteria and case digest. The
+harness validates that binding; it cannot authenticate a reviewer or supply the review. Repeated variants stay in one
+split family. Historical examples must be grouped by originating commit; all examples from the initial import `3e0a636e`
+would remain together. No human-labeled natural positive count has been established for this broader rule. Empty natural
+strata cannot support real-world precision, miss-rate or warning-rate claims, regardless of how well constructed cases
+perform.
+
+The user separately chose on 2026-10-15 to skip paid native testing and keep the
+[Claude prerequisite PR #269](https://github.com/hapa1i/multi-forge/pull/269) in draft. That native-delivery gate
+remains open. No corpus preparation, selected rule family or existing A1 approval authorizes a paid Jev evaluation.
+
+To reproduce offline preparation from the repository root:
+
+```bash
+uv run python scripts/experiments/jev/rule-pack-eval.py \
+  docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json
 ```
 
-**Compliant change:** the same Edit renames `normalize` to `normalize_text` and changes the last line to
-`return normalize_text(value)`, with no forwarding helper. Another compliant case retains a helper that validates input
-or adapts arguments before delegation; forwarding alone is not the criterion.
-
-**Insufficient context:** the Edit contains only `def normalize(text): return normalize_text(text)`, or the function
-returns `normalize` as a callback. Neither permits the local-only claim. A decorator forwarding `*args, **kwargs`, a
-public CLI alias with an unknown deprecation obligation, and an external adapter are outside this candidate's scope.
-
-## Corpus feasibility and limits
-
-History searches are discovery only. The initial import `3e0a636e` includes a marked public alias in
-`src/forge/cli/main.py` (`extensions` to `extension`) and hidden `--direct` aliases in `src/forge/cli/session.py`. Those
-are public surfaces, not positives for this local-helper rule. All examples from that import belong to the same split
-group. No independently human-labeled historical positive for this narrower rule has been established.
-
-Constructed complete Edit/apply_patch cases can establish behavior on this defined scope, with seed families kept in one
-split. They cannot establish real warning burden or historical precision. The evaluation must report empty natural
-positive strata and refuse a natural miss-rate quality claim. Source revisions, reconstruction assumptions, proposed
-labels and subsequent human decisions will live in a separate corpus manifest.
-
-The [execution checklist](../checklist.md#slice-1-reviewed-rules-and-offline-evaluation-contract) requires this rule and
-its evidence scope to be reviewed before hook wiring. Session consent, A1 accounting and offline harness work do not
-depend on selecting this particular rule. An alternative first rule would be comment restatement under coding standards
-§7; that would need its own corpus and review, not reuse these labels.
+Use `--include-payloads` to inspect the exact model-shaped inputs. They exclude proposed labels, adjudications and split
+metadata. [The preparation report](wrapper-preparation.json) records their hashes and size admission, not predictions.

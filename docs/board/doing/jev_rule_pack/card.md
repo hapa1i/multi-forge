@@ -7,14 +7,16 @@ Epic: [Jev support](../epic_jev_support/card.md). Member **A2**. Depends on
 
 Claude delivery also requires the separately reviewed
 [feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), implemented separately and awaiting
-native evidence before merge.
+native evidence before merge. The user chose on 2026-10-15 to skip paid native testing and keep that PR in draft.
 
 Status: **doing**, activated 2026-10-14 on `codex/jev-rule-pack`, based on `main` at `f7ce7a9a` after A1's closeout. The
 [execution checklist](checklist.md) records the proposed integration, evaluation gates and outstanding decisions.
 Offline execution started on 2026-10-14 with explicit evaluation identity and session consent boundaries. The
-[initial rule/context proposal](evidence/initial-rule-review.md) remains open; no paid A2 evaluation has run and the
-bundle is not yet registered for activation. Draft [PR #270](https://github.com/hapa1i/multi-forge/pull/270) contains
-the completed foundations and tracks this card's remaining execution.
+[wrapper evidence contract](evidence/initial-rule-review.md) follows the user's 2026-10-15 choice to keep broader
+wrappers. It now has 14 constructed hook-shaped examples and an offline preparation harness, with human labels and
+quality gates still open. No paid A2 evaluation has run and the bundle is not yet registered for activation. Draft
+[PR #270](https://github.com/hapa1i/multi-forge/pull/270) contains the completed foundations and tracks this card's
+remaining execution.
 
 ## Problem and outcome
 
@@ -59,12 +61,13 @@ stable rule citations, action evidence and semantic correctness.
 
 ## Acceptance and validation
 
-- Establish corpus feasibility before selecting the first rule. Reconstruct historical changes into the Write/Edit or
-  apply_patch actions the hook sees, with documented assumptions. Include constructed positives when needed, labeled and
-  measured separately; any native transcript cohort requires its own data decision. Keep originating changes and
-  mutation families within one calibration/held-out split. Evaluate per-rule false positives and misses, insufficient
-  evidence, calibration, pack-wide warning frequency, latency and API cost against existing deterministic checks. Human
-  adjudication supplies labels; merged history and another model's verdict are not automatic ground truth.
+- Establish corpus feasibility and quality limits for the selected wrapper family before runtime admission. Reconstruct
+  historical changes into the Write/Edit or apply_patch actions the hook sees, with documented assumptions. Include
+  constructed positives when needed, labeled and measured separately; any native transcript cohort requires its own data
+  decision. Keep originating changes and mutation families within one calibration/held-out split. Evaluate per-rule
+  false positives and misses, insufficient evidence, calibration, pack-wide warning frequency, latency and API cost
+  against existing deterministic checks. Human adjudication supplies labels; merged history and another model's verdict
+  are not automatic ground truth.
 - Unit/regression tests cover pack validation, applicability, deterministic-policy coexistence, batched answer mapping,
   multi-file attribution, consent/override boundaries, blocked-action suppression, stale cache, incomplete state,
   injected instructions and consumer-specific timeout/malformed-result diagnostics. Evaluation runs need distinct
