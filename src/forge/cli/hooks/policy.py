@@ -128,7 +128,7 @@ class ClaudeHookResponder:
     """Serialize a composed policy decision into Claude Code's PreToolUse wire contract.
 
     Claude reads a block reason from stderr on exit :attr:`BLOCK_EXIT` (2) and continues
-    on :attr:`ALLOW_EXIT` (0); the allow path may emit a ``hookSpecificOutput`` JSON. This
+    on :attr:`ALLOW_EXIT` (0), subject to native permissions; feedback may use ``hookSpecificOutput`` JSON. This
     responder owns ONLY that runtime wire shape (see ``protocols.HookResponder``) -- the
     Forge summary/warning overlay (telemetry) stays in the hook command.
     ``CodexHookResponder`` (cli/hooks/codex_policy.py) maps the same
@@ -147,11 +147,10 @@ class ClaudeHookResponder:
         return format_needs_review_text(result)
 
     def allow_feedback(self, additional_context: str) -> dict[str, Any]:
-        """Build the allow-path ``hookSpecificOutput`` JSON carrying ``additional_context``."""
+        """Carry policy context without overriding Claude's permission rules."""
         return {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
-                "permissionDecision": "allow",
                 "additionalContext": additional_context,
             }
         }

@@ -35,6 +35,11 @@ Or from within a Claude Code session (no terminal needed):
 
 ## How policies work
 
+Passing a Forge policy check leaves Claude's normal permission rules in charge. Policy summaries no longer send an
+explicit native approval, so manual/default-mode users may see a permission prompt that an earlier Forge summary
+silently approved. An existing Claude allow rule or permission mode still applies. Disabling `policy_summary_feedback`
+changes feedback, not permissions; blocking policy decisions and operator warnings are retained.
+
 Policies run inside the `PreToolUse` hook, which fires before every Write or Edit tool call:
 
 ```

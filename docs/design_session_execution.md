@@ -405,6 +405,12 @@ proves Stop inactive; uncertain manifests and enrollment probes still reach the 
 See the [B4 evidence and limits](board/done/codex_stop_review/evidence/README.md) and
 [user configuration contract](end-user/policy.md#review-once-at-codex-stop-opt-in).
 
+Claude policy feedback uses `hookSpecificOutput.additionalContext` with `hookEventName=PreToolUse` and no
+`permissionDecision`. The native permission gate remains separate from Forge's policy verdict. Turning
+`policy_summary_feedback` off removes that model-context emission; operator warnings, audit and policy blocks remain.
+The [permission-feedback card](board/doing/claude_policy_feedback_permissions/checklist.md) tracks native receipt and
+permission evidence independently of B3's Codex admission.
+
 ### I.3 Codex operational guards (probe-churn + enrollment)
 
 **Policy feedback admission:** `core/runtime/codex_feedback.py` owns a feature-specific measured-version set, separate
