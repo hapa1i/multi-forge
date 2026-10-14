@@ -1,6 +1,7 @@
 # Epic: Jev support
 
-Status: proposed. Scope drafted 2026-10-06; implementation has not started.
+Status: **doing**, activated 2026-10-14 with A1. The [coordination checklist](checklist.md) tracks member gates and
+handoffs. Implementation has not started; A2 and A3 remain proposed.
 
 ## Problem and outcome
 
@@ -17,11 +18,11 @@ decision-quality result has been measured.
 
 ## Members and dependencies
 
-| ID  | Card                                                      | Independently shippable outcome                                               | Depends on                        |
-| --- | --------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------- |
-| A1  | [Jev client and probes](../jev_client_probes/card.md)     | Typed OpenRouter transport and reproducible contract/latency/billing evidence | None                              |
-| A2  | [Jev rule pack, warnings only](../jev_rule_pack/card.md)  | Opt-in semantic policy type over fixed atomic rules                           | A1; B3 for Codex-visible warnings |
-| A3  | [Jev as the cascade's first tier](../jev_cascade/card.md) | Validated covered allows avoid a Claude review; other cases escalate          | A1, B1                            |
+| ID  | Card                                                                  | Independently shippable outcome                                               | Depends on                        |
+| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------- |
+| A1  | [Jev client and probes](../jev_client_probes/card.md)                 | Typed OpenRouter transport and reproducible contract/latency/billing evidence | None                              |
+| A2  | [Jev rule pack, warnings only](../../proposed/jev_rule_pack/card.md)  | Opt-in semantic policy type over fixed atomic rules                           | A1; B3 for Codex-visible warnings |
+| A3  | [Jev as the cascade's first tier](../../proposed/jev_cascade/card.md) | Validated covered allows avoid a Claude review; other cases escalate          | A1, B1                            |
 
 [B1](../../done/plan_file_supervision/card.md) and [B3](../../done/codex_policy_warnings/card.md) belong to the separate
 [Codex supervisor epic](../../done/epic_codex_supervisor/card.md). A2 and A3 can proceed independently after their
@@ -53,14 +54,15 @@ execution branches when activated.
 Direct TypeSafe remains an intended later access path. Its distinct System One transport and limits are documented in
 the research, but implementation is outside these three cards; the epic does not claim both routes at closeout.
 Standalone Jev blocking, team classification, search and memory selection remain research avenues.
-[Jev Router](../jev_router/card.md) stays a separate card because it chooses a generative model and reasoning effort,
-with different routing and identity contracts. Codex runtime supervision is owned by its own epic.
+[Jev Router](../../proposed/jev_router/card.md) stays a separate card because it chooses a generative model and
+reasoning effort, with different routing and identity contracts. Codex runtime supervision is owned by its own epic.
 
 ## Completion evidence
 
-A1 must establish the usable route contract and measure latency, request size and multi-question accounting. A2 must
-show useful, visible warnings with a labeled per-rule evaluation. A3 must demonstrate avoided Claude calls at an
-acceptable measured false-allow rate, including hard cases, failures, evidence gaps and real escalation.
+A1 begins with a small authorized synthetic capture after the minimal transport, then establishes the usable route
+contract and measures latency, request size and multi-question accounting. A2 must show useful, visible warnings with a
+labeled per-rule evaluation. A3 must demonstrate avoided Claude calls at an acceptable measured false-allow rate,
+including hard cases, failures, evidence gaps and real escalation.
 
 Report calls avoided, reviewer model/tokens, latency, warning burden and escalation rate alongside Jev's reported API
 cost. Record quota measurements only when usable provider evidence exists; tokens are not an exact quota conversion.

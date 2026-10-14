@@ -3,6 +3,9 @@
 Epic: [Jev support](../epic_jev_support/card.md). Member **A1**. No new-card dependencies. Provides the client and
 evidence consumed by A2 and A3.
 
+Status: **doing**, activated 2026-10-14 on `codex/jev-client-probes` from `main` at `1ae9667d` (`v1.1.0`). The
+[execution checklist](checklist.md) is the current cursor. Implementation and live probes have not started.
+
 ## Problem and outcome
 
 Forge has no typed Jev transport. OpenRouter's Decisions API is alpha, and there is no measured Forge latency or
@@ -11,6 +14,11 @@ multi-question cost baseline. Add a thin client over existing `httpx` and reprod
 
 Use the [research](../epic_jev_support/research.md#access-paths-and-their-implications) as the starting evidence, not as
 a substitute for live probes. Vendor speed claims do not establish this deployment's p50/p95 latency.
+
+Start with the minimal credential, URL, ZDR and timeout path, then a separately authorized small synthetic capture.
+Reconcile those responses before finalizing retries, telemetry and estimator assumptions; the larger latency and
+accounting matrix follows later. The [evidence index](evidence/README.md) distinguishes public documentation from future
+live results.
 
 ## Scope
 
@@ -37,6 +45,8 @@ a substitute for live probes. Vendor speed claims do not establish this deployme
 
 - Fixture-based unit/regression tests cover wire shaping, ZDR override attempts, bad responses, absent optional
   metadata, redaction, deadlines and retries without live API spend.
+- Decisions token/cost fields and local trace IDs map into the existing downstream v2 and usage v1 schemas. Existing
+  history remains readable, and baseline strict readers accept new records without new fields or route literals.
 - The documented live probe matrix yields reproducible results or explicit unresolved/unsupported outcomes. A valid
   request with ZDR enabled must succeed before A2/A3 are advertised as available; inability to establish that contract
   remains a dependency blocker.

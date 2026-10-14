@@ -1,7 +1,7 @@
 # Jev as the cascade's first tier
 
-Epic: [Jev support](../epic_jev_support/card.md). Member **A3**. Depends on
-[A1: Jev client and probes](../jev_client_probes/card.md) and
+Epic: [Jev support](../../doing/epic_jev_support/card.md). Member **A3**. Depends on
+[A1: Jev client and probes](../../doing/jev_client_probes/card.md) and
 [B1: plan-file Claude supervision](../../done/plan_file_supervision/card.md). A2 is not a dependency.
 
 ## Problem and outcome
@@ -12,7 +12,7 @@ cascade's conservative allow-or-escalate boundary.
 
 Only an actual avoided Claude invocation preserves reviewer quota. Jev's request price is an additional API charge, and
 sampled audits/retries/escalations consume resources too. Everyday subscription-only supervision keeps this tier
-disabled. See the [economics research](../epic_jev_support/research.md#economics-protecting-claude-quota).
+disabled. See the [economics research](../../doing/epic_jev_support/research.md#economics-protecting-claude-quota).
 
 ## Scope
 
