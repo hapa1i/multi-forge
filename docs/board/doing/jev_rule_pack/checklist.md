@@ -2,18 +2,18 @@
 
 ## Current focus
 
-Execution continues in draft [PR #271](https://github.com/hapa1i/multi-forge/pull/271) on
-`codex/jev-rule-pack-evaluation`, based on the foundation closeout on `main` at `203e4404`. Foundation
-[PR #270](https://github.com/hapa1i/multi-forge/pull/270) merged on 2026-10-15 with the A1 explicit evaluation-identity
-extension, session consent/inheritance and raw-override guards. The continuation implements offline consumer outcomes
-and saved-response evaluation, with explicit threshold settings and human labels kept separate. Its
-[evaluation plan](evidence/evaluation-plan.md) documents the workflow, denominators and pending release decisions. The
-[wrapper evidence contract](evidence/initial-rule-review.md) now keeps broader wrappers under the user's 2026-10-15
-decision. Review corrections unify disable/revocation, separate reviewer notes from model evidence, and distinguish
-host-decided outcomes from model candidates. Human labels, thresholds and real scope fact resolution remain open before
-hook wiring/evaluation. The merged foundation does not complete A2 or enable Jev checks. No paid A2 evaluation has run.
-The [card](card.md) owns scope; the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains
-proposed and will use a separate execution branch.
+The offline outcome/evaluation slice shipped through [PR #271](https://github.com/hapa1i/multi-forge/pull/271), merged
+as `791d9872` on 2026-10-15. The [merge handoff](#offline-evaluation-merge-and-next-gate) records its verified scope. It
+builds on [PR #270](https://github.com/hapa1i/multi-forge/pull/270)'s explicit evaluation identity, session consent and
+override guards. The evaluation branch is merged; the next execution branch must start from the current `main`.
+
+Next, establish corpus feasibility and human adjudication, then review numerical quality criteria. All 17 constructed
+cases remain unadjudicated. Prepare the host-owned surface/exception fact-source contract before hook wiring; fixture
+facts are not runtime authority. The [evaluation plan](evidence/evaluation-plan.md) owns methodology and acceptance
+decisions; the [wrapper evidence contract](evidence/initial-rule-review.md) retains the user's broader wrapper scope.
+The merged slices do not complete A2 or enable Jev checks. No paid A2 evaluation has run. The [card](card.md) owns
+scope; the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed and will use a
+separate execution branch.
 
 Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
 never introduce a Jev denial or `needs_review`. An independently configured policy or supervisor retains its existing
@@ -370,7 +370,8 @@ Paths under `tests/src/policy/rule_pack/` and the A2 harness/integration test na
 - [ ] Reconcile shared cache/audit and A1 contract changes with the epic/A3; A2 results do not validate A3 plan
   alignment. Keep the epic active and A3 unactivated unless separately selected.
 - [x] Open the draft A2 PR with concise implemented scope, limitations, actual validation and outstanding acceptance
-  gates. [PR #270](https://github.com/hapa1i/multi-forge/pull/270) is attached to this task.
+  gates. [PR #270](https://github.com/hapa1i/multi-forge/pull/270) and
+  [PR #271](https://github.com/hapa1i/multi-forge/pull/271) are attached to this task and merged.
 - [ ] After review/merge, record the merged head, finish design/end-user sync, add the completed-work change-log entry
   and propose durable notes for human review.
 - [ ] Move A2 to `done/` only when its acceptance gates are satisfied and the code is merged; repoint inbound links and
@@ -384,10 +385,30 @@ passed. The final independent review passed 215 focused tests and seven fixture-
 reproduced the offline preparation report. The implementation also records 11,001 unit tests, 1,889 regressions and 46
 distinct targeted integrations below. Session, telemetry and end-user policy docs describe the shipped foundation.
 
-A2 remains `doing/`. Continue on `codex/jev-rule-pack-evaluation` from the merged head with the offline outcome contract
-and evaluation harness. Activation, authoritative runtime facts, hook dispatch, human labels, numeric quality gates and
-native delivery remain open. No paid evaluation or native trial is authorized by this handoff. A3 remains proposed; its
-consumer can use A1's optional explicit run identity without changing existing ambient callers or schemas.
+A2 remained `doing/` and continued on `codex/jev-rule-pack-evaluation` with the offline outcome contract and evaluation
+harness, subsequently merged in [PR #271](#offline-evaluation-merge-and-next-gate). A3 can use A1's optional explicit
+run identity without changing existing ambient callers or schemas; its own evaluation and acceptance remain separate.
+
+## Offline evaluation merge and next gate
+
+2026-10-15: [PR #271](https://github.com/hapa1i/multi-forge/pull/271) merged as
+`791d9872bb39631a8b769ed739c680fdd07e688a`, with the same tree as reviewed head `cd008613`. All five GitHub checks
+passed. Local validation passed 148 focused tests, 11,076 unit tests (117 deselected), 1,924 regressions and full
+`make pre-commit`. The first unit run hit the existing watchdog timeout test; its six-test module and the full unit
+rerun passed unchanged. The schema-2 CLI fixture smoke retained three host decisions, nine model candidates, one saved
+observation and eight missing observations without claiming accuracy. Offline preparation reproduced byte-for-byte.
+
+Shared rule definitions, host applicability, fixed diagnostics and saved-response evaluation are shipped. The
+[rule-pack design](../../../design_rule_packs.md) records ownership, and the
+[evaluation plan](evidence/evaluation-plan.md) records identity, metric denominators and limitations. This slice adds no
+activation command or hook dispatch and changes no A1 API or telemetry schema. No paid A2 evaluation or native trial
+ran.
+
+A2 and the epic remain `doing/`; A3 remains proposed. The next offline work is a case-hash-bound human review worksheet
+and corpus-feasibility assessment, alongside a concrete runtime fact-source/action-envelope contract. Human labels and
+numerical quality gates remain open; fixture proposals are not human adjudications or production thresholds. Runtime
+activation, audit/cache integration and native warning delivery remain unfinished. This handoff authorizes no new data
+collection or paid/native run.
 
 ## Execution evidence
 

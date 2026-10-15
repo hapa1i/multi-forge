@@ -3,8 +3,9 @@
 Status: **doing**, activated 2026-10-14 with A1. The [coordination checklist](checklist.md) tracks member gates and
 handoffs. A1 shipped through [PR #268](https://github.com/hapa1i/multi-forge/pull/268), merged as `9778007a` on
 2026-10-14. A2's foundations shipped through [PR #270](https://github.com/hapa1i/multi-forge/pull/270) as `9442c1e5` on
-2026-10-15. A2 continues on `codex/jev-rule-pack-evaluation` with offline outcomes and evaluation; its activation and
-acceptance gates remain open. A3 remains proposed.
+2026-10-15. Its offline outcomes and evaluation shipped through
+[PR #271](https://github.com/hapa1i/multi-forge/pull/271) as `791d9872` on the same day. A2's quality, runtime
+fact-source, activation and native-delivery gates remain open. A3 remains proposed.
 
 ## Problem and outcome
 
@@ -33,12 +34,12 @@ reported cost for the captured shapes; quota savings and decision quality remain
 prerequisites; A2's fixed-rule quality evidence does not validate A3's plan-alignment questions. Cards use separate
 execution branches when activated.
 
-Selected next: A2 establishes the first policy consumer and exercises warning delivery against A1's shipped boundary.
+Selected member: A2 establishes the first policy consumer and exercises warning delivery against A1's shipped boundary.
 Its [checklist](../jev_rule_pack/checklist.md) owns implementation, rule-quality gates and new data/spend decisions.
-This is a single-card branch; A2 does not make plan-alignment decisions for A3.
+Continuation branches remain scoped to A2; A2 does not make plan-alignment decisions for A3.
 
 The independent [Claude feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), shipped as
-`e9c144eb` and is included in A2's rebased branch. Its
+`e9c144eb` and is included on `main`. Its
 [closeout](../../done/claude_policy_feedback_permissions/checklist.md#merged-closeout) records the decision to merge
 with native testing skipped. It remains outside this epic's membership, and A2's native delivery gate stays open.
 
@@ -58,9 +59,10 @@ with native testing skipped. It remains outside this epic's membership, and A2's
 - Keep action choice in the policy consumer. A2 warns only; A3 allows only validated covered cases and otherwise
   escalates. Deterministic denials retain priority. A rule's source citation and evidence of a violation are separate.
 - Cache and audit identity include canonical action/state, rule/question/plan version, route/model and decision rule.
-  Record Jev attempts and any reviewer escalation separately, including retries and sampled audits. A2 proposes an
-  optional explicit evaluation `RunIdentity` on A1's `judge()` so consumers do not reuse the whole interactive run as
-  one invocation. Reconcile the extension with A3 and preserve existing caller/schema compatibility.
+  Record Jev attempts and any reviewer escalation separately, including retries and sampled audits. A1's `judge()`
+  accepts an optional explicit evaluation `RunIdentity` so consumers do not reuse the whole interactive run as one
+  invocation. A2/A3 own their evaluation runs; existing callers retain the ambient fallback and telemetry schemas are
+  unchanged.
 - Paid calls require explicit opt-in. Probes start with synthetic data, bounded requests and a declared budget; ordinary
   tests use fixtures. Do not automatically send repository history to a new provider.
 

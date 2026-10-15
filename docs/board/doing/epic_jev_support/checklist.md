@@ -2,15 +2,17 @@
 
 ## Current focus
 
-Continue [A2: warnings-only rule pack](../jev_rule_pack/checklist.md) on `codex/jev-rule-pack-evaluation` from `main` at
-`9442c1e5`, after its foundation merge on 2026-10-15. [A1](../../done/jev_client_probes/card.md) shipped through
-[PR #268](https://github.com/hapa1i/multi-forge/pull/268) at `9778007a`. The epic stays active with one selected member.
-A1's [evidence report](../../done/jev_client_probes/evidence/2026-10-14/report.md) records successful ZDR-required
-routing, latency, accounting and limitations. A2's session-consent and explicit evaluation-identity foundations shipped
-through [PR #270](https://github.com/hapa1i/multi-forge/pull/270); the user selected broader wrappers on 2026-10-15. The
-next slice covers offline outcomes and evaluation; activation, dispatch and A2 acceptance remain open. Its revised
-evidence contract and provisional corpus do not yet establish quality. A3 remains proposed. Neither decision quality nor
-quota savings has been evaluated.
+[A2: warnings-only rule pack](../jev_rule_pack/checklist.md) remains the selected member after its offline evaluator
+shipped through [PR #271](https://github.com/hapa1i/multi-forge/pull/271) as `791d9872` on 2026-10-15.
+[A1](../../done/jev_client_probes/card.md) shipped through [PR #268](https://github.com/hapa1i/multi-forge/pull/268) at
+`9778007a`. The epic stays active with one selected member. A1's
+[evidence report](../../done/jev_client_probes/evidence/2026-10-14/report.md) records successful ZDR-required routing,
+latency, accounting and limitations. A2's session-consent and explicit evaluation-identity foundations shipped through
+[PR #270](https://github.com/hapa1i/multi-forge/pull/270); the user selected broader wrappers on 2026-10-15. The next
+gate covers human adjudication, corpus feasibility and trusted runtime facts, owned by the
+[A2 handoff](../jev_rule_pack/checklist.md#offline-evaluation-merge-and-next-gate). Activation, dispatch and A2
+acceptance remain open. Its provisional corpus does not yet establish quality. A3 remains proposed. Neither decision
+quality nor quota savings has been evaluated.
 
 ## Activation and sequence
 
@@ -84,6 +86,12 @@ available to either consumer; omitted identity retains the ambient fallback, and
 comes from the environment. Downstream v2 and usage v1 are unchanged. A3 remains unimplemented and must derive its own
 evaluation runs; A2's unfinished cache/audit and quality gates remain separate. See the
 [foundation handoff](../jev_rule_pack/checklist.md#foundation-merge-and-continuation).
+
+Offline evaluation handoff, 2026-10-15: PR #271 merged as `791d9872` with all five CI checks passing and the same tree
+as reviewed head `cd008613`. It changes no A1 API or telemetry schema. Its saved-response identities, human/host audit
+and metric definitions belong to A2; they supply no quality evidence for A3. The
+[A2 handoff](../jev_rule_pack/checklist.md#offline-evaluation-merge-and-next-gate) records validation and remaining
+acceptance gates. A2 and the epic remain active; A3 is not activated.
 
 ## Coordination acceptance
 

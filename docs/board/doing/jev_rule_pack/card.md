@@ -6,18 +6,19 @@ Epic: [Jev support](../epic_jev_support/card.md). Member **A2**. Depends on
 2026-10-11.
 
 The independent [feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), shipped as
-`e9c144eb` and is included in this branch. Its
+`e9c144eb` and is included on `main`. Its
 [closeout](../../done/claude_policy_feedback_permissions/checklist.md#merged-closeout) records the user's decision to
 merge with paid native testing skipped. A2 still needs its own native warning-delivery evidence.
 
 Status: **doing**. The foundations shipped through [PR #270](https://github.com/hapa1i/multi-forge/pull/270), merged as
-`9442c1e5` on 2026-10-15. Execution continues on `codex/jev-rule-pack-evaluation` from that merged head. The
-[execution checklist](checklist.md) records the offline outcome/evaluation work and outstanding activation gates. The
+`9442c1e5` on 2026-10-15. Offline outcomes and saved-response evaluation shipped through
+[PR #271](https://github.com/hapa1i/multi-forge/pull/271) as `791d9872` on the same day. The
+[execution checklist](checklist.md) records the outstanding quality and activation gates. The
 [wrapper evidence contract](evidence/initial-rule-review.md) follows the user's 2026-10-15 choice to keep broader
-wrappers. It has 17 constructed hook-shaped examples and an offline preparation harness, with human labels and quality
+wrappers. It has 17 constructed hook-shaped examples and an offline evaluation harness, with human labels and quality
 gates still open. No paid A2 evaluation has run and the bundle is not yet registered for activation. The
-[foundation handoff](checklist.md#foundation-merge-and-continuation) records shipped scope without closing A2.
-Implemented ownership is described in [rule-pack design](../../../design_rule_packs.md).
+[merge handoff](checklist.md#offline-evaluation-merge-and-next-gate) records shipped scope and the next gate without
+closing A2. Implemented ownership is described in [rule-pack design](../../../design_rule_packs.md).
 
 ## Problem and outcome
 

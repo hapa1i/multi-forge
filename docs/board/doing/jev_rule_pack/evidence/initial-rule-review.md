@@ -155,9 +155,9 @@ successes. Preparation counts measure neither real hook coverage nor accuracy; t
 open.
 
 The user separately chose on 2026-10-15 to skip paid native testing, then authorized merging the
-[Claude prerequisite PR #269](https://github.com/hapa1i/multi-forge/pull/269). The fix is included in this branch, but
-A2's native-delivery gate remains open. No corpus preparation, selected rule family or existing A1 approval authorizes a
-paid Jev evaluation.
+[Claude prerequisite PR #269](https://github.com/hapa1i/multi-forge/pull/269). The fix is included on `main`, but A2's
+native-delivery gate remains open. No corpus preparation, selected rule family or existing A1 approval authorizes a paid
+Jev evaluation.
 
 To reproduce offline preparation from the repository root:
 

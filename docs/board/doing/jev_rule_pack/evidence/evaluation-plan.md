@@ -1,8 +1,9 @@
 # A2 offline evaluation plan
 
-Status: methodology and report implementation ready for review; human labels, calibrated thresholds and numerical
-acceptance limits remain unset. This document authorizes no collection, provider request or native trial. A1's probe
-approvals do not carry over.
+Status: the offline evaluator shipped through [PR #271](https://github.com/hapa1i/multi-forge/pull/271); human labels,
+calibrated thresholds and numerical acceptance limits remain unset. The
+[merge handoff](../checklist.md#offline-evaluation-merge-and-next-gate) records validation and the next gate. This
+document authorizes no collection, provider request or native trial. A1's probe approvals do not carry over.
 
 ## Scope and current evidence
 
