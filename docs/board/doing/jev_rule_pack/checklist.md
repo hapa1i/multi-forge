@@ -2,10 +2,11 @@
 
 ## Current focus
 
-Execution continues on `codex/jev-rule-pack-evaluation`, based on `main` at `9442c1e5`. Foundation
-[PR #270](https://github.com/hapa1i/multi-forge/pull/270) merged on 2026-10-15 with the A1 explicit evaluation-identity
-extension, session consent/inheritance and raw-override guards. The next slice defines offline consumer outcomes and
-fixture-response evaluation, with provisional thresholds and human labels kept explicit. The
+Execution continues on `codex/jev-rule-pack-evaluation`, based on the foundation closeout on `main` at `203e4404`.
+Foundation [PR #270](https://github.com/hapa1i/multi-forge/pull/270) merged on 2026-10-15 with the A1 explicit
+evaluation-identity extension, session consent/inheritance and raw-override guards. The continuation implements offline
+consumer outcomes and saved-response evaluation, with explicit threshold settings and human labels kept separate. Its
+[evaluation plan](evidence/evaluation-plan.md) documents the workflow, denominators and pending release decisions. The
 [wrapper evidence contract](evidence/initial-rule-review.md) now keeps broader wrappers under the user's 2026-10-15
 decision. Review corrections unify disable/revocation, separate reviewer notes from model evidence, and distinguish
 host-decided outcomes from model candidates. Human labels, thresholds and real scope fact resolution remain open before
@@ -93,7 +94,7 @@ native trial or paid Jev request. Keep only the merged `done/` card when consumi
 - [x] Bind the candidate to [coding standards §5](../../../developer/coding_standards.md#5-interface-changes), including
   justified exceptions and surface distinctions. A missing marker comment is not itself a violation. Define positive,
   compliant and insufficient-context examples before coding; exclude rules whose required facts the hook cannot supply.
-- [ ] Define the consumer outcomes: not applicable, evaluated without a warning, warning, uncertain and unavailable.
+- [x] Define the consumer outcomes: not applicable, evaluated without a warning, warning, uncertain and unavailable.
   Only a covered, valid answer can support an assessed outcome. Give uncertainty and unavailable evidence visible fixed
   diagnostics without inventing a violation, model justification, denial or review request.
 - [ ] Build a local corpus manifest with source revisions, rule versions and human-adjudicated labels. Reconstruct
@@ -112,7 +113,7 @@ native trial or paid Jev request. Keep only the merged `done/` card when consumi
   ceiling before looking at held-out results. Choose thresholds on calibration data, not a transferred probability of
   0.8. Record uncertainty intervals and the response to a failed gate: revise/re-evaluate, narrow scope or stop
   shipping.
-- [ ] Add a dry-run/fixture-first evaluation harness under `scripts/experiments/jev/`, with tests flat in
+- [x] Add a dry-run/fixture-first evaluation harness under `scripts/experiments/jev/`, with tests flat in
   `tests/src/scripts/`. Follow A1's path-based loader in `tests/src/scripts/test_jev_probe.py`; the existing
   `codex_probe.load_script` is fixed to `codex-hooks/`. Store methodology, manifests, labels and sanitized results under
   this card's `evidence/`; keep fake transports in tests/the harness.
@@ -120,8 +121,22 @@ native trial or paid Jev request. Keep only the merged `done/` card when consumi
 The preparation stage is implemented in `scripts/experiments/jev/rule-pack-eval.py`: it validates native action shapes,
 keeps source families in one split, binds adjudications to evidence and semantic criteria, excludes labels and reviewer
 notes from model inputs, and applies the declared host applicability table before building size-checked A1 payloads.
-Prompt wording has a separate identity. It has no live mode, predictions or quality verdict. Response evaluation and
-metrics remain open under the harness item above.
+Prompt wording has a separate identity. The saved-response evaluator now binds corpus membership/splits, predictions,
+settings and adjudications independently; it reports per-cohort/per-repetition confusion, abstentions, coverage,
+question calibration, latency and known/unknown cost. Shared definitions preserve the existing payload hashes. The
+outcome combiner requires explicit question bands and preserves coverage gaps and contradictions. There is no live mode
+or quality acceptance verdict. Human labels, real predictions and approved numerical gates remain outstanding.
+
+The 2026-10-15 offline continuation passed 95 focused outcome, harness and label-isolation tests. The decision tests
+cover all three-way answer combinations, cutoff endpoints, malformed contracts and empty denominators. Report tests
+cover stale/split/duplicate observations, missing-response abstentions, unknown cost, separate repetition counts and
+annotation identity. The original preparation report still reproduces byte-for-byte. These are implementation fixtures,
+not calibration results. See [rule-pack design](../../../design_rule_packs.md) for implemented ownership.
+
+Aggregate validation passed: `make test-unit` (11,058 passed, 117 deselected), `make test-regression` (1,889 passed) and
+`make pre-commit`. The CLI fixture smoke kept three host decisions separate from nine model candidates, marked eight
+absent responses unavailable and reported no accuracy result for the unadjudicated corpus. The exact-file token cache
+regression also passed; existing provider-cached documents are unchanged. No paid A2 request or native trial ran.
 
 **Decision gate:** the broader family is selected. Implement and verify the revised evidence contract, including the
 host-owned origin of surface/exception facts, before hook wiring; do not populate those facts from action comments or

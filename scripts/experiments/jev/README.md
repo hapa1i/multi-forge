@@ -1,5 +1,11 @@
 # Jev Decisions probes
 
+The A2 `rule-pack-eval.py` harness prepares the wrapper corpus and evaluates saved responses without a live mode. See
+its [evaluation plan](../../../docs/board/doing/jev_rule_pack/evidence/evaluation-plan.md) for manifests, explicit
+threshold settings, label provenance and metric limitations. The paid transport probe below remains separate.
+
+Shared module ownership is in [rule-pack design](../../../docs/design_rule_packs.md).
+
 The default prints a fixed synthetic manifest without resolving credentials or making network requests:
 
 ```bash
