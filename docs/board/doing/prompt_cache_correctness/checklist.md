@@ -2,7 +2,7 @@
 
 ## Current focus
 
-Branch `prompt-caching` from `main` at `203e4404`. Implementation and verification are complete; the PR carries the
+Branch `prompt-caching` from `main` at `203e4404`. Implementation and verification are complete; PR #273 carries the
 probe and end-to-end evidence, and closeout follows merge. The [card](card.md) owns scope; the user's 2026-10-15
 decisions exclude Forge-placed markers, LiteLLM-specific work and provider pinning, and authorize bounded paid checks.
 
@@ -97,5 +97,5 @@ decisions exclude Forge-placed markers, LiteLLM-specific work and provider pinni
 
 ## Closeout
 
-- [ ] Commit series split by intent; PR with probe evidence and the role-semantics risk called out.
+- [x] Commit series split by intent; PR #273 with probe evidence and the role-semantics risk called out.
 - [ ] Change-log entry, design-doc check, card move to `done/` after merge.
