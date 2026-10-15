@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shlex
 from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
@@ -19,13 +20,16 @@ DISCLOSURE = (
     "TypeSafe provider, with zero data retention required on every request. Each derived session requires its own "
     "acknowledgment."
 )
-_RECOVERY = "use 'forge policy enable --help' for the validating activation command"
+_ACTIVATION_UNAVAILABLE = "Jev activation is not available in this build."
 
 
 def build_acknowledgment(
     session: SessionState, settings: Mapping[str, Any], *, acknowledge_paid_data_sharing: bool
 ) -> dict[str, Any]:
-    """Bind an explicit acknowledgment to one session instance and validated pack settings."""
+    """Bind an explicit acknowledgment to one session instance and validated pack settings.
+
+    The unkeyed digest detects stale or copied scope; a trusted local manifest writer can recreate it.
+    """
     if acknowledge_paid_data_sharing is not True:
         raise ValueError(DISCLOSURE + " Explicit acknowledgment is required.")
     if not session.name or not session.created_at or not session.forge_root or not session.worktree:
@@ -102,7 +106,14 @@ def reject_raw_activation(key: str, value: Any) -> None:
     elif key == f"policy.bundle_config.{BUNDLE_NAME}" or key.startswith(f"policy.bundle_config.{BUNDLE_NAME}."):
         rejected = True
     if rejected:
-        raise ValueError(f"Jev paid-data acknowledgment cannot be set through raw overrides; {_RECOVERY}")
+        raise ValueError(f"Jev paid-data acknowledgment cannot be set through raw overrides. {_ACTIVATION_UNAVAILABLE}")
+
+
+def raw_override_disables_policy(key: str, value: Any) -> bool:
+    """Recognize explicit disabling writes so repeated disables also revoke retained grants."""
+    if key == "policy" and isinstance(value, dict):
+        return raw_override_disables_policy("policy.enabled", value.get("enabled", True))
+    return key in {"policy", "policy.enabled", "policy.*"} and (value is False or value is None)
 
 
 def snapshot_activation(session: SessionState) -> dict[str, Any] | None:
@@ -119,10 +130,15 @@ def snapshot_activation(session: SessionState) -> dict[str, Any] | None:
     return {"config": config.get(BUNDLE_NAME) if isinstance(config, dict) else None}
 
 
-def check_raw_transition(before: dict[str, Any] | None, after: dict[str, Any] | None) -> bool:
+def check_raw_transition(before: dict[str, Any] | None, after: dict[str, Any] | None, *, session_name: str) -> bool:
     """Refuse enabling/changing an effective paid configuration; return whether to revoke it."""
     if after is not None and before != after:
-        raise ValueError(f"Raw overrides cannot activate or change paid Jev checks; {_RECOVERY}")
+        target = shlex.quote(session_name)
+        raise ValueError(
+            f"Raw overrides cannot activate or change paid Jev checks. {_ACTIVATION_UNAVAILABLE} "
+            f"To clear overrides with policy disabled, run 'forge policy disable --session {target}', "
+            f"then 'forge session reset --session {target}'."
+        )
     return before is not None and after is None
 
 

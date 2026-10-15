@@ -426,6 +426,7 @@ def set_session_override(
         def _mutate(m: SessionState) -> None:
             from forge.policy.rule_pack.consent import (
                 check_raw_transition,
+                raw_override_disables_policy,
                 revoke_acknowledgment,
                 snapshot_activation,
             )
@@ -436,7 +437,9 @@ def set_session_override(
             set_override(m.overrides, key, parsed_value)
             effective = compute_effective_intent(m, strict=True, override_key=key)
             try:
-                if check_raw_transition(old_jev, snapshot_activation(m)):
+                if check_raw_transition(
+                    old_jev, snapshot_activation(m), session_name=m.name
+                ) or raw_override_disables_policy(key, parsed_value):
                     revoke_acknowledgment(m)
             except ValueError as exc:
                 raise InvalidOverrideValueError(key, str(exc), value_str) from exc
@@ -520,7 +523,7 @@ def reset_session_overrides(
                 old_jev = snapshot_activation(m)
                 result_holder["deleted"] = delete_override(m.overrides, key)
                 try:
-                    if check_raw_transition(old_jev, snapshot_activation(m)):
+                    if check_raw_transition(old_jev, snapshot_activation(m), session_name=m.name):
                         revoke_acknowledgment(m)
                 except ValueError as exc:
                     raise ForgeOpError(str(exc)) from exc
@@ -560,7 +563,7 @@ def reset_session_overrides(
                     old_jev = snapshot_activation(m)
                     clear_overrides(m.overrides)
                     try:
-                        if check_raw_transition(old_jev, snapshot_activation(m)):
+                        if check_raw_transition(old_jev, snapshot_activation(m), session_name=m.name):
                             revoke_acknowledgment(m)
                     except ValueError as exc:
                         raise ForgeOpError(str(exc)) from exc

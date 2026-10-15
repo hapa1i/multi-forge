@@ -34,7 +34,7 @@ from forge.session.overrides import (
 def test_raw_jev_writes_refuse_before_any_mutation(key, value):
     overrides = {"policy": {"enabled": False}, "memory": {"auto_recall": True}}
     before = deepcopy(overrides)
-    with pytest.raises(InvalidOverrideKeyError, match="validating activation command"):
+    with pytest.raises(InvalidOverrideKeyError, match="Jev activation is not available"):
         set_override(overrides, key, value)
     assert overrides == before
 

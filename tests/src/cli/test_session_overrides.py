@@ -67,7 +67,7 @@ def test_raw_effective_enable_cannot_restore_a_paid_grant(runner, temp_env, oper
     }[operation]
     result = runner.invoke(main, ["session", *args, "--session", "jev-test"])
     assert result.exit_code == 1, result.output
-    assert "validating activation command" in result.output
+    assert "Jev activation is not available" in result.output
     assert store.read() == before
 
 

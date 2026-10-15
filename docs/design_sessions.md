@@ -70,9 +70,21 @@ configuration from inherited intent and overrides; relaunch copies overrides bef
 bundles, supervisors and unrelated overrides retain their existing inheritance. The acknowledgment binds project,
 worktree, session name/creation and exact pack settings, so a copied grant does not enable another session instance. It
 fits inside the existing `policy.bundle_config` mapping without adding a strict manifest field or raising its schema
-version. Raw set/reset paths cannot activate a paid configuration, and disabling it through raw overrides revokes both
-intent and override grants. The validating Jev activation/dispatch surfaces remain under development; this boundary does
-not register a runnable bundle or authorize a network call.
+version. Reopening the same session preserves a matching acknowledgment. Disabling policy through
+`forge policy disable`, `%policy disable` or raw overrides revokes both intent and override grants, including repeated
+disable requests. Terminal disable also clears the `policy.enabled` override so an earlier direct enable cannot keep
+policy active. Supervisor setup can re-enable policy but cannot restore a revoked acknowledgment. Raw set/reset paths
+cannot activate a paid configuration, even with a retained matching grant. To clear overrides that would expose Jev
+intent, first run `forge policy disable --session <name>`, then `forge session reset --session <name>`. Unrelated
+individual overrides can still be reset directly. The validating Jev activation/dispatch surfaces remain under
+development; this boundary does not register a runnable bundle or authorize a network call.
+
+The acknowledgment detects stale settings and accidental copying across sessions. Its unkeyed digest records scope; it
+does not authenticate a human decision against an actor that can rewrite the manifest and recompute the digest.
+Supported activation and manifest-writing code form the trust boundary. Raw override APIs reject Jev selection and
+acknowledgment writes, and the current activation builder admits only registered deterministic bundles. Future Jev
+activation must own disclosure and acknowledgment creation; dispatch must independently validate the grant before any
+request. Arbitrary local manifest writers are outside this consent mechanism's threat model.
 
 The session file has three sections:
 

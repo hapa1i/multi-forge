@@ -33,9 +33,17 @@ Or from within a Claude Code session (no terminal needed):
 
 ---
 
-Jev rule-pack activation is still under development. `forge session set` and `reset` cannot opt a session into paid Jev
-checks; copied settings in a fork or fresh-resume/relaunch child do not carry permission to share repository action
-content. Ordinary policy bundles keep their existing behavior. No Jev request is made by the consent preparation alone.
+`jev_rule_pack` is reserved; this build cannot activate or run Jev checks. Raw `forge session set` and `reset` commands
+cannot activate it. Disabling policy through either command surface or raw overrides revokes any stored Jev
+acknowledgment. If resetting overrides would expose Jev settings, keep policy disabled while clearing them:
+
+```bash
+forge policy disable --session <name>
+forge session reset --session <name>
+```
+
+An unrelated individual override can still be reset directly. Fork, fresh-resume and relaunch children do not inherit
+Jev permission; reopening the same session preserves a matching acknowledgment unless it was revoked.
 
 ## How policies work
 

@@ -38,6 +38,16 @@ def test_same_instance_retains_acknowledgment_through_strict_store_roundtrip(ses
     assert loaded.schema_version == 3  # The existing ordinary-session writer needs no schema bump for bundle config.
 
 
+def test_acknowledgment_does_not_authenticate_arbitrary_local_manifest_writers(session):
+    copied = deepcopy(session)
+    copied.name = "another-session"
+    config = copied.intent.policy.bundle_config[BUNDLE_NAME]
+    assert not has_acknowledgment(copied, config)
+    settings = {key: value for key, value in config.items() if key != ACKNOWLEDGMENT_KEY}
+    config[ACKNOWLEDGMENT_KEY] = build_acknowledgment(copied, settings, acknowledge_paid_data_sharing=True)
+    assert has_acknowledgment(copied, config)
+
+
 @pytest.mark.parametrize("value", [False, None, "true", 1])
 def test_grant_requires_explicit_boolean_acknowledgment(session, value):
     with pytest.raises(ValueError, match="Explicit acknowledgment"):
