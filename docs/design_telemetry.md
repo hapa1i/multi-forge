@@ -60,8 +60,9 @@ skip counts rather than reattribute them.
 **Token convention.** Attempt `input_tokens` is the provider's total prompt. `cached_tokens` (cache reads) and
 `cache_write_tokens` (cache writes) are subsets of it, so cache rates cannot exceed 100%. Anthropic-native usage — the
 passthrough proxy, headless Claude results and statusline transcript reads — reports uncached input beside reads and
-writes, so Forge adds them back. `cache_write_tokens` was added without a schema bump and is omitted when absent; older
-strict readers skip only records that carry it.
+writes, so Forge adds them back. Proxy attempts, direct `claude -p` verbs and workers, and direct `core.llm` calls
+record `cache_write_tokens` when the route reports writes; usage-ledger events carry reads only. The field was added
+without a schema bump and is omitted when absent or zero; older strict readers skip only records that carry it.
 
 `CostTracker` takes the larger attempt/checkpoint total. Completion updates counters before an unbounded FIFO worker
 persists cost/trace and coalesced snapshots. Shutdown drains jobs and retries failed checkpoints; hangs can delay it.

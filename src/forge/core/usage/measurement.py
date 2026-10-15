@@ -26,6 +26,8 @@ class UsageMeasurement:
     input_tokens: int | None = None
     output_tokens: int | None = None
     cached_tokens: int | None = None
+    # Cache writes, a subset of input_tokens; proxy snapshots and Codex report none.
+    cache_write_tokens: int | None = None
     write_downstream: bool = False
 
 
@@ -39,6 +41,7 @@ class DirectCostProvenance(NamedTuple):
     input_tokens: int | None
     output_tokens: int | None
     cached_tokens: int | None
+    cache_write_tokens: int | None = None
 
 
 def direct_cost_provenance(
@@ -47,16 +50,14 @@ def direct_cost_provenance(
     input_tokens: int | None,
     output_tokens: int | None,
     cached_tokens: int | None,
+    cache_write_tokens: int | None = None,
 ) -> DirectCostProvenance:
     """One-reporter cost precedence for a direct ``claude -p`` run."""
+    tokens = (input_tokens, output_tokens, cached_tokens, cache_write_tokens)
     if self_cost is not None:
-        return DirectCostProvenance(
-            self_cost, "claude_code", "reported", "runtime_native", input_tokens, output_tokens, cached_tokens
-        )
+        return DirectCostProvenance(self_cost, "claude_code", "reported", "runtime_native", *tokens)
     if envelope_parsed and input_tokens is not None:
-        return DirectCostProvenance(
-            None, None, "unavailable", "provider_usage_exact", input_tokens, output_tokens, cached_tokens
-        )
+        return DirectCostProvenance(None, None, "unavailable", "provider_usage_exact", *tokens)
     return DirectCostProvenance(None, None, "unavailable", "unattributed", None, None, None)
 
 
@@ -70,6 +71,7 @@ def resolve_claude_p_measurement(
     input_tokens: int | None = None,
     output_tokens: int | None = None,
     cached_tokens: int | None = None,
+    cache_write_tokens: int | None = None,
 ) -> UsageMeasurement:
     """Resolve measurement for a ``claude -p`` verb or worker event."""
     if proxied and caller == "worker":
@@ -101,7 +103,9 @@ def resolve_claude_p_measurement(
             write_downstream=False,
         )
 
-    prov = direct_cost_provenance(self_cost, envelope_parsed, input_tokens, output_tokens, cached_tokens)
+    prov = direct_cost_provenance(
+        self_cost, envelope_parsed, input_tokens, output_tokens, cached_tokens, cache_write_tokens
+    )
     return UsageMeasurement(
         prov.cost_micro_usd,
         prov.reporter,
@@ -110,6 +114,7 @@ def resolve_claude_p_measurement(
         prov.input_tokens,
         prov.output_tokens,
         prov.cached_tokens,
+        prov.cache_write_tokens,
         write_downstream=True,
     )
 
@@ -144,5 +149,6 @@ def resolve_direct_llm_measurement(*, usage: dict[str, int] | None) -> UsageMeas
         usage.get("prompt_tokens") if usage else None,
         usage.get("completion_tokens") if usage else None,
         usage.get("cached_tokens") if usage else None,
+        usage.get("cache_write_tokens") if usage else None,
         write_downstream=True,
     )

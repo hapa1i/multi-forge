@@ -106,6 +106,7 @@ class HeadlessResult:
     input_tokens: int | None = None
     output_tokens: int | None = None
     cached_tokens: int | None = None
+    cache_write_tokens: int | None = None
     envelope_parsed: bool = False
     runtime_is_error: bool = False
     # Runtime-native resume/session id, when the runtime announces one in-band:

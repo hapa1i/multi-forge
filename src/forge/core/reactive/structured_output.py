@@ -81,6 +81,7 @@ class HeadlessEnvelope:
     input_tokens: int | None = None
     output_tokens: int | None = None
     cached_tokens: int | None = None
+    cache_write_tokens: int | None = None
     is_error: bool = False
     parsed: bool = False
 
@@ -154,10 +155,11 @@ def parse_headless_envelope(stdout: str) -> HeadlessEnvelope:
         result_text=result_text,
         cost_micro_usd=usd_to_micros(result_obj.get("total_cost_usd")),
         # Anthropic's input_tokens excludes cache reads and writes; Forge counts the
-        # total prompt (as Codex and the proxy do), with reads as the cached subset.
+        # total prompt (as Codex and the proxy do), with reads and writes as subsets.
         input_tokens=None if fresh_input is None else fresh_input + (cache_reads or 0) + (cache_writes or 0),
         output_tokens=_coerce_token_count(usage.get("output_tokens")),
         cached_tokens=cache_reads,
+        cache_write_tokens=cache_writes,
         is_error=bool(result_obj.get("is_error")),
         parsed=True,
     )

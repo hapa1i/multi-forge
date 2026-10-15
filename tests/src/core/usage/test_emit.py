@@ -271,6 +271,24 @@ class TestEmitDirectLlmUsage:
         assert downstream[0].provider_session_id == "forge_sess_abc_supervisor"
         assert downstream[0].backend_id == "openrouter"
 
+    def test_direct_cache_writes_persist_downstream_and_zero_is_omitted(self, monkeypatch) -> None:
+        monkeypatch.setenv("FORGE_RUN_ID", "run_amb")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_amb")
+
+        emit_direct_llm_usage(
+            command="tagger",
+            provider="openrouter",
+            usage={"prompt_tokens": 100, "completion_tokens": 1, "cached_tokens": 60, "cache_write_tokens": 30},
+        )
+        emit_direct_llm_usage(
+            command="tagger",
+            provider="openrouter",
+            usage={"prompt_tokens": 100, "completion_tokens": 1, "cache_write_tokens": 0},
+        )
+
+        writes_by_reads = {r.cached_tokens: r.cache_write_tokens for r in read_downstream_records(kind="attempt")}
+        assert writes_by_reads == {60: 30, None: None}
+
 
 class TestEmitVerbAndWorkerVocabulary:
     """route/reporter/confidence on the fan-out aggregate and the per-worker leaf."""

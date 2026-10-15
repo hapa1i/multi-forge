@@ -60,6 +60,7 @@ def _result_from_outcome(
             input_tokens=envelope.input_tokens,
             output_tokens=envelope.output_tokens,
             cached_tokens=envelope.cached_tokens,
+            cache_write_tokens=envelope.cache_write_tokens,
             envelope_parsed=True,
             runtime_is_error=envelope.is_error and treat_is_error_as_failure(),
             **ident,
@@ -152,6 +153,7 @@ def _emit_worker(request: HeadlessRequest, result: HeadlessResult) -> None:
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
         cached_tokens=result.cached_tokens,
+        cache_write_tokens=result.cache_write_tokens,
         envelope_parsed=result.envelope_parsed,
     )
     _record_worker_upstream(attribution, result, status)

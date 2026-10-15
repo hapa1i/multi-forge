@@ -785,6 +785,7 @@ def _headless_to_session_result(result: HeadlessResult) -> SessionResult:
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
         cached_tokens=result.cached_tokens,
+        cache_write_tokens=result.cache_write_tokens,
         envelope_parsed=result.envelope_parsed,
         runtime_is_error=result.runtime_is_error,
     )
