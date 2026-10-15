@@ -361,6 +361,25 @@ def _as_system_reminder(text: str) -> str:
     return f"{_SYSTEM_REMINDER_OPEN}\n{text}\n</system-reminder>"
 
 
+def _anthropic_cache_usage(prompt_tokens: Any, cached_tokens: Any, cache_write_tokens: Any) -> Dict[str, Any]:
+    """Split OpenAI-style total prompt tokens into Anthropic usage fields.
+
+    OpenAI-compatible usage counts cache reads and writes inside ``prompt_tokens``;
+    Anthropic reports them beside an ``input_tokens`` that covers only the uncached
+    remainder. Claude Code adds the three fields to size its context, so reporting
+    cache reads without shrinking ``input_tokens`` would double-count them. Malformed
+    counts pass through unchanged so response validation rejects them as before.
+    """
+    counts = (prompt_tokens, cached_tokens, cache_write_tokens)
+    if all(isinstance(value, int) and not isinstance(value, bool) for value in counts):
+        prompt_tokens = max(prompt_tokens - cached_tokens - cache_write_tokens, 0)
+    return {
+        "input_tokens": prompt_tokens,
+        "cache_creation_input_tokens": cache_write_tokens,
+        "cache_read_input_tokens": cached_tokens,
+    }
+
+
 def convert_anthropic_to_openai(
     request: MessagesRequest, provider: str = "gemini", *, resolved_model: str | None = None
 ) -> Dict[str, Any]:
@@ -854,8 +873,12 @@ def convert_openai_to_anthropic(
             stop_reason=anthropic_stop_reason,  # type: ignore[arg-type]  # values from controlled stop_reason_map
             stop_sequence=None,  # not returned in OpenAI format
             usage=Usage(
-                input_tokens=usage_data.get("prompt_tokens", 0),
                 output_tokens=usage_data.get("completion_tokens", 0),
+                **_anthropic_cache_usage(
+                    usage_data.get("prompt_tokens", 0),
+                    usage_data.get("cached_tokens", 0),
+                    usage_data.get("cache_write_tokens", 0),
+                ),
             ),
         )
     except Exception as e:
@@ -930,7 +953,9 @@ async def convert_openai_to_anthropic_sse(
     tool_calls_buffer: Dict[int, Dict[str, Any]] = (
         {}
     )  # {openai_tc_index: {id: str, name: str, args: str, block_idx: int}}
-    final_usage: Dict[str, Any] = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0}
+    # Forge accounting convention: input_tokens is the provider's total prompt (cache
+    # reads and writes included); the client-facing events split it Anthropic-style.
+    final_usage: Dict[str, Any] = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0, "cache_write_tokens": 0}
     _stream_failed = False
     _stream_error_type: Optional[str] = None
     final_stop_reason: Optional[str] = None
@@ -1049,6 +1074,13 @@ async def convert_openai_to_anthropic_sse(
                 _final_usage_seen = True  # the proxy saw the final accounting chunk (lifecycle)
                 prompt_tokens = chunk_usage.get("prompt_tokens", 0)
                 completion_tokens = chunk_usage.get("completion_tokens", 0)
+                # Cache reads/writes ride the usage dict from client_adapter.
+                cached_tokens = chunk_usage.get("cached_tokens", 0) or 0
+                cache_write_tokens = chunk_usage.get("cache_write_tokens", 0) or 0
+                if cached_tokens > 0:
+                    final_usage["cached_tokens"] = cached_tokens
+                if cache_write_tokens > 0:
+                    final_usage["cache_write_tokens"] = cache_write_tokens
 
                 if prompt_tokens > 0 and final_usage["input_tokens"] == 0:
                     # Emit input tokens once, when the stream first reports them.
@@ -1056,7 +1088,7 @@ async def convert_openai_to_anthropic_sse(
                     usage_update_event = {
                         "type": "message_delta",
                         "delta": {},
-                        "usage": {"input_tokens": prompt_tokens},
+                        "usage": _anthropic_cache_usage(prompt_tokens, cached_tokens, cache_write_tokens),
                     }
                     yield f"event: message_delta\ndata: {json.dumps(usage_update_event)}\n\n"
                     logger.debug(f"[{request_id}] Sent immediate message_delta with input_tokens={prompt_tokens}")
@@ -1064,11 +1096,6 @@ async def convert_openai_to_anthropic_sse(
                 if completion_tokens > 0:
                     final_usage["output_tokens"] = completion_tokens
                     logger.debug(f"[{request_id}] Updated output_tokens={completion_tokens}")
-
-                # Accumulate cached_tokens (propagated from client_adapter since Step 2)
-                cached_tokens = chunk_usage.get("cached_tokens", 0)
-                if cached_tokens > 0:
-                    final_usage["cached_tokens"] = cached_tokens
 
                 # Route-reported cost (micros) rides in final_usage like cached_tokens.
                 # It is never emitted to the client (the message_delta usage is tokens
@@ -1347,7 +1374,9 @@ async def convert_openai_to_anthropic_sse(
         output_tokens = final_usage.get("output_tokens", 0)
         if input_tokens > 0 or output_tokens > 0:
             final_delta_event["usage"] = {
-                "input_tokens": input_tokens,
+                **_anthropic_cache_usage(
+                    input_tokens, final_usage.get("cached_tokens", 0), final_usage.get("cache_write_tokens", 0)
+                ),
                 "output_tokens": output_tokens,
             }
 

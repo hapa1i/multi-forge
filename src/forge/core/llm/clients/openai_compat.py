@@ -39,25 +39,49 @@ def is_retryable_error(error: Exception) -> bool:
     return False
 
 
-def extract_cached_tokens(usage: object) -> int:
-    """Extract cached_tokens from a usage object's prompt_tokens_details.
-
-    LiteLLM and OpenRouter pass through provider cache metrics in
-    ``usage.prompt_tokens_details.cached_tokens``.  The field may be an
-    object (SDK model) or a plain dict depending on the response path.
-
-    Returns 0 if no cache data is present.
-    """
+def _prompt_tokens_detail(usage: object, key: str) -> int:
+    """Read one ``usage.prompt_tokens_details`` count from an SDK object or a plain dict; 0 when absent."""
     prompt_details = getattr(usage, "prompt_tokens_details", None)
     if prompt_details is None and isinstance(usage, dict):
         prompt_details = usage.get("prompt_tokens_details")
     if not prompt_details:
         return 0
     if isinstance(prompt_details, dict):
-        raw = prompt_details.get("cached_tokens", 0) or 0
+        raw = prompt_details.get(key, 0) or 0
     else:
-        raw = getattr(prompt_details, "cached_tokens", 0) or 0
+        raw = getattr(prompt_details, key, 0) or 0
     return int(raw)
+
+
+def extract_cached_tokens(usage: object) -> int:
+    """Extract cache-read tokens (``prompt_tokens_details.cached_tokens``).
+
+    LiteLLM and OpenRouter pass through provider cache metrics there. Returns 0 if
+    no cache data is present.
+    """
+    return _prompt_tokens_detail(usage, "cached_tokens")
+
+
+def extract_cache_write_tokens(usage: object) -> int:
+    """Extract cache-write tokens (OpenRouter ``prompt_tokens_details.cache_write_tokens``).
+
+    Like cache reads, writes are already counted inside ``prompt_tokens``. Returns 0
+    if the route reports none.
+    """
+    return _prompt_tokens_detail(usage, "cache_write_tokens")
+
+
+def selected_provider(payload: Any) -> str | None:
+    """Return the upstream OpenRouter routed to (body or chunk ``provider``), if reported.
+
+    The typed SDK stashes the unknown ``provider`` field in ``model_extra``.
+    """
+    selected = getattr(payload, "provider", None)
+    if selected is None:
+        extra = getattr(payload, "model_extra", None)
+        if isinstance(extra, dict):
+            selected = extra.get("provider")
+    return selected if isinstance(selected, str) else None
 
 
 def extract_reported_cost_usd(usage: object) -> float | None:
@@ -174,17 +198,11 @@ def provider_trace_meta(response: Any, provider: str) -> ProviderTraceMeta:
     response_id = response_id if isinstance(response_id, str) else None
     generation_id = response_id if response_id and response_id.startswith("gen-") else None
 
-    selected = getattr(response, "provider", None)
-    if selected is None:
-        extra = getattr(response, "model_extra", None)
-        if isinstance(extra, dict):
-            selected = extra.get("provider")
-
     return ProviderTraceMeta(
         provider=provider,
         provider_response_id=response_id,
         provider_generation_id=generation_id,
-        selected_provider=selected if isinstance(selected, str) else None,
+        selected_provider=selected_provider(response),
     )
 
 
@@ -284,6 +302,9 @@ def openai_response_to_completion(response: Any, provider: str) -> CompletionRes
         cached = extract_cached_tokens(response.usage)
         if cached:
             usage["cached_tokens"] = cached
+        cache_writes = extract_cache_write_tokens(response.usage)
+        if cache_writes:
+            usage["cache_write_tokens"] = cache_writes
         cost_usd = extract_reported_cost_usd(response.usage)
 
     return CompletionResponse(

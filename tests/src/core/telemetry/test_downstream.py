@@ -76,6 +76,32 @@ def test_write_stamps_current_backend_identity_schema(
     assert raw["backend_id"] == "openrouter"
 
 
+def test_cache_write_tokens_omitted_when_absent_and_round_trips(_isolated_downstream: Path) -> None:
+    # Additive field without a schema bump: absent writes leave the key out, so older
+    # strict readers keep reading every record that carries no writes.
+    write_downstream_record(
+        DownstreamRecord(kind="attempt", downstream_event_id="ds_no_writes", input_tokens=10, cached_tokens=4)
+    )
+    write_downstream_record(
+        DownstreamRecord(
+            kind="attempt",
+            downstream_event_id="ds_writes",
+            input_tokens=10,
+            cached_tokens=4,
+            cache_write_tokens=5,
+        )
+    )
+
+    [path] = list(_isolated_downstream.glob("*.jsonl"))
+    raw = {r["downstream_event_id"]: r for r in map(json.loads, path.read_text().splitlines())}
+    assert "cache_write_tokens" not in raw["ds_no_writes"]
+    assert raw["ds_writes"]["cache_write_tokens"] == 5
+
+    by_id = {r.downstream_event_id: r for r in read_downstream_records()}
+    assert by_id["ds_no_writes"].cache_write_tokens is None
+    assert by_id["ds_writes"].cache_write_tokens == 5
+
+
 def test_backend_id_survives_later_null_merge_and_can_filter() -> None:
     write_downstream_record(
         DownstreamRecord(

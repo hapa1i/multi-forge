@@ -516,6 +516,20 @@ class TestConvertOpenaiToAnthropic:
         assert result.usage.input_tokens == 0
         assert result.usage.output_tokens == 0
 
+    def test_cache_usage_split_anthropic_style(self) -> None:
+        """Cache reads and writes leave input_tokens; the three fields sum to the provider prompt."""
+        response = {
+            "id": "chatcmpl-cache",
+            "choices": [{"finish_reason": "stop", "message": {"content": "hi"}}],
+            "usage": {"prompt_tokens": 200, "completion_tokens": 5, "cached_tokens": 100, "cache_write_tokens": 30},
+        }
+        result = convert_openai_to_anthropic(response)
+        assert result is not None
+        assert result.usage.input_tokens == 70
+        assert result.usage.cache_read_input_tokens == 100
+        assert result.usage.cache_creation_input_tokens == 30
+        assert result.usage.output_tokens == 5
+
     @pytest.mark.parametrize(
         "openai_reason,expected_anthropic",
         [
@@ -900,24 +914,35 @@ class TestConvertOpenaiToAnthropicSse:
 
     @pytest.mark.asyncio
     async def test_usage_tracking(self, base_request: MessagesRequest) -> None:
-        """Usage from chunks is accumulated and reported in final message_delta."""
+        """Usage reaches Claude Code Anthropic-style: cache reads/writes split out of input."""
         chunks = [
             {
                 "choices": [{"delta": {"content": "hi"}, "finish_reason": None}],
-                "usage": {"prompt_tokens": 200, "completion_tokens": 50, "cached_tokens": 100},
+                "usage": {
+                    "prompt_tokens": 200,
+                    "completion_tokens": 50,
+                    "cached_tokens": 100,
+                    "cache_write_tokens": 30,
+                },
             },
             {"choices": [{"delta": {}, "finish_reason": "stop"}]},
         ]
-        events = await self._collect_events(chunks, base_request)
+        completed: list[dict] = []
+        events = await self._collect_events(
+            chunks, base_request, on_complete=lambda usage, _failed, _error: completed.append(usage)
+        )
 
-        # Find the final message_delta with stop_reason
-        final_deltas = [
-            e for e in events if e["event"] == "message_delta" and e["data"].get("delta", {}).get("stop_reason")
-        ]
-        assert len(final_deltas) == 1
-        usage = final_deltas[0]["data"].get("usage", {})
-        assert usage["input_tokens"] == 200
-        assert usage["output_tokens"] == 50
+        expected_cache = {"input_tokens": 70, "cache_read_input_tokens": 100, "cache_creation_input_tokens": 30}
+        deltas = [e["data"] for e in events if e["event"] == "message_delta"]
+        immediate = [d for d in deltas if not d.get("delta")]
+        assert immediate and immediate[0]["usage"] == expected_cache
+        final = [d for d in deltas if d.get("delta", {}).get("stop_reason")]
+        assert len(final) == 1
+        assert final[0]["usage"] == {**expected_cache, "output_tokens": 50}
+        # Forge's own accounting keeps the total prompt with reads and writes as subsets.
+        assert completed[0]["input_tokens"] == 200
+        assert completed[0]["cached_tokens"] == 100
+        assert completed[0]["cache_write_tokens"] == 30
 
     @pytest.mark.asyncio
     async def test_non_dict_chunk_skipped(self, base_request: MessagesRequest) -> None:

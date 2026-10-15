@@ -57,7 +57,7 @@ def test_array_envelope_takes_last_result_and_lifts_metrics() -> None:
     assert env.parsed is True
     assert env.result_text == "MODEL TEXT"
     assert env.cost_micro_usd == 26900  # 0.0269 USD -> micro-USD (Decimal exact)
-    assert env.input_tokens == 120
+    assert env.input_tokens == 212  # 120 fresh + 80 cache reads + 12 cache writes
     assert env.output_tokens == 34
     assert env.cached_tokens == 80  # cache_read_input_tokens, NOT cache_creation
     assert env.is_error is False

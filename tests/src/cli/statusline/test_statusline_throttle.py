@@ -180,7 +180,7 @@ class TestCacheHitSegmentE2E:
 
     def test_direct_computes_and_writes_throttle_file(self, tmp_path):
         visible = _render_cache_hit(self._fixture(tmp_path))
-        assert "cache:30%" in visible  # 30 / 100
+        assert "cache:23%" in visible  # 30 reads / (100 fresh + 30 read)
         assert _cache_path("sess-e2e", str(tmp_path / "t.jsonl")).is_file()
 
     def test_cache_hit_off_hides_segment(self, tmp_path):

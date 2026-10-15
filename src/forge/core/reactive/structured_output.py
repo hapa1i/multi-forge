@@ -147,14 +147,17 @@ def parse_headless_envelope(stdout: str) -> HeadlessEnvelope:
 
     usage = result_obj.get("usage")
     usage = usage if isinstance(usage, dict) else {}
+    fresh_input = _coerce_token_count(usage.get("input_tokens"))
+    cache_reads = _coerce_token_count(usage.get("cache_read_input_tokens"))
+    cache_writes = _coerce_token_count(usage.get("cache_creation_input_tokens"))
     return HeadlessEnvelope(
         result_text=result_text,
         cost_micro_usd=usd_to_micros(result_obj.get("total_cost_usd")),
-        input_tokens=_coerce_token_count(usage.get("input_tokens")),
+        # Anthropic's input_tokens excludes cache reads and writes; Forge counts the
+        # total prompt (as Codex and the proxy do), with reads as the cached subset.
+        input_tokens=None if fresh_input is None else fresh_input + (cache_reads or 0) + (cache_writes or 0),
         output_tokens=_coerce_token_count(usage.get("output_tokens")),
-        # cache_read is the conventional "cached" count (cache hits over fresh input),
-        # matching the proxy's cache-hit semantics; cache_creation is a separate cost.
-        cached_tokens=_coerce_token_count(usage.get("cache_read_input_tokens")),
+        cached_tokens=cache_reads,
         is_error=bool(result_obj.get("is_error")),
         parsed=True,
     )

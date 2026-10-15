@@ -33,15 +33,15 @@ def test_string_token_field_coerced(tmp_path):
     path = _write(
         tmp_path, [{"requestId": "r1", "message": {"usage": {"input_tokens": "100", "cache_read_input_tokens": "50"}}}]
     )
-    assert compute_cache_hit_rate(path) == 50.0  # coerced, not crashed
+    assert compute_cache_hit_rate(path) == 33.3  # coerced, not crashed: 50 read / (100 + 50) total
 
 
 def test_non_numeric_token_field_skipped(tmp_path):
     path = _write(
         tmp_path, [{"requestId": "r1", "message": {"usage": {"input_tokens": "abc", "cache_read_input_tokens": 5}}}]
     )
-    # input coerces to 0 -> no usable input -> 0.0, no crash.
-    assert compute_cache_hit_rate(path) == 0.0
+    # Fresh input coerces to 0, no crash; the 5 cache reads remain the whole (total) input.
+    assert compute_cache_hit_rate(path) == 100.0
 
 
 def test_non_dict_message_skipped(tmp_path):
@@ -60,7 +60,7 @@ def test_non_object_json_line_skipped(tmp_path):
         "123\n[1,2]\n"
         + json.dumps({"requestId": "r1", "message": {"usage": {"input_tokens": 100, "cache_read_input_tokens": 40}}})
     )
-    assert compute_cache_hit_rate(str(p)) == 40.0  # good row still counted
+    assert compute_cache_hit_rate(str(p)) == 28.6  # good row still counted: 40 / 140
 
 
 def test_mixed_good_and_bad_rows(tmp_path):
@@ -72,4 +72,4 @@ def test_mixed_good_and_bad_rows(tmp_path):
             {"requestId": "r3", "message": {"usage": {"input_tokens": 100, "cache_read_input_tokens": 25}}},
         ],
     )
-    assert compute_cache_hit_rate(path) == 25.0  # only r3 contributes
+    assert compute_cache_hit_rate(path) == 20.0  # only r3 contributes: 25 / 125

@@ -513,6 +513,7 @@ def _calc_and_log_cost(
     forge_run_id: str | None = None,
     forge_root_run_id: str | None = None,
     downstream_event_id: str | None = None,
+    cache_write_tokens: int = 0,
 ) -> int | None:
     """Log a request's cost (microdollars) and return it, or ``None`` if unavailable.
 
@@ -539,6 +540,7 @@ def _calc_and_log_cost(
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
                 cached_tokens=cached_tokens,
+                cache_write_tokens=cache_write_tokens,
                 cost_micros=cost_micros,
                 latency_ms=latency_ms,
                 failed=failed,
@@ -1219,6 +1221,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
                 cached_tokens=cached_tokens,
+                cache_write_tokens=_coerce_usage_count(usage.get("cache_write_tokens")),
                 latency_ms=duration_ms,
                 failed=True,
                 request_id=request_id,
@@ -1364,6 +1367,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     input_tokens=in_tok,
                     output_tokens=out_tok,
                     cached_tokens=cache_tok,
+                    cache_write_tokens=usage.get("cache_write_tokens", 0),
                     latency_ms=elapsed,
                     failed=failed,
                     request_id=request_id,
@@ -1445,6 +1449,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     input_tokens=_in,
                     output_tokens=_out,
                     cached_tokens=_cached,
+                    cache_write_tokens=_usage.get("cache_write_tokens", 0),
                     latency_ms=duration_ms,
                     failed=False,
                     request_id=request_id,
@@ -1551,6 +1556,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     input_tokens=_ri,
                     output_tokens=_ro,
                     cached_tokens=_rc,
+                    cache_write_tokens=_retry_usage.get("cache_write_tokens", 0),
                     latency_ms=retry_duration_ms,
                     failed=False,
                     request_id=request_id,

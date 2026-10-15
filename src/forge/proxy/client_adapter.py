@@ -223,6 +223,7 @@ class CoreLLMClientAdapter:
                 "completion_tokens": response.usage.get("completion_tokens", 0) if response.usage else 0,
                 "total_tokens": response.usage.get("total_tokens", 0) if response.usage else 0,
                 "cached_tokens": response.usage.get("cached_tokens", 0) if response.usage else 0,
+                "cache_write_tokens": response.usage.get("cache_write_tokens", 0) if response.usage else 0,
             },
         }
         # Internal-only carrier (underscore key, dropped by the Anthropic translation):
@@ -474,6 +475,7 @@ class CoreLLMClientAdapter:
                     "completion_tokens": event.usage.get("completion_tokens", 0) if event.usage else 0,
                     "total_tokens": event.usage.get("total_tokens", 0) if event.usage else 0,
                     "cached_tokens": event.usage.get("cached_tokens", 0) if event.usage else 0,
+                    "cache_write_tokens": event.usage.get("cache_write_tokens", 0) if event.usage else 0,
                 }
                 # Internal-only carrier (dropped by the Anthropic translation): route-reported
                 # cost in micros, read by the SSE converter → _on_stream_complete. (provider_meta
