@@ -2,10 +2,11 @@
 
 ## Current focus
 
-Execution continues on `codex/jev-rule-pack-evaluation`, based on the foundation closeout on `main` at `203e4404`.
-Foundation [PR #270](https://github.com/hapa1i/multi-forge/pull/270) merged on 2026-10-15 with the A1 explicit
-evaluation-identity extension, session consent/inheritance and raw-override guards. The continuation implements offline
-consumer outcomes and saved-response evaluation, with explicit threshold settings and human labels kept separate. Its
+Execution continues in draft [PR #271](https://github.com/hapa1i/multi-forge/pull/271) on
+`codex/jev-rule-pack-evaluation`, based on the foundation closeout on `main` at `203e4404`. Foundation
+[PR #270](https://github.com/hapa1i/multi-forge/pull/270) merged on 2026-10-15 with the A1 explicit evaluation-identity
+extension, session consent/inheritance and raw-override guards. The continuation implements offline consumer outcomes
+and saved-response evaluation, with explicit threshold settings and human labels kept separate. Its
 [evaluation plan](evidence/evaluation-plan.md) documents the workflow, denominators and pending release decisions. The
 [wrapper evidence contract](evidence/initial-rule-review.md) now keeps broader wrappers under the user's 2026-10-15
 decision. Review corrections unify disable/revocation, separate reviewer notes from model evidence, and distinguish
