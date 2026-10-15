@@ -7,20 +7,30 @@ import hashlib
 import json
 import math
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import asdict
 from pathlib import Path, PurePosixPath
 from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from forge.core.judgments.openrouter import DEFAULT_MODEL, build_payload, encode_payload
+from forge.core.judgments import openrouter as judgment_client
+from forge.core.judgments import types as judgment_types
+from forge.core.judgments.openrouter import (
+    DEFAULT_MODEL,
+    MAX_RESPONSE_BYTES,
+    build_payload,
+    encode_payload,
+)
 from forge.core.judgments.types import (
     JudgmentError,
     JudgmentResponse,
     NoulAnswer,
+    Question,
     partial_metadata,
+    validate_answers,
 )
+from forge.policy.rule_pack import definitions, outcomes
 from forge.policy.rule_pack.definitions import (
     APPLICABILITY,
     CONTRACT_VERSION,
@@ -34,11 +44,13 @@ from forge.policy.rule_pack.outcomes import (
     Assessment,
     DecisionThresholds,
     Outcome,
+    assess_applicability,
     assess_response,
 )
 
 Text = Annotated[str, Field(min_length=1, pattern=r"\S")]
 Digest = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+MAX_OBSERVATIONS = 5000
 
 
 class Record(BaseModel):
@@ -95,16 +107,38 @@ class Case(Record):
 
 class Corpus(Record):
     schema_version: Annotated[int, Field(strict=True, ge=1, le=1)]
-    rule_id: Literal["coding_standards.compatibility-wrapper"]
-    rule_version: Literal["draft-2"]
-    evidence_contract_version: Annotated[int, Field(strict=True, ge=3, le=3)]
+    rule_id: Text
+    rule_version: Text
+    evidence_contract_version: Annotated[int, Field(ge=1)]
     cases: Annotated[list[Case], Field(min_length=1, max_length=500)]
+
+    @model_validator(mode="after")
+    def current_contract(self) -> Self:
+        self.validate_contract()
+        return self
+
+    def validate_contract(self) -> None:
+        if (self.rule_id, self.rule_version, self.evidence_contract_version) != (
+            RULE_ID,
+            RULE_VERSION,
+            CONTRACT_VERSION,
+        ):
+            raise ValueError("Corpus rule or evidence-contract version does not match the current definitions")
 
 
 class EvaluationSettings(Record):
     schema_version: Annotated[int, Field(ge=1, le=1)]
-    decision_version: Literal["draft-1"]
+    decision_version: Text
     thresholds: DecisionThresholds
+
+    @model_validator(mode="after")
+    def current_decision(self) -> Self:
+        self.validate_decision()
+        return self
+
+    def validate_decision(self) -> None:
+        if self.decision_version != DECISION_VERSION:
+            raise ValueError("Settings decision version does not match the current outcome combiner")
 
 
 class SavedPrediction(Record):
@@ -113,44 +147,59 @@ class SavedPrediction(Record):
     payload_sha256: Digest
     repetition: Annotated[int, Field(ge=1, le=100)]
     response: dict[str, Any] | None = None
-    failure: Text | None = None
+    failure: Annotated[str, Field(min_length=1, max_length=256, pattern=r"\S")] | None = None
     latency_ms: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None = None
+    status_code: Annotated[int, Field(ge=100, le=599)] | None = None
+    response_bytes: Annotated[int, Field(ge=0)] | None = None
 
     @model_validator(mode="after")
     def one_result(self) -> Self:
         if (self.response is None) == (self.failure is None):
             raise ValueError("Supply exactly one saved response or failure")
+        if self.response is not None:
+            if self.status_code is None or self.response_bytes is None:
+                raise ValueError(f"Case {self.case_id}: a saved response requires HTTP status and wire byte size")
+            try:
+                _canonical_bytes(self.response)
+            except (TypeError, ValueError, UnicodeError, RecursionError) as exc:
+                raise ValueError(
+                    f"Case {self.case_id}: response must be finite, UTF-8 JSON with bounded nesting"
+                ) from exc
         return self
 
 
 class SavedPredictions(Record):
-    schema_version: Annotated[int, Field(ge=1, le=1)]
+    schema_version: Annotated[int, Field(ge=2, le=2)]
     source_kind: Literal["fixture", "capture"]
     source_reference: Text
+    expected_model: Annotated[str, Field(min_length=1, max_length=256, pattern=r"\S")]
     corpus_sha256: Digest
     prompt_sha256: Digest
     split: Literal["calibration", "held_out"]
     repetitions: Annotated[int, Field(ge=1, le=100)]
-    predictions: Annotated[list[SavedPrediction], Field(max_length=5000)]
+    predictions: Annotated[list[SavedPrediction], Field(max_length=MAX_OBSERVATIONS)]
 
 
-def _digest(value: Any) -> str:
-    encoded = json.dumps(
+def _canonical_bytes(value: Any) -> bytes:
+    return json.dumps(
         value,
         sort_keys=True,
         ensure_ascii=False,
         allow_nan=False,
         separators=(",", ":"),
-    )
-    return hashlib.sha256(encoded.encode()).hexdigest()
+    ).encode("utf-8")
 
 
-def prompt_digest() -> str:
+def _digest(value: Any) -> str:
+    return hashlib.sha256(_canonical_bytes(value)).hexdigest()
+
+
+def prompt_digest(question_set: dict[str, Question] | None = None) -> str:
     """Track question wording independently from human semantic adjudications."""
-    return _digest({name: question.model_dump() for name, question in questions().items()})
+    return _digest({name: question.model_dump() for name, question in (question_set or questions()).items()})
 
 
-def case_digest(case: Case) -> str:
+def case_digest(case: Case, *, question_set: dict[str, Question] | None = None) -> str:
     """Bind annotations to semantic meaning and evidence, not prompts or dataset bookkeeping."""
     value = {
         "rule_id": RULE_ID,
@@ -159,7 +208,8 @@ def case_digest(case: Case) -> str:
         "rule_definition": RULE_DEFINITION,
         "applicability": APPLICABILITY,
         "semantic_criteria": {
-            name: question.model_dump(exclude={"instructions"}) for name, question in questions().items()
+            name: question.model_dump(exclude={"instructions"})
+            for name, question in (question_set or questions()).items()
         },
         "action": case.action.model_dump(),
         "scope_facts": case.scope_facts.model_dump(exclude={"basis"}),
@@ -172,10 +222,7 @@ def corpus_digest(corpus: Corpus) -> str:
     """Bind prediction artifacts to dataset membership and splits independently of human labels."""
     return _digest(
         sorted(
-            (
-                {"id": case.id, "family": case.family, "split": case.split, "case_sha256": case_digest(case)}
-                for case in corpus.cases
-            ),
+            ({"id": case.id, "family": case.family, "split": case.split} for case in corpus.cases),
             key=lambda item: item["id"],
         )
     )
@@ -183,29 +230,23 @@ def corpus_digest(corpus: Corpus) -> str:
 
 def host_decision(case: Case) -> tuple[str, str] | None:
     """Apply authoritative fixture facts before preparing any model request."""
-    facts = case.scope_facts
-    outcome = APPLICABILITY[facts.surface][facts.compatibility_decision]
-    if outcome == "invalid":
-        raise ValueError("Internal approved exceptions are not defined by coding standards section 5")
-    if outcome == "unavailable":
-        reason = "unknown_surface" if facts.surface == "unknown" else "unknown_compatibility_decision"
-        return outcome, reason
-    if outcome == "not_applicable":
-        reason = "stable_surface" if facts.surface == "public_stable" else "approved_preview_exception"
-        return outcome, reason
-    if case.action.tool_name == "Write":
-        # This fixture schema carries proposed content only, with no attributed prior-interface evidence.
-        return "unavailable", "write_without_prior_interface_evidence"
-    return None
+    assessment = assess_applicability(
+        surface=case.scope_facts.surface,
+        compatibility_decision=case.scope_facts.compatibility_decision,
+        tool_name=case.action.tool_name,
+    )
+    return (assessment.outcome, assessment.reason) if assessment else None
 
 
 def prepare(corpus: Corpus, *, include_payloads: bool = False) -> dict[str, Any]:
     """Validate shape and grouping without claiming semantic coverage or label correctness."""
+    corpus.validate_contract()
     seen: set[str] = set()
     groups: dict[str, str] = {}
     counts: Counter[str] = Counter()
     preparation_counts: Counter[str] = Counter()
     prepared = []
+    request_questions = questions()
     for case in corpus.cases:
         if case.id in seen:
             raise ValueError(f"Duplicate case id: {case.id}")
@@ -220,7 +261,7 @@ def prepare(corpus: Corpus, *, include_payloads: bool = False) -> dict[str, Any]
         if group in groups and groups[group] != case.split:
             raise ValueError(f"Source family crosses calibration/held-out splits: {group}")
         groups[group] = case.split
-        digest = case_digest(case)
+        digest = case_digest(case, question_set=request_questions)
         if case.adjudication and case.adjudication.case_sha256 != digest:
             raise ValueError(f"Stale adjudication for {case.id}")
         label_status = "adjudicated" if case.adjudication else "unadjudicated"
@@ -241,7 +282,7 @@ def prepare(corpus: Corpus, *, include_payloads: bool = False) -> dict[str, Any]
                 "action": case.action.model_dump(),
                 "scope_facts": case.scope_facts.model_dump(exclude={"basis"}),
             }
-            payload = build_payload(DEFAULT_MODEL, state, questions())
+            payload = build_payload(DEFAULT_MODEL, state, request_questions)
             encoded = encode_payload(payload)
             entry.update(
                 preparation="model_input",
@@ -265,7 +306,7 @@ def prepare(corpus: Corpus, *, include_payloads: bool = False) -> dict[str, Any]
         "rule_id": RULE_ID,
         "rule_version": RULE_VERSION,
         "evidence_contract_version": CONTRACT_VERSION,
-        "prompt_sha256": prompt_digest(),
+        "prompt_sha256": prompt_digest(request_questions),
         "mode": "offline_preparation",
         "max_physical_requests": 0,
         "quality_accepted": False,
@@ -279,14 +320,16 @@ def prepare(corpus: Corpus, *, include_payloads: bool = False) -> dict[str, Any]
 
 def evaluate(corpus: Corpus, saved: SavedPredictions, settings: EvaluationSettings) -> dict[str, Any]:
     """Score bounded saved observations; never dispatch or promote proposed labels to truth."""
+    settings.validate_decision()
     report = prepare(corpus)
-    if saved.corpus_sha256 != corpus_digest(corpus) or saved.prompt_sha256 != prompt_digest():
+    if saved.corpus_sha256 != corpus_digest(corpus) or saved.prompt_sha256 != report["prompt_sha256"]:
         raise ValueError("Saved predictions do not match the corpus membership/splits or prompt")
     prepared = {item["id"]: item for item in report["cases"]}
     cases = {case.id: case for case in corpus.cases if case.split == saved.split}
-    if not cases:
-        raise ValueError("Selected split contains no cases")
+    _validate_plan(report, saved.split, saved.repetitions, corpus)
     observations: dict[tuple[str, int], dict[str, Any]] = {}
+    outcomes_by_case: dict[str, set[str]] = defaultdict(set)
+    request_questions = questions()
     for prediction in saved.predictions:
         case = cases.get(prediction.case_id)
         if case is None:
@@ -301,17 +344,29 @@ def evaluate(corpus: Corpus, saved: SavedPredictions, settings: EvaluationSettin
             raise ValueError(f"Duplicate or out-of-plan repetition: {case.id}")
         assessment = Assessment("unavailable", "jev_saved_failure")
         probabilities = {}
+        metadata = partial_metadata(prediction.response)
         if prediction.response is not None:
-            try:
-                response = JudgmentResponse.model_validate(prediction.response)
-                assessment = assess_response(response, settings.thresholds)
-                if assessment.reason != "jev_invalid_response":
+            model = prediction.response.get("model")
+            if isinstance(model, str) and model != saved.expected_model:
+                raise ValueError(f"Case {case.id}: reported model does not match declared expected_model")
+            if (prediction.response_bytes or 0) > MAX_RESPONSE_BYTES:
+                assessment = Assessment("unavailable", "jev_response_too_large")
+                # A1 stops before parsing an oversized body, so its metadata is not accepted either.
+                metadata = {}
+            elif prediction.status_code != 200:
+                assessment = Assessment("unavailable", "jev_transport_failure")
+            else:
+                try:
+                    response = JudgmentResponse.model_validate(prediction.response)
+                    validate_answers(response, request_questions)
+                    assessment = assess_response(response, settings.thresholds)
                     probabilities = {
                         name: answer.noul for name, answer in response.answers.items() if isinstance(answer, NoulAnswer)
                     }
-            except ValueError:
-                assessment = Assessment("unavailable", "jev_invalid_response")
-        usage = partial_metadata(prediction.response).get("usage")
+                except ValueError:
+                    assessment = Assessment("unavailable", "jev_invalid_response")
+        usage = metadata.get("usage")
+        outcomes_by_case[case.id].add(assessment.outcome)
         observations[key] = {
             **asdict(assessment),
             "diagnostic": assessment.diagnostic,
@@ -319,17 +374,37 @@ def evaluate(corpus: Corpus, saved: SavedPredictions, settings: EvaluationSettin
             "probabilities": probabilities,
             "latency_ms": prediction.latency_ms,
             "cost": usage.cost if usage else None,
-            "model": partial_metadata(prediction.response).get("model"),
+            "model": metadata.get("model"),
+            "failure": prediction.failure,
+            "status_code": prediction.status_code,
+            "response_bytes": prediction.response_bytes,
         }
 
     cohorts = {}
     assessed_cases = []
+    all_host_cases = []
     for kind in ("constructed", "historical"):
         selected = [case for case in cases.values() if case.provenance.kind == kind]
         if not selected:
             continue
         model_cases = [case for case in selected if prepared[case.id]["preparation"] == "model_input"]
-        host_cases = [prepared[case.id] for case in selected if prepared[case.id]["preparation"] == "host_decision"]
+        host_cases = []
+        for case in selected:
+            entry = prepared[case.id]
+            if entry["preparation"] == "host_decision":
+                expected = case.adjudication.outcome if case.adjudication else None
+                host_cases.append(
+                    {
+                        "id": case.id,
+                        "case_sha256": entry["case_sha256"],
+                        "outcome": entry["host_outcome"],
+                        "reason": entry["host_reason"],
+                        "diagnostic": Assessment(entry["host_outcome"], entry["host_reason"]).diagnostic,
+                        "expected_outcome": expected,
+                        "matches_adjudication": entry["host_outcome"] == expected if expected is not None else None,
+                    }
+                )
+        all_host_cases.extend(host_cases)
         repetitions = {}
         for repetition in range(1, saved.repetitions + 1):
             rows = []
@@ -339,12 +414,15 @@ def evaluate(corpus: Corpus, saved: SavedPredictions, settings: EvaluationSettin
                     {
                         "outcome": "unavailable",
                         "reason": "jev_missing_saved_response",
-                        "diagnostic": "No saved response is available for this planned observation.",
+                        "diagnostic": Assessment("unavailable", "jev_missing_saved_response").diagnostic,
                         "observed": False,
                         "probabilities": {},
                         "latency_ms": None,
                         "cost": None,
                         "model": None,
+                        "failure": None,
+                        "status_code": None,
+                        "response_bytes": None,
                     },
                 )
                 rows.append((case, result))
@@ -357,25 +435,37 @@ def evaluate(corpus: Corpus, saved: SavedPredictions, settings: EvaluationSettin
                         **result,
                     }
                 )
-            repetitions[str(repetition)] = _summarize(rows)
+            repetitions[str(repetition)] = _summarize(rows, host_cases)
+        model_groups = {_source_group(case) for case in model_cases}
+        host_groups = {_source_group(case) for case in selected if prepared[case.id]["preparation"] == "host_decision"}
         cohorts[f"{kind}/{saved.split}"] = {
             "cases": len(selected),
             "model_cases": len(model_cases),
-            "source_groups": len(
-                {case.provenance.origin if kind == "historical" else case.family for case in selected}
-            ),
-            "host_decisions": dict(Counter(item["host_outcome"] for item in host_cases)),
+            "source_groups": len(model_groups),
+            "host_only_source_groups": len(host_groups - model_groups),
+            "host_decisions": dict(Counter(item["outcome"] for item in host_cases)),
+            "host_adjudication": {
+                "unadjudicated": sum(item["expected_outcome"] is None for item in host_cases),
+                "confusion": dict(
+                    Counter(
+                        f"{item['expected_outcome']}/{item['outcome']}"
+                        for item in host_cases
+                        if item["expected_outcome"] is not None
+                    )
+                ),
+                "labeled_positives": sum(item["expected_outcome"] == "warning" for item in host_cases),
+                "disagreements": sum(item["matches_adjudication"] is False for item in host_cases),
+            },
             "repetitions": repetitions,
         }
-    varied = [
-        case.id
-        for case in cases.values()
-        if len({row["outcome"] for (case_id, _), row in observations.items() if case_id == case.id}) > 1
-    ]
+    sources = _evaluator_sources()
     return {
         "mode": "offline_evaluation",
         "source_kind": saved.source_kind,
         "source_reference": saved.source_reference,
+        "expected_model": saved.expected_model,
+        "evaluator_sources": sources,
+        "evaluator_sha256": _digest(sources),
         "max_physical_requests": 0,
         "rule_id": RULE_ID,
         "rule_version": RULE_VERSION,
@@ -398,6 +488,11 @@ def evaluate(corpus: Corpus, saved: SavedPredictions, settings: EvaluationSettin
         ]
         + (["fixture_predictions_are_not_quality_evidence"] if saved.source_kind == "fixture" else [])
         + (["human_adjudication_incomplete"] if any(case.adjudication is None for case in cases.values()) else [])
+        + (
+            ["host_adjudication_conflicts"]
+            if any(row["matches_adjudication"] is False for row in all_host_cases)
+            else []
+        )
         + (["missing_saved_responses"] if any(not row["observed"] for row in assessed_cases) else [])
         + (["no_model_candidates"] if not assessed_cases else [])
         + (
@@ -406,9 +501,36 @@ def evaluate(corpus: Corpus, saved: SavedPredictions, settings: EvaluationSettin
             else []
         ),
         "cohorts": cohorts,
-        "observed_outcome_variation": sorted(varied),
+        "observed_outcome_variation": sorted(
+            case_id for case_id, values in outcomes_by_case.items() if len(values) > 1
+        ),
+        "host_cases": all_host_cases,
         "cases": assessed_cases,
     }
+
+
+def _validate_plan(prepared: dict[str, Any], split: str, repetitions: int, corpus: Corpus) -> None:
+    selected_ids = {case.id for case in corpus.cases if case.split == split}
+    candidates = sum(
+        entry["id"] in selected_ids and entry["preparation"] == "model_input" for entry in prepared["cases"]
+    )
+    if not candidates:
+        raise ValueError("Selected split contains no model-input cases")
+    if candidates * repetitions > MAX_OBSERVATIONS:
+        raise ValueError(f"Planned model cases times repetitions exceeds the {MAX_OBSERVATIONS}-observation limit")
+
+
+def _source_group(case: Case) -> str:
+    return case.provenance.origin if case.provenance.kind == "historical" else case.family
+
+
+def _evaluator_sources() -> dict[str, str]:
+    paths = {"rule-pack-eval.py": Path(__file__)}
+    for module in (definitions, outcomes, judgment_types, judgment_client):
+        if module.__file__ is None:
+            raise ValueError(f"Cannot identify evaluator source for {module.__name__}")
+        paths[module.__name__] = Path(module.__file__)
+    return {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in paths.items()}
 
 
 def _rate(numerator: int, denominator: int) -> dict[str, Any]:
@@ -424,11 +546,14 @@ def _rate(numerator: int, denominator: int) -> dict[str, Any]:
         "numerator": numerator,
         "denominator": denominator,
         "value": value,
-        "wilson_95": [max(0.0, center - spread), min(1.0, center + spread)],
+        "wilson_95": [
+            0.0 if numerator == 0 else max(0.0, center - spread),
+            1.0 if numerator == denominator else min(1.0, center + spread),
+        ],
     }
 
 
-def _summarize(rows: list[tuple[Case, dict[str, Any]]]) -> dict[str, Any]:
+def _summarize(rows: list[tuple[Case, dict[str, Any]]], host_cases: list[dict[str, Any]]) -> dict[str, Any]:
     outcomes = Counter(row["outcome"] for _, row in rows)
     confusion: Counter[str] = Counter()
     counts: Counter[str] = Counter()
@@ -473,13 +598,24 @@ def _summarize(rows: list[tuple[Case, dict[str, Any]]]) -> dict[str, Any]:
     latencies = sorted(row["latency_ms"] for _, row in rows if row["observed"] and row["latency_ms"] is not None)
     costs = [row["cost"] for _, row in rows if row["observed"] and row["cost"] is not None]
     observed = sum(row["observed"] for _, row in rows)
+    try:
+        subtotal = math.fsum(costs)
+    except OverflowError as exc:
+        raise ValueError("Reported costs exceed the supported numeric range") from exc
     negatives = counts["no_warning"] - counts["no_warning_abstentions"]
     positives = counts["warning"] - counts["warning_abstentions"]
+    host_positives = sum(row["expected_outcome"] == "warning" for row in host_cases)
     return {
         "expected": len(rows),
         "observed": observed,
         "missing": len(rows) - observed,
         "outcomes": dict(sorted(outcomes.items())),
+        "unavailable_reasons": dict(
+            sorted(Counter(row["reason"] for _, row in rows if row["outcome"] == "unavailable").items())
+        ),
+        "saved_failures": dict(
+            sorted(Counter(row["failure"] for _, row in rows if row["failure"] is not None).items())
+        ),
         "confusion": dict(sorted(confusion.items())),
         "unadjudicated": counts["unadjudicated"],
         "labeled_positives": counts["warning"],
@@ -491,18 +627,21 @@ def _summarize(rows: list[tuple[Case, dict[str, Any]]]) -> dict[str, Any]:
         "assessed_false_positive_rate": _rate(confusion["no_warning/warning"], negatives),
         "assessed_miss_rate": _rate(confusion["warning/no_warning"], positives),
         "effective_miss_rate": _rate(counts["warning"] - confusion["warning/warning"], counts["warning"]),
+        "pipeline_effective_miss_rate": _rate(
+            counts["warning"] - confusion["warning/warning"] + host_positives, counts["warning"] + host_positives
+        ),
         "questions": questions_report,
         "latency_ms": {
             "known": len(latencies),
-            "unknown": observed - len(latencies),
+            "unknown": len(rows) - len(latencies),
             "p50": latencies[math.ceil(len(latencies) * 0.5) - 1] if latencies else None,
             "p95": latencies[math.ceil(len(latencies) * 0.95) - 1] if latencies else None,
         },
         "reported_cost_usd": {
             "known": len(costs),
             "unknown": len(rows) - len(costs),
-            "known_subtotal": math.fsum(costs),
-            "total": math.fsum(costs) if rows and len(costs) == len(rows) else None,
+            "known_subtotal": subtotal,
+            "total": subtotal if rows and len(costs) == len(rows) else None,
         },
     }
 
@@ -563,7 +702,12 @@ def _read_json(path: Path, max_bytes: int) -> Any:
         raw = stream.read(max_bytes + 1)
     if len(raw) > max_bytes:
         raise ValueError(f"{path.name} exceeds its {max_bytes}-byte offline input limit")
-    return json.loads(raw, object_pairs_hook=_unique_object)
+    try:
+        return json.loads(raw, object_pairs_hook=_unique_object)
+    except RecursionError as exc:
+        raise ValueError(f"{path.name}: excessive JSON nesting") from exc
+    except (ValueError, UnicodeError) as exc:
+        raise ValueError(f"{path.name}: {exc}") from exc
 
 
 def main() -> int:
@@ -584,6 +728,8 @@ def main() -> int:
     parser.add_argument(
         "--split", choices=("calibration", "held_out"), help="Split for a prediction template (default: calibration)"
     )
+    parser.add_argument("--expected-model", help="Required resolved model identity for a prediction template")
+    parser.add_argument("--repetitions", type=int, help="Planned repetitions for a prediction template (default: 1)")
     args = parser.parse_args()
     if bool(args.predictions) != bool(args.settings):
         parser.error("--predictions and --settings are required together")
@@ -591,6 +737,10 @@ def main() -> int:
         parser.error("--prediction-template cannot be combined with evaluation or --include-payloads")
     if args.split and not args.prediction_template:
         parser.error("--split is only valid with --prediction-template; evaluation uses the saved manifest's split")
+    if args.prediction_template and not args.expected_model:
+        parser.error("--prediction-template requires --expected-model with a resolved model identity")
+    if (args.expected_model is not None or args.repetitions is not None) and not args.prediction_template:
+        parser.error("--expected-model and --repetitions apply only to --prediction-template")
     if args.predictions and args.include_payloads:
         parser.error("--include-payloads applies only to preparation")
     try:
@@ -600,17 +750,20 @@ def main() -> int:
             settings = EvaluationSettings.model_validate(_read_json(args.settings, 10_000))
             report = evaluate(corpus, saved, settings)
         elif args.prediction_template:
-            prepare(corpus)
-            report = SavedPredictions(
-                schema_version=1,
+            prepared = prepare(corpus)
+            manifest = SavedPredictions(
+                schema_version=2,
                 source_kind="fixture",
                 source_reference="unfilled-local-fixture",
+                expected_model=args.expected_model,
                 corpus_sha256=corpus_digest(corpus),
                 prompt_sha256=prompt_digest(),
                 split=args.split or "calibration",
-                repetitions=1,
+                repetitions=args.repetitions if args.repetitions is not None else 1,
                 predictions=[],
-            ).model_dump()
+            )
+            _validate_plan(prepared, manifest.split, manifest.repetitions, corpus)
+            report = manifest.model_dump()
         else:
             report = prepare(corpus, include_payloads=args.include_payloads)
         print(
@@ -620,7 +773,7 @@ def main() -> int:
                 allow_nan=False,
             )
         )
-    except (OSError, ValueError, JudgmentError) as exc:
+    except (OSError, ValueError, JudgmentError, RecursionError, OverflowError) as exc:
         parser.error(str(exc))
     return 0
 

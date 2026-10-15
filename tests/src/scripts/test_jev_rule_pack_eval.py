@@ -328,7 +328,8 @@ def evaluation_inputs(probe, raw):
     corpus = probe.Corpus.model_validate(raw)
     prepared = probe.prepare(corpus)
     saved = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "expected_model": "fixture-model",
         "source_kind": "fixture",
         "source_reference": "synthetic unit-test responses",
         "corpus_sha256": probe.corpus_digest(corpus),
@@ -359,6 +360,9 @@ def evaluation_inputs(probe, raw):
                 },
             }
         )
+        prediction = saved["predictions"][-1]
+        prediction["status_code"] = 200
+        prediction["response_bytes"] = len(json.dumps(prediction["response"]).encode())
     settings = probe.EvaluationSettings.model_validate(
         {
             "schema_version": 1,
@@ -541,7 +545,7 @@ def test_saved_evaluation_cli_cannot_contact_models(probe, evaluation_inputs, tm
     monkeypatch.setattr(sys, "argv", ["eval", paths[0], "--predictions", paths[1], "--settings", paths[2]])
     assert probe.main() == 0
     assert json.loads(capsys.readouterr().out)["mode"] == "offline_evaluation"
-    monkeypatch.setattr(sys, "argv", ["eval", paths[0], "--prediction-template"])
+    monkeypatch.setattr(sys, "argv", ["eval", paths[0], "--prediction-template", "--expected-model", "fixture-model"])
     assert probe.main() == 0
     template = json.loads(capsys.readouterr().out)
     assert template["predictions"] == [] and template["source_kind"] == "fixture"

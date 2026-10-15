@@ -128,16 +128,27 @@ question calibration, latency and known/unknown cost. Shared definitions preserv
 outcome combiner requires explicit question bands and preserves coverage gaps and contradictions. There is no live mode
 or quality acceptance verdict. Human labels, real predictions and approved numerical gates remain outstanding.
 
-The 2026-10-15 offline continuation passed 95 focused outcome, harness and label-isolation tests. The decision tests
-cover all three-way answer combinations, cutoff endpoints, malformed contracts and empty denominators. Report tests
-cover stale/split/duplicate observations, missing-response abstentions, unknown cost, separate repetition counts and
-annotation identity. The original preparation report still reproduces byte-for-byte. These are implementation fixtures,
-not calibration results. See [rule-pack design](../../../design_rule_packs.md) for implemented ownership.
+The 2026-10-15 review follow-up passed 148 focused outcome, harness, regression and label-isolation tests. Coverage
+includes distinct per-question bands, shared host diagnostics, held-out edits preserving calibration captures,
+model-snapshot mismatches, host-label conflicts and misses, malformed JSON, transport admission, missing latency,
+source-family counts and exact interval endpoints. The original preparation report still reproduces byte-for-byte. These
+are implementation fixtures, not calibration results. See [rule-pack design](../../../design_rule_packs.md) for
+implemented ownership.
 
-Aggregate validation passed: `make test-unit` (11,058 passed, 117 deselected), `make test-regression` (1,889 passed) and
+Saved-prediction schema 2 requires the expected resolved model plus original HTTP status and response byte size. Reports
+retain bounded failure text, reason counts, separate host-label comparisons and pipeline misses, and evaluator source
+hashes. Corpus identity binds membership/families/splits; observations bind the content actually scored. This replaces
+schema 1's draft fixture format; this card records no paid A2 captures. Rule and decision versions validate against
+their shared owners. Human adjudication and quality acceptance remain open.
+
+Aggregate validation passed: `make test-unit` (11,076 passed, 117 deselected), `make test-regression` (1,924 passed) and
 `make pre-commit`. The CLI fixture smoke kept three host decisions separate from nine model candidates, marked eight
 absent responses unavailable and reported no accuracy result for the unadjudicated corpus. The exact-file token cache
-regression also passed; existing provider-cached documents are unchanged. No paid A2 request or native trial ran.
+regression also passed. The user approved the updated design overview's token count on 2026-10-15; its refreshed cache
+records 20,757 provider tokens. No paid A2 request or native trial ran.
+
+The first full unit run failed the existing `test_deadline_reports_timeout` assertion once. Its six-test watchdog module
+and the full unit rerun passed without source or test changes.
 
 **Decision gate:** the broader family is selected. Implement and verify the revised evidence contract, including the
 host-owned origin of surface/exception facts, before hook wiring; do not populate those facts from action comments or

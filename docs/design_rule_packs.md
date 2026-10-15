@@ -6,16 +6,17 @@ Normative ownership for the implemented rule-pack foundations. Policy engine com
 ## Evaluation foundations
 
 `policy/rule_pack/definitions.py` owns the provisional compatibility-wrapper rule, applicability table and three atomic
-Noul questions. `outcomes.py` requires explicit per-question threshold bands and composes covered answers into warning,
-no-warning, uncertain or unavailable assessments with fixed diagnostics. Contradictory answers remain uncertain; missing
-coverage cannot establish compliance. These modules do not register or activate a bundle and do not dispatch requests.
+Noul questions. `outcomes.py` applies that host applicability table and owns fixed diagnostics for every host and model
+outcome. It requires explicit per-question threshold bands and composes covered answers into warning, no-warning,
+uncertain or unavailable assessments with fixed diagnostics. Contradictory answers remain uncertain; missing coverage
+cannot establish compliance. These modules do not register or activate a bundle and do not dispatch requests.
 
 The development harness `scripts/experiments/jev/rule-pack-eval.py` prepares bounded inputs or evaluates saved responses
 offline. Corpus/split, semantic evidence, prompt, prediction, settings and adjudication identities remain distinct.
-Reports separate host decisions, source cohorts and repetitions, preserve abstentions and unknown costs, and use only
-human adjudications for error/calibration metrics. Fixture reports cannot establish rule quality; no release verdict is
-implemented. The [A2 evaluation plan](board/doing/jev_rule_pack/evidence/evaluation-plan.md) owns the pending
-calibration, data and acceptance decisions. Session consent is described in [session design](design_sessions.md).
+Reports compare host decisions with human labels, separate source cohorts and repetitions, preserve abstentions and
+unknown costs, and use only human adjudications for error/calibration metrics. Fixture reports cannot establish rule
+quality; no release verdict is implemented. Calibration, data and acceptance decisions remain pending in the A2 card;
+they are not runtime contracts. Session consent is described in [session design](design_sessions.md).
 
 ## Consent and runtime boundary
 
@@ -32,6 +33,10 @@ Threshold settings are explicit calibration inputs; accepting a settings file do
 Semantic annotations bind rule/contract versions, question criteria, action bytes, enumerated scope facts and source
 provenance. Reviewer notes and proposed labels stay outside model evidence. Separate hashes track prompt wording, corpus
 membership/families/splits, saved observations, decision settings and human adjudications.
+
+Corpus identity excludes case content; scored observations bind their own evidence and payload hashes. Saved manifests
+declare one expected resolved model and preserve response status/size, preventing cross-snapshot pooling and admission
+of responses A1 would reject. Reports also identify the evaluator and shared rule/client source bytes.
 
 A report retains the selected source cohort and split, planned versus observed responses, per-repetition confusion
 counts and abstentions, question calibration, known latency and reported cost. Host decisions never count as model

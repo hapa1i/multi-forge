@@ -30,6 +30,8 @@ Load Forge context in two passes so domain partitioning reduces aggregate contex
   plus @docs/board/impl_notes/core_installation.md
 - **Workflows or memory**: @docs/design_workflows.md and/or @docs/design_memory.md; add the implementation-note ledger
   named by @docs/board/impl_notes.md only when it contains relevant precedent
+- **Rule packs or judgment evaluation**: @docs/design_rule_packs.md; add @docs/design_workflows.md for policy-engine
+  composition
 - **CLI surfaces**: @docs/cli_reference.md
 - **Documentation or context-limit work**: @.file-size-limits.json and @docs/developer/documentation_guidelines.md
 
