@@ -38,7 +38,9 @@ def claude_code_tool_loop(model: str, *, completed_tool_turns: int) -> MessagesR
         messages.append(
             {
                 "role": "assistant",
-                "content": [{"type": "tool_use", "id": tool_id, "name": "Read", "input": {"file_path": f"n{turn}.txt"}}],
+                "content": [
+                    {"type": "tool_use", "id": tool_id, "name": "Read", "input": {"file_path": f"n{turn}.txt"}}
+                ],
             }
         )
         messages.append(
@@ -71,5 +73,7 @@ def message_markers(openai_request: dict[str, Any]) -> list[dict[str, Any]]:
     for message in openai_request["messages"]:
         content = message.get("content")
         if isinstance(content, list):
-            markers.extend(part["cache_control"] for part in content if isinstance(part, dict) and "cache_control" in part)
+            markers.extend(
+                part["cache_control"] for part in content if isinstance(part, dict) and "cache_control" in part
+            )
     return markers
