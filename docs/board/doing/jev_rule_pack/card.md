@@ -17,6 +17,7 @@ Status: **doing**. The foundations shipped through [PR #270](https://github.com/
 wrappers. It has 17 constructed hook-shaped examples and an offline preparation harness, with human labels and quality
 gates still open. No paid A2 evaluation has run and the bundle is not yet registered for activation. The
 [foundation handoff](checklist.md#foundation-merge-and-continuation) records shipped scope without closing A2.
+Implemented ownership is described in [rule-pack design](../../../design_rule_packs.md).
 
 ## Problem and outcome
 

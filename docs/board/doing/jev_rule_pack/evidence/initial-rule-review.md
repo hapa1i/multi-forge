@@ -98,7 +98,8 @@ hash. If the whole eligible action exceeds the single-request budget, send nothi
 
 ## Draft atomic questions
 
-The offline preparation harness authors three Noul questions with explicit true/false criteria:
+[`policy.rule_pack.definitions`](../../../../../src/forge/policy/rule_pack/definitions.py) owns three Noul questions
+with explicit true/false criteria, shared by offline preparation and evaluation:
 
 1. **Coverage:** Do complete relevant before/after definitions and attributed scope facts establish whether an earlier
    interface is retained? A retained wrapper also requires its complete definition, replacement contract and enough

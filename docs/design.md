@@ -11,6 +11,7 @@
 - **Telemetry design**: [design_telemetry.md](design_telemetry.md) (status, spend, audit, usage, provider lifecycle)
 - **Installation design**: [design_installation.md](design_installation.md) (configuration, credentials, extensions)
 - **Workflow design**: [design_workflows.md](design_workflows.md) (policy, skills, and workflow runners)
+- **Rule-pack design**: [design_rule_packs.md](design_rule_packs.md) (rule definitions, offline evaluation, and consent)
 - **Memory design**: [design_memory.md](design_memory.md) (designated memory, passports, writers, activation)
 - **Architecture history**: [design_history.md](design_history.md) (retired contracts and removal rationale)
 - **CLI reference**: [cli_reference.md](cli_reference.md) (terminal and direct-command inventory)

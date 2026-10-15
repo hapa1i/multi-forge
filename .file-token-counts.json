@@ -57,10 +57,10 @@
       "tokens": 21164
     },
     "docs/design.md": {
-      "sha256": "f0bd625c4385ab454fcd41b57c0ce6684e57b5f1a3d916df5d17d41a630b4e41",
+      "sha256": "5d0c00b11fc625db715b818cdbddae98a65f8f204253bda668c9c743f9bdb99d",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 20706
+      "tokens": 20757
     },
     "docs/design_installation.md": {
       "sha256": "80011d7bd8427fee739251aa3676b8c1dfeda5abdeec48105c78cb650f68d1b6",

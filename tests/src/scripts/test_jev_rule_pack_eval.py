@@ -40,6 +40,16 @@ def test_constructed_proposals_are_never_promoted_to_labels_or_quality(probe, ra
     assert sum(report["preparation_counts"].values()) == len(raw["cases"])
 
 
+def test_annotation_changes_have_report_identity_without_changing_capture_identity(probe, evaluation_inputs):
+    corpus, _, _ = evaluation_inputs
+    before = score(probe, evaluation_inputs)
+    corpus.cases[0].adjudication = None
+    after = score(probe, evaluation_inputs)
+    assert before["corpus_sha256"] == after["corpus_sha256"]
+    assert before["predictions_sha256"] == after["predictions_sha256"]
+    assert before["adjudications_sha256"] != after["adjudications_sha256"]
+
+
 def test_payloads_preserve_broad_actions_and_exclude_review_labels(probe, raw):
     raw["cases"][0]["proposal"]["reason"] = "PRIVATE_PROPOSED_LABEL_DO_NOT_SEND"
     raw["cases"][0]["scope_facts"]["basis"] = "PRIVATE_REVIEWER_REASON_DO_NOT_SEND"
@@ -291,3 +301,252 @@ def test_duplicate_json_cannot_hide_a_second_label_or_scope_value(probe, tmp_pat
         probe.main()
     assert exc.value.code == 2
     assert "Duplicate JSON key" in capsys.readouterr().err
+
+
+@pytest.fixture
+def evaluation_inputs(probe, raw):
+    raw = copy.deepcopy(raw)
+    raw["cases"] = [
+        case
+        for case in raw["cases"]
+        if case["id"]
+        in {
+            "module-forwarding",
+            "module-direct-update",
+            "method-argument-adapter",
+        }
+    ]
+    for case in raw["cases"]:
+        warning = case["id"] != "module-direct-update"
+        case["adjudication"] = {
+            "outcome": "warning" if warning else "no_warning",
+            "reviewer": "unit-test fixture",
+            "review_reference": "synthetic test labels only",
+            "case_sha256": probe.case_digest(probe.Case.model_validate(case)),
+            "question_answers": {"coverage": True, "compatibility_retention": warning, "independent_boundary": False},
+        }
+    corpus = probe.Corpus.model_validate(raw)
+    prepared = probe.prepare(corpus)
+    saved = {
+        "schema_version": 2,
+        "expected_model": "fixture-model",
+        "source_kind": "fixture",
+        "source_reference": "synthetic unit-test responses",
+        "corpus_sha256": probe.corpus_digest(corpus),
+        "prompt_sha256": probe.prompt_digest(),
+        "split": "calibration",
+        "repetitions": 1,
+        "predictions": [],
+    }
+    for case, entry in zip(corpus.cases, prepared["cases"], strict=True):
+        saved["predictions"].append(
+            {
+                "case_id": case.id,
+                "case_sha256": entry["case_sha256"],
+                "payload_sha256": entry["payload_sha256"],
+                "repetition": 1,
+                "latency_ms": 10.0,
+                "response": {
+                    "model": "fixture-model",
+                    "usage": {"input_tokens": 1, "output_tokens": 0, "cost": 0.000001},
+                    "answers": {
+                        "coverage": {"type": "noul", "noul": 0.9},
+                        "compatibility_retention": {
+                            "type": "noul",
+                            "noul": 0.1 if case.id == "module-direct-update" else 0.9,
+                        },
+                        "independent_boundary": {"type": "noul", "noul": 0.1},
+                    },
+                },
+            }
+        )
+        prediction = saved["predictions"][-1]
+        prediction["status_code"] = 200
+        prediction["response_bytes"] = len(json.dumps(prediction["response"]).encode())
+    settings = probe.EvaluationSettings.model_validate(
+        {
+            "schema_version": 1,
+            "decision_version": "draft-1",
+            "thresholds": {name: {"false_max": 0.1, "true_min": 0.9} for name in probe.questions()},
+        }
+    )
+    return corpus, saved, settings
+
+
+def score(probe, inputs):
+    corpus, saved, settings = inputs
+    return probe.evaluate(corpus, probe.SavedPredictions.model_validate(saved), settings)
+
+
+def first_repetition(report):
+    return report["cohorts"]["constructed/calibration"]["repetitions"]["1"]
+
+
+def test_saved_fixture_metrics_do_not_establish_quality(probe, evaluation_inputs):
+    report = score(probe, evaluation_inputs)
+    result = first_repetition(report)
+    assert result["confusion"] == {"no_warning/no_warning": 1, "warning/warning": 2}
+    assert result["assessed_coverage"]["value"] == 1
+    assert result["assessed_false_positive_rate"]["denominator"] == 1
+    assert result["assessed_miss_rate"]["denominator"] == 2
+    assert result["effective_miss_rate"]["value"] == 0
+    for metric in result["questions"].values():
+        assert metric["count"] == 3
+        assert metric["brier_score"] == pytest.approx(0.01)
+    assert report["quality_accepted"] is False
+    assert "fixture_predictions_are_not_quality_evidence" in report["blockers"]
+    assert report["max_physical_requests"] == 0
+
+
+def test_proposals_are_excluded_from_confusion_and_calibration(probe, evaluation_inputs):
+    corpus, _, _ = evaluation_inputs
+    for case in corpus.cases:
+        case.adjudication = None
+    report = score(probe, evaluation_inputs)
+    result = first_repetition(report)
+    assert result["unadjudicated"] == 3
+    assert result["confusion"] == {}
+    assert result["assessed_false_positive_rate"]["value"] is None
+    assert result["assessed_miss_rate"]["wilson_95"] is None
+    assert all(metric["count"] == 0 and metric["brier_score"] is None for metric in result["questions"].values())
+    assert "human_adjudication_incomplete" in report["blockers"]
+
+
+def test_missing_and_invalid_responses_count_as_abstentions_and_unknown_cost(probe, evaluation_inputs):
+    _, saved, _ = evaluation_inputs
+    # Keep independently valid accounting from a malformed answer; omit the other positive entirely.
+    del saved["predictions"][0]["response"]["answers"]["coverage"]
+    saved["predictions"].pop()
+    report = score(probe, evaluation_inputs)
+    result = first_repetition(report)
+    assert result["expected"] == 3 and result["observed"] == 2 and result["missing"] == 1
+    assert result["positive_abstentions"] == 2
+    assert result["assessed_miss_rate"]["value"] is None
+    assert result["effective_miss_rate"]["value"] == 1
+    assert result["reported_cost_usd"] == {
+        "known": 2,
+        "unknown": 1,
+        "known_subtotal": 0.000002,
+        "total": None,
+    }
+    assert {case["reason"] for case in report["cases"]} >= {"jev_invalid_response", "jev_missing_saved_response"}
+
+
+def test_saved_failure_never_becomes_a_negative_prediction(probe, evaluation_inputs):
+    _, saved, _ = evaluation_inputs
+    row = saved["predictions"][1]
+    row.pop("response")
+    row["failure"] = "timeout"
+    result = first_repetition(score(probe, evaluation_inputs))
+    assert result["negative_abstentions"] == 1
+    assert result["assessed_false_positive_rate"]["value"] is None
+    assert result["confusion"]["no_warning/unavailable"] == 1
+
+
+def test_unknown_reported_cost_is_not_zero(probe, evaluation_inputs):
+    _, saved, _ = evaluation_inputs
+    del saved["predictions"][0]["response"]["usage"]["cost"]
+    result = first_repetition(score(probe, evaluation_inputs))
+    assert result["reported_cost_usd"]["unknown"] == 1
+    assert result["reported_cost_usd"]["known_subtotal"] == 0.000002
+    assert result["reported_cost_usd"]["total"] is None
+
+
+@pytest.mark.parametrize("field", ["case_sha256", "payload_sha256"])
+def test_stale_prediction_binding_is_rejected(probe, evaluation_inputs, field):
+    _, saved, _ = evaluation_inputs
+    saved["predictions"][0][field] = "a" * 64
+    with pytest.raises(ValueError, match="Stale prediction"):
+        score(probe, evaluation_inputs)
+
+
+@pytest.mark.parametrize("field", ["corpus_sha256", "prompt_sha256"])
+def test_stale_capture_scope_is_rejected(probe, evaluation_inputs, field):
+    _, saved, _ = evaluation_inputs
+    saved[field] = "a" * 64
+    with pytest.raises(ValueError, match="membership/splits or prompt"):
+        score(probe, evaluation_inputs)
+
+
+@pytest.mark.parametrize("mutation", ["duplicate", "repetition", "unknown_case"])
+def test_unplanned_predictions_are_rejected(probe, evaluation_inputs, mutation):
+    _, saved, _ = evaluation_inputs
+    if mutation == "duplicate":
+        saved["predictions"].append(copy.deepcopy(saved["predictions"][0]))
+    elif mutation == "repetition":
+        saved["predictions"][0]["repetition"] = 2
+    else:
+        saved["predictions"][0]["case_id"] = "not-in-this-split"
+    with pytest.raises(ValueError, match="Duplicate or out-of-plan|outside selected split"):
+        score(probe, evaluation_inputs)
+
+
+def test_repetitions_do_not_inflate_sample_counts_and_variation_is_visible(probe, evaluation_inputs):
+    _, saved, _ = evaluation_inputs
+    saved["repetitions"] = 2
+    repeated = copy.deepcopy(saved["predictions"])
+    for row in repeated:
+        row["repetition"] = 2
+    repeated[0]["response"]["answers"]["compatibility_retention"]["noul"] = 0.1
+    saved["predictions"].extend(repeated)
+    report = score(probe, evaluation_inputs)
+    cohort = report["cohorts"]["constructed/calibration"]
+    assert cohort["cases"] == 3 and cohort["source_groups"] == 2
+    assert all(rep["expected"] == 3 for rep in cohort["repetitions"].values())
+    assert cohort["repetitions"]["2"]["effective_miss_rate"]["value"] == 0.5
+    assert report["observed_outcome_variation"] == ["module-forwarding"]
+
+
+def test_host_outcomes_are_not_model_successes(probe, evaluation_inputs, raw):
+    corpus, saved, _ = evaluation_inputs
+    host_case = probe.Case.model_validate(next(case for case in raw["cases"] if case["id"] == "stable-alias"))
+    corpus.cases.append(host_case)
+    saved["corpus_sha256"] = probe.corpus_digest(corpus)
+    report = score(probe, evaluation_inputs)
+    cohort = report["cohorts"]["constructed/calibration"]
+    assert cohort["cases"] == 4 and cohort["model_cases"] == 3
+    assert cohort["host_decisions"] == {"not_applicable": 1}
+    assert first_repetition(report)["expected"] == 3
+    row = copy.deepcopy(saved["predictions"][0])
+    row["case_id"] = host_case.id
+    saved["predictions"].append(row)
+    with pytest.raises(ValueError, match="Host-decided"):
+        score(probe, evaluation_inputs)
+
+
+def test_relabeling_split_invalidates_capture_without_invalidating_semantic_label(probe, evaluation_inputs):
+    corpus, _, _ = evaluation_inputs
+    case = corpus.cases[-1]
+    case.split = "held_out"
+    assert case.adjudication.case_sha256 == probe.case_digest(case)
+    with pytest.raises(ValueError, match="membership/splits"):
+        score(probe, evaluation_inputs)
+
+
+def test_binomial_interval_and_empty_denominator(probe):
+    rate = probe._rate(0, 10)
+    assert rate["wilson_95"] == pytest.approx([0, 0.27753279986])
+    assert probe._rate(0, 0) == {"numerator": 0, "denominator": 0, "value": None, "wilson_95": None}
+
+
+def test_saved_evaluation_cli_cannot_contact_models(probe, evaluation_inputs, tmp_path, monkeypatch, capsys):
+    corpus, saved, settings = evaluation_inputs
+    paths = []
+    for name, body in (("corpus", corpus.model_dump()), ("predictions", saved), ("settings", settings.model_dump())):
+        path = tmp_path / f"{name}.json"
+        path.write_text(json.dumps(body))
+        paths.append(str(path))
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("Offline evaluation must not resolve auth or construct a client")
+
+    monkeypatch.setattr("forge.core.llm.credentials.CredentialManager.default", unexpected)
+    monkeypatch.setattr("forge.core.judgments.OpenRouterJudgmentClient.__init__", unexpected)
+    monkeypatch.setattr(sys, "argv", ["eval", paths[0], "--predictions", paths[1], "--settings", paths[2]])
+    assert probe.main() == 0
+    assert json.loads(capsys.readouterr().out)["mode"] == "offline_evaluation"
+    monkeypatch.setattr(sys, "argv", ["eval", paths[0], "--prediction-template", "--expected-model", "fixture-model"])
+    assert probe.main() == 0
+    template = json.loads(capsys.readouterr().out)
+    assert template["predictions"] == [] and template["source_kind"] == "fixture"
+    assert template["corpus_sha256"] == probe.corpus_digest(corpus)
