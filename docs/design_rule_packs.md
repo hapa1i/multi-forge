@@ -18,6 +18,13 @@ unknown costs, and use only human adjudications for error/calibration metrics. F
 quality; no release verdict is implemented. Calibration, data and acceptance decisions remain pending in the A2 card;
 they are not runtime contracts. Session consent is described in [session design](design_sessions.md).
 
+The same harness exports human-review packets containing rule criteria and exact case evidence while withholding
+proposals, reviewer-only notes and existing labels. Import verifies contract, membership and content identity before
+emitting a new corpus. Pending rows preserve prior adjudications; replacements are explicit. Disputed/excluded rows
+block import instead of silently removing cases. The retained packet owns review notes, referenced by each imported
+adjudication. Named reviewers are provenance supplied by the operator, not authenticated identities. This workflow
+cannot establish that a human performed the review or turn fixture proposals into quality evidence.
+
 ## Consent and runtime boundary
 
 `policy/rule_pack/consent.py` binds the paid repository-data acknowledgment to the session instance and pack settings.

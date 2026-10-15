@@ -17,6 +17,12 @@ The shared `policy.rule_pack.definitions` module owns the unchanged draft-2 ques
 they do not register a bundle, enable a session or dispatch a request. Runtime surface/exception authority remains a
 separate gate.
 
+The [feasibility checkpoint](corpus-feasibility.md) counts current families and action shapes without treating proposed
+labels as truth. The [human review workflow](human-review.md) exports exact evidence with authored labels/rationales
+withheld, validates partial adjudications and retains disagreements/exclusions in the review ledger. The
+[runtime evidence proposal](runtime-evidence-contract.md) remains separate from fixture governance and does not activate
+the bundle.
+
 ## Decision contract
 
 Each question requires an explicit false-maximum and true-minimum. The false cutoff must be below 0.5 and the true

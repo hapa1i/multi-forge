@@ -20,6 +20,11 @@ gates still open. No paid A2 evaluation has run and the bundle is not yet regist
 [merge handoff](checklist.md#offline-evaluation-merge-and-next-gate) records shipped scope and the next gate without
 closing A2. Implemented ownership is described in [rule-pack design](../../../design_rule_packs.md).
 
+Continuation: `codex/jev-rule-pack-evidence` prepares [human review](evidence/human-review.md), records
+[corpus feasibility](evidence/corpus-feasibility.md) and proposes the
+[runtime evidence contract](evidence/runtime-evidence-contract.md). It does not enable the policy or supply human
+labels.
+
 ## Problem and outcome
 
 Literal coding-standards checks miss semantic patterns, such as a compatibility shim without a matching marker comment.

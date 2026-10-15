@@ -68,9 +68,11 @@ evidence is not a clean result.
 Surface and exception facts must come from the host-owned activation/evidence owner, with source and content identity. A
 comment such as “approved compatibility shim” in the action cannot manufacture that authority. The synthetic corpus
 supplies invented governance facts explicitly for its examples; those facts are not production declarations or human
-labels. Its `scope_facts.basis` is reviewer-only prose and is excluded from model evidence and annotation identity. Only
-the enumerated surface and exception decision enter model state; required boundary contracts must be present in the
-supplied action evidence. Runtime resolution of real facts remains an implementation gate.
+labels. The [runtime evidence proposal](runtime-evidence-contract.md) describes a possible owner-selected declaration
+and complete-action boundary; its loader and runtime admission are not implemented. The corpus's `scope_facts.basis` is
+reviewer-only prose and is excluded from model evidence and annotation identity. Only the enumerated surface and
+exception decision enter model state; required boundary contracts must be present in the supplied action evidence.
+Runtime resolution of real facts remains an implementation gate.
 
 ## Hook-shaped acquisition and identity
 

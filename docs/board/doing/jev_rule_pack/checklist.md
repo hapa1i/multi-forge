@@ -5,15 +5,18 @@
 The offline outcome/evaluation slice shipped through [PR #271](https://github.com/hapa1i/multi-forge/pull/271), merged
 as `791d9872` on 2026-10-15. The [merge handoff](#offline-evaluation-merge-and-next-gate) records its verified scope. It
 builds on [PR #270](https://github.com/hapa1i/multi-forge/pull/270)'s explicit evaluation identity, session consent and
-override guards. The evaluation branch is merged; the next execution branch must start from the current `main`.
+override guards. Execution continues on `codex/jev-rule-pack-evidence` from `main` at `8a2e46d5`.
 
-Next, establish corpus feasibility and human adjudication, then review numerical quality criteria. All 17 constructed
-cases remain unadjudicated. Prepare the host-owned surface/exception fact-source contract before hook wiring; fixture
-facts are not runtime authority. The [evaluation plan](evidence/evaluation-plan.md) owns methodology and acceptance
-decisions; the [wrapper evidence contract](evidence/initial-rule-review.md) retains the user's broader wrapper scope.
-The merged slices do not complete A2 or enable Jev checks. No paid A2 evaluation has run. The [card](card.md) owns
-scope; the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed and will use a
-separate execution branch.
+The [human review worksheet](evidence/human-review.md) now exposes the 17 constructed cases with labels and rationales
+withheld, and the harness exports/imports evidence-bound review packets. All cases remain unadjudicated. The
+[feasibility checkpoint](evidence/corpus-feasibility.md) records empty historical strata and sparse proposed held-out
+positives. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) defines a candidate owner-selected
+declaration and whole-action boundary before hook wiring; it is not implemented or approved runtime authority. The
+[evaluation plan](evidence/evaluation-plan.md) owns quality decisions, and the
+[wrapper evidence contract](evidence/initial-rule-review.md) retains the user's broader wrapper scope. The merged slices
+do not complete A2 or enable Jev checks. No paid A2 evaluation has run. The [card](card.md) owns scope; the
+[epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed and will use a separate
+execution branch.
 
 Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
 never introduce a Jev denial or `needs_review`. An independently configured policy or supervisor retains its existing
@@ -149,6 +152,29 @@ records 20,757 provider tokens. No paid A2 request or native trial ran.
 
 The first full unit run failed the existing `test_deadline_reports_timeout` assertion once. Its six-test watchdog module
 and the full unit rerun passed without source or test changes.
+
+### Human review and runtime evidence continuation
+
+- [x] Prepare a review packet bound to current rule semantics, corpus membership/splits and exact case evidence.
+  Withhold proposed outcomes, reviewer rationales, reconstruction notes, prior human labels and model responses; retain
+  IDs and provenance without claiming a fully blinded independent study.
+- [x] Validate human review import into a new corpus: pending rows preserve prior labels, explicit replacements require
+  acknowledgment, and changed evidence or unresolved disputes/exclusions stop the import. Retain notes in the review
+  ledger, with the corpus referencing it; do not promote authored proposals to human truth.
+- [x] Record the current cohort/family inventory and prepare a concrete runtime evidence proposal against the existing
+  owners. The proposal remains unimplemented; it does not satisfy action preparation or activation checks below.
+- [ ] Obtain human outcomes and per-question labels, resolve disputes/exclusions, and recount independently labeled
+  positive/negative families. Record feasibility and any required additional acquisition scope before selecting
+  numerical quality gates.
+- [ ] Review the proposed uniform-file declaration and pinned-authority limits, then implement declaration/evidence
+  fixtures before hook wiring. Mixed or missing facts must remain unavailable; fixture scope is not production policy.
+
+2026-10-15 continuation verification: 235 focused rule-pack, probe, evaluation, review and integrity tests passed. The
+tracked packet matches regenerated JSON content; importing its 17 pending rows preserves the source corpus exactly as
+JSON without creating labels. The original preparation report still reproduces byte-for-byte. Independent review found
+an attribution/output-size amplification edge; bounded reviewer/reference fields and an exact emitted-size check now
+cover completed and pending imports, including Unicode expansion and empty stdout on failure. The stale-adjudication
+recovery is documented in the review guide. No runtime policy code or provider call is part of this slice.
 
 **Decision gate:** the broader family is selected. Implement and verify the revised evidence contract, including the
 host-owned origin of surface/exception facts, before hook wiring; do not populate those facts from action comments or

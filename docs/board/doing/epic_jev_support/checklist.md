@@ -14,6 +14,9 @@ gate covers human adjudication, corpus feasibility and trusted runtime facts, ow
 acceptance remain open. Its provisional corpus does not yet establish quality. A3 remains proposed. Neither decision
 quality nor quota savings has been evaluated.
 
+A2's continuation branch is `codex/jev-rule-pack-evidence` from `main` at `8a2e46d5`. Its checklist owns human-review
+material, corpus feasibility and the proposed runtime evidence contract; no additional member is activated.
+
 ## Activation and sequence
 
 - [x] Verify clean `main` at `1ae9667d`, create the A1 execution branch, and move the epic/A1 to `doing/` on 2026-10-14.

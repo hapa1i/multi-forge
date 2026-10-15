@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import math
@@ -51,6 +52,7 @@ from forge.policy.rule_pack.outcomes import (
 Text = Annotated[str, Field(min_length=1, pattern=r"\S")]
 Digest = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
 MAX_OBSERVATIONS = 5000
+MAX_CORPUS_BYTES = 1_000_000
 
 
 class Record(BaseModel):
@@ -180,6 +182,53 @@ class SavedPredictions(Record):
     predictions: Annotated[list[SavedPrediction], Field(max_length=MAX_OBSERVATIONS)]
 
 
+class HumanReview(Record):
+    status: Literal["pending", "adjudicated", "excluded", "disputed"]
+    outcome: Outcome | None
+    question_answers: QuestionAnswers | None
+    notes: Annotated[str, Field(max_length=4000)]
+    replace_existing: bool
+
+    @model_validator(mode="after")
+    def explicit_review_state(self) -> Self:
+        if self.status == "adjudicated":
+            if self.outcome is None:
+                raise ValueError("Adjudicated rows require an explicit human outcome")
+        elif (
+            self.outcome is not None
+            or (
+                self.question_answers is not None
+                and any(value is not None for value in self.question_answers.model_dump().values())
+            )
+            or self.replace_existing
+        ):
+            raise ValueError("Only adjudicated rows may set labels or replace an existing adjudication")
+        if self.status in {"excluded", "disputed"} and not self.notes.strip():
+            raise ValueError("Excluded or disputed rows require notes explaining the unresolved issue")
+        return self
+
+
+class ReviewCase(Record):
+    id: Text
+    case_sha256: Digest
+    family: Text
+    split: Literal["calibration", "held_out"]
+    provenance: Provenance
+    action: Action
+    scope_facts: dict[str, str]
+    review: HumanReview
+
+
+class ReviewPacket(Record):
+    schema_version: Annotated[int, Field(ge=1, le=1)]
+    kind: Literal["jev_rule_pack_human_review"]
+    corpus_sha256: Digest
+    rule: dict[str, Any]
+    reviewer: Annotated[str, Field(min_length=1, max_length=256, pattern=r"\S")] | None
+    review_reference: Annotated[str, Field(min_length=1, max_length=1024, pattern=r"\S")] | None
+    cases: Annotated[list[ReviewCase], Field(min_length=1, max_length=500)]
+
+
 def _canonical_bytes(value: Any) -> bytes:
     return json.dumps(
         value,
@@ -192,6 +241,10 @@ def _canonical_bytes(value: Any) -> bytes:
 
 def _digest(value: Any) -> str:
     return hashlib.sha256(_canonical_bytes(value)).hexdigest()
+
+
+def _format_output(value: Any) -> str:
+    return json.dumps(value, indent=2, allow_nan=False)
 
 
 def prompt_digest(question_set: dict[str, Question] | None = None) -> str:
@@ -226,6 +279,115 @@ def corpus_digest(corpus: Corpus) -> str:
             key=lambda item: item["id"],
         )
     )
+
+
+def review_packet(corpus: Corpus) -> dict[str, Any]:
+    """Export complete action evidence without proposals, predictions, or previous labels."""
+    prepared = {row["id"]: row for row in prepare(corpus)["cases"]}
+    question_set = questions()
+    return {
+        "schema_version": 1,
+        "kind": "jev_rule_pack_human_review",
+        "corpus_sha256": corpus_digest(corpus),
+        "rule": {
+            "rule_id": RULE_ID,
+            "rule_version": RULE_VERSION,
+            "evidence_contract_version": CONTRACT_VERSION,
+            "definition": RULE_DEFINITION,
+            "applicability": copy.deepcopy(APPLICABILITY),
+            "questions": {
+                name: question.model_dump(exclude={"instructions"}) for name, question in question_set.items()
+            },
+        },
+        "reviewer": None,
+        "review_reference": None,
+        "cases": [
+            {
+                "id": case.id,
+                "case_sha256": prepared[case.id]["case_sha256"],
+                "family": case.family,
+                "split": case.split,
+                "provenance": case.provenance.model_dump(),
+                "action": case.action.model_dump(),
+                "scope_facts": case.scope_facts.model_dump(exclude={"basis"}),
+                "review": {
+                    "status": "pending",
+                    "outcome": None,
+                    "question_answers": {name: None for name in question_set},
+                    "notes": "",
+                    "replace_existing": False,
+                },
+            }
+            for case in corpus.cases
+        ],
+    }
+
+
+def import_review(corpus: Corpus, packet: ReviewPacket) -> dict[str, Any]:
+    """Apply explicit human decisions to a copy; pending rows retain any prior adjudication."""
+    packet = ReviewPacket.model_validate(packet.model_dump())
+    try:
+        _canonical_bytes(packet.model_dump())
+    except (TypeError, ValueError, UnicodeError, RecursionError) as exc:
+        raise ValueError("Review packet must contain finite UTF-8 JSON with bounded nesting") from exc
+    expected = review_packet(corpus)
+    if packet.corpus_sha256 != expected["corpus_sha256"] or _canonical_bytes(packet.rule) != _canonical_bytes(
+        expected["rule"]
+    ):
+        raise ValueError("Review packet membership/splits or rule contract changed; regenerate the packet")
+    expected_rows = {row["id"]: row for row in expected["cases"]}
+    seen = set()
+    for row in packet.cases:
+        if row.id in seen:
+            raise ValueError(f"Duplicate review case: {row.id}")
+        seen.add(row.id)
+        if row.id not in expected_rows:
+            raise ValueError(f"Unknown review case: {row.id}")
+        unchanged = {key: value for key, value in expected_rows[row.id].items() if key != "review"}
+        if _canonical_bytes(row.model_dump(exclude={"review"})) != _canonical_bytes(unchanged):
+            raise ValueError(f"Review evidence changed or is stale for {row.id}; regenerate the packet")
+    missing = set(expected_rows) - seen
+    if missing:
+        raise ValueError(f"Review packet is missing cases: {', '.join(sorted(missing))}")
+    unresolved = [row.id for row in packet.cases if row.review.status in {"excluded", "disputed"}]
+    if unresolved:
+        raise ValueError(
+            f"Unresolved excluded/disputed cases: {', '.join(unresolved)}. Resolve their reviews, or revise the "
+            "source corpus and regenerate the packet; no cases were excluded or labels imported."
+        )
+    reviewed = [row for row in packet.cases if row.review.status == "adjudicated"]
+    updated = corpus.model_copy(deep=True)
+    cases = {case.id: case for case in updated.cases}
+    for row in reviewed:
+        if packet.reviewer is None or packet.review_reference is None:
+            raise ValueError("Adjudicated reviews require a human reviewer and review_reference")
+        case = cases[row.id]
+        if case.adjudication is not None and not row.review.replace_existing:
+            raise ValueError(
+                f"Case {row.id} already has an adjudication. Keep it with status=pending, or explicitly set "
+                "replace_existing=true after reviewing the previous adjudication in the source corpus."
+            )
+        if row.review.question_answers is None:
+            if host_decision(case) is None:
+                raise ValueError(f"Case {row.id}: model candidates require all three human question-answer fields")
+            if not row.review.notes.strip():
+                raise ValueError(f"Case {row.id}: explain omitted host-case question answers in review notes")
+        assert row.review.outcome is not None
+        case.adjudication = Adjudication(
+            outcome=row.review.outcome,
+            reviewer=packet.reviewer,
+            review_reference=packet.review_reference,
+            case_sha256=row.case_sha256,
+            question_answers=row.review.question_answers,
+        )
+    result = updated.model_dump()
+    if len((_format_output(result) + "\n").encode("utf-8")) > MAX_CORPUS_BYTES:
+        raise ValueError(
+            f"Imported corpus exceeds the {MAX_CORPUS_BYTES}-byte corpus input limit in its emitted JSON form. "
+            "Shorten reviewer/reference text or source metadata, or reduce the corpus and regenerate its review "
+            "packet; no corpus was emitted."
+        )
+    return result
 
 
 def host_decision(case: Case) -> tuple[str, str] | None:
@@ -711,7 +873,17 @@ def _read_json(path: Path, max_bytes: int) -> Any:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        epilog=(
+            "Human review: export with --review-packet, fill reviewer/reference and each review block, then "
+            "use --import-review PATH and save stdout to a NEW corpus file. Pending rows preserve prior labels; "
+            "replacing an existing adjudication requires replace_existing=true. Excluded/disputed rows block "
+            "import until resolved or the source corpus is revised and the packet regenerated. Scope basis and "
+            "reconstruction notes stay in the source corpus, outside the packet. Retain the completed packet "
+            "as the review record, including notes."
+        ),
+    )
     parser.add_argument("corpus", type=Path)
     parser.add_argument(
         "--include-payloads",
@@ -730,7 +902,26 @@ def main() -> int:
     )
     parser.add_argument("--expected-model", help="Required resolved model identity for a prediction template")
     parser.add_argument("--repetitions", type=int, help="Planned repetitions for a prediction template (default: 1)")
+    parser.add_argument(
+        "--review-packet", action="store_true", help="Export human-review evidence with labels and rationales withheld"
+    )
+    parser.add_argument(
+        "--import-review", type=Path, help="Validate a completed packet and emit a new corpus on stdout"
+    )
     args = parser.parse_args()
+    if args.review_packet or args.import_review:
+        if (args.review_packet and args.import_review) or any(
+            (
+                args.include_payloads,
+                args.predictions,
+                args.settings,
+                args.prediction_template,
+                args.split is not None,
+                args.expected_model is not None,
+                args.repetitions is not None,
+            )
+        ):
+            parser.error("Choose one review operation without preparation, prediction, or evaluation options")
     if bool(args.predictions) != bool(args.settings):
         parser.error("--predictions and --settings are required together")
     if args.prediction_template and (args.predictions or args.include_payloads):
@@ -744,8 +935,13 @@ def main() -> int:
     if args.predictions and args.include_payloads:
         parser.error("--include-payloads applies only to preparation")
     try:
-        corpus = Corpus.model_validate(_read_json(args.corpus, 1_000_000))
-        if args.predictions:
+        corpus = Corpus.model_validate(_read_json(args.corpus, MAX_CORPUS_BYTES))
+        if args.review_packet:
+            report = review_packet(corpus)
+        elif args.import_review:
+            packet = ReviewPacket.model_validate(_read_json(args.import_review, 4_000_000))
+            report = import_review(corpus, packet)
+        elif args.predictions:
             saved = SavedPredictions.model_validate(_read_json(args.predictions, 10_000_000))
             settings = EvaluationSettings.model_validate(_read_json(args.settings, 10_000))
             report = evaluate(corpus, saved, settings)
@@ -766,13 +962,7 @@ def main() -> int:
             report = manifest.model_dump()
         else:
             report = prepare(corpus, include_payloads=args.include_payloads)
-        print(
-            json.dumps(
-                report,
-                indent=2,
-                allow_nan=False,
-            )
-        )
+        print(_format_output(report))
     except (OSError, ValueError, JudgmentError, RecursionError, OverflowError) as exc:
         parser.error(str(exc))
     return 0
