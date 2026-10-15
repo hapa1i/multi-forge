@@ -249,7 +249,13 @@ durable observation point and a signature-safe control point.
    - `openai_translated` (default): `convert_anthropic_to_openai` → upstream → `convert_openai_to_anthropic`. **Strips
      `thinking`/`redacted_thinking` blocks** — inspectable but **not** signature-safe (lossy). Tool choice maps `any` →
      `required`, `auto` → `auto`, named → named function, and `none` → `none` across GPT Responses; impossible filtered
-     required/named choices return HTTP 400 before upstream acquisition.
+     required/named choices return HTTP 400 before upstream acquisition. **Prompt-cache shape:** system messages after
+     the conversation starts (Claude Code's environment block and per-turn reminders) travel in place as user-role
+     `<system-reminder>` text, because OpenRouter hoists OpenAI system messages into the provider system prompt and a
+     per-turn change there defeats prefix caching. Client `cache_control` markers, including `ttl` and tool-result
+     markers, reach the upstream only when the resolved backend's catalog `prompt_caching.mechanism` is `cache_control`;
+     `auto` backends cache from the stable prefix. Responses report Anthropic usage, with `input_tokens` excluding
+     `cache_read_input_tokens` and `cache_creation_input_tokens`.
    - `anthropic_passthrough`: forwards the raw Anthropic body unchanged and streams the response back unchanged.
      **Preserves thinking blocks byte-for-byte** (signature-safe). Shipped as the `anthropic-passthrough` template
      (`provider: litellm` is a credential slot only; `wire_shape` is the wire truth, and `GET /` labels it so).

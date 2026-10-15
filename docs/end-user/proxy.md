@@ -459,6 +459,28 @@ OpenRouter plan checks and transfer/rewind transcript curation always send `prov
 does not send OpenRouter ZDR fields through LiteLLM, and rejects `allow_non_zdr` or `zdr_fallbacks` keys in a LiteLLM
 `proxy.yaml`.
 
+### Prompt caching
+
+Forge sends Claude Code's prompt to OpenRouter in a shape each provider can reuse between turns:
+
+- Claude models (`openrouter-anthropic`) cache only where the request carries `cache_control` markers. Forge forwards
+  Claude Code's markers, including `ttl` and markers on tool results.
+- Other models (Gemini, Kimi, Qwen, GLM, DeepSeek, MiniMax, GPT) cache automatically from a stable prompt prefix, and
+  Forge strips the markers. On OpenRouter's Gemini route, markers never created a cache for Gemini 4 Argon and doubled
+  the reported prompt tokens for Gemini 3.8 Flash.
+- Claude Code sends its environment block and a per-turn reminder as mid-conversation system messages. Forge sends them
+  in place as user-role `<system-reminder>` text. OpenRouter would otherwise fold them into the system prompt, which
+  then changes every turn and leaves nothing reusable.
+
+The backend model's catalog `prompt_caching.mechanism` (`cache_control` or `auto`) decides marker forwarding; the model
+name Claude Code sends does not. LiteLLM-backed templates use the same translation.
+
+Claude Code receives cache usage in Anthropic form (`cache_read_input_tokens`, `cache_creation_input_tokens` and the
+uncached `input_tokens`), so transcripts and the status line show reuse. `forge proxy metrics <proxy_id> --json` reports
+`cache_hit_rate` as cache reads over total prompt tokens. Downstream telemetry also records cache writes
+(`cache_write_tokens`) and the OpenRouter provider that served each request. Automatic caching is best-effort and per
+provider host, and OpenRouter can route consecutive requests for multi-host models to different hosts.
+
 ---
 
 ## Model alternatives
