@@ -21,6 +21,7 @@ import uuid
 from typing import Any, AsyncGenerator, Callable, Dict, List, Literal, Optional, Union
 
 from forge.proxy.data_models import (
+    CacheControl,
     ContentBlock,
     ContentBlockText,
     ContentBlockToolUse,
@@ -313,19 +314,51 @@ def _should_ignore_tool(tool_name: str) -> bool:
     return False
 
 
-def _model_supports_cache_control(model_name: str) -> bool:
-    """Check if model requires explicit cache_control in requests.
+def _model_supports_cache_control(model_name: str | None) -> bool:
+    """Return whether client cache_control markers should reach this backend model.
 
-    Anthropic/Bedrock: requires cache_control on content blocks to enable caching.
-    OpenAI/Deepseek: automatic caching (≥1024 tokens), no field needed.
-    Gemini: separate Context Caching API (not supported here).
-
-    For non-Anthropic models, cache_control is silently stripped to avoid 400 errors.
+    Pass the resolved backend model: the client's name (``claude-opus-5-5`` on a Gemini
+    proxy) says nothing about the backend. Only catalog ``cache_control`` models
+    (Anthropic) cache at client markers. Automatic-caching models reuse a stable prefix
+    without them; on OpenRouter's Gemini route, markers doubled reported prompt tokens
+    in a 2026-10-15 probe. Models the catalog does not know fall back to Anthropic name
+    detection.
     """
     if not model_name:
         return False
-    name = model_name.lower()
-    return "anthropic/" in name or "claude" in name or "bedrock/anthropic" in name
+    from forge.core.models import (
+        ModelCatalogError,
+        get_model_spec,
+        strip_transport_model_suffix,
+    )
+
+    try:
+        spec = get_model_spec(strip_transport_model_suffix(model_name))
+    except ModelCatalogError:
+        name = model_name.lower()
+        return "anthropic/" in name or "claude" in name or "bedrock/anthropic" in name
+    return spec.prompt_cache_mechanism == "cache_control"
+
+
+def _cache_marker(cache_control: CacheControl) -> Dict[str, Any]:
+    """Forward a client marker verbatim (``type`` plus any ``ttl``)."""
+    return cache_control.model_dump(exclude_none=True)
+
+
+_SYSTEM_REMINDER_OPEN = "<system-reminder>"
+
+
+def _as_system_reminder(text: str) -> str:
+    """Wrap mid-conversation system text the way Claude Code wraps user-turn reminders.
+
+    OpenRouter hoists every OpenAI ``system`` message into the provider's system prompt
+    (Gemini, Anthropic, some Kimi hosts). Claude Code's per-turn trailing system message
+    then changes the prompt start on every request and defeats prefix caching, so the
+    translated path sends these messages as user-role reminders in place.
+    """
+    if text.lstrip().startswith(_SYSTEM_REMINDER_OPEN):
+        return text
+    return f"{_SYSTEM_REMINDER_OPEN}\n{text}\n</system-reminder>"
 
 
 def convert_anthropic_to_openai(
@@ -365,8 +398,9 @@ def convert_anthropic_to_openai(
                 )
 
     openai_messages = []
+    forward_cache_markers = _model_supports_cache_control(resolved_model or request.model)
 
-    # system_cache_control is preserved and forwarded for Anthropic models only
+    # system_cache_control is preserved and forwarded for explicit-marker backends only
     system_text = None
     system_cache_control = None
 
@@ -378,14 +412,14 @@ def convert_anthropic_to_openai(
             for block in request.system:
                 if block.type == "text":
                     text_parts.append(block.text)
-                    if block.cache_control and _model_supports_cache_control(request.model):
-                        system_cache_control = {"type": block.cache_control.type}
+                    if block.cache_control and forward_cache_markers:
+                        system_cache_control = _cache_marker(block.cache_control)
             system_text = "\n".join(text_parts) if text_parts else None
 
         if system_text:
             if provider in ("openai", "litellm", "openrouter"):
                 # Auto-inject cache_control if configured and no explicit cache_control
-                if not system_cache_control and _model_supports_cache_control(request.model):
+                if not system_cache_control and forward_cache_markers:
                     try:
                         from forge.config import config as forge_config
 
@@ -424,13 +458,20 @@ def convert_anthropic_to_openai(
         else:
             system_text = None  # Ensure it's None if empty
 
+    conversation_started = False
     for msg in request.messages:
+        # System messages after the conversation starts travel as user-role reminders in
+        # place (see _as_system_reminder); leading ones stay part of the system prompt.
+        as_reminder = msg.role == "system" and conversation_started
+        conversation_started = conversation_started or msg.role != "system"
         is_tool_response_message = False
         content_list = []
         tool_calls_list: list[Dict[str, Any]] = []
 
         if isinstance(msg.content, str):
-            content_list.append({"type": "text", "text": msg.content})
+            content_list.append(
+                {"type": "text", "text": _as_system_reminder(msg.content) if as_reminder else msg.content}
+            )
         elif isinstance(msg.content, list):
             for block in msg.content:  # type: ignore[assignment]  # Pydantic ContentBlock union
                 if block.type in ("thinking", "redacted_thinking"):
@@ -439,9 +480,10 @@ def convert_anthropic_to_openai(
                     logger.debug("Stripping %s block (unsupported by target provider)", block.type)
                     continue
                 if block.type == "text":
-                    text_block: Dict[str, Any] = {"type": "text", "text": block.text}
-                    if block.cache_control and _model_supports_cache_control(request.model):
-                        text_block["cache_control"] = {"type": block.cache_control.type}
+                    text = _as_system_reminder(block.text) if as_reminder else block.text
+                    text_block: Dict[str, Any] = {"type": "text", "text": text}
+                    if block.cache_control and forward_cache_markers:
+                        text_block["cache_control"] = _cache_marker(block.cache_control)
                     content_list.append(text_block)
                 elif block.type == "image" and msg.role == "user":  # Images only supported for user role
                     content_list.append(
@@ -479,13 +521,17 @@ def convert_anthropic_to_openai(
                         except Exception:
                             tool_content = str(tool_content)  # Fallback to string representation
 
-                    openai_messages.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": block.tool_use_id,
-                            "content": tool_content,
-                        }
-                    )
+                    tool_message: Dict[str, Any] = {
+                        "role": "tool",
+                        "tool_call_id": block.tool_use_id,
+                        "content": tool_content,
+                    }
+                    if block.cache_control and forward_cache_markers:
+                        # A text part carries the marker; OpenRouter maps it onto the Anthropic tool_result.
+                        tool_message["content"] = [
+                            {"type": "text", "text": tool_content, "cache_control": _cache_marker(block.cache_control)}
+                        ]
+                    openai_messages.append(tool_message)
                     logger.debug(f"User tool_result for '{block.tool_use_id}' converted to intermediate tool message.")
                     is_tool_response_message = True
                     # Don't break - process all tool_result blocks in this message
@@ -496,7 +542,7 @@ def convert_anthropic_to_openai(
             content_list = []
 
         if not is_tool_response_message:
-            openai_message: Dict[str, Any] = {"role": msg.role}
+            openai_message: Dict[str, Any] = {"role": "user" if as_reminder else msg.role}
             # Simplify content if only text AND no extra metadata (like cache_control)
             first_item = content_list[0] if len(content_list) == 1 else None
             if (

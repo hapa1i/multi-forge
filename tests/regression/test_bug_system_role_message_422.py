@@ -34,11 +34,14 @@ def test_system_role_message_validates() -> None:
     assert req.messages[1].content == "Continue with the QA runtime context."
 
 
-def test_system_role_message_preserved_for_openrouter() -> None:
+def test_system_role_message_translated_in_place_for_openrouter() -> None:
+    # Kept in position but sent as a user-role reminder: OpenRouter hoists OpenAI system
+    # messages into the provider system prompt, which defeats prefix caching
+    # (test_bug_mid_conversation_system_cache_prefix.py).
     req = MessagesRequest(**RAW_BODY)
     result = convert_anthropic_to_openai(req, provider="openrouter")
 
     assert result["messages"][1] == {
-        "role": "system",
-        "content": "Continue with the QA runtime context.",
+        "role": "user",
+        "content": "<system-reminder>\nContinue with the QA runtime context.\n</system-reminder>",
     }

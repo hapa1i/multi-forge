@@ -977,8 +977,11 @@ models:
     supports_sampling_overrides: false
     default_timeout_seconds: 180
     prompt_caching:
-      # Google provides implicit caching; Forge cache accounting is unverified.
-      supports: false
+      # OpenRouter probe 2026-10-15: implicit prefix caching once Claude Code's
+      # mid-conversation system messages reach it as user reminders. cache_control
+      # markers never wrote a cache, so the proxy strips them.
+      supports: true
+      mechanism: auto
     native_thinking_param: thinking_level
     thinking_levels: [low, medium, high]
     default_thinking_level: medium
@@ -999,7 +1002,7 @@ models:
     supports_top_p: true  # Gemini supports top_p
     default_timeout_seconds: 180
     prompt_caching:
-      supports: false  # Gemini has Context Caching API but LiteLLM doesn't support it
+      supports: false  # Unverified on Forge routes; cache markers are not forwarded.
     # Native: thinking_level (low, high only for Pro)
     native_thinking_param: thinking_level
     thinking_levels: [low, high]
@@ -1046,7 +1049,7 @@ models:
     supports_top_p: true
     default_timeout_seconds: 120
     prompt_caching:
-      supports: false  # Gemini has Context Caching API but LiteLLM doesn't support it
+      supports: false  # Unverified on Forge routes; cache markers are not forwarded.
     # Native: thinking_level (minimal, low, medium, high for Flash)
     native_thinking_param: thinking_level
     thinking_levels: [minimal, low, medium, high]
@@ -1072,7 +1075,7 @@ models:
     supports_top_p: true
     default_timeout_seconds: 180
     prompt_caching:
-      supports: false  # Gemini has Context Caching API but LiteLLM doesn't support it
+      supports: false  # Unverified on Forge routes; cache markers are not forwarded.
     # Native: thinking.budget_tokens (128 to 32768, cannot disable)
     native_thinking_param: thinking_budget
     # LiteLLM mapping: reasoning_effort -> budget_tokens
@@ -1099,7 +1102,7 @@ models:
     supports_top_p: true
     default_timeout_seconds: 90
     prompt_caching:
-      supports: false  # Gemini has Context Caching API but LiteLLM doesn't support it
+      supports: false  # Unverified on Forge routes; cache markers are not forwarded.
     # Native: thinking.budget_tokens (0 to 24576, can disable with 0)
     native_thinking_param: thinking_budget
     # LiteLLM mapping: reasoning_effort -> budget_tokens
@@ -1121,7 +1124,7 @@ models:
     supports_top_p: true
     default_timeout_seconds: 120
     prompt_caching:
-      supports: false  # Gemini has Context Caching API but LiteLLM doesn't support it
+      supports: false  # Unverified on Forge routes; cache markers are not forwarded.
     # Native: thinking_level (minimal, low, medium, high for Flash)
     native_thinking_param: thinking_level
     thinking_levels: [minimal, low, medium, high]
@@ -1206,7 +1209,11 @@ models:
     supports_sampling_overrides: false
     default_timeout_seconds: 120
     prompt_caching:
-      supports: false
+      # OpenRouter probe 2026-10-15: implicit caching in ~4k-token steps with user
+      # reminders. With cache_control markers OpenRouter reported doubled prompt
+      # tokens and rewrote the cache every turn, so the proxy strips them.
+      supports: true
+      mechanism: auto
     native_thinking_param: thinking_level
     thinking_levels: [low, medium, high]
     default_thinking_level: medium
@@ -2123,7 +2130,9 @@ models:
     supports_top_p: true
     default_timeout_seconds: 180
     prompt_caching:
-      supports: false
+      # OpenRouter endpoint metadata (2026-10-15) advertises implicit caching.
+      supports: true
+      mechanism: auto
     # No reasoning_effort knob (matches m2.7); keep null to avoid reasoning drift.
     native_thinking_param: null
     litellm_reasoning_efforts: null
@@ -2293,7 +2302,9 @@ models:
     supports_top_p: true
     default_timeout_seconds: 120
     prompt_caching:
-      supports: false
+      # OpenRouter endpoint metadata (2026-10-15) advertises implicit caching.
+      supports: true
+      mechanism: auto
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null

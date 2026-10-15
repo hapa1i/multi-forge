@@ -7,14 +7,16 @@ module level for efficiency.
 
 import logging
 from importlib import resources
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
 from forge.core.models.types import (
+    PROMPT_CACHE_MECHANISMS,
     REQUIRED_TIERS,
     ModelCatalog,
     ModelSpec,
+    PromptCacheMechanism,
     TemperatureSpec,
 )
 
@@ -106,6 +108,26 @@ def _parse_tuple_or_none(model_id: str, field_name: str, data: Any) -> tuple[str
     return tuple(str(item) for item in data)
 
 
+def _parse_prompt_cache_mechanism(model_id: str, data: Any) -> PromptCacheMechanism | None:
+    """Parse ``prompt_caching`` into the mechanism the proxy acts on, or None when unsupported."""
+    if data is None:
+        return None
+    if not isinstance(data, dict):
+        raise ModelCatalogError(f"Model {model_id!r} prompt_caching must be a mapping, got {type(data).__name__}")
+    supports = data.get("supports")
+    if not isinstance(supports, bool):
+        raise ModelCatalogError(f"Model {model_id!r} prompt_caching.supports must be a boolean, got {supports!r}")
+    if not supports:
+        return None
+    mechanism = data.get("mechanism")
+    if mechanism not in PROMPT_CACHE_MECHANISMS:
+        raise ModelCatalogError(
+            f"Model {model_id!r} prompt_caching.mechanism must be one of {sorted(PROMPT_CACHE_MECHANISMS)}, "
+            f"got {mechanism!r}"
+        )
+    return cast(PromptCacheMechanism, mechanism)  # validated against PROMPT_CACHE_MECHANISMS
+
+
 def _parse_model_spec(model_id: str, data: dict[str, Any]) -> ModelSpec:
     """Parse and validate a single model spec from YAML data.
 
@@ -189,6 +211,7 @@ def _parse_model_spec(model_id: str, data: dict[str, Any]) -> ModelSpec:
             sampling_requires_no_reasoning=bool(data.get("sampling_requires_no_reasoning", False)),
             supports_1m_context=bool(data.get("supports_1m_context", False)),
             supports_forced_tool_choice=bool(data.get("supports_forced_tool_choice", True)),
+            prompt_cache_mechanism=_parse_prompt_cache_mechanism(model_id, data.get("prompt_caching")),
             temperature_constraint=constraint,
             temperature=temperature,
             verbosity_levels=verbosity_levels,

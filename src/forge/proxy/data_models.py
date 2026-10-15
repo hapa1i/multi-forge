@@ -39,12 +39,13 @@ def _detect_tier(values: dict) -> dict:
 class CacheControl(BaseModel):
     """Cache control directive for prompt caching (Anthropic API).
 
-    The "ephemeral" type indicates content should be cached for the session.
-    Only affects Anthropic/Bedrock models — other providers cache automatically
-    or don't support the field.
+    The translated path forwards markers only to explicit-marker backends (catalog
+    ``prompt_caching.mechanism: cache_control``); see ``_model_supports_cache_control``.
     """
 
     type: Literal["ephemeral"] = "ephemeral"
+    # Anthropic accepts "5m" (default) or "1h"; kept as a string and forwarded verbatim.
+    ttl: Optional[str] = None
 
 
 class ContentBlockText(BaseModel):
@@ -76,6 +77,7 @@ class ContentBlockToolResult(BaseModel):
     tool_use_id: str
     content: Union[str, List[Dict[str, Any]]]
     is_error: Optional[bool] = False
+    cache_control: Optional[CacheControl] = None
 
 
 class ContentBlockThinking(BaseModel):
