@@ -7,9 +7,10 @@ Execute [A2: warnings-only rule pack](../jev_rule_pack/checklist.md) on `codex/j
 through [PR #268](https://github.com/hapa1i/multi-forge/pull/268) at `9778007a`. The epic stays active with one selected
 member. A1's [evidence report](../../done/jev_client_probes/evidence/2026-10-14/report.md) records successful
 ZDR-required routing, latency, accounting and limitations. A2's session-consent and explicit evaluation-identity
-foundations are in draft [PR #270](https://github.com/hapa1i/multi-forge/pull/270); the user selected broader wrappers
-on 2026-10-15. Its revised evidence contract and provisional corpus do not yet establish quality. A3 remains proposed.
-Neither decision quality nor quota savings has been evaluated.
+foundations are in [PR #270](https://github.com/hapa1i/multi-forge/pull/270); the user selected broader wrappers on
+2026-10-15. Review corrections prepare the foundation for merge; activation, dispatch and A2 acceptance remain open. Its
+revised evidence contract and provisional corpus do not yet establish quality. A3 remains proposed. Neither decision
+quality nor quota savings has been evaluated.
 
 ## Activation and sequence
 

@@ -5,12 +5,13 @@
 Execution started on 2026-10-14. A2 is active on `codex/jev-rule-pack`, originally based on `main` at
 `f7ce7a9a45f2e208d0fd72c74454750f4fd30e1f` after A1's closeout and rebased onto `18b5670e` on 2026-10-15 after the
 Claude permission fix's closeout. The A1 explicit evaluation-identity extension is implemented, along with session
-consent/inheritance and raw-override guards, in draft [PR #270](https://github.com/hapa1i/multi-forge/pull/270). The
-[wrapper evidence contract](evidence/initial-rule-review.md) now keeps broader wrappers under the user's 2026-10-15
-decision. Offline preparation covers 14 constructed, unadjudicated hook actions. Human labels, thresholds and real scope
-fact resolution remain open before hook wiring/evaluation. No paid A2 evaluation has run. The [card](card.md) owns
-scope; the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed and will use a
-separate execution branch.
+consent/inheritance and raw-override guards, in foundation [PR #270](https://github.com/hapa1i/multi-forge/pull/270).
+The [wrapper evidence contract](evidence/initial-rule-review.md) now keeps broader wrappers under the user's 2026-10-15
+decision. Review corrections unify disable/revocation, separate reviewer notes from model evidence, and distinguish
+host-decided outcomes from model candidates. Human labels, thresholds and real scope fact resolution remain open before
+hook wiring/evaluation. Merging this foundation does not complete A2 or enable Jev checks. No paid A2 evaluation has
+run. The [card](card.md) owns scope; the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains
+proposed and will use a separate execution branch.
 
 Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
 never introduce a Jev denial or `needs_review`. An independently configured policy or supervisor retains its existing
@@ -117,8 +118,9 @@ native trial or paid Jev request. Keep only the merged `done/` card when consumi
   this card's `evidence/`; keep fake transports in tests/the harness.
 
 The preparation stage is implemented in `scripts/experiments/jev/rule-pack-eval.py`: it validates native action shapes,
-keeps source families in one split, binds adjudications to evidence, excludes labels from model inputs and builds
-size-checked A1 payloads without dispatch. It has no live mode, predictions or quality verdict. Response evaluation and
+keeps source families in one split, binds adjudications to evidence and semantic criteria, excludes labels and reviewer
+notes from model inputs, and applies the declared host applicability table before building size-checked A1 payloads.
+Prompt wording has a separate identity. It has no live mode, predictions or quality verdict. Response evaluation and
 metrics remain open under the harness item above.
 
 **Decision gate:** the broader family is selected. Implement and verify the revised evidence contract, including the
@@ -401,6 +403,28 @@ no-`.env` integration rerun passed all 43 selected judgment-observability, sessi
 policy-hook tests, using injected responses and fixture runtimes. Full `make pre-commit` passed, and the offline
 preparation report reproduced exactly. The follow-up reconciles prerequisite links and status; no paid/native test ran,
 and quality and native-delivery gates remain open.
+
+2026-10-15 review corrections: all policy disable entry points now revoke both acknowledgment layers, including repeated
+raw disable. Terminal disable also removes a conflicting enabled override. Raw set/reset still cannot activate Jev;
+refusals now name the working disable-then-reset recovery. The consent record's trusted-writer boundary is documented.
+
+The revised corpus has 17 constructed, unadjudicated cases across seven source families: 12 calibration and five
+held-out. Related module/multi-file variants share their calibration family. Required callback and validation adapters
+carry supplied consumer contracts, alongside redundant-validation and return-shape counterexamples. Reviewer scope notes
+no longer enter model input. The applicability table resolves four cases on the host and prepares 13 model inputs; these
+counts are preparation coverage, not a quality result. Annotation identity retains semantic criteria and evidence while
+instruction wording has a separate prompt hash. Per-question human answers are supported but remain unset.
+
+Validation: the 300 focused consent/override tests and 38 harness/leakage tests passed. The selected Docker suites
+covered 46 distinct tests with injected responses and fixture runtimes. The initial run passed 44 and exposed two
+recovery-test assertions that compared Rich-wrapped command text literally; after comparing and executing parsed argv,
+all three disable/recovery cases passed the targeted rerun. No runtime correction was needed for those two assertions.
+The runner reported the expected missing-Gemini-key warning; these tests make no paid inference requests.
+
+The integrated review corrections passed `make test-unit` (11,001 passed; 117 integration tests deselected) and
+`make test-regression` (1,889 passed). Full `make pre-commit`, `git diff --check` and both file/diff forms of
+`forge policy check --bundle coding_standards` passed. The offline preparation report reproduces byte-for-byte. The
+telemetry document's required provider token-count cache was refreshed; no paid model evaluation or native trial ran.
 
 ## Planning verification
 

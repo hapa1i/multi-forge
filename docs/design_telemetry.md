@@ -23,10 +23,12 @@ canonical OpenRouter endpoint proves API billing; custom gateways retain unknown
 The client emits once per attempt. Downstream readers merge duplicate event IDs, keeping cost totals stable while
 distinct retries count separately. Usage events require a run identity, supplied explicitly through
 `judge(run_identity=...)` or inherited from the environment. A consumer can derive a child run for each evaluation,
-preserving parent/root ancestry without changing process environment. Standalone calls without either identity still
-write downstream evidence without inventing a run, session or proxy. The probe harness establishes its own root run.
-Trace list/show/ explain and cost by-model work without a managed session; by-verb needs run attribution, and session
-activity needs session attribution. Proxy metrics contain no synthetic Jev proxy. Existing v2 history remains readable.
+preserving parent/root ancestry without changing process environment. Explicit run identity overrides only run
+attribution; session and grouping attribution still come from the environment. Standalone calls without either identity
+still write downstream evidence without inventing a run, session or proxy. The probe harness establishes its own root
+run. Trace list/show/explain and cost by-model work without a managed session; by-verb needs run attribution, and
+session activity needs session attribution. Proxy metrics contain no synthetic Jev proxy. Existing v2 history remains
+readable.
 
 ### 3.14 Cost tracking and spend caps
 
