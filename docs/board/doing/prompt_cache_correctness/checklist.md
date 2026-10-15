@@ -95,6 +95,18 @@ decisions exclude Forge-placed markers, LiteLLM-specific work and provider pinni
   request read the whole previous prompt. Captured requests show Claude Code's system, tools and leading messages are
   identical across those turns, so the misses are provider-side cache routing (see the provider-pinning follow-up).
 
+## Review fixes (round 1)
+
+- [x] **Headless cache writes** (`structured_output.py`, `session_runner.py`, `invoker/claude.py`, `measurement.py`,
+  `emit.py`): the envelope folded writes into total input but dropped their count, so direct `claude -p` verbs and
+  workers wrote downstream attempts with input 3,000 and reads 2,519 but no writes. The count now rides
+  `HeadlessEnvelope`, `SessionResult`, `HeadlessResult` and `UsageMeasurement` to every direct downstream writer,
+  including direct `core.llm` calls; zero writes stay omitted, and usage-ledger events keep reads only. Tests:
+  `test_bug_anthropic_usage_cache_rate_overflow.py` (verb and worker paths from a real envelope) and
+  `test_emit.py::test_direct_cache_writes_persist_downstream_and_zero_is_omitted`.
+- [x] **CI formatting**: Black with the configured `--line-length 120` reformats
+  `tests/fixtures/claude_code_requests.py`. Local `make pre-commit` skipped the file while it was untracked.
+
 ## Closeout
 
 - [x] Commit series split by intent; PR #273 with probe evidence and the role-semantics risk called out.
