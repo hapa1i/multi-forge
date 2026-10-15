@@ -157,11 +157,12 @@ chain (§3.6.12).
 ### Typed judgments
 
 `core.judgments.OpenRouterJudgmentClient` sends Choice, Noul and Score questions to OpenRouter Decisions through
-`httpx`. Callers supply state, named typed questions and an absolute monotonic deadline. Credentials resolve through
-`CredentialManager`; `/api/v1` bases map explicitly to `/api/alpha/decisions`, retaining custom gateway prefixes.
-Unsupported base paths fail before dispatch. Redirects are disabled, remote bases require HTTPS, and caller provider
-options cannot override `zdr: true`. The default model is `typesafe/jev-1.13`; requested and returned model IDs remain
-separate. There is no direct TypeSafe fallback.
+`httpx`. Callers supply state, named typed questions and an absolute monotonic deadline. An optional `run_identity`
+attributes all attempts to one consumer evaluation without changing process environment; omission retains the ambient
+run identity. Credentials resolve through `CredentialManager`; `/api/v1` bases map explicitly to `/api/alpha/decisions`,
+retaining custom gateway prefixes. Unsupported base paths fail before dispatch. Redirects are disabled, remote bases
+require HTTPS, and caller provider options cannot override `zdr: true`. The default model is `typesafe/jev-1.13`;
+requested and returned model IDs remain separate. There is no direct TypeSafe fallback.
 
 The client snapshots the request and admits at most 30,000 serialized UTF-8 bytes, including attribution fields. This
 conservative screen leaves room below the documented 32,000-token prompt ceiling; it is not an exact tokenizer or a

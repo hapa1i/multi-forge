@@ -153,6 +153,8 @@ def _inherited_launch_intent(parent_state: SessionState) -> LaunchIntent | None:
 
 def _inherit_intent_fields(child_state: SessionState, parent_state: SessionState) -> None:
     """Copy intent fields that derived sessions inherit from their parent."""
+    from forge.policy.rule_pack.consent import strip_inherited_activation
+
     for field_name in (
         "subprocess_proxy",
         "policy",
@@ -164,6 +166,7 @@ def _inherit_intent_fields(child_state: SessionState, parent_state: SessionState
         parent_val = getattr(parent_state.intent, field_name, None)
         if parent_val is not None:
             setattr(child_state.intent, field_name, deepcopy(parent_val))
+    strip_inherited_activation(child_state)
     inherited_launch = _inherited_launch_intent(parent_state)
     if inherited_launch is not None:
         child_state.intent.launch = inherited_launch
@@ -1165,7 +1168,6 @@ class SessionManager:
 
         child_state.parent_session = parent_name
         child_state.is_fork = False  # Same worktree, context continuation (not a fork)
-        # Propagate identity from parent
         child_state.forge_root = parent_entry.forge_root or parent_state.forge_root
 
         from .memory_inheritance import apply_memory_inheritance
@@ -1927,10 +1929,9 @@ class SessionManager:
             worktree_branch=parent.worktree.branch if parent.worktree else None,
         )
 
-        _inherit_intent_fields(child_state, parent)
         child_state.overrides = deepcopy(parent.overrides)
+        _inherit_intent_fields(child_state, parent)
 
-        # Propagate identity from parent
         child_state.forge_root = parent_entry.forge_root or parent.forge_root
 
         child_store = SessionStore(parent_entry.forge_root or parent_worktree_path, child_name)

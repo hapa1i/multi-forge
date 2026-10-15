@@ -1,0 +1,164 @@
+{
+  "rule_id": "coding_standards.compatibility-wrapper",
+  "rule_version": "draft-2",
+  "evidence_contract_version": 3,
+  "prompt_sha256": "c8b51c065e4451230b7f28c3a4769b93cb9882322a9f40e50be8ff11c362c670",
+  "mode": "offline_preparation",
+  "max_physical_requests": 0,
+  "quality_accepted": false,
+  "blockers": [
+    "numeric_quality_gates_unset",
+    "no_predictions_or_quality_evaluation",
+    "live_execution_not_implemented",
+    "human_adjudication_incomplete",
+    "no_historical_evidence"
+  ],
+  "cohorts": {
+    "constructed/calibration/unadjudicated": 12,
+    "constructed/held_out/unadjudicated": 5
+  },
+  "preparation_counts": {
+    "host_decision/not_applicable": 2,
+    "host_decision/unavailable": 2,
+    "model_input": 13
+  },
+  "source_groups": 7,
+  "cases": [
+    {
+      "id": "module-forwarding",
+      "case_sha256": "d2b346448ece407f103cf4c5b5d29f7b1bdd5054871e52e7a8560155b5215f36",
+      "label_status": "unadjudicated",
+      "preparation": "model_input",
+      "payload_sha256": "f37d6e187827efbaafd4b6092cfe50d560ab4ae666672ef775d347ece28f862b",
+      "request_bytes": 3238
+    },
+    {
+      "id": "module-direct-update",
+      "case_sha256": "0ab7b27883d50f7e0a20fab72f72405853b96850690ce63d04603de99ec10137",
+      "label_status": "unadjudicated",
+      "preparation": "model_input",
+      "payload_sha256": "ca4fc284d262202f4ce9f93311317ffc263ad7ee7434edac656247fdd82c0dda",
+      "request_bytes": 3184
+    },
+    {
+      "id": "module-injection",
+      "case_sha256": "9b4754e476701ed4330bc9042782b88d73194e9851ebe4869094228c2b7ac0e4",
+      "label_status": "unadjudicated",
+      "preparation": "model_input",
+      "payload_sha256": "8cfde2d607bcbad5c02b60200815ca516238c3dc2322295cc64dd2bff56f33a0",
+      "request_bytes": 3584
+    },
+    {
+      "id": "method-argument-adapter",
+      "case_sha256": "3f292443d4fcc37ebdd6a10bc8d340cdc908892c56b32b1daddc800d8bfd3375",
+      "label_status": "unadjudicated",
+      "preparation": "model_input",
+      "payload_sha256": "4d40da4cf766bdb155d7f5a6eb980532c4034d6713e748a20ca3edf9302fff15",
+      "request_bytes": 3677
+    },
+    {
+      "id": "validation-boundary",
+      "case_sha256": "ad196d3129b404fcf0aea9ba382bb47febb2e2fabd23149ed50091eb5b7f7b73",
+      "label_status": "unadjudicated",
+      "preparation": "model_input",
+      "payload_sha256": "37e33804babeb618e9edb2eb50c03b5257e303d1893b53ddceb2c8ff2c19e678",
+      "request_bytes": 5110
+    },
+    {
+      "id": "validation-gratuitous",
+      "case_sha256": "d84886246ae16fbcba956294a5eaed15bc959ac38e23c9c5727924e33c30a2ea",
+      "label_status": "unadjudicated",
+      "preparation": "model_input",
+      "payload_sha256": "451e767a7e7194bb194f6733ddbfa827925e3c16b80320cd0e50c452f1da98ea",
+      "request_bytes": 5183
+    },
+    {
+      "id": "preview-alias",
+      "case_sha256": "3a0b39a0b7693169050289770bd630cf0f333dfdb50ce2ecc1b336527806a529",
+      "label_status": "unadjudicated",
+      "preparation": "model_input",
+      "payload_sha256": "f4ff59029ea0fe719c8dd5fb8c1248d46da015d082cf40cba9fc5e8d98b8111c",
+      "request_bytes": 3099
+    },
+    {
+      "id": "stable-alias",
+      "case_sha256": "880649431ded3b23e53c9cff6bd1f1c76e119501d86cd3a14255f513a62409bf",
+      "label_status": "unadjudicated",
+      "preparation": "host_decision",
+      "host_outcome": "not_applicable",
+      "host_reason": "stable_surface"
+    },
+    {
+      "id": "preview-approved-exception",
+      "case_sha256": "fbc96529edfad1056e7979e21b6273dbce09c2cc0b32c6222d9bcee15ad8b1d6",
+      "label_status": "unadjudicated",
+      "preparation": "host_decision",
+      "host_outcome": "not_applicable",
+      "host_reason": "approved_preview_exception"
+    },
+    {
+      "id": "unknown-public-status",
+      "case_sha256": "c9cf692d7701ac125aaf37887bab81c31d131f5d3aeb7b9a0a8a96f2b83f79c4",
+      "label_status": "unadjudicated",
+      "preparation": "host_decision",
+      "host_outcome": "unavailable",
+      "host_reason": "unknown_surface"
+    },
+    {
+      "id": "callback-protocol",
+      "case_sha256": "743d343c42b4df5668e71bcc720bde68801f4aa55cf58cc1b07e422cb4dbe680",
+      "label_status": "unadjudicated",
+      "preparation": "model_input",
+      "payload_sha256": "dd766590158d6780c3f1431f9a756e7e4984ad54e5b583667b1ebcde6e427469",
+      "request_bytes": 4779
+    },
+    {
+      "id": "decorator-instrumentation",
+      "case_sha256": "d9f60ab21a0f003d0c899344cf16cc25266d65fd252954f3e54b1639d0bd1bcd",
+      "label_status": "unadjudicated",
+      "preparation": "model_input",
+      "payload_sha256": "551453b0fa7cf4235434d0123a84f4dd27c7ba7a4459c55415b699c1e564fda5",
+      "request_bytes": 3399
+    },
+    {
+      "id": "write-without-history",
+      "case_sha256": "4dfc9172a08b90db2f59da266828280970a02fe381fd7e515219ddb84912317b",
+      "label_status": "unadjudicated",
+      "preparation": "host_decision",
+      "host_outcome": "unavailable",
+      "host_reason": "write_without_prior_interface_evidence"
+    },
+    {
+      "id": "partial-edit",
+      "case_sha256": "d8b46e7d92c06473fb6446f0d06cb2870d9c0635460492c6255bb30be84057d8",
+      "label_status": "unadjudicated",
+      "preparation": "model_input",
+      "payload_sha256": "06354deb55d6733af231e31b7ecb6e1bf3536f4032b9a70ca6655ad371a066ee",
+      "request_bytes": 3013
+    },
+    {
+      "id": "return-shape-adapter",
+      "case_sha256": "b429b81e0ef621ff9700b9ace8d35e00bbec71e487b077f983a5e7c275f7a616",
+      "label_status": "unadjudicated",
+      "preparation": "model_input",
+      "payload_sha256": "6a20f4721ce7164566d74559de2f29da8ed28d0694a978f76c70ad2191fc62e8",
+      "request_bytes": 3418
+    },
+    {
+      "id": "return-shape-direct-update",
+      "case_sha256": "c1b5621f9815d06e38d3727fd4c53b2711bfe7a8c3b39f450052fc9269b7eb3c",
+      "label_status": "unadjudicated",
+      "preparation": "model_input",
+      "payload_sha256": "c6bbee2619ad931ad4f31c2b94f815968c6b7df7560b14984a789e01b45881b5",
+      "request_bytes": 3309
+    },
+    {
+      "id": "multi-file-wrapper",
+      "case_sha256": "50f002b80618884bce18781644b270050260de4fa232e023af929a7619f3b196",
+      "label_status": "unadjudicated",
+      "preparation": "model_input",
+      "payload_sha256": "a04dfabae5b8465e86914814408bb0764b151c6e8d15fa4808df8c83384af9ef",
+      "request_bytes": 3237
+    }
+  ]
+}

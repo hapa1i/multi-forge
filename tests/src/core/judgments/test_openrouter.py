@@ -11,6 +11,7 @@ import pytest
 from forge.core.judgments import JudgmentError, NoulQuestion, OpenRouterJudgmentClient
 from forge.core.judgments.openrouter import decisions_url
 from forge.core.llm.credentials import CredentialManager
+from forge.core.reactive.env import RunIdentity
 
 
 @pytest.fixture
@@ -26,6 +27,35 @@ def credentials(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "synthetic-probe-key")
     monkeypatch.delenv("OPENROUTER_BASE_URL", raising=False)
     return CredentialManager()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("explicit,ambient", [(True, True), (True, False), (False, True), (False, False)])
+async def test_judgment_run_identity(question, credentials, monkeypatch, explicit, ambient):
+    for key in ("FORGE_RUN_ID", "FORGE_PARENT_RUN_ID", "FORGE_ROOT_RUN_ID"):
+        monkeypatch.delenv(key, raising=False)
+    parent = RunIdentity("run_session", None, "run_session")
+    if ambient:
+        for key, value in parent.as_env().items():
+            monkeypatch.setenv(key, value)
+    child = RunIdentity("run_evaluation", "run_session", "run_session") if explicit else None
+    emitted = []
+    monkeypatch.setattr("forge.core.judgments.openrouter.emit_attempt", lambda attempt, **kw: emitted.append(kw))
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200,
+            json={
+                "model": "typesafe/jev-1.13-20260917",
+                "answers": {"q": {"type": "noul", "noul": 0.9}},
+                "usage": {"input_tokens": 30, "output_tokens": 2},
+            },
+        )
+    )
+    await OpenRouterJudgmentClient(credentials=credentials, transport=transport).judge(
+        "Synthetic", {"q": question}, deadline=time.monotonic() + 2, run_identity=child
+    )
+    assert len(emitted) == 1
+    assert emitted[0]["identity"] == (child if explicit else parent if ambient else None)
 
 
 @pytest.mark.asyncio

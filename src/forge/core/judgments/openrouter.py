@@ -69,15 +69,16 @@ class OpenRouterJudgmentClient:
         *,
         deadline: float,
         provider_options: dict[str, Any] | None = None,
+        run_identity: RunIdentity | None = None,
     ) -> JudgmentResult:
-        """Return usable judgments or a typed failure with independently valid attempt evidence."""
+        """Return judgments with attempt evidence attributed to the supplied run or the ambient run."""
         payload = build_payload(self.model, state, questions, provider_options)
         question_snapshot = {
             key: type(question).model_validate(payload["questions"][key]) for key, question in questions.items()
         }
         if not math.isfinite(deadline) or deadline <= time.monotonic():
             raise JudgmentError("deadline", "Judgment deadline expired before dispatch")
-        identity = get_run_identity()
+        identity = run_identity if run_identity is not None else get_run_identity()
         session = os.environ.get("FORGE_SESSION")
         attempts: list[JudgmentAttempt] = []
         try:

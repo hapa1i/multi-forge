@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import time
 
 import httpx
@@ -10,6 +11,7 @@ from click.testing import CliRunner
 
 from forge.cli.main import main
 from forge.core.judgments import NoulQuestion, OpenRouterJudgmentClient
+from forge.core.reactive.env import derive_child_run_identity
 from forge.core.telemetry.downstream import (
     read_downstream_records,
     write_downstream_record,
@@ -19,6 +21,58 @@ from forge.session.index import IndexStore
 from tests.fixtures.session_state import publish_session_from_fields
 
 pytestmark = pytest.mark.integration
+
+
+def test_evaluations_count_separately_and_retries_retain_ancestry(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "synthetic-key")
+    monkeypatch.setenv("FORGE_RUN_ID", "run_session")
+    monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_root")
+    monkeypatch.delenv("FORGE_PARENT_RUN_ID", raising=False)
+    before = dict(os.environ)
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        if len(requests) % 2:
+            return httpx.Response(429, json={"error": {"code": 429}}, headers={"retry-after": "0"})
+        return httpx.Response(
+            200,
+            json={
+                "model": "typesafe/jev-1.13-20260917",
+                "answers": {"q": {"type": "noul", "noul": 0.9}},
+                "usage": {"input_tokens": 30, "output_tokens": 2, "cost": 0.00000126},
+            },
+        )
+
+    identities = [derive_child_run_identity(), derive_child_run_identity()]
+    client = OpenRouterJudgmentClient(transport=httpx.MockTransport(handler), command="jev-rule-pack")
+    for identity in identities:
+        result = asyncio.run(
+            client.judge(
+                "Synthetic",
+                {"q": NoulQuestion(instructions="Synthetic?", criteria={"true": "Yes", "false": "No"})},
+                deadline=time.monotonic() + 3,
+                run_identity=identity,
+            )
+        )
+        assert len(result.attempts) == 2
+    assert dict(os.environ) == before
+    records = read_downstream_records()
+    assert len(records) == len({record.request_id for record in records}) == 4
+    assert {record.forge_run_id for record in records} == {identity.run_id for identity in identities}
+    assert {record.forge_root_run_id for record in records} == {"run_root"}
+    events = read_usage_events()
+    assert {event.run_id for event in events} == {identity.run_id for identity in identities}
+    assert {event.parent_run_id for event in events} == {"run_session"}
+    assert {event.root_run_id for event in events} == {"run_root"}
+    assert {record.schema_version for record in records} == {2}
+    assert {event.schema_version for event in events} == {1}
+    assert {event.route for event in events} == {"core_llm"}
+    response = CliRunner().invoke(main, ["telemetry", "costs", "show", "--period", "all", "--json"])
+    assert response.exit_code == 0, response.output
+    costs = json.loads(response.output)
+    assert costs["total_requests"] == 4
+    assert costs["by_verb"]["jev-rule-pack"]["invocations"] == 2
 
 
 @pytest.mark.parametrize("managed", [False, True])

@@ -1,9 +1,24 @@
 # Jev rule pack, warnings only
 
-Epic: [Jev support](../../doing/epic_jev_support/card.md). Member **A2**. Depends on
+Epic: [Jev support](../epic_jev_support/card.md). Member **A2**. Depends on
 [A1: Jev client and probes](../../done/jev_client_probes/card.md). Codex-visible delivery also depends on
 [B3: warnings Codex can see](../../done/codex_policy_warnings/card.md), shipped through PR #262 and closed on
-2026-10-11. This card remains proposed.
+2026-10-11.
+
+The independent [feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), shipped as
+`e9c144eb` and is included in this branch. Its
+[closeout](../../done/claude_policy_feedback_permissions/checklist.md#merged-closeout) records the user's decision to
+merge with paid native testing skipped. A2 still needs its own native warning-delivery evidence.
+
+Status: **doing**, activated 2026-10-14 on `codex/jev-rule-pack` from `main` at `f7ce7a9a` after A1's closeout, and
+rebased onto `18b5670e` on 2026-10-15 after the permission fix's closeout. The [execution checklist](checklist.md)
+records the proposed integration, evaluation gates and outstanding decisions. Offline execution started on 2026-10-14
+with explicit evaluation identity and session consent boundaries. The
+[wrapper evidence contract](evidence/initial-rule-review.md) follows the user's 2026-10-15 choice to keep broader
+wrappers. It now has 14 constructed hook-shaped examples and an offline preparation harness, with human labels and
+quality gates still open. No paid A2 evaluation has run and the bundle is not yet registered for activation. Draft
+[PR #270](https://github.com/hapa1i/multi-forge/pull/270) contains the completed foundations and tracks this card's
+remaining execution.
 
 ## Problem and outcome
 
@@ -13,8 +28,8 @@ warnings. It works without a plan or supervisor and provides measurable evidence
 block actions.
 
 [Workflow design §1.1](../../../design_workflows.md#11-deterministic-policy-forge-policy) motivates this use. The
-[research](../../doing/epic_jev_support/research.md#rule-packs-backed-by-jev-fixed-semantic-checks) explains the
-boundary between stable rule citations, action evidence and semantic correctness.
+[research](../epic_jev_support/research.md#rule-packs-backed-by-jev-fixed-semantic-checks) explains the boundary between
+stable rule citations, action evidence and semantic correctness.
 
 ## Scope
 
@@ -28,7 +43,12 @@ boundary between stable rule citations, action evidence and semantic correctness
   model, input identity and evaluated excerpt; mark insufficient evidence explicitly. Jev does not generate free-form
   justifications, and a selected rule citation alone does not prove a violation.
 - Register the new policy type through the existing engine/configuration contract with atomic validation of bad pack
-  settings. Respect per-session activation, deadlines, cache identity and A1's paid opt-in/ZDR requirements.
+  settings. Require an explicit acknowledgment of API cost and repository-data sharing. The 2026-10-14 user decision
+  requires a new acknowledgment in every fork, fresh-resume or relaunch child; same-session resume retains it. Raw
+  overrides and inherited configuration cannot supply consent. Respect the existing hook deadline, cache identity and
+  A1's ZDR requirements.
+- Run A2 after existing policy checks finish for the whole action. An already blocked action makes no Jev request;
+  otherwise use only the remaining shared hook budget, with the bounded A2 stage specified in the checklist.
 - Return non-blocking warnings only. Service failure or malformed/incomplete evidence must not introduce a new Jev
   denial or unresolved `needs_review`; display an unavailable-check diagnostic. Existing independent denials remain
   intact. This card does not invoke a supervisor, even when one is configured.
@@ -43,12 +63,17 @@ boundary between stable rule citations, action evidence and semantic correctness
 
 ## Acceptance and validation
 
-- Use a labeled historical-diff corpus with compliant examples and violations, held-out changes, rule versions and
-  reconstructed context. Evaluate per-rule false positives and misses, insufficient evidence, calibration, pack-wide
-  warning frequency, latency and API cost against existing deterministic checks. Human adjudication supplies labels;
-  merged history and another model's verdict are not automatic ground truth.
+- Establish corpus feasibility and quality limits for the selected wrapper family before runtime admission. Reconstruct
+  historical changes into the Write/Edit or apply_patch actions the hook sees, with documented assumptions. Include
+  constructed positives when needed, labeled and measured separately; any native transcript cohort requires its own data
+  decision. Keep originating changes and mutation families within one calibration/held-out split. Evaluate per-rule
+  false positives and misses, insufficient evidence, calibration, pack-wide warning frequency, latency and API cost
+  against existing deterministic checks. Human adjudication supplies labels; merged history and another model's verdict
+  are not automatic ground truth.
 - Unit/regression tests cover pack validation, applicability, deterministic-policy coexistence, batched answer mapping,
-  multi-file attribution, stale cache, incomplete state, injected instructions and timeout/malformed-result warnings.
+  multi-file attribution, consent/override boundaries, blocked-action suppression, stale cache, incomplete state,
+  injected instructions and consumer-specific timeout/malformed-result diagnostics. Evaluation runs need distinct
+  identities and bounded audit artifacts outside the session manifest.
 - Targeted hook integration tests with `policy_summary_feedback` enabled prove the actual rule/evidence warning reaches
   the model and the action remains allowed. With it disabled, assert absent model feedback, retained operator/audit
   diagnostics and the same action outcome. Cover Claude and B3's Codex path. Use client fixtures for ordinary tests; any
@@ -60,7 +85,7 @@ boundary between stable rule citations, action evidence and semantic correctness
 
 Direct blocking and escalation of fixed-rule findings are deferred. The existing plan supervisor cannot adjudicate rule
 findings merely because it is configured; that extension would need an explicit rule/evidence handoff.
-[A3](../jev_cascade/card.md) is plan-check cascade work, not a shortcut around that requirement.
+[A3](../../proposed/jev_cascade/card.md) is plan-check cascade work, not a shortcut around that requirement.
 
 ## B3 formatter handoff (2026-10-10)
 

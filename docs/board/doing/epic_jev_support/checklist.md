@@ -2,30 +2,38 @@
 
 ## Current focus
 
-Close out [A1: client and probes](../../done/jev_client_probes/card.md), shipped through
-[PR #268](https://github.com/hapa1i/multi-forge/pull/268) at `9778007a` on 2026-10-14, and select the next member. The
-epic stays active; this is not an A1–A3 implementation batch. A1's
-[evidence report](../../done/jev_client_probes/evidence/2026-10-14/report.md) records successful ZDR-required routing,
-latency, accounting and limitations. A2/A3 remain proposed; neither decision quality nor quota savings has been
-evaluated.
+Execute [A2: warnings-only rule pack](../jev_rule_pack/checklist.md) on `codex/jev-rule-pack`, rebased onto `main` at
+`18b5670e` after the Claude permission fix's closeout on 2026-10-15. [A1](../../done/jev_client_probes/card.md) shipped
+through [PR #268](https://github.com/hapa1i/multi-forge/pull/268) at `9778007a`. The epic stays active with one selected
+member. A1's [evidence report](../../done/jev_client_probes/evidence/2026-10-14/report.md) records successful
+ZDR-required routing, latency, accounting and limitations. A2's session-consent and explicit evaluation-identity
+foundations are in [PR #270](https://github.com/hapa1i/multi-forge/pull/270); the user selected broader wrappers on
+2026-10-15. Review corrections prepare the foundation for merge; activation, dispatch and A2 acceptance remain open. Its
+revised evidence contract and provisional corpus do not yet establish quality. A3 remains proposed. Neither decision
+quality nor quota savings has been evaluated.
 
 ## Activation and sequence
 
 - [x] Verify clean `main` at `1ae9667d`, create the A1 execution branch, and move the epic/A1 to `doing/` on 2026-10-14.
 - [x] Confirm shipped prerequisites through [B1 closeout](../../done/plan_file_supervision/checklist.md#merged-closeout)
   and [B3 closeout](../../done/codex_policy_warnings/checklist.md#merged-closeout); they no longer block sequencing.
-- [x] Keep A2/A3 proposed, with separate branches/checklists when activated. Preserve the
+- [x] Keep A2/A3 proposed during A1 execution, with separate branches/checklists when activated. Preserve the
   [shared contract](card.md#shared-contract); Jev Router remains separate.
 - [x] Verify activation links: the initial 2026-10-14 audit passed for all 672 Markdown sources.
 
-| Member                                     | Lane     | Prerequisites  | Acceptance owner                                                          |
-| ------------------------------------------ | -------- | -------------- | ------------------------------------------------------------------------- |
-| [A1](../../done/jev_client_probes/card.md) | Done     | None           | [A1 closeout](../../done/jev_client_probes/checklist.md#merged-closeout)  |
-| [A2](../../proposed/jev_rule_pack/card.md) | Proposed | A1; shipped B3 | [A2 card](../../proposed/jev_rule_pack/card.md#acceptance-and-validation) |
-| [A3](../../proposed/jev_cascade/card.md)   | Proposed | A1; shipped B1 | [A3 card](../../proposed/jev_cascade/card.md#acceptance-and-validation)   |
+| Member                                     | Lane     | Prerequisites  | Acceptance owner                                                         |
+| ------------------------------------------ | -------- | -------------- | ------------------------------------------------------------------------ |
+| [A1](../../done/jev_client_probes/card.md) | Done     | None           | [A1 closeout](../../done/jev_client_probes/checklist.md#merged-closeout) |
+| [A2](../jev_rule_pack/card.md)             | Doing    | A1; shipped B3 | [A2 checklist](../jev_rule_pack/checklist.md)                            |
+| [A3](../../proposed/jev_cascade/card.md)   | Proposed | A1; shipped B1 | [A3 card](../../proposed/jev_cascade/card.md#acceptance-and-validation)  |
 
 A2 is not an A3 dependency. Neither member's quality evidence validates the other. A valid live ZDR-required Decisions
 request gates consumer availability, even when offline transport is ready.
+
+A2 now includes the independent [feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269),
+merged as `e9c144eb`. Its [closeout](../../done/claude_policy_feedback_permissions/checklist.md#merged-closeout) records
+the user's decision to merge with paid native testing skipped. The fix is outside this epic's membership; A2's native
+warning-delivery evidence remains its own open gate.
 
 ## Gate 1: shared transport handoff
 
@@ -46,7 +54,7 @@ thresholds and any reviewer reserve; A1 supplies no decision-quality or quota-sa
 
 ## Gate 2: consumer activation and drift control
 
-- [ ] Select the next member explicitly after reviewing its prerequisites. Create its branch/checklist and update both
+- [x] Select the next member explicitly after reviewing its prerequisites. Create its branch/checklist and update both
   sides of the epic link; no implicit parallel activation or shared implementation batch.
 - [ ] Review the selected member against the shared contract and the B1/B3 handoff it consumes. Put its concrete
   fixtures, quality thresholds, corpus/data decisions and paid observation budget in its own checklist, following its
@@ -58,6 +66,18 @@ thresholds and any reviewer reserve; A1 supplies no decision-quality or quota-sa
   the separate everyday supervision path and existing Stop/native-source boundaries.
 - [ ] Link each member's acceptance evidence and limitations here when it ships. If findings change scope or
   dependencies, update the owning card first, then this sequence; member quality evidence remains independent.
+
+2026-10-14 selection: A2, on `codex/jev-rule-pack` from `f7ce7a9a`. It exercises A1's first policy integration and B3's
+warning delivery before A3's review-skipping decisions. The [A2 checklist](../jev_rule_pack/checklist.md) owns
+whole-action coverage, bounded dispatch, warning provenance and quality/data gates. A2's calibration and held-out
+acceptance criteria still need review before evaluation; its quality evidence cannot validate A3.
+
+Review handoff, 2026-10-14: A2 owns the user's decision to require a new paid/data-sharing acknowledgment in every
+derived session, and runs after existing whole-action checks inside the established hook deadline. A2's A1 extension now
+accepts `judge(run_identity=...)` with the ambient fallback retained. Five offline telemetry integrations verify
+distinct evaluations, retry identity and run ancestry; A2's dispatch/cache integration remains pending. Gate 2 must
+reconcile that API, run ancestry and audit storage with A3 before merge. The
+[A2 checklist](../jev_rule_pack/checklist.md) owns the fixtures and numeric limits.
 
 ## Coordination acceptance
 

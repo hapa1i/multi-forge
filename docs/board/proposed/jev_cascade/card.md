@@ -33,6 +33,10 @@ disabled. See the [economics research](../../doing/epic_jev_support/research.md#
 - Extend observation/shadow evidence to include hard cases and failures, not just sampled Jev allows. Record all
   reviewer attempts once, and attribute Jev cost separately from Claude usage. Keep audit volume explicitly bounded so
   it does not silently consume the quota being protected.
+- Reconcile A2's optional evaluation `RunIdentity` parameter, `judge(run_identity=...)`, at the
+  [epic handoff](../../doing/epic_jev_support/checklist.md#gate-2-consumer-activation-and-drift-control). Use distinct
+  evaluation runs with retained parent/root ancestry for Jev, reviewer escalation and audits; do not count an entire
+  interactive session as one evaluation. This is a shared API review, not an A2 quality dependency.
 - Require offline evaluation and an opt-in observation phase before enabling Jev to skip reviews. Select thresholds from
   Forge data; neither the supervisor's 0.8 bar nor a vendor example is a valid default acceptance threshold.
 
