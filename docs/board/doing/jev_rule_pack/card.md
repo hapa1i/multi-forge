@@ -10,15 +10,13 @@ The independent [feedback-permissions fix, PR #269](https://github.com/hapa1i/mu
 [closeout](../../done/claude_policy_feedback_permissions/checklist.md#merged-closeout) records the user's decision to
 merge with paid native testing skipped. A2 still needs its own native warning-delivery evidence.
 
-Status: **doing**, activated 2026-10-14 on `codex/jev-rule-pack` from `main` at `f7ce7a9a` after A1's closeout, and
-rebased onto `18b5670e` on 2026-10-15 after the permission fix's closeout. The [execution checklist](checklist.md)
-records the proposed integration, evaluation gates and outstanding decisions. Offline execution started on 2026-10-14
-with explicit evaluation identity and session consent boundaries. The
+Status: **doing**. The foundations shipped through [PR #270](https://github.com/hapa1i/multi-forge/pull/270), merged as
+`9442c1e5` on 2026-10-15. Execution continues on `codex/jev-rule-pack-evaluation` from that merged head. The
+[execution checklist](checklist.md) records the offline outcome/evaluation work and outstanding activation gates. The
 [wrapper evidence contract](evidence/initial-rule-review.md) follows the user's 2026-10-15 choice to keep broader
-wrappers. It now has 14 constructed hook-shaped examples and an offline preparation harness, with human labels and
-quality gates still open. No paid A2 evaluation has run and the bundle is not yet registered for activation. Draft
-[PR #270](https://github.com/hapa1i/multi-forge/pull/270) contains the completed foundations and tracks this card's
-remaining execution.
+wrappers. It has 17 constructed hook-shaped examples and an offline preparation harness, with human labels and quality
+gates still open. No paid A2 evaluation has run and the bundle is not yet registered for activation. The
+[foundation handoff](checklist.md#foundation-merge-and-continuation) records shipped scope without closing A2.
 
 ## Problem and outcome
 

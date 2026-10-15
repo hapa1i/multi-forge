@@ -2,15 +2,15 @@
 
 ## Current focus
 
-Execute [A2: warnings-only rule pack](../jev_rule_pack/checklist.md) on `codex/jev-rule-pack`, rebased onto `main` at
-`18b5670e` after the Claude permission fix's closeout on 2026-10-15. [A1](../../done/jev_client_probes/card.md) shipped
-through [PR #268](https://github.com/hapa1i/multi-forge/pull/268) at `9778007a`. The epic stays active with one selected
-member. A1's [evidence report](../../done/jev_client_probes/evidence/2026-10-14/report.md) records successful
-ZDR-required routing, latency, accounting and limitations. A2's session-consent and explicit evaluation-identity
-foundations are in [PR #270](https://github.com/hapa1i/multi-forge/pull/270); the user selected broader wrappers on
-2026-10-15. Review corrections prepare the foundation for merge; activation, dispatch and A2 acceptance remain open. Its
-revised evidence contract and provisional corpus do not yet establish quality. A3 remains proposed. Neither decision
-quality nor quota savings has been evaluated.
+Continue [A2: warnings-only rule pack](../jev_rule_pack/checklist.md) on `codex/jev-rule-pack-evaluation` from `main` at
+`9442c1e5`, after its foundation merge on 2026-10-15. [A1](../../done/jev_client_probes/card.md) shipped through
+[PR #268](https://github.com/hapa1i/multi-forge/pull/268) at `9778007a`. The epic stays active with one selected member.
+A1's [evidence report](../../done/jev_client_probes/evidence/2026-10-14/report.md) records successful ZDR-required
+routing, latency, accounting and limitations. A2's session-consent and explicit evaluation-identity foundations shipped
+through [PR #270](https://github.com/hapa1i/multi-forge/pull/270); the user selected broader wrappers on 2026-10-15. The
+next slice covers offline outcomes and evaluation; activation, dispatch and A2 acceptance remain open. Its revised
+evidence contract and provisional corpus do not yet establish quality. A3 remains proposed. Neither decision quality nor
+quota savings has been evaluated.
 
 ## Activation and sequence
 
@@ -78,6 +78,12 @@ accepts `judge(run_identity=...)` with the ambient fallback retained. Five offli
 distinct evaluations, retry identity and run ancestry; A2's dispatch/cache integration remains pending. Gate 2 must
 reconcile that API, run ancestry and audit storage with A3 before merge. The
 [A2 checklist](../jev_rule_pack/checklist.md) owns the fixtures and numeric limits.
+
+Foundation handoff, 2026-10-15: PR #270 merged as `9442c1e5`. The additive `judge(run_identity=...)` contract is
+available to either consumer; omitted identity retains the ambient fallback, and session/grouping attribution still
+comes from the environment. Downstream v2 and usage v1 are unchanged. A3 remains unimplemented and must derive its own
+evaluation runs; A2's unfinished cache/audit and quality gates remain separate. See the
+[foundation handoff](../jev_rule_pack/checklist.md#foundation-merge-and-continuation).
 
 ## Coordination acceptance
 

@@ -2,8 +2,9 @@
 
 Status: **doing**, activated 2026-10-14 with A1. The [coordination checklist](checklist.md) tracks member gates and
 handoffs. A1 shipped through [PR #268](https://github.com/hapa1i/multi-forge/pull/268), merged as `9778007a` on
-2026-10-14. A2 is now executing on `codex/jev-rule-pack`, rebased onto `main` at `18b5670e`, with its foundations in
-draft [PR #270](https://github.com/hapa1i/multi-forge/pull/270). A3 remains proposed.
+2026-10-14. A2's foundations shipped through [PR #270](https://github.com/hapa1i/multi-forge/pull/270) as `9442c1e5` on
+2026-10-15. A2 continues on `codex/jev-rule-pack-evaluation` with offline outcomes and evaluation; its activation and
+acceptance gates remain open. A3 remains proposed.
 
 ## Problem and outcome
 

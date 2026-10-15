@@ -9,6 +9,19 @@ Older entries are retained verbatim in [2026-08-18](archive/change_log_2026-08-1
 
 ## 2026-10-15
 
+### Ship Jev consent and offline evaluation foundations
+
+**Goal**: Prepare session-scoped paid-data acknowledgment and reviewable evidence before enabling Jev policy checks.
+
+**Key changes**: Bound consent to each session instance, revoked both stored grants on policy disable, and blocked raw
+activation/reset bypasses. Added explicit judgment run identity and an offline wrapper corpus that excludes reviewer
+notes from model evidence. A2 remains active; activation, quality and native delivery are not established.
+
+**Verification**: [PR #270](https://github.com/hapa1i/multi-forge/pull/270) merged as `9442c1e5`, identical to reviewed
+head `55ce6e24`, with all CI checks passing. Implementation checks passed 11,001 unit tests, 1,889 regressions and 46
+distinct targeted integrations; final review passed 215 focused tests and seven policy CLI integrations. See the
+[foundation handoff](doing/jev_rule_pack/checklist.md#foundation-merge-and-continuation). No paid/native trial ran.
+
 ### Preserve Claude permissions in policy feedback
 
 **Goal**: Keep Write/Edit policy feedback from granting native Claude permission.

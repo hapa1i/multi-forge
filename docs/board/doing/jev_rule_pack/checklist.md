@@ -2,15 +2,15 @@
 
 ## Current focus
 
-Execution started on 2026-10-14. A2 is active on `codex/jev-rule-pack`, originally based on `main` at
-`f7ce7a9a45f2e208d0fd72c74454750f4fd30e1f` after A1's closeout and rebased onto `18b5670e` on 2026-10-15 after the
-Claude permission fix's closeout. The A1 explicit evaluation-identity extension is implemented, along with session
-consent/inheritance and raw-override guards, in foundation [PR #270](https://github.com/hapa1i/multi-forge/pull/270).
-The [wrapper evidence contract](evidence/initial-rule-review.md) now keeps broader wrappers under the user's 2026-10-15
+Execution continues on `codex/jev-rule-pack-evaluation`, based on `main` at `9442c1e5`. Foundation
+[PR #270](https://github.com/hapa1i/multi-forge/pull/270) merged on 2026-10-15 with the A1 explicit evaluation-identity
+extension, session consent/inheritance and raw-override guards. The next slice defines offline consumer outcomes and
+fixture-response evaluation, with provisional thresholds and human labels kept explicit. The
+[wrapper evidence contract](evidence/initial-rule-review.md) now keeps broader wrappers under the user's 2026-10-15
 decision. Review corrections unify disable/revocation, separate reviewer notes from model evidence, and distinguish
 host-decided outcomes from model candidates. Human labels, thresholds and real scope fact resolution remain open before
-hook wiring/evaluation. Merging this foundation does not complete A2 or enable Jev checks. No paid A2 evaluation has
-run. The [card](card.md) owns scope; the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains
+hook wiring/evaluation. The merged foundation does not complete A2 or enable Jev checks. No paid A2 evaluation has run.
+The [card](card.md) owns scope; the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains
 proposed and will use a separate execution branch.
 
 Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
@@ -89,7 +89,7 @@ native trial or paid Jev request. Keep only the merged `done/` card when consumi
 - [ ] Establish corpus feasibility for this family: count independently human-labeled positive/negative changes in each
   split. Marker/delegation searches cannot count unmarked semantic violations. Narrow the quality claim if natural
   evidence is sparse. Finalize rule/pack/decision versions, applicability and atomic Noul questions before runtime
-  admission; the offline draft questions and 14 proposed labels are not acceptance evidence.
+  admission; the offline draft questions and 17 proposed labels are not acceptance evidence.
 - [x] Bind the candidate to [coding standards §5](../../../developer/coding_standards.md#5-interface-changes), including
   justified exceptions and surface distinctions. A missing marker comment is not itself a violation. Define positive,
   compliant and insufficient-context examples before coding; exclude rules whose required facts the hook cannot supply.
@@ -348,6 +348,19 @@ Paths under `tests/src/policy/rule_pack/` and the A2 harness/integration test na
   and propose durable notes for human review.
 - [ ] Move A2 to `done/` only when its acceptance gates are satisfied and the code is merged; repoint inbound links and
   update the epic's next-member decision.
+
+## Foundation merge and continuation
+
+2026-10-15: [PR #270](https://github.com/hapa1i/multi-forge/pull/270) merged as
+`9442c1e5503ea66f9761a995e71c428230d4d49f`, with the same tree as reviewed head `55ce6e24`. All five GitHub checks
+passed. The final independent review passed 215 focused tests and seven fixture-backed policy CLI integrations and
+reproduced the offline preparation report. The implementation also records 11,001 unit tests, 1,889 regressions and 46
+distinct targeted integrations below. Session, telemetry and end-user policy docs describe the shipped foundation.
+
+A2 remains `doing/`. Continue on `codex/jev-rule-pack-evaluation` from the merged head with the offline outcome contract
+and evaluation harness. Activation, authoritative runtime facts, hook dispatch, human labels, numeric quality gates and
+native delivery remain open. No paid evaluation or native trial is authorized by this handoff. A3 remains proposed; its
+consumer can use A1's optional explicit run identity without changing existing ambient callers or schemas.
 
 ## Execution evidence
 
