@@ -62,7 +62,7 @@ def test_success_unwraps_result_and_lifts_metrics(mock_run: MagicMock) -> None:
     assert "total_cost_usd" not in result.stdout
     assert result.envelope_parsed is True
     assert result.cost_micro_usd == 4200
-    assert result.input_tokens == 200
+    assert result.input_tokens == 300  # 200 fresh + 100 cache reads
     assert result.output_tokens == 50
     assert result.cached_tokens == 100
     assert result.success is True
@@ -101,7 +101,7 @@ def test_token_only_envelope_keeps_tokens_without_cost(mock_run: MagicMock) -> N
     result = run_claude_session("prompt")
 
     assert result.envelope_parsed is True
-    assert result.input_tokens == 200
+    assert result.input_tokens == 300
     assert result.cost_micro_usd is None
 
 

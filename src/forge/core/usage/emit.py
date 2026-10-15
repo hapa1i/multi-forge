@@ -121,6 +121,7 @@ def emit_usage_for_session_result(
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
             cached_tokens=result.cached_tokens,
+            cache_write_tokens=result.cache_write_tokens,
         )
 
         # "Direct" for billing only when no proxy is in the path; a proxied call's
@@ -170,6 +171,7 @@ def emit_usage_for_session_result(
                     input_tokens=measurement.input_tokens,
                     output_tokens=measurement.output_tokens,
                     cached_tokens=measurement.cached_tokens,
+                    cache_write_tokens=measurement.cache_write_tokens or None,
                     cost_micros=measurement.cost_micro_usd,
                     reporter=measurement.reporter,
                     confidence=measurement.confidence,
@@ -250,6 +252,7 @@ def emit_worker_usage(
     input_tokens: int | None = None,
     output_tokens: int | None = None,
     cached_tokens: int | None = None,
+    cache_write_tokens: int | None = None,
     envelope_parsed: bool = False,
 ) -> None:
     """Emit a per-worker UsageEvent: one run-tree leaf of a fan-out.
@@ -280,6 +283,7 @@ def emit_worker_usage(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             cached_tokens=cached_tokens,
+            cache_write_tokens=cache_write_tokens,
         )
 
         event = UsageEvent(
@@ -321,6 +325,7 @@ def emit_worker_usage(
                     input_tokens=measurement.input_tokens,
                     output_tokens=measurement.output_tokens,
                     cached_tokens=measurement.cached_tokens,
+                    cache_write_tokens=measurement.cache_write_tokens or None,
                     cost_micros=measurement.cost_micro_usd,
                     reporter=measurement.reporter,
                     confidence=measurement.confidence,
@@ -504,6 +509,7 @@ def emit_direct_llm_usage(
                     input_tokens=measurement.input_tokens,
                     output_tokens=measurement.output_tokens,
                     cached_tokens=measurement.cached_tokens,
+                    cache_write_tokens=measurement.cache_write_tokens or None,
                     cost_micros=measurement.cost_micro_usd,
                     reporter=measurement.reporter,
                     confidence=measurement.confidence,

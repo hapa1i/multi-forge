@@ -67,21 +67,28 @@ def build_upstream_headers(inbound: Mapping[str, str], api_key: str) -> dict[str
 
 
 def _normalize_usage(usage: Any) -> dict[str, int]:
-    """Map an Anthropic ``usage`` object onto the cost fields the proxy logs.
+    """Map an Anthropic ``usage`` object onto Forge's accounting convention.
 
-    ``cache_read_input_tokens`` is the discounted-read analog of the translated
-    path's ``cached_tokens``; cache *creation* is billed as normal input, so it
-    is left in ``input_tokens`` rather than counted as cached.
+    Anthropic's ``input_tokens`` covers only uncached input. Cache reads
+    (``cache_read_input_tokens``) and writes (``cache_creation_input_tokens``,
+    billed above the base input price) are reported beside it. Forge logs
+    ``input_tokens`` as the total prompt, as the translated path does, with
+    reads in ``cached_tokens`` and writes in ``cache_write_tokens``, so cache
+    rates stay within 100%.
     """
     if not isinstance(usage, Mapping):
         return {}
     out: dict[str, int] = {}
+    reads = int(usage.get("cache_read_input_tokens") or 0)
+    writes = int(usage.get("cache_creation_input_tokens") or 0)
     if usage.get("input_tokens") is not None:
-        out["input_tokens"] = int(usage.get("input_tokens") or 0)
+        out["input_tokens"] = int(usage.get("input_tokens") or 0) + reads + writes
     if usage.get("output_tokens") is not None:
         out["output_tokens"] = int(usage.get("output_tokens") or 0)
     if usage.get("cache_read_input_tokens") is not None:
-        out["cached_tokens"] = int(usage.get("cache_read_input_tokens") or 0)
+        out["cached_tokens"] = reads
+    if usage.get("cache_creation_input_tokens") is not None:
+        out["cache_write_tokens"] = writes
     return out
 
 
@@ -129,7 +136,7 @@ class _UsageAccumulator:
         etype = event.get("type")
         if etype == "message_start":
             parsed = _normalize_usage((event.get("message") or {}).get("usage"))
-            for key in ("input_tokens", "cached_tokens", "output_tokens"):
+            for key in ("input_tokens", "cached_tokens", "cache_write_tokens", "output_tokens"):
                 if key in parsed:
                     self.usage[key] = parsed[key]
         elif etype == "message_delta":

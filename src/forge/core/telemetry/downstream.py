@@ -94,9 +94,13 @@ class DownstreamRecord:
     model: str | None = None
     mapped_model: str | None = None
     tier: str | None = None
+    # input_tokens is the total prompt; cached_tokens (reads) and cache_write_tokens are
+    # subsets of it. cache_write_tokens is additive (no schema bump) and omitted when
+    # absent, so older strict readers skip only records that carry writes.
     input_tokens: int | None = None
     output_tokens: int | None = None
     cached_tokens: int | None = None
+    cache_write_tokens: int | None = None
     cost_micros: int | None = None
     reporter: Reporter | None = None
     confidence: Confidence = "unknown"

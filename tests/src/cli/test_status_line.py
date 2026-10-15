@@ -1159,7 +1159,7 @@ class TestFormatBillingCost:
 
 
 class TestComputeCacheHitRate:
-    """Deduped cache-hit-rate matching the proxy formula (cache_read / input)."""
+    """Deduped cache-hit-rate matching the proxy formula (cache reads over total prompt input)."""
 
     def _write(self, tmp_path, entries):
         p = tmp_path / "transcript.jsonl"
@@ -1170,7 +1170,7 @@ class TestComputeCacheHitRate:
         path = self._write(
             tmp_path, [{"requestId": "r1", "message": {"usage": {"input_tokens": 100, "cache_read_input_tokens": 50}}}]
         )
-        assert compute_cache_hit_rate(path) == 50.0
+        assert compute_cache_hit_rate(path) == 33.3  # 50 / (100 fresh + 50 read)
 
     def test_dedup_by_request_id_keeps_final(self, tmp_path):
         # Streaming appends growing usage for the same requestId — count once
@@ -1182,7 +1182,7 @@ class TestComputeCacheHitRate:
                 {"requestId": "r1", "message": {"usage": {"input_tokens": 100, "cache_read_input_tokens": 50}}},
             ],
         )
-        assert compute_cache_hit_rate(path) == 50.0  # only the 100/50 snapshot
+        assert compute_cache_hit_rate(path) == 33.3  # only the 100/50 snapshot
 
     def test_sums_across_distinct_requests(self, tmp_path):
         path = self._write(
@@ -1192,7 +1192,7 @@ class TestComputeCacheHitRate:
                 {"requestId": "r2", "message": {"usage": {"input_tokens": 100, "cache_read_input_tokens": 100}}},
             ],
         )
-        assert compute_cache_hit_rate(path) == 75.0  # 150 / 200 * 100
+        assert compute_cache_hit_rate(path) == 42.9  # 150 read / 350 total
 
     def test_message_id_fallback(self, tmp_path):
         path = self._write(
@@ -1202,7 +1202,26 @@ class TestComputeCacheHitRate:
                 {"message": {"id": "m1", "usage": {"input_tokens": 50, "cache_read_input_tokens": 10}}},
             ],
         )
-        assert compute_cache_hit_rate(path) == 20.0  # deduped to one 50/10
+        assert compute_cache_hit_rate(path) == 16.7  # deduped to one 50/10
+
+    def test_mostly_cached_transcript_stays_within_100(self, tmp_path):
+        # Anthropic usage: a few fresh tokens beside large cache reads and writes.
+        path = self._write(
+            tmp_path,
+            [
+                {
+                    "requestId": "r1",
+                    "message": {
+                        "usage": {
+                            "input_tokens": 4,
+                            "cache_read_input_tokens": 2519,
+                            "cache_creation_input_tokens": 477,
+                        }
+                    },
+                }
+            ],
+        )
+        assert compute_cache_hit_rate(path) == 84.0  # 2519 / 3000
 
     def test_no_cache_reads_is_zero(self, tmp_path):
         path = self._write(

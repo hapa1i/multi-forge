@@ -28,12 +28,14 @@ from .base import estimate_message_tokens, merge_hyperparams
 from .openai_compat import (
     ToolCallAccumulator,
     build_chat_completion_kwargs,
+    extract_cache_write_tokens,
     extract_cached_tokens,
     extract_reported_cost_usd,
     is_retryable_error,
     merge_provider_headers,
     message_to_openai,
     openai_response_to_completion,
+    selected_provider,
 )
 
 logger = logging.getLogger(__name__)
@@ -214,6 +216,8 @@ class OpenRouterClient:
                             provider=self._provider,
                             provider_response_id=generation_id,
                             provider_generation_id=generation_id,
+                            # OpenRouter names the routed upstream on every chunk, the first included.
+                            selected_provider=selected_provider(chunk),
                         )
                         provider_meta_pending = True
 
@@ -226,6 +230,9 @@ class OpenRouterClient:
                     cached = extract_cached_tokens(chunk.usage)
                     if cached:
                         usage_data["cached_tokens"] = cached
+                    cache_writes = extract_cache_write_tokens(chunk.usage)
+                    if cache_writes:
+                        usage_data["cache_write_tokens"] = cache_writes
                     # OpenRouter reports spend in the final usage chunk (usage.cost).
                     chunk_cost = extract_reported_cost_usd(chunk.usage)
                     if chunk_cost is not None:

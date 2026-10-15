@@ -46,12 +46,15 @@ def build_request_cost_record(
     forge_root_run_id: str | None = None,
     downstream_event_id: str | None = None,
     backend_id: str | None = None,
+    cache_write_tokens: int = 0,
 ) -> DownstreamRecord:
     """Build detached request-cost evidence for direct or queued persistence.
 
     ``cost_micros`` is ``None`` when no route reported a cost, distinct from a
     reported ``0``. ``confidence`` and ``reporter`` carry the dollar figure's
-    provenance rather than treating Forge as a cost oracle.
+    provenance rather than treating Forge as a cost oracle. ``input_tokens`` is
+    the total prompt; cache reads and writes are subsets of it, and zero writes
+    are omitted from the record.
 
     Validated run-tree ids join proxied ``claude -p`` requests to their originating
     Forge run. They remain ``None`` for interactive and non-Forge traffic.
@@ -70,6 +73,7 @@ def build_request_cost_record(
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         cached_tokens=cached_tokens,
+        cache_write_tokens=cache_write_tokens or None,
         cost_micros=cost_micros,
         reporter=reporter,
         confidence=confidence,

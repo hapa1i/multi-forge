@@ -65,6 +65,49 @@ class TestModelFieldValidation:
             _parse_model_spec("test", data)
 
 
+class TestPromptCachingValidation:
+    """prompt_caching becomes the mechanism the translated proxy acts on."""
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            (None, None),
+            ({"supports": False}, None),
+            ({"supports": True, "mechanism": "auto", "min_tokens": 1024}, "auto"),
+            ({"supports": True, "mechanism": "cache_control", "max_cache_blocks": 4}, "cache_control"),
+        ],
+    )
+    def test_parses_mechanism(self, raw, expected):
+        data = _minimal_model_data()
+        if raw is not None:
+            data["prompt_caching"] = raw
+        assert _parse_model_spec("test", data).prompt_cache_mechanism == expected
+
+    @pytest.mark.parametrize(
+        ("raw", "match"),
+        [
+            ("yes", "must be a mapping"),
+            ({"mechanism": "auto"}, "supports must be a boolean"),
+            ({"supports": True}, "mechanism must be one of"),
+            ({"supports": True, "mechanism": "context_cache_api"}, "mechanism must be one of"),
+        ],
+    )
+    def test_rejects_invalid_prompt_caching(self, raw, match):
+        data = _minimal_model_data()
+        data["prompt_caching"] = raw
+        with pytest.raises(ModelCatalogError, match=match):
+            _parse_model_spec("test", data)
+
+    def test_packaged_openrouter_routes_resolve_mechanisms(self):
+        catalog = load_model_catalog()
+        assert catalog.get("anthropic/claude-opus-5.5").prompt_cache_mechanism == "cache_control"
+        assert catalog.get("anthropic/claude-haiku-4.5").prompt_cache_mechanism == "cache_control"
+        # Probe 2026-10-15: Gemini caches implicitly on OpenRouter; markers never helped.
+        assert catalog.get("google/gemini-4-argon").prompt_cache_mechanism == "auto"
+        assert catalog.get("google/gemini-3.8-flash").prompt_cache_mechanism == "auto"
+        assert catalog.get("moonshotai/kimi-k3").prompt_cache_mechanism == "auto"
+
+
 class TestTemperatureValidation:
     """Tests for temperature spec validation."""
 

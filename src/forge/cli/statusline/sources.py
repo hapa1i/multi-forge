@@ -210,12 +210,12 @@ def scan_transcript(transcript_path: str) -> TranscriptStats:
 def compute_cache_hit_rate(transcript_path: str) -> float | None:
     """Return the proxy-compatible cache-read rate for a transcript.
 
-    Proxy formula (``metrics.py`` / ``passthrough.py``):
-    ``sum(cache_read_input_tokens) / sum(input_tokens) * 100`` -- cache reads
-    over fresh input only (cache creation is billed as normal input, not a
-    hit). Entries are deduped by ``requestId`` (fallback ``message.id``), keeping
-    the snapshot with the largest input count because streaming appends growing
-    usage records; see Claude Code #5904:
+    Proxy formula (``metrics.py``): cache reads over total prompt input. Claude
+    transcripts carry Anthropic usage, whose ``input_tokens`` excludes cache reads
+    and writes, so the total is ``input_tokens + cache_read_input_tokens +
+    cache_creation_input_tokens``. Entries are deduped by ``requestId`` (fallback
+    ``message.id``), keeping the snapshot with the largest input count because
+    streaming appends growing usage records; see Claude Code #5904:
     https://github.com/anthropics/claude-code/issues/5904. Summing those records
     blindly inflates usage 2--4x. Returns ``0.0`` for input without cache reads
     and ``None`` for missing or unreadable data.
@@ -245,13 +245,17 @@ def compute_cache_hit_rate(transcript_path: str) -> float | None:
                         continue
                     request_id = entry.get("requestId") or message.get("id")
                     key = str(request_id) if request_id is not None else f"_line_{idx}"
-                    input_tokens = _safe_int(usage.get("input_tokens"))
                     cache_read = _safe_int(usage.get("cache_read_input_tokens"))
+                    total_input = (
+                        _safe_int(usage.get("input_tokens"))
+                        + cache_read
+                        + _safe_int(usage.get("cache_creation_input_tokens"))
+                    )
                 except (json.JSONDecodeError, AttributeError, TypeError, ValueError):
                     continue
                 previous = by_request.get(key)
-                if previous is None or input_tokens >= previous[0]:
-                    by_request[key] = (input_tokens, cache_read)
+                if previous is None or total_input >= previous[0]:
+                    by_request[key] = (total_input, cache_read)
     except OSError:
         return None
 

@@ -75,6 +75,7 @@ class SessionResult:
     input_tokens: int | None = None
     output_tokens: int | None = None
     cached_tokens: int | None = None
+    cache_write_tokens: int | None = None
     envelope_parsed: bool = False
     runtime_is_error: bool = False
     dispatched: bool = True
@@ -197,6 +198,7 @@ def run_claude_session(
         input_tokens: int | None = None,
         output_tokens: int | None = None,
         cached_tokens: int | None = None,
+        cache_write_tokens: int | None = None,
         envelope_parsed: bool = False,
         runtime_is_error: bool = False,
         observed_models: tuple[str, ...] = (),
@@ -214,6 +216,7 @@ def run_claude_session(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             cached_tokens=cached_tokens,
+            cache_write_tokens=cache_write_tokens,
             envelope_parsed=envelope_parsed,
             runtime_is_error=runtime_is_error,
             child_billing_mode=child_billing_mode,
@@ -374,6 +377,7 @@ def run_claude_session(
                     input_tokens=envelope.input_tokens,
                     output_tokens=envelope.output_tokens,
                     cached_tokens=envelope.cached_tokens,
+                    cache_write_tokens=envelope.cache_write_tokens,
                     envelope_parsed=True,
                     runtime_is_error=envelope.is_error and treat_is_error_as_failure(),
                     observed_models=observed_headless_models(result.stdout),

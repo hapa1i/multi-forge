@@ -7,10 +7,12 @@ from types import SimpleNamespace
 import httpx
 
 from forge.core.llm.clients.openai_compat import (
+    extract_cache_write_tokens,
     extract_reported_cost_usd,
     merge_provider_headers,
     openai_response_to_completion,
     provider_trace_headers,
+    selected_provider,
 )
 from forge.core.llm.types import CompletionResponse, ProviderTraceMeta
 
@@ -74,6 +76,22 @@ class TestOpenAIResponseToCompletion:
         assert result.cost_usd == 0.0023
         assert result.usage == {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
 
+    def test_cache_reads_and_writes_lifted_into_usage(self):
+        usage = SimpleNamespace(
+            prompt_tokens=100,
+            completion_tokens=5,
+            total_tokens=105,
+            prompt_tokens_details={"cached_tokens": 60, "cache_write_tokens": 30},
+        )
+        result = openai_response_to_completion(self._response(usage), "openrouter")
+        assert result.usage == {
+            "prompt_tokens": 100,
+            "completion_tokens": 5,
+            "total_tokens": 105,
+            "cached_tokens": 60,
+            "cache_write_tokens": 30,
+        }
+
     def test_no_cost_field_leaves_cost_usd_none(self):
         usage = SimpleNamespace(
             prompt_tokens=10,
@@ -134,6 +152,24 @@ class TestOpenAIResponseToCompletion:
         meta = openai_response_to_completion(resp, "openrouter").provider_meta
         assert meta is not None
         assert meta.selected_provider == "Fireworks"
+
+
+class TestCacheWriteAndSelectedProvider:
+    """OpenRouter reports cache writes and the routed upstream beside the usual usage."""
+
+    def test_cache_writes_from_sdk_object(self):
+        usage = SimpleNamespace(prompt_tokens_details=SimpleNamespace(cached_tokens=3, cache_write_tokens=7))
+        assert extract_cache_write_tokens(usage) == 7
+
+    def test_cache_writes_absent_is_zero(self):
+        assert extract_cache_write_tokens({"prompt_tokens_details": {"cached_tokens": 3}}) == 0
+        assert extract_cache_write_tokens(SimpleNamespace(prompt_tokens_details=None)) == 0
+
+    def test_selected_provider_from_attribute_or_model_extra(self):
+        assert selected_provider(SimpleNamespace(provider="Google")) == "Google"
+        assert selected_provider(SimpleNamespace(model_extra={"provider": "Wafer"})) == "Wafer"
+        assert selected_provider(SimpleNamespace(provider=None, model_extra=None)) is None
+        assert selected_provider(SimpleNamespace(provider=7)) is None
 
 
 class TestProviderTraceHeaders:

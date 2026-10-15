@@ -57,6 +57,13 @@ cost (OpenRouter `usage.cost` or LiteLLM `x-litellm-response-cost`) with its rep
 emitters set it only when the mapping is unambiguous. Schema-v2 readers fence older records with a warning and expose
 skip counts rather than reattribute them.
 
+**Token convention.** Attempt `input_tokens` is the provider's total prompt. `cached_tokens` (cache reads) and
+`cache_write_tokens` (cache writes) are subsets of it, so cache rates cannot exceed 100%. Anthropic-native usage — the
+passthrough proxy, headless Claude results and statusline transcript reads — reports uncached input beside reads and
+writes, so Forge adds them back. Proxy attempts, direct `claude -p` verbs and workers, and direct `core.llm` calls
+record `cache_write_tokens` when the route reports writes; usage-ledger events carry reads only. The field was added
+without a schema bump and is omitted when absent or zero; older strict readers skip only records that carry it.
+
 `CostTracker` takes the larger attempt/checkpoint total. Completion updates counters before an unbounded FIFO worker
 persists cost/trace and coalesced snapshots. Shutdown drains jobs and retries failed checkpoints; hangs can delay it.
 Passthrough response-body audit and overload/drop stay separate. Current-month shards preserve restart evidence.
@@ -657,6 +664,8 @@ Semantics and invariants:
   record joined to cost by `downstream_event_id`. Before any provider response, lifecycle flags stay false; a received
   response sets `stream_started=true`, while content/usage and header cost reflect only observed evidence. Validation,
   conversion, routing, client construction, and non-generation relays write none.
+- **`selected_provider`** = the upstream OpenRouter routed to, read from the response body or, when streaming, the first
+  chunk (OpenRouter names it on every chunk).
 - **`first_chunk_seen`** = first user-visible content chunk. The first-event `_provider_meta` carrier does not count, so
   a pre-content cancellation can retain its generation id with `first_chunk_seen=false`.
 - **`local_usage_status`** = `available` after final usage or reported cost, else `unavailable`. Probe 2

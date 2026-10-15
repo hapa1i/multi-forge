@@ -8,6 +8,11 @@ the catalog remains a stable reference.
 from dataclasses import dataclass, field
 from typing import Literal
 
+# How a provider reuses a stable prompt prefix: "auto" caches without client markers;
+# "cache_control" caches only at client-placed cache_control markers (Anthropic).
+PromptCacheMechanism = Literal["auto", "cache_control"]
+PROMPT_CACHE_MECHANISMS: frozenset[str] = frozenset({"auto", "cache_control"})
+
 
 @dataclass(frozen=True)
 class TemperatureSpec:
@@ -54,6 +59,8 @@ class ModelSpec:
     sampling_requires_no_reasoning: bool = False
     supports_1m_context: bool = False
     supports_forced_tool_choice: bool = True
+    # None when the catalog records no prompt-caching support.
+    prompt_cache_mechanism: PromptCacheMechanism | None = None
 
     # Temperature configuration
     temperature_constraint: Literal["fixed", "range"] = "range"

@@ -602,7 +602,7 @@ async def test_forward_streaming_taps_usage(anthropic_transport):
     _ = [chunk async for chunk in resp.body_iterator]  # drain → fires on_complete in finally
 
     assert captured["usage"] == {
-        "input_tokens": 200,
+        "input_tokens": 220,  # Anthropic fresh input plus cache reads (Forge total-input convention)
         "output_tokens": 77,
         "cached_tokens": 20,
     }
@@ -631,7 +631,7 @@ async def test_passthrough_logs_cost_from_response_usage(monkeypatch, proxy_runt
     assert resp.status_code == 200
     assert resp.headers["X-Resolved-Model"] == "claude-opus-4-6"  # M7
     assert len(captured_cost) == 1
-    assert captured_cost[0]["input_tokens"] == 100
+    assert captured_cost[0]["input_tokens"] == 110  # 100 fresh + 10 cache reads
     assert captured_cost[0]["output_tokens"] == 50
     assert captured_cost[0]["cached_tokens"] == 10
     assert captured_cost[0]["model"] == "claude-opus-4-6"

@@ -393,6 +393,46 @@ class TestOpenRouterClientStream:
             assert meta.provider_response_id == "gen-stream-abc"
 
     @pytest.mark.asyncio
+    async def test_stream_records_selected_provider_and_cache_writes(self, client):
+        """Streaming keeps OpenRouter's routed upstream and cache-write count (both on the wire)."""
+        chunk1 = MagicMock()
+        chunk1.id = "gen-stream-cache"
+        chunk1.provider = "Google"
+        chunk1.usage = None
+        chunk1.choices = [MagicMock(delta=MagicMock(content="Hi", tool_calls=None))]
+
+        chunk2 = MagicMock()
+        chunk2.id = "gen-stream-cache"
+        chunk2.provider = "Google"
+        chunk2.usage = SimpleNamespace(
+            prompt_tokens=100,
+            completion_tokens=2,
+            total_tokens=102,
+            prompt_tokens_details={"cached_tokens": 50, "cache_write_tokens": 20},
+        )
+        chunk2.choices = []
+
+        async def mock_stream():
+            yield chunk1
+            yield chunk2
+
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=mock_stream())
+        mock_creds = {"api_key": "sk-or-test", "base_url": "https://openrouter.ai/api/v1", "extra_headers": {}}
+        with patch.object(client, "_credentials") as mock_cm:
+            mock_cm.get_credentials = AsyncMock(return_value=mock_creds)
+            client._client = mock_client
+            events = [e async for e in client.stream(messages=[Message(role="user", content="Hello")])]
+
+        [usage_event] = [e for e in events if e.type == "usage"]
+        assert usage_event.usage is not None
+        assert usage_event.usage["cached_tokens"] == 50
+        assert usage_event.usage["cache_write_tokens"] == 20
+        metas = [e.provider_meta for e in events if e.provider_meta is not None]
+        assert metas
+        assert all(meta.selected_provider == "Google" for meta in metas)
+
+    @pytest.mark.asyncio
     async def test_stream_non_string_id_leaves_provider_meta_none(self, client):
         """A chunk with no usable string id yields no provider_meta (guards against mock ids)."""
         chunk = MagicMock(spec=["usage", "choices"])  # no .id attribute at all
