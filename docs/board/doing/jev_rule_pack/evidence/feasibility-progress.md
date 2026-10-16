@@ -1,7 +1,7 @@
 # A2 feasibility progress
 
 2026-10-17 continuation from PR #272 (`64317485`). The 17 constructed human judgments and semantic criteria are
-unchanged. This checkpoint records preparation, an acquisition shortfall and the first synthetic capture; it does not
+unchanged. This checkpoint records preparation, an acquisition shortfall and two synthetic captures; it does not
 establish runtime feasibility.
 
 ## Approved local inventory
@@ -50,21 +50,27 @@ Threshold settings remain unset; no held-out manifest is prepared. Constructed o
 representative evidence or justify runtime implementation.
 
 The user approved an
-[instruction-only boundary clarification](boundary-question-proposal.md#adopted-boundary-instruction) on 2026-10-17.
-Coverage, retention, all semantic criteria and human labels stay unchanged. The
-[next capture plan](calibration-boundary-run-plan.md) proposes the same nine constructed requests with one observation
-each, subject to a new paid approval. The first capture and its consumed approval remain historical evidence. The next
-run will compare boundary-positive and negative cases, while checking all three question outputs; without a
-contemporaneous control or repetitions it cannot establish causation or stability. No held-out requests or runtime work
-are authorized by preparing that manifest.
+[instruction-only boundary clarification](boundary-question-proposal.md#adopted-boundary-instruction) on 2026-10-17,
+keeping coverage, retention, all semantic criteria and human labels unchanged. A separately approved
+[second capture](calibration-boundary-2026-10-17/README.md) completed the same nine constructed requests at `970de77a`.
+All returned HTTP 200 from the expected snapshot; reported cost was $0.000516936, with 539.679 ms median and 742.992 ms
+maximum latency. Both nine-request approvals are now consumed; no further provider requests are authorized.
+
+The active boundary instruction did not resolve the blocker. Boundary-positive scores were 0.15 and 0.28, while the
+negative duplicated-validation case also scored 0.28. Callback coverage was 0.48 and direct-update coverage was 0.47,
+despite true human labels. All three human `no_warning` cases are now unrecoverable under the allowed bands. The
+decision remains **revise**, settings remain unset, and held-out capture and runtime work remain gated. The historical
+comparison has no contemporaneous control or repetitions, so it cannot establish causation or stability.
 
 ## Verification
 
 The combined rule-pack, A1 probe, evaluation/review, capture, baseline, inventory and regression selection passed 347
 tests. These tests use synthetic metadata and injected transports. The first retained manifest reproduces from its
-recorded source; current preparation artifacts use the revised boundary instruction. All nine live response contracts,
-model/accounting guards and telemetry request-ID joins pass; numerical quality gates and runtime admission remain open.
+recorded source; current preparation artifacts use the revised boundary instruction. The first capture's nine response
+contracts, model/accounting guards and telemetry request-ID joins pass; numerical quality gates and runtime admission
+remain open.
 
 The instruction revision preserves all 17 adjudication hashes and the human-review packet. The refreshed preparation and
 baseline reports bind the new prompt/payload identities; baseline signals remain unchanged. The new nine-request
-manifest reproduces from current source and changes only boundary instructions within its payloads.
+manifest reproduces from its capture revision and changes only boundary instructions within its payloads. The second
+capture completed all nine attempts without transport, answer-contract, model or accounting guard failures.

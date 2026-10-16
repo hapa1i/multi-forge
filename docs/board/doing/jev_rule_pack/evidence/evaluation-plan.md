@@ -31,7 +31,9 @@ cannot recover the human labels under any allowed bands, so settings remain unse
 
 The [2026-10-17 boundary instruction revision](boundary-question-proposal.md) preserves coverage, criteria and human
 adjudications. Current preparation reports bind its new prompt/payload hashes. The
-[follow-up capture plan](calibration-boundary-run-plan.md) requires separate approval; it has no new predictions yet.
+[separately approved follow-up](calibration-boundary-2026-10-17/README.md) is complete and its allowance is consumed. It
+still cannot recover the two required-boundary labels; the clean-break case also cannot clear coverage. All three human
+no-warning cases remain unrecoverable under allowed settings, so the decision remains revise.
 
 The shared `policy.rule_pack.definitions` module owns the draft-3 questions and contract version 4. The
 `policy.rule_pack.outcomes` module owns decision version `draft-2`. These modules are available for offline evaluation;

@@ -21,9 +21,9 @@ feedback implementation. It measures real-action evidence coverage, exception ma
 approved inventory's missing-source shortfall and constructed baseline signals. The
 [runtime evidence proposal](evidence/runtime-evidence-contract.md) remains unimplemented and selects no production
 authority. The [wrapper evidence contract](evidence/initial-rule-review.md) retains broader wrappers and advisory
-supplied-evidence semantics. The [first approved calibration capture](evidence/calibration-2026-10-16/README.md)
-completed, but required-boundary scores cannot support the human labels under any allowed bands. Settings remain unset
-and runtime work remains gated. No bundle is enabled. The [card](card.md) owns scope; the
+supplied-evidence semantics. The [boundary-instruction follow-up](evidence/calibration-boundary-2026-10-17/README.md)
+completed, but boundary and coverage scores cannot recover the three human no-warning labels under any allowed bands.
+Settings remain unset and runtime work remains gated. No bundle is enabled. The [card](card.md) owns scope; the
 [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed.
 
 Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
@@ -243,8 +243,10 @@ revisited. The compound capture/settings/held-out checklist item remains open.
 
 On 2026-10-17, the user approved an [instruction-only boundary clarification](evidence/boundary-question-proposal.md).
 Coverage, semantic criteria and human labels are unchanged. The
-[next capture plan](evidence/calibration-boundary-run-plan.md) prepares nine synthetic requests with separate paid
-approval pending; the original capture and its consumed allowance remain historical evidence.
+[follow-up capture](evidence/calibration-boundary-2026-10-17/README.md) then ran nine separately approved requests. The
+clarification did not resolve the blocker: boundary scores remain 0.15/0.28, and callback/clean-break coverage is
+0.48/0.47. All three human no-warning cases remain unrecoverable under allowed settings. Both nine-request allowances
+are consumed; keep settings unset and review decomposition or model/rule fit before further paid work.
 
 ## Slice 3: complete action evidence and bounded dispatch
 

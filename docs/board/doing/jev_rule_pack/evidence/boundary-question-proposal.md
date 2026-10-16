@@ -3,9 +3,10 @@
 Adopted, 2026-10-17. The [first calibration capture](calibration-2026-10-16/README.md) cannot recover the two
 human-labeled boundary exceptions under the current decision bands. The user approved the boundary instruction change
 below, keeping coverage unchanged. Semantic criteria and human labels remain unchanged; settings remain unset. The
-[next capture plan](calibration-boundary-run-plan.md) requires separate approval before dispatch.
+[second capture](calibration-boundary-2026-10-17/README.md) was separately approved and completed on the same date. It
+did not resolve the semantic blocker. The instruction remains active, and both nine-request allowances are consumed.
 
-## What the capture establishes
+## What the first capture establishes
 
 An offline audit reproduced the approved manifest, implementation identities, payload hashes and saved predictions. All
 nine requests contained their complete corpus actions and then-current questions. Both affected requests included the
@@ -77,12 +78,11 @@ uncertain. It does not exempt all callbacks, validation or signature adapters.
 
 Coverage stays unchanged so the only prompt intervention is the boundary instruction. Record coverage alongside boundary
 results; a boundary-only improvement is insufficient for the combined rule. This does not by itself establish a causal
-effect: the next capture compares against a historical run without a contemporaneous control.
+effect: the second capture compared against a historical run without a contemporaneous control.
 
 ## Unadopted coverage candidate
 
-The following coverage clarification remains a possible later experiment and is not part of the active questions or next
-manifest:
+The following coverage clarification remains unadopted and was not part of either capture:
 
 > Assess structural evidence completeness separately from whether retention is justified. For an Edit, read old_string
 > as the before-image and new_string as the after-image. For apply_patch, read the supplied before/after hunks. Check
@@ -99,14 +99,20 @@ hashes. Active rule/contract/decision versions and labels can remain unchanged o
 remain unchanged. Any criteria rewrite, extra semantic question or changed boundary standard requires corresponding
 versioning and human review; do not migrate labels automatically. Retain the original capture unchanged.
 
-The [next capture plan](calibration-boundary-run-plan.md) keeps the existing nine-case runner and takes one new
-observation per case, including duplicated validation and ordinary adapters. Its fresh manifest binds the exact
-payloads, limits and expected snapshot. It compares with the retained first capture; it adds no contemporaneous
-original-prompt control or repetitions. This narrow comparison cannot distinguish an instruction effect from run-to-run
-changes or establish stability. Do not choose threshold bands merely to turn the difficult cases into abstentions.
+The [completed capture plan](calibration-boundary-run-plan.md) kept the existing nine-case runner and took one new
+observation per case, including duplicated validation and ordinary adapters. Its manifest bound the exact payloads,
+limits and expected snapshot. It compares with the retained first capture; it added no contemporaneous original-prompt
+control or repetitions. This narrow comparison cannot distinguish an instruction effect from run-to-run changes or
+establish stability. Do not choose threshold bands merely to turn the difficult cases into abstentions.
 
-The next observation should test whether the two positive boundary scores separate from negative controls while
-preserving coverage and retention. If the clarification still fails, consider decomposing contract identification and
-replacement compatibility into separately reviewed questions, or revisit model/rule fit. That would be a semantic
-redesign, not another silent wording adjustment. No held-out model outputs or extra action context are needed for this
-proposal. Representative evidence and practical usefulness remain separate, unresolved feasibility gates.
+## Result of the adopted instruction
+
+The [second capture](calibration-boundary-2026-10-17/README.md) did not separate the legitimate boundaries from negative
+controls. Boundary scores for validation and callback changed from 0.14/0.16 to 0.15/0.28; duplicated validation scored
+0.28. Callback coverage was 0.48 and direct-update coverage was 0.47, below every allowed true cutoff. None of the three
+human `no_warning` cases can produce that outcome under any allowed settings.
+
+The decision remains **revise**, with settings unset and held-out/runtime work gated. These observations do not identify
+Jev's reasoning or establish that the instruction caused the score differences. The selected wording remains active;
+further changes require a new review, and no further paid request is authorized. Representative evidence and practical
+usefulness remain separate, unresolved feasibility gates.
