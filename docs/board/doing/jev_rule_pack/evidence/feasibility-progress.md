@@ -62,6 +62,12 @@ despite true human labels. All three human `no_warning` cases are now unrecovera
 decision remains **revise**, settings remain unset, and held-out capture and runtime work remain gated. The historical
 comparison has no contemporaneous control or repetitions, so it cannot establish causation or stability.
 
+The [offline decomposition review](decomposition-diagnostic-proposal.md) recommends a separate diagnostic experiment:
+check explicit code facts, then constrained substitutions, while testing structural coverage independently.
+Human-selected targets would isolate reasoning after selection, not demonstrate a feasible hook selector. New predicates
+and controls need human review and separate identities; the active contract and labels remain unchanged. No further
+capture is prepared or authorized.
+
 ## Verification
 
 The combined rule-pack, A1 probe, evaluation/review, capture, baseline, inventory and regression selection passed 347

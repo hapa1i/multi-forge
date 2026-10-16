@@ -248,6 +248,10 @@ clarification did not resolve the blocker: boundary scores remain 0.15/0.28, and
 0.48/0.47. All three human no-warning cases remain unrecoverable under allowed settings. Both nine-request allowances
 are consumed; keep settings unset and review decomposition or model/rule fit before further paid work.
 
+The [offline diagnostic proposal](evidence/decomposition-diagnostic-proposal.md) separates code-fact extraction,
+constrained contract comparisons and coverage. It requires attributed targets and new human review before a separately
+versioned experiment; it changes no active rule or label and does not satisfy the feasibility gate.
+
 ## Slice 3: complete action evidence and bounded dispatch
 
 - [ ] After the feasibility decision, implement and verify the owner-approved project default, scoped exceptions and
