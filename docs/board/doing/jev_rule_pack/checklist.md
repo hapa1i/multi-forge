@@ -252,6 +252,10 @@ The [offline diagnostic proposal](evidence/decomposition-diagnostic-proposal.md)
 constrained contract comparisons and coverage. It requires attributed targets and new human review before a separately
 versioned experiment; it changes no active rule or label and does not satisfy the feasibility gate.
 
+The [diagnostic human-review packet](evidence/diagnostic-human-review.md) is prepared with 12 synthetic cases and 95
+pending question answers. Criteria and target annotations also await review. The separate offline validator preserves
+partial answers and rejects stale evidence; no active labels, thresholds or paid manifest change.
+
 ## Slice 3: complete action evidence and bounded dispatch
 
 - [ ] After the feasibility decision, implement and verify the owner-approved project default, scoped exceptions and

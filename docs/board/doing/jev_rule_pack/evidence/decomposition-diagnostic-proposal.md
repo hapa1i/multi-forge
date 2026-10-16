@@ -8,6 +8,9 @@ capture. They do not establish that Jev cannot answer simpler questions or suppo
 This offline proposal changes no active questions, criteria, versions, labels or settings. It contains no runnable
 manifest or paid allowance. The existing broad-wrapper, supplied-evidence warning standard remains the target.
 
+The [diagnostic review packet](diagnostic-human-review.md) is now prepared: six original calibration actions and six
+controls, with separate target-bound questions and all human answers pending. Contract review is still open.
+
 ## What needs explaining
 
 Both runs passed transport, answer validation and snapshot checks. The model supplies no rationale. Legitimate-boundary

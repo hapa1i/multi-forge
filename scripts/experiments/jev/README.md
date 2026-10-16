@@ -11,6 +11,18 @@ explicit replacement and disagreement/exclusion handling. These commands do not 
 
 Shared module ownership is in [rule-pack design](../../../docs/design_rule_packs.md).
 
+Prepare the separate decomposition diagnostic packet without credentials or dispatch:
+
+```bash
+uv run python scripts/experiments/jev/rule-pack-diagnostic.py > /tmp/jev-diagnostic-review.json
+uv run python scripts/experiments/jev/rule-pack-diagnostic.py --case validation-boundary
+uv run python scripts/experiments/jev/rule-pack-diagnostic.py --validate-review /tmp/jev-diagnostic-review.json
+```
+
+The [diagnostic review guide](../../../docs/board/doing/jev_rule_pack/evidence/diagnostic-human-review.md) links the
+pending worksheets. This packet has separate criteria and identities; old human labels do not answer its new questions.
+Validation checks a retained partial ledger without importing labels into the active corpus. There is no live mode.
+
 Compare the same action evidence with marker and AST signals without dispatching requests:
 
 ```bash

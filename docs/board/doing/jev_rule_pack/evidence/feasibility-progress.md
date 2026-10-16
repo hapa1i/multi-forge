@@ -68,6 +68,12 @@ Human-selected targets would isolate reasoning after selection, not demonstrate 
 and controls need human review and separate identities; the active contract and labels remain unchanged. No further
 capture is prepared or authorized.
 
+The [diagnostic packet](diagnostic-human-review.md) now contains 12 synthetic cases and 95 unanswered Choice questions.
+It preserves the six original action inputs and adds six controls, including a two-target action and matched missing
+evidence. Target hints, selector bindings and exact transformations are hash-bound and await human review. The offline
+validator reports partial answers and contract status without importing labels or accepting quality. No diagnostic
+capture manifest or provider run is included.
+
 ## Verification
 
 The combined rule-pack, A1 probe, evaluation/review, capture, baseline, inventory and regression selection passed 347
@@ -80,3 +86,7 @@ The instruction revision preserves all 17 adjudication hashes and the human-revi
 baseline reports bind the new prompt/payload identities; baseline signals remain unchanged. The new nine-request
 manifest reproduces from its capture revision and changes only boundary instructions within its payloads. The second
 capture completed all nine attempts without transport, answer-contract, model or accounting guard failures.
+
+Diagnostic preparation passed 398 focused tests, including 51 new packet/identity/validator and executable-fixture
+checks. The JSON packet reproduces exactly; all 12 worksheets preserve its evidence, criteria, targets and pending
+answers. Executable transformation results remain test evidence, separate from human adjudications.

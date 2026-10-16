@@ -50,6 +50,12 @@ approved default stores directly without invoking session repair, retains only a
 selected source paths without replacement scans. It does not extract native actions or establish governance, semantic
 coverage or usefulness. Runtime evidence acquisition remains separate.
 
+`scripts/experiments/jev/rule-pack-diagnostic.py` prepares a separate versioned human-review packet and renders exact
+synthetic evidence, reviewable target hints and proposed transformations. It validates partial review ledgers against
+the current packet without importing labels into the active corpus. Diagnostic answers remain distinct from policy
+outcomes; this tool has no provider dispatch or quality-scoring mode. Target selection and new predicates require human
+review, and successful diagnostic reasoning would not establish runtime evidence acquisition.
+
 ## Consent and runtime boundary
 
 `policy/rule_pack/consent.py` binds the paid repository-data acknowledgment to the session instance and pack settings.
