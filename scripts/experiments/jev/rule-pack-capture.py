@@ -125,7 +125,7 @@ def manifest() -> dict[str, Any]:
         "attempts_per_request": 1,
         "deadline_seconds": 30,
         "runtime_comparison_seconds": 5,
-        "price_date": "2026-10-16",
+        "price_date": "2026-10-17",
         "input_usd_per_token": PRICE_PER_TOKEN,
         "output_usd_per_token": 0,
         "input_tokens_per_question_bound": 32_000,

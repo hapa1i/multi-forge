@@ -241,6 +241,11 @@ records transport success and a **revise** calibration decision: threshold tunin
 required-boundary labels. Do not freeze settings or advance to held-out capture until the question/model fit is
 revisited. The compound capture/settings/held-out checklist item remains open.
 
+On 2026-10-17, the user approved an [instruction-only boundary clarification](evidence/boundary-question-proposal.md).
+Coverage, semantic criteria and human labels are unchanged. The
+[next capture plan](evidence/calibration-boundary-run-plan.md) prepares nine synthetic requests with separate paid
+approval pending; the original capture and its consumed allowance remain historical evidence.
+
 ## Slice 3: complete action evidence and bounded dispatch
 
 - [ ] After the feasibility decision, implement and verify the owner-approved project default, scoped exceptions and

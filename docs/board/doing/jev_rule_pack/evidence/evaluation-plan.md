@@ -29,6 +29,10 @@ live proposal; the evaluator itself remains offline. The
 cannot recover the human labels under any allowed bands, so settings remain unset and held-out capture is deferred.
 `quality_accepted` remains false.
 
+The [2026-10-17 boundary instruction revision](boundary-question-proposal.md) preserves coverage, criteria and human
+adjudications. Current preparation reports bind its new prompt/payload hashes. The
+[follow-up capture plan](calibration-boundary-run-plan.md) requires separate approval; it has no new predictions yet.
+
 The shared `policy.rule_pack.definitions` module owns the draft-3 questions and contract version 4. The
 `policy.rule_pack.outcomes` module owns decision version `draft-2`. These modules are available for offline evaluation;
 they do not register a bundle, enable a session or dispatch a request. Runtime surface/exception authority remains a

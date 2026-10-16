@@ -83,9 +83,18 @@ def questions() -> dict[str, Question]:
         "independent_boundary": NoulQuestion(
             instructions=(
                 guard
-                + "Does supplied evidence establish a current independent requirement for retaining this interface? "
-                "Materially ambiguous or conflicting supplied boundary evidence remains uncertain; do not force it "
-                "to either criterion. Absence of supplied justification alone is not that ambiguity."
+                + "Does the supplied evidence justify a boundary role for the retained interface, distinct from its "
+                "replacement? Identify the retained interface, its replacement, and any supplied consumer, "
+                "registration, contract or test evidence requiring a particular name, signature, callable identity "
+                "or behavior. Compare that requirement with what the replacement provides. An ordinary caller still "
+                "using the old name or signature does not alone establish an independent requirement, and "
+                "direct-substitution failure alone is insufficient. Assess evidenced boundary contracts as written; "
+                "do not redesign them to erase the requirement. A justified adapter role need not have an "
+                "irreplaceable function name, though an explicitly required name or identity can itself establish a "
+                "boundary. If the wrapper's behavior could move into the replacement, check whether that move "
+                "preserves all supplied required consumer contracts and the replacement's other supplied uses. "
+                "Behavior already provided by the replacement does not justify duplicating it. Apply the stated "
+                "criteria to absent, ambiguous or conflicting justification; do not infer unseen requirements."
             ),
             criteria={
                 "true": (

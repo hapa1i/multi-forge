@@ -28,10 +28,10 @@ Prepare A2's nine-request constructed calibration manifest without credential ac
 PYTHON_DOTENV_DISABLED=1 uv run python scripts/experiments/jev/rule-pack-capture.py > /tmp/jev-calibration.json
 ```
 
-The [calibration run plan](../../../docs/board/doing/jev_rule_pack/evidence/calibration-run-plan.md) records its exact
-scope, dated price and planning allowance. Only after that manifest is approved, run the same script with
-`--live --manifest /tmp/jev-calibration.json --output /tmp/jev-calibration-capture`. It requires a new absolute output
-directory, isolates `FORGE_HOME`, disables retries and stops at the first failure or model/accounting drift. Its
+The [current calibration plan](../../../docs/board/doing/jev_rule_pack/evidence/calibration-boundary-run-plan.md)
+records its exact scope, dated price and planning allowance. Only after that manifest is approved, run the same script
+with `--live --manifest /tmp/jev-calibration.json --output /tmp/jev-calibration-capture`. It requires a new absolute
+output directory, isolates `FORGE_HOME`, disables retries and stops at the first failure or model/accounting drift. Its
 `capture.json` journal is authoritative; `predictions.json` uses evaluator schema 2. The journal binds source bytes and
 revision and retains sanitized bodies, original response sizes/status and elapsed client-call time, including local
 journal I/O. Unknown cost remains unknown. There is no resume or held-out mode; a continuation needs a new request

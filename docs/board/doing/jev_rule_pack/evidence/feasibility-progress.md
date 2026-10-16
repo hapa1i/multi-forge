@@ -1,7 +1,8 @@
 # A2 feasibility progress
 
-2026-10-16 continuation from PR #272 (`64317485`). The 17 constructed human judgments and rule contract are unchanged.
-This checkpoint records preparation and an acquisition shortfall; it does not establish runtime feasibility.
+2026-10-17 continuation from PR #272 (`64317485`). The 17 constructed human judgments and semantic criteria are
+unchanged. This checkpoint records preparation, an acquisition shortfall and the first synthetic capture; it does not
+establish runtime feasibility.
 
 ## Approved local inventory
 
@@ -45,13 +46,25 @@ completed on the expected Jev 1.13 snapshot with ZDR required, no retries and is
 
 The semantic calibration decision is **revise**: neither legitimate-boundary case can produce its human `no_warning`
 outcome under any allowed threshold bands. Boundary-positive scores are 0.14 and 0.16, below every allowed true cutoff.
-Threshold settings remain unset; no held-out manifest is prepared. Revisit the question/model fit before another
-separately approved capture. Constructed observations cannot replace the missing representative evidence or justify
-runtime implementation.
+Threshold settings remain unset; no held-out manifest is prepared. Constructed observations cannot replace the missing
+representative evidence or justify runtime implementation.
+
+The user approved an
+[instruction-only boundary clarification](boundary-question-proposal.md#adopted-boundary-instruction) on 2026-10-17.
+Coverage, retention, all semantic criteria and human labels stay unchanged. The
+[next capture plan](calibration-boundary-run-plan.md) proposes the same nine constructed requests with one observation
+each, subject to a new paid approval. The first capture and its consumed approval remain historical evidence. The next
+run will compare boundary-positive and negative cases, while checking all three question outputs; without a
+contemporaneous control or repetitions it cannot establish causation or stability. No held-out requests or runtime work
+are authorized by preparing that manifest.
 
 ## Verification
 
-The combined rule-pack, A1 probe, evaluation/review, capture, baseline, inventory and regression selection passed 345
-tests. These tests use synthetic metadata and injected transports. The retained manifest and baseline report reproduce
-from the current source. All nine live response contracts, model/accounting guards and telemetry request-ID joins pass;
-numerical quality gates and runtime admission remain open.
+The combined rule-pack, A1 probe, evaluation/review, capture, baseline, inventory and regression selection passed 347
+tests. These tests use synthetic metadata and injected transports. The first retained manifest reproduces from its
+recorded source; current preparation artifacts use the revised boundary instruction. All nine live response contracts,
+model/accounting guards and telemetry request-ID joins pass; numerical quality gates and runtime admission remain open.
+
+The instruction revision preserves all 17 adjudication hashes and the human-review packet. The refreshed preparation and
+baseline reports bind the new prompt/payload identities; baseline signals remain unchanged. The new nine-request
+manifest reproduces from current source and changes only boundary instructions within its payloads.

@@ -23,7 +23,9 @@ The manifest must be regenerated and reviewed if the prompt, case evidence, mode
 bound changes. Preparing a manifest does not select thresholds or approve dispatch.
 
 The [retained manifest](calibration-manifest.json) contains all nine exact payloads, their identities and the source
-digests checked before credential resolution. Prepared payloads range from 4,250 to 6,334 bytes. Reproduce it offline:
+digests checked before credential resolution. Prepared payloads range from 4,250 to 6,334 bytes. The following command
+reproduces this historical manifest at revision `a6e748cb94c676677ee7ace8ecb44a96444a7538`. Current preparation uses the
+[boundary-instruction follow-up plan](calibration-boundary-run-plan.md) and requires a new approval:
 
 ```bash
 PYTHON_DOTENV_DISABLED=1 uv run python scripts/experiments/jev/rule-pack-capture.py > /tmp/jev-calibration.json
