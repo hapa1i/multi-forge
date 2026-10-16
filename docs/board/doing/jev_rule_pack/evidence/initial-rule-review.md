@@ -8,8 +8,9 @@ based on [coding standards §5](../../../../developer/coding_standards.md#5-inte
 **User decision, 2026-10-16:** use an advisory evidence standard. Warn when a covered change retains an earlier
 interface through its replacement on an applicable clean-break surface and the supplied evidence does not establish a
 justification for retaining it. This changes the semantic criteria, not just prompt wording. It does not establish that
-no requirement exists elsewhere. Previous question/case hashes are superseded; all 17 constructed cases still need human
-adjudication.
+no requirement exists elsewhere. Previous question/case hashes are superseded. The
+[2026-10-16 ledger](human-review-2026-10-16.json) records two subsequently confirmed human adjudications under the new
+criteria; ten calibration and five held-out cases remain pending.
 
 ## What the rule judges
 
@@ -160,18 +161,18 @@ public deprecation, validation, callbacks, decorators, missing context, injectio
 [offline harness](../../../../../scripts/experiments/jev/rule-pack-eval.py) validates action shapes and source-family
 splits, builds size-checked A1 payloads without dispatch, and reports label/quality gaps. It has no live mode.
 
-Every initial example is constructed and unadjudicated. The proposed outcomes are assistant-authored review aids, not
-ground truth. Paths are repository-relative fixture coordinates; these are not captured native tool calls. An
-adjudication must name the human reviewer and review reference and bind the semantic rule definition, applicability
-table, question types and true/false criteria, rule/contract versions, action, enumerated scope facts and source
-provenance. Human per-question answers may be recorded separately, with null for unresolved questions; final outcomes
-alone cannot calibrate each question. Reviewer notes, proposed labels, case names, families, splits and reconstruction
-prose are outside annotation identity. Evidence needed to justify a label belongs in the bound action or scope facts.
-The harness validates that binding; it cannot authenticate a reviewer or supply the review. Repeated variants stay in
-one split family. Historical examples must be grouped by originating commit; all examples from the initial import
-`3e0a636e` would remain together. No human-labeled natural positive count has been established for this broader rule.
-Empty natural strata cannot support real-world precision, miss-rate or warning-rate claims, regardless of how well
-constructed cases perform.
+Every example is constructed. Two calibration cases now have confirmed human labels; the remaining 15 are unadjudicated.
+The proposed outcomes remain assistant-authored review aids, not ground truth. Paths are repository-relative fixture
+coordinates; these are not captured native tool calls. An adjudication must name the human reviewer and review reference
+and bind the semantic rule definition, applicability table, question types and true/false criteria, rule/contract
+versions, action, enumerated scope facts and source provenance. Human per-question answers may be recorded separately,
+with null for unresolved questions; final outcomes alone cannot calibrate each question. Reviewer notes, proposed
+labels, case names, families, splits and reconstruction prose are outside annotation identity. Evidence needed to
+justify a label belongs in the bound action or scope facts. The harness validates that binding; it cannot authenticate a
+reviewer or supply the review. Repeated variants stay in one split family. Historical examples must be grouped by
+originating commit; all examples from the initial import `3e0a636e` would remain together. No human-labeled natural
+positive count has been established for this broader rule. Empty natural strata cannot support real-world precision,
+miss-rate or warning-rate claims, regardless of how well constructed cases perform.
 
 Full prompt wording has a separate `prompt_sha256`; payload hashes also change when wording changes. Instruction-only
 tuning does not discard human adjudications. True/false criteria are the canonical semantic contract: changes to them

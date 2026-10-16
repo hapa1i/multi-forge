@@ -25,7 +25,11 @@ def probe(monkeypatch):
 
 @pytest.fixture
 def raw():
-    return json.loads(CORPUS.read_text())
+    data = json.loads(CORPUS.read_text())
+    # Tests mutate evidence and author their own labels independently of ongoing human review.
+    for case in data["cases"]:
+        case["adjudication"] = None
+    return data
 
 
 def test_constructed_proposals_are_never_promoted_to_labels_or_quality(probe, raw):

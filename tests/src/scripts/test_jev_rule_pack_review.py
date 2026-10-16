@@ -31,6 +31,9 @@ def corpus(evaluator):
         for case in raw["cases"]
         if case["id"] in {"module-forwarding", "module-direct-update", "stable-alias", "write-without-history"}
     ]
+    # Import tests explicitly seed previous labels; real human review must not change their initial state.
+    for case in raw["cases"]:
+        case["adjudication"] = None
     return evaluator.Corpus.model_validate(raw)
 
 

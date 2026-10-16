@@ -1,8 +1,10 @@
 # A2 human review: calibration
 
-Rendered from [human-review-packet.json](human-review-packet.json). These 12 cases remain pending. Read the
+Evidence rendered from [human-review-packet.json](human-review-packet.json). Two of these 12 cases have confirmed human
+reviews in the [2026-10-16 ledger](human-review-2026-10-16.json); ten remain pending. Read the
 [review instructions](human-review.md) and exact question criteria first. No model responses or proposed labels appear
-here. Rule `draft-3` / evidence contract 4 uses the advisory standard: absent supplied boundary justification can
+here. The first two outcomes below were confirmed by the user after AI-assisted discussion, not independent blinded
+review. Rule `draft-3` / evidence contract 4 uses the advisory standard: absent supplied boundary justification can
 support a warning when interface evidence is otherwise complete. Case names may suggest author intent; they are not
 labels.
 
@@ -41,8 +43,9 @@ def render(value):
     return normalize(value)
 ```
 
-Human review: **pending**. Record outcome, coverage, compatibility retention, independent boundary and notes in the
-matching packet row.
+Human review: **reviewed, 2026-10-16**. Outcome: `warning`; coverage: `true`; compatibility retention: `true`;
+independent boundary: `false`. The [retained ledger](human-review-2026-10-16.json) holds the confirmed notes and case
+identity.
 
 ## module-direct-update
 
@@ -72,8 +75,9 @@ def render(value):
     return normalize_text(value)
 ```
 
-Human review: **pending**. Record outcome, coverage, compatibility retention, independent boundary and notes in the
-matching packet row.
+Human review: **reviewed, 2026-10-16**. Outcome: `no_warning`; coverage: `true`; compatibility retention: `false`;
+independent boundary: `false`. The [retained ledger](human-review-2026-10-16.json) holds the confirmed notes and case
+identity. This case shares the `module-rename` family with `module-forwarding`.
 
 ## module-injection
 

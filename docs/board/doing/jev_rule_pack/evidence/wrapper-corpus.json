@@ -32,7 +32,17 @@
         "outcome": "warning",
         "reason": "The complete action retains the old module-level interface through its replacement, without establishing an independent justification for retaining it. This is a review prompt, not proof that unseen callers do not require the interface."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16.json",
+        "case_sha256": "16e294ba92fc1192ef6a075fd47af72231032f428c21e34fd1dd2d54b6ae37ec",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "module-direct-update",
@@ -62,7 +72,17 @@
         "outcome": "no_warning",
         "reason": "The interface and visible caller move directly; no wrapper remains."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "no_warning",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16.json",
+        "case_sha256": "e29152bdbf0665a5aa7839f6ef10afde34009a83b5cee5833ef3e9185982cf17",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": false,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "module-injection",

@@ -1,7 +1,7 @@
 # A2 offline evaluation plan
 
-Status: the offline evaluator shipped through [PR #271](https://github.com/hapa1i/multi-forge/pull/271); human labels,
-calibrated thresholds and numerical acceptance limits remain unset. The
+Status: the offline evaluator shipped through [PR #271](https://github.com/hapa1i/multi-forge/pull/271). Human
+adjudication has started; calibrated thresholds and numerical acceptance limits remain unset. The
 [merge handoff](../checklist.md#offline-evaluation-merge-and-next-gate) records validation and the next gate. This
 document authorizes no collection, provider request or native trial. A1's probe approvals do not carry over.
 
@@ -9,8 +9,10 @@ document authorizes no collection, provider request or native trial. A1's probe 
 
 The [candidate contract](initial-rule-review.md) owns the broader compatibility-wrapper semantics. The
 [corpus](wrapper-corpus.json) contains 17 constructed actions in seven source families: 12 calibration and five
-held-out. Four cases are decided from fixture applicability/history facts; 13 require semantic assessment. Every
-proposed label remains unadjudicated. There is no human-labeled historical cohort or measured model accuracy.
+held-out. Four cases are decided from fixture applicability/history facts; 13 require semantic assessment. The
+[2026-10-16 ledger](human-review-2026-10-16.json) records two human-adjudicated calibration cases: one warning and one
+no warning, both in the `module-rename` family. Ten calibration and five held-out cases remain pending. There is no
+human-labeled historical cohort or measured model accuracy.
 
 The shared `policy.rule_pack.definitions` module owns the draft-3 questions and contract version 4. The
 `policy.rule_pack.outcomes` module owns decision version `draft-2`. These modules are available for offline evaluation;

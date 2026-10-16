@@ -1,10 +1,15 @@
 # A2 human review worksheet
 
-The next input is human adjudication of the existing constructed examples. The
-[calibration worksheet](review-calibration.md) contains 12 cases; the [held-out worksheet](review-held-out.md) contains
-five. Both show the supplied action and enumerated scope facts, with the exact case hash. The
-[JSON packet](human-review-packet.json) holds the canonical action strings, semantic criteria and editable review
-fields. All 17 reviews are pending. No human verdict or model prediction is supplied.
+Human adjudication has started. The [calibration worksheet](review-calibration.md) contains 12 cases: two reviewed and
+ten pending. The [held-out worksheet](review-held-out.md) contains five pending cases. Both show the supplied action and
+enumerated scope facts, with the exact case hash. The [JSON packet](human-review-packet.json) remains a reproducible
+blank template containing canonical action strings, semantic criteria and pending review fields.
+
+The retained [2026-10-16 review ledger](human-review-2026-10-16.json) records the user's confirmed labels for
+`module-forwarding` (warning) and `module-direct-update` (no warning), imported into the corpus. Both belong to the same
+`module-rename` source family; they are not two independent families. The remaining 15 cases have no human labels. The
+user confirmed these judgments after AI-assisted discussion; they are not independently blinded labels. No model
+predictions are supplied.
 
 The packet omits authored proposals/rationales, reviewer-only scope notes, reconstruction notes and previous
 adjudications. Case IDs and shared authorship remain visible and can hint at intended behavior; this is not a fully
@@ -45,10 +50,10 @@ would find the warning useful; an unseen legitimate requirement can make a corre
 
 ## Record a review
 
-Copy the JSON packet to a review file and retain it as the review ledger. Set top-level `reviewer` to the human who
-actually made the decisions and `review_reference` to the retained review record. An assistant may transcribe explicit
-human answers; it must not supply its own decisions under a human's name. The importer validates structure and evidence
-identity, not whether the named person performed the review.
+Copy the JSON packet to a new review file and retain it as that batch's review ledger. Set top-level `reviewer` to the
+human who actually made the decisions and `review_reference` to the retained review record. An assistant may transcribe
+explicit human answers; it must not supply its own decisions under a human's name. The importer validates structure and
+evidence identity, not whether the named person performed the review.
 
 For each completed case, edit only its `review` object:
 
@@ -56,13 +61,16 @@ For each completed case, edit only its `review` object:
   answers are allowed. A host-decided case may instead use `question_answers: null` with an explanation in notes.
 - Use `notes` for evidence, disagreements or limitations. Notes remain in the retained packet; the emitted corpus
   references that ledger and does not put notes into model evidence.
-- Leave `replace_existing: false` for this initially unadjudicated corpus. Replacing a later existing adjudication
-  requires explicitly reviewing it in the source corpus and setting this flag to true.
+- Leave `replace_existing: false` when adding a label to a pending case. Replacing an existing adjudication requires
+  explicitly reviewing it in the source corpus and setting this flag to true.
 
 Leave unreviewed rows `pending` with null labels. Partial import is allowed and preserves any existing adjudication on
 pending rows; it does not clear prior labels. If a case cannot be settled, use `disputed` or `excluded`, null labels,
 and explanatory notes. Either status blocks the entire import. Resolve the issue or explicitly revise corpus membership,
 record the exclusion and regenerate a packet; no case is silently dropped.
+
+For the next batch, leave the two already adjudicated cases pending in the new packet so import preserves their corpus
+labels. Keep the completed first-batch ledger unchanged; do not resubmit its completed rows as new labels.
 
 You can also return decisions in conversation, naming the case ID, outcome, three question answers and notes. The exact
 packet case hash remains the reviewed identity. Confirm the final transcribed ledger before treating it as your review.

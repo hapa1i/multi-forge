@@ -1,21 +1,29 @@
 # A2 corpus feasibility checkpoint
 
 2026-10-16. Inventory of the existing [constructed corpus](wrapper-corpus.json), at source SHA-256
-`827cfec682dbbb474eb7cced74250f0ee2ccb55afc3fca1c684a33a7add5d288`. No historical examples or native transcripts were
-collected for this checkpoint. Counts describe the authored fixtures, not independently established semantic truth.
+`0d312c74d4007d68816640d370d168427f090d9f53bdc55378aadc327cccc7c8`. No historical examples or native transcripts were
+collected for this checkpoint. The counts distinguish authored fixtures and preparation results from the two confirmed
+human adjudications.
 
 ## Evidence available
 
 | Cohort and split        | Cases | Families | Model candidates | Host decisions | Human labels |
 | ----------------------- | ----- | -------- | ---------------- | -------------- | ------------ |
-| Constructed calibration | 12    | 4        | 9                | 3              | 0            |
+| Constructed calibration | 12    | 4        | 9                | 3              | 2            |
 | Constructed held-out    | 5     | 3        | 4                | 1              | 0            |
 | Historical calibration  | 0     | 0        | 0                | 0              | 0            |
 | Historical held-out     | 0     | 0        | 0                | 0              | 0            |
 
-All three questions have zero human answers in both splits. The host resolves calibration's stable surface and approved
-preview exception as not applicable, and its unknown surface as unavailable. It resolves the held-out Write without
-prior-interface evidence as unavailable. These are applicability/preparation results, not measured model outcomes.
+The [2026-10-16 ledger](human-review-2026-10-16.json) records `module-forwarding` as warning and `module-direct-update`
+as no warning, with all three question answers for each. Each question therefore has two human answers in calibration
+and zero in held-out. Both labeled cases are from `module-rename`: the positive-family and negative-family counts are
+one each, but they are the same family, not two independent sources. The user confirmed these judgments after
+AI-assisted discussion; they are not independently blinded labels. Ten calibration and five held-out cases remain
+pending.
+
+The host resolves calibration's stable surface and approved preview exception as not applicable, and its unknown surface
+as unavailable. It resolves the held-out Write without prior-interface evidence as unavailable. These are
+applicability/preparation results, not measured model outcomes.
 
 For corpus planning only, the authored proposals contain six warnings in four calibration families and one warning in
 one held-out family. Proposed no-warning examples span three calibration families and two held-out families. The
@@ -41,14 +49,14 @@ No historical positive or negative has been adjudicated. Earlier marker/delegati
 semantic labels or evidence that all unmarked wrappers were found. They cannot fill an empty historical stratum.
 Repetitions of a constructed input would measure variation, not add independent examples.
 
-The present corpus can support reviewed behavioral fixtures once a human resolves its labels. It cannot support a
+The present corpus includes two reviewed behavioral fixtures, with 15 labels still unresolved. It cannot support a
 production-quality or historical-accuracy claim, even if every constructed prediction were correct. Keep the broader
 wrapper family selected by the user; narrow the evidence claim to these constructed actions until representative
 evidence exists. Do not treat this limitation as permission to activate the bundle.
 
 ## Next gate
 
-Use the blind [human review worksheet](human-review.md) to adjudicate exact case hashes, including host-decided cases.
+Continue the [human review worksheet](human-review.md) to adjudicate exact case hashes, including host-decided cases.
 Record per-question answers, uncertainty and disagreements before inspecting predictions. An unresolved disagreement or
 proposed exclusion remains visible and blocks importing that packet; revising membership requires a new packet and
 explicit accounting for the excluded cases.
