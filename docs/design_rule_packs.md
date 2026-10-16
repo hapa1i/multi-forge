@@ -11,12 +11,29 @@ outcome. It requires explicit per-question threshold bands and composes covered 
 uncertain or unavailable assessments with fixed diagnostics. Contradictory answers remain uncertain; missing coverage
 cannot establish compliance. These modules do not register or activate a bundle and do not dispatch requests.
 
+The provisional warning contract is advisory: complete supplied interface history and replacement evidence establish
+retention, but the supplied action does not establish an independent justification for keeping that interface. No
+repository-wide proof of absence is required. A named protocol, signature or callable identity can justify a pure alias;
+extra behavior alone does not. Missing structural/policy evidence remains unavailable, and materially ambiguous or
+conflicting supplied boundary evidence remains uncertain. Warnings ask for caller and compatibility review rather than
+claiming deletion is safe. Packet-label accuracy and practical warning usefulness are separate evaluation claims.
+
 The development harness `scripts/experiments/jev/rule-pack-eval.py` prepares bounded inputs or evaluates saved responses
 offline. Corpus/split, semantic evidence, prompt, prediction, settings and adjudication identities remain distinct.
 Reports compare host decisions with human labels, separate source cohorts and repetitions, preserve abstentions and
 unknown costs, and use only human adjudications for error/calibration metrics. Fixture reports cannot establish rule
 quality; no release verdict is implemented. Calibration, data and acceptance decisions remain pending in the A2 card;
 they are not runtime contracts. Session consent is described in [session design](design_sessions.md).
+
+The same harness exports human-review packets containing rule criteria and exact case evidence while withholding
+proposals, reviewer-only notes and existing labels. Import verifies contract, membership and content identity before
+emitting a new corpus. Pending rows preserve prior adjudications; replacements are explicit. Disputed/excluded rows
+block import instead of silently removing cases. The retained packet owns review notes, referenced by each imported
+adjudication. Review references are paths relative to the retained corpus directory; keep the corpus and ledgers
+together when relocating evidence. The importer stores the reference without opening or hashing that file, so retain the
+reviewed Git revision to identify ledger contents. Named reviewers are provenance supplied by the operator, not
+authenticated identities. This workflow cannot establish that a human performed the review or turn fixture proposals
+into quality evidence.
 
 ## Consent and runtime boundary
 

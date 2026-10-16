@@ -74,6 +74,23 @@ def test_cutoffs_are_inclusive_and_probabilities_are_not_multiplied(thresholds):
     assert assess_response(response(0.899, 0.9, 0.1), thresholds).outcome == "uncertain"
 
 
+def test_warning_diagnostic_limits_its_claim_to_supplied_evidence(thresholds):
+    result = assess_response(response(1.0, 1.0, 0.0), thresholds)
+    assert result.outcome == "warning"
+    assert result.diagnostic == (
+        "The covered action retains an earlier interface, but the supplied evidence does not establish why "
+        "that interface must remain; review affected callers and compatibility before changing it."
+    )
+
+
+def test_ambiguous_boundary_assessment_does_not_become_an_advisory_warning(thresholds):
+    result = assess_response(response(1.0, 1.0, 0.5), thresholds)
+    assert (result.outcome, result.reason) == ("uncertain", "jev_boundary_uncertain")
+    assert result.diagnostic == (
+        "Whether the supplied evidence establishes a required boundary for this interface is uncertain."
+    )
+
+
 @pytest.mark.parametrize(
     "probabilities,outcome,reason",
     [

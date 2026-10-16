@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from forge.core.judgments.types import JudgmentResponse, NoulAnswer, validate_answers
 from forge.policy.rule_pack.definitions import APPLICABILITY, questions
 
-DECISION_VERSION = "draft-1"
+DECISION_VERSION = "draft-2"
 Outcome = Literal["warning", "no_warning", "uncertain", "unavailable", "not_applicable"]
 _DIAGNOSTICS = {
     "unknown_surface": "The action's internal, preview or stable surface is unknown, so this rule was not assessed.",
@@ -28,10 +28,13 @@ _DIAGNOSTICS = {
     "jev_conflicting_answers": "The answers disagree about whether a retained interface exists.",
     "jev_no_compatibility_retention": "The covered action shows no retained compatibility interface.",
     "jev_retention_uncertain": "Whether this action retains an earlier interface is uncertain.",
-    "jev_boundary_uncertain": "Whether a required boundary justifies the retained interface is uncertain.",
+    "jev_boundary_uncertain": (
+        "Whether the supplied evidence establishes a required boundary for this interface is uncertain."
+    ),
     "jev_required_boundary": "The covered action establishes a required boundary for the retained interface.",
     "jev_compatibility_retention": (
-        "The covered action appears to retain an earlier interface without a required boundary; "
+        "The covered action retains an earlier interface, but the supplied evidence does not establish why "
+        "that interface must remain; "
         "review affected callers and compatibility before changing it."
     ),
     "jev_saved_failure": "The saved attempt failed, so this rule was not assessed.",

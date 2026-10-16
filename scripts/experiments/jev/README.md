@@ -4,6 +4,11 @@ The A2 `rule-pack-eval.py` harness prepares the wrapper corpus and evaluates sav
 its [evaluation plan](../../../docs/board/doing/jev_rule_pack/evidence/evaluation-plan.md) for manifests, explicit
 threshold settings, label provenance and metric limitations. The paid transport probe below remains separate.
 
+Use `--review-packet` to export case evidence with authored labels/rationales withheld, and `--import-review <path>` to
+validate a human-completed packet and emit a new corpus on stdout. See the
+[human review instructions](../../../docs/board/doing/jev_rule_pack/evidence/human-review.md) for partial reviews,
+explicit replacement and disagreement/exclusion handling. These commands do not call a provider.
+
 Shared module ownership is in [rule-pack design](../../../docs/design_rule_packs.md).
 
 The default prints a fixed synthetic manifest without resolving credentials or making network requests:

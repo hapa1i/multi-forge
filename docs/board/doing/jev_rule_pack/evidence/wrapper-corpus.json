@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "rule_id": "coding_standards.compatibility-wrapper",
-  "rule_version": "draft-2",
-  "evidence_contract_version": 3,
+  "rule_version": "draft-3",
+  "evidence_contract_version": 4,
   "cases": [
     {
       "id": "module-forwarding",
@@ -30,9 +30,19 @@
       "reconstruction": "Authored directly as one synthetic hook action; no repository history or transcript was copied. Supplied strings are the complete intended fixture fragments, not a claim that arbitrary live Edit strings are complete.",
       "proposal": {
         "outcome": "warning",
-        "reason": "The old module-level interface remains solely as forwarding to its replacement. No local-function restriction applies."
+        "reason": "The complete action retains the old module-level interface through its replacement, without establishing an independent justification for retaining it. This is a review prompt, not proof that unseen callers do not require the interface."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16.json",
+        "case_sha256": "16e294ba92fc1192ef6a075fd47af72231032f428c21e34fd1dd2d54b6ae37ec",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "module-direct-update",
@@ -62,7 +72,17 @@
         "outcome": "no_warning",
         "reason": "The interface and visible caller move directly; no wrapper remains."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "no_warning",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16.json",
+        "case_sha256": "e29152bdbf0665a5aa7839f6ef10afde34009a83b5cee5833ef3e9185982cf17",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": false,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "module-injection",
@@ -92,7 +112,17 @@
         "outcome": "warning",
         "reason": "The English and Japanese source comments attempt to replace both instructions and policy facts. They do not override the separately supplied internal/not_approved scope; the retained wrapper matches the seed."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-2.json",
+        "case_sha256": "5d99db97005d021edad8bad9178e603d3478d5b1b93405cac2b1b69c7a3a4226",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "method-argument-adapter",
@@ -122,7 +152,17 @@
         "outcome": "warning",
         "reason": "The complete replacement implements the previous behavior, and restore migrates to it. The retained load method only translates the obsolete strict flag; no separate boundary use is supplied."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-2.json",
+        "case_sha256": "e49cbc1f7d0131c93ed99e4d5c2d08dc0176c172f51eb3a8949558802b496283",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "validation-boundary",
@@ -152,7 +192,17 @@
         "outcome": "no_warning",
         "reason": "InputCommand requires BlankDocument, while the pre-existing inspection consumer requires JSONDecodeError for blank input. The retained parser supplies the command-specific validation around the generic decoder. Moving BlankDocument validation into decode_json would break the migrated inspection consumer."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "no_warning",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-3.json",
+        "case_sha256": "c0bbf4ed9e5c11d4ed463d9b0906b5f07c06eda876ff90e184e5641aaeec3b81",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": true
+        }
+      }
     },
     {
       "id": "validation-gratuitous",
@@ -180,9 +230,19 @@
       "reconstruction": "Authored as one synthetic Edit. Both images include the pre-existing InputCommand exception contract and parser registration, a separate inspect_document consumer with its exception contract, and unchanged tests for both consumers. Replacement definitions and caller migrations are supplied in full. No external project history or API is asserted.",
       "proposal": {
         "outcome": "warning",
-        "reason": "decode_json already supplies the command BlankDocument contract; the inspection consumer accepts both JSONDecodeError and BlankDocument through ValueError. The retained parse_document duplicates validation without preserving any independently required boundary. Caller review is still required before removal."
+        "reason": "decode_json already supplies the shown command BlankDocument contract; the inspection consumer accepts both JSONDecodeError and BlankDocument through ValueError. The retained parse_document duplicates validation without a separate justification established by the supplied contracts. Caller review remains necessary before removal."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-3.json",
+        "case_sha256": "2634654ece0db0bdf8379b9c285fe19e9b131167c8972c541e31df25beb75883",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "preview-alias",
@@ -210,9 +270,19 @@
       "reconstruction": "Authored directly as one synthetic hook action; no repository history or transcript was copied. Supplied strings are the complete intended fixture fragments, not a claim that arbitrary live Edit strings are complete.",
       "proposal": {
         "outcome": "warning",
-        "reason": "A declared preview interface is renamed while its old alias remains without an approved exception."
+        "reason": "The complete action retains the old preview name through its replacement, with no approved exception or supplied independent requirement. A named protocol could justify a pure alias, but none is established in this packet."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-4.json",
+        "case_sha256": "7e9b1af800c746d845d723a7dfb75a1cfa2e9a3d6c50aa4a8eb2d7f36d21f6a1",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "stable-alias",
@@ -242,7 +312,13 @@
         "outcome": "not_applicable",
         "reason": "The supplied public_stable classification places this interface outside the no-default-shim prohibition. This does not verify deprecation or migration correctness."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "not_applicable",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-4.json",
+        "case_sha256": "cd37bc6c2d3eeb834e5ac66534ee8b1e6960632540d5428498c64e505ed7a23d",
+        "question_answers": null
+      }
     },
     {
       "id": "preview-approved-exception",
@@ -272,7 +348,13 @@
         "outcome": "not_applicable",
         "reason": "An explicit preview compatibility exception makes the no-default-shim prohibition inapplicable; this does not verify implementation of the exception."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "not_applicable",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-5.json",
+        "case_sha256": "6ea445651da669ee390da3c7d836c066107f1902a3d2e5ef639cf2cd0e350df2",
+        "question_answers": null
+      }
     },
     {
       "id": "unknown-public-status",
@@ -302,7 +384,13 @@
         "outcome": "unavailable",
         "reason": "The action alone cannot establish public stability or exception approval."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "unavailable",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-5.json",
+        "case_sha256": "8533b24b7829996ab56feef463a059ee62346a153d4837b0f2aacacfdf10b06b",
+        "question_answers": null
+      }
     },
     {
       "id": "callback-protocol",
@@ -332,7 +420,17 @@
         "outcome": "no_warning",
         "reason": "The retained on_record callable preserves its Record argument interface around consume_payload. The unchanged RecordBus registration and delivery require a Record callback, while the new consumer and migrated process_line take strings. Extracting record.payload supplies an independently required protocol adaptation."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "no_warning",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-6.json",
+        "case_sha256": "ba79983c7a53c03c0c4e184f6fe639c54da0c2a76e7c9859c268f3ffc527d550",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": true
+        }
+      }
     },
     {
       "id": "decorator-instrumentation",
@@ -362,7 +460,17 @@
         "outcome": "no_warning",
         "reason": "The decorator adds instrumentation to the unchanged handle implementation and caller. No replaced callable, name, argument or return interface is retained; the independent-boundary question is false because it asks specifically about a retained compatibility wrapper."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "no_warning",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-7.json",
+        "case_sha256": "609cd48a1a83e6a2d0593005d02d55afbb5a4383d0adf2366f506176fb520ca6",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": false,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "write-without-history",
@@ -390,7 +498,13 @@
         "outcome": "unavailable",
         "reason": "Write content supplies neither prior-interface history nor the replacement contract; it is not evidence that the target did not exist."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "unavailable",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-7.json",
+        "case_sha256": "6278ba9ad3d9c7fb8470b330485cda5c03689540556b5dd7b77c687a1bfd7469",
+        "question_answers": null
+      }
     },
     {
       "id": "partial-edit",
@@ -418,9 +532,19 @@
       "reconstruction": "Authored directly as one synthetic hook action; no repository history or transcript was copied. Supplied strings are the complete intended fixture fragments, not a claim that arbitrary live Edit strings are complete.",
       "proposal": {
         "outcome": "unavailable",
-        "reason": "A changed forwarding line does not establish a complete wrapper, replacement contract or compatibility purpose."
+        "reason": "A changed forwarding line does not establish complete interface history, wrapper definitions or a replacement contract."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "unavailable",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-8.json",
+        "case_sha256": "674fc6de1fbdeb72af5a51959b339ce5940fe4d3cace414c344e5c733343bb88",
+        "question_answers": {
+          "coverage": false,
+          "compatibility_retention": null,
+          "independent_boundary": null
+        }
+      }
     },
     {
       "id": "return-shape-adapter",
@@ -448,9 +572,19 @@
       "reconstruction": "Authored directly as one synthetic hook action; no repository history or transcript was copied. Supplied strings are the complete intended fixture fragments, not a claim that arbitrary live Edit strings are complete.",
       "proposal": {
         "outcome": "warning",
-        "reason": "The migrated render caller consumes the replacement mapping. The retained describe function reconstructs only the previous tuple return contract, with no separately required boundary behavior."
+        "reason": "The migrated render caller consumes the replacement mapping. The retained describe function reconstructs the previous tuple return contract without an independent requirement established in the supplied evidence."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-8.json",
+        "case_sha256": "d57fd194f32e397e8e8c19151fce465ee1e4ad40951e43cbbb7e55c458b37ef8",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "return-shape-direct-update",
@@ -480,7 +614,17 @@
         "outcome": "no_warning",
         "reason": "The earlier tuple interface is removed and the visible caller consumes the replacement mapping directly."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "no_warning",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-8.json",
+        "case_sha256": "82f0c26ca9bcd281c334fa9ec5d62ecf82a4eccb4b697e491529cbeacd0db414",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": false,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "multi-file-wrapper",
@@ -505,9 +649,19 @@
       "reconstruction": "Authored directly as one complete synthetic two-file apply_patch action. The old wrapper and its replacement bodies are present; this does not assert that arbitrary patch hunks provide complete definitions.",
       "proposal": {
         "outcome": "warning",
-        "reason": "The internal old interface remains around its moved replacement. Both complete function bodies are supplied in the same atomic patch; no same-file restriction applies."
+        "reason": "The old internal interface remains around its moved replacement. Both complete function bodies are supplied in the same patch without an established boundary justification; the warning still requires caller and compatibility review."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "human-review-2026-10-16-batch-6.json",
+        "case_sha256": "dc722d956bb8c39f8a54e0166d439a86ae5904ef25310552c7e27d81bb4ddd7f",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     }
   ]
 }

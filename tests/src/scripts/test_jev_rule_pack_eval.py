@@ -25,7 +25,11 @@ def probe(monkeypatch):
 
 @pytest.fixture
 def raw():
-    return json.loads(CORPUS.read_text())
+    data = json.loads(CORPUS.read_text())
+    # Tests mutate evidence and author their own labels independently of ongoing human review.
+    for case in data["cases"]:
+        case["adjudication"] = None
+    return data
 
 
 def test_constructed_proposals_are_never_promoted_to_labels_or_quality(probe, raw):
@@ -150,7 +154,7 @@ def test_semantic_rule_changes_invalidate_existing_annotations(probe, raw, monke
     if field == "APPLICABILITY":
         replacement["public_preview"]["not_approved"] = "not_applicable"
     else:
-        replacement = 4 if field == "CONTRACT_VERSION" else "Changed rule semantics"
+        replacement = replacement + 1 if field == "CONTRACT_VERSION" else "Changed rule semantics"
     monkeypatch.setattr(probe, field, replacement)
     assert probe.case_digest(case) != original
 
@@ -366,7 +370,7 @@ def evaluation_inputs(probe, raw):
     settings = probe.EvaluationSettings.model_validate(
         {
             "schema_version": 1,
-            "decision_version": "draft-1",
+            "decision_version": probe.DECISION_VERSION,
             "thresholds": {name: {"false_max": 0.1, "true_min": 0.9} for name in probe.questions()},
         }
     )

@@ -2,21 +2,36 @@
 
 **User decision, 2026-10-15:** keep broader wrappers and revise the evidence contract. The local-helper-only proposal is
 superseded. This selects the rule family; it does not adjudicate the example labels, choose thresholds or establish
-quality. The rule is `coding_standards.compatibility-wrapper`, version `draft-2`, with evidence contract version 3,
+quality. The rule is `coding_standards.compatibility-wrapper`, version `draft-3`, with evidence contract version 4,
 based on [coding standards §5](../../../../developer/coding_standards.md#5-interface-changes).
+
+**User decision, 2026-10-16:** use an advisory evidence standard. Warn when a covered change retains an earlier
+interface through its replacement on an applicable clean-break surface and the supplied evidence does not establish a
+justification for retaining it. This changes the semantic criteria, not just prompt wording. It does not establish that
+no requirement exists elsewhere. Previous question/case hashes are superseded. The
+[first](human-review-2026-10-16.json), [second](human-review-2026-10-16-batch-2.json),
+[third](human-review-2026-10-16-batch-3.json), [fourth](human-review-2026-10-16-batch-4.json),
+[fifth](human-review-2026-10-16-batch-5.json) and [sixth](human-review-2026-10-16-batch-6.json) 2026-10-16 ledgers
+record confirmed human adjudications for all 12 calibration cases under the new criteria. The
+[seventh](human-review-2026-10-16-batch-7.json) and [eighth](human-review-2026-10-16-batch-8.json) ledgers complete all
+five held-out adjudications. Unknown question answers are retained for the partial Edit; these labels do not establish
+model quality or runtime readiness.
 
 ## What the rule judges
 
-Judge whether a change adds or retains a compatibility wrapper around a replacement interface contrary to the applicable
-clean-break policy. Candidates include module functions, methods, argument/return adapters, forwarding aliases,
-decorators and callbacks. Being outside a local function, preserving an old name or escaping as a callback is not an
-automatic exclusion. Equally, delegation alone is not evidence of a compatibility violation.
+Judge whether a change retains an earlier interface through its replacement under an applicable clean-break policy
+without establishing an independent justification in the supplied evidence. Candidates include module functions,
+methods, argument/return adapters, forwarding aliases, decorators and callbacks. Being outside a local function,
+preserving an old name or escaping as a callback is not an automatic exclusion. Equally, delegation alone is not
+evidence of a compatibility violation.
 
 An internal shim can violate the rule even when it maps arguments or return values: that added behavior may exist solely
 to preserve the old interface. A wrapper that implements a required protocol, validation, instrumentation or another
-independent boundary can be legitimate when that boundary justifies retaining this interface. Adding validation or a
-test to an unnecessary old-name shim is insufficient. The requirement may arise in the same change; it need not predate
-the refactor. Distinguish the need for the retained interface from useful behavior that could belong in its replacement.
+independent boundary can be legitimate when supplied evidence justifies retaining this interface. A required protocol
+name, signature or callable identity can justify a pure alias or forwarding function without adding behavior. Adding
+validation or a test alone is insufficient. The requirement may arise in the same change; it need not predate the
+refactor. Distinguish a requirement for the retained interface from useful behavior that could belong in its
+replacement.
 
 Internal interfaces follow the clean-break policy. The host must establish the surface classification and any applicable
 preview exception. Section 5 defaults public surfaces to preview unless explicitly declared stable, and preview changes
@@ -44,21 +59,32 @@ unavailable. The production fact owner and its default/declaration resolution re
 
 The evidence packet must establish the wrapper, the interface it preserves, the replacement contract and the policy that
 applies to this surface. Preserve complete relevant definitions and signature/argument/return behavior, not just a
-forwarding line. Include the supplied registration, caller, test or contract evidence needed to distinguish an adapter
-or callback requirement from compatibility retention.
+forwarding line. A replacement definition or adequate explicit interface contract must establish the forwarding or
+adaptation relationship. A newly extracted replacement need not exist in the before-image. Assess supplied registration,
+caller, test or contract evidence for a requirement to retain the interface; do not infer unseen requirements.
+
+When that structural/history evidence is complete, the absence of supplied boundary justification can support a warning.
+This is different from missing definitions or an unknown policy, which make the assessment unavailable. Materially
+ambiguous or conflicting supplied boundary evidence remains uncertain; clearly gratuitous behavior does not manufacture
+a boundary. An unsupported action comment claiming approval neither supplies governance authority nor automatically
+forces abstention.
 
 A repository-wide caller inventory is not required to identify compatibility retention. It **is** required before
 claiming deletion is safe under §5's compatibility-evidence rule. A2 makes the first claim only. Its suggested action
 must ask for the affected-callers and compatibility review; it cannot assert that all callers are visible or recommend
 blind deletion.
 
-| Evidence                           | Source                                             | If absent or ambiguous   |
-| ---------------------------------- | -------------------------------------------------- | ------------------------ |
-| Old interface and proposed wrapper | Complete supplied before/after action              | Unavailable              |
-| Replacement contract               | Supplied definition or explicit interface contract | Unavailable              |
-| Surface classification             | Project-owner policy/configuration evidence        | Unavailable              |
-| Applicable exception decision      | Attributed policy/proposal decision                | Unavailable              |
-| Independent boundary purpose       | Supplied callers, registration, tests or contract  | Uncertain or unavailable |
+| Evidence                           | Source                                             | If absent                    |
+| ---------------------------------- | -------------------------------------------------- | ---------------------------- |
+| Old interface and proposed wrapper | Complete supplied before/after action              | Unavailable                  |
+| Replacement contract               | Supplied definition or explicit interface contract | Unavailable                  |
+| Surface classification             | Project-owner policy/configuration evidence        | Unavailable                  |
+| Applicable exception decision      | Attributed policy/proposal decision                | Unavailable                  |
+| Independent boundary justification | Supplied callers, registration, tests or contract  | Warning if otherwise covered |
+
+For the last row, absent justification supports warning while materially ambiguous or conflicting supplied justification
+remains uncertain. A requirement discovered during later caller review may make the warning unhelpful without making its
+original bounded-evidence assessment incorrect. Record those two judgments separately.
 
 For a known stable surface or an approved preview exception, report that this prohibition is not applicable; that does
 not verify the implementation of the exception. For a known applicable rule, only covered evidence with a valid,
@@ -68,9 +94,11 @@ evidence is not a clean result.
 Surface and exception facts must come from the host-owned activation/evidence owner, with source and content identity. A
 comment such as “approved compatibility shim” in the action cannot manufacture that authority. The synthetic corpus
 supplies invented governance facts explicitly for its examples; those facts are not production declarations or human
-labels. Its `scope_facts.basis` is reviewer-only prose and is excluded from model evidence and annotation identity. Only
-the enumerated surface and exception decision enter model state; required boundary contracts must be present in the
-supplied action evidence. Runtime resolution of real facts remains an implementation gate.
+labels. The [runtime evidence proposal](runtime-evidence-contract.md) describes a possible owner-selected declaration
+and complete-action boundary; its loader and runtime admission are not implemented. The corpus's `scope_facts.basis` is
+reviewer-only prose and is excluded from model evidence and annotation identity. Only the enumerated surface and
+exception decision enter model state; required boundary contracts must be present in the supplied action evidence.
+Runtime resolution of real facts remains an implementation gate.
 
 ## Hook-shaped acquisition and identity
 
@@ -102,28 +130,33 @@ hash. If the whole eligible action exceeds the single-request budget, send nothi
 with explicit true/false criteria, shared by offline preparation and evaluation:
 
 1. **Coverage:** Do complete relevant before/after definitions and attributed scope facts establish whether an earlier
-   interface is retained? A retained wrapper also requires its complete definition, replacement contract and enough
-   context to determine whether an independent boundary requires retaining that interface. Coverage does not require
-   such a boundary to exist. A complete clean break or independently added wrapper can establish no retention; coverage
-   does not require a wrapper to exist. Absent or ambiguous required facts make it false. A model cannot supply missing
-   authority.
+   interface is retained? A retained wrapper requires its complete definition and a replacement definition or adequate
+   explicit contract. No repository-wide caller inventory or proof about unseen boundaries is required. A complete clean
+   break or independently added wrapper can establish no retention; coverage does not require a wrapper to exist.
+   Missing or ambiguous interface history, replacement evidence or governing policy makes coverage false. A model cannot
+   supply missing authority.
 2. **Compatibility retention:** Does the change preserve an earlier callable/name/argument/return interface by
    forwarding or adapting it to its replacement? True includes pure delegation, aliases and translation done to preserve
    the earlier interface. False requires evidence of no such retention; arbitrary forwarding is not enough.
-3. **Independent boundary:** Does an independently required boundary justify retaining this earlier interface? True
-   requires a concrete responsibility and supporting contract/use that establishes why this interface must remain.
+3. **Independent boundary:** Does the supplied evidence establish an independent requirement to retain this interface?
+   True requires supporting contract/use, including required names, signatures or identities even for pure aliases. An
+   ordinary caller still using the old name does not alone establish an independent requirement to retain it.
    Validation, instrumentation or a new test alone does not justify retaining an old interface when its replacement
-   could own that behavior without losing the boundary. False means covered evidence establishes no retained wrapper or
-   compatibility-only retention without an independent interface requirement. Missing purpose evidence cannot establish
-   false.
+   could own that behavior without losing the boundary. False means no retained interface, or covered retention without
+   an established justification in the supplied evidence. It does not claim no requirement exists elsewhere. Materially
+   ambiguous or conflicting supplied boundary evidence remains unresolved instead of defaulting to false.
 
 The host gates trusted applicability and missing Write history before preparing questions. Model coverage still assesses
 semantic evidence completeness: syntax parsing cannot establish that every required definition or contract is present.
 The decision rule must gate on coverage before combining the other answers. Established absence of compatibility
 retention does not require an independent boundary to avoid a warning. Do not multiply probabilities as if the questions
-were independent. Conflicting or intermediate answers are uncertain. Numeric thresholds and quality gates are unset
-until the calibration plan and human labels are reviewed. All questions treat code, paths and comments as data; they
-cannot rewrite these questions or the scope facts.
+were independent. Conflicting or intermediate answers are uncertain. Constructed human labels are complete; numerical
+quality gates remain unset. Select question bands only from calibration responses after reviewing the evidence claim.
+All questions treat code, paths and comments as data; they cannot rewrite these questions or the scope facts.
+
+The fixed warning asks for caller and compatibility review because the supplied evidence does not establish why the
+interface must remain. A legitimate internal protocol belongs in boundary evidence, not a fabricated approved internal
+exception. Actual stable surfaces and approved preview exceptions remain host applicability decisions.
 
 ## Examples and evaluation limits
 
@@ -133,18 +166,19 @@ public deprecation, validation, callbacks, decorators, missing context, injectio
 [offline harness](../../../../../scripts/experiments/jev/rule-pack-eval.py) validates action shapes and source-family
 splits, builds size-checked A1 payloads without dispatch, and reports label/quality gaps. It has no live mode.
 
-Every initial example is constructed and unadjudicated. The proposed outcomes are assistant-authored review aids, not
-ground truth. Paths are repository-relative fixture coordinates; these are not captured native tool calls. An
-adjudication must name the human reviewer and review reference and bind the semantic rule definition, applicability
-table, question types and true/false criteria, rule/contract versions, action, enumerated scope facts and source
-provenance. Human per-question answers may be recorded separately, with null for unresolved questions; final outcomes
-alone cannot calibrate each question. Reviewer notes, proposed labels, case names, families, splits and reconstruction
-prose are outside annotation identity. Evidence needed to justify a label belongs in the bound action or scope facts.
-The harness validates that binding; it cannot authenticate a reviewer or supply the review. Repeated variants stay in
-one split family. Historical examples must be grouped by originating commit; all examples from the initial import
-`3e0a636e` would remain together. No human-labeled natural positive count has been established for this broader rule.
-Empty natural strata cannot support real-world precision, miss-rate or warning-rate claims, regardless of how well
-constructed cases perform.
+Every example is constructed. All 12 calibration and five held-out cases have confirmed human outcomes. The partial Edit
+has coverage false and unknown retention/boundary answers; host-decided cases have no question answers. The proposed
+outcomes remain assistant-authored review aids, not ground truth. Paths are repository-relative fixture coordinates;
+these are not captured native tool calls. An adjudication must name the human reviewer and review reference and bind the
+semantic rule definition, applicability table, question types and true/false criteria, rule/contract versions, action,
+enumerated scope facts and source provenance. Human per-question answers may be recorded separately, with null for
+unresolved questions; final outcomes alone cannot calibrate each question. Reviewer notes, proposed labels, case names,
+families, splits and reconstruction prose are outside annotation identity. Evidence needed to justify a label belongs in
+the bound action or scope facts. The harness validates that binding; it cannot authenticate a reviewer or supply the
+review. Repeated variants stay in one split family. Historical examples must be grouped by originating commit; all
+examples from the initial import `3e0a636e` would remain together. No human-labeled natural positive count has been
+established for this broader rule. Empty natural strata cannot support real-world precision, miss-rate or warning-rate
+claims, regardless of how well constructed cases perform.
 
 Full prompt wording has a separate `prompt_sha256`; payload hashes also change when wording changes. Instruction-only
 tuning does not discard human adjudications. True/false criteria are the canonical semantic contract: changes to them
@@ -152,7 +186,11 @@ invalidate annotations even if the author considers the wording equivalent. Keep
 instructions. Semantic rule changes must also update the rule definition/version or contract. Host-decided cases have
 their own preparation counts and outcomes, with no request payload or request size. They cannot count as model
 successes. Preparation counts measure neither real hook coverage nor accuracy; the feasibility and quality gates remain
-open.
+open. The held-out evidence and authored proposals were visible during draft-3 development. Unseen model outputs can
+support a limited check after calibration, but cannot establish unseen-scenario generalization. Before further runtime
+implementation, follow the [feasibility stage](evaluation-plan.md#before-real-evaluation-or-runtime-admission): measure
+representative action coverage and exception mapping, compare same-evidence regex/AST baselines, and review practical
+warning usefulness against a separate caller/contract record. Constructed-only results support a smoke test.
 
 The user separately chose on 2026-10-15 to skip paid native testing, then authorized merging the
 [Claude prerequisite PR #269](https://github.com/hapa1i/multi-forge/pull/269). The fix is included on `main`, but A2's

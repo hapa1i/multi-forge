@@ -5,15 +5,22 @@
 The offline outcome/evaluation slice shipped through [PR #271](https://github.com/hapa1i/multi-forge/pull/271), merged
 as `791d9872` on 2026-10-15. The [merge handoff](#offline-evaluation-merge-and-next-gate) records its verified scope. It
 builds on [PR #270](https://github.com/hapa1i/multi-forge/pull/270)'s explicit evaluation identity, session consent and
-override guards. The evaluation branch is merged; the next execution branch must start from the current `main`.
+override guards. Execution continues on `codex/jev-rule-pack-evidence`, rebased from its original `8a2e46d5` base onto
+`main` at `3573c147`.
 
-Next, establish corpus feasibility and human adjudication, then review numerical quality criteria. All 17 constructed
-cases remain unadjudicated. Prepare the host-owned surface/exception fact-source contract before hook wiring; fixture
-facts are not runtime authority. The [evaluation plan](evidence/evaluation-plan.md) owns methodology and acceptance
-decisions; the [wrapper evidence contract](evidence/initial-rule-review.md) retains the user's broader wrapper scope.
-The merged slices do not complete A2 or enable Jev checks. No paid A2 evaluation has run. The [card](card.md) owns
-scope; the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed and will use a
-separate execution branch.
+All 17 constructed cases now have [human adjudications](evidence/human-review.md): 12 calibration and five held-out. The
+[feasibility checkpoint](evidence/corpus-feasibility.md) records seven families, empty historical strata and only one
+held-out positive family. Its scenarios and proposals were visible during draft-3 development; held-out model outputs
+can support only a limited check, not unseen-scenario generalization. Select question bands on calibration responses
+only.
+
+The next [feasibility gate](#slice-2-feasibility-before-runtime-work) precedes declaration, dispatch, activation and
+feedback implementation. It measures real-action evidence coverage, exception mapping and warning usefulness against the
+[evaluation plan](evidence/evaluation-plan.md). The [runtime evidence proposal](evidence/runtime-evidence-contract.md)
+remains unimplemented and selects no production authority. The
+[wrapper evidence contract](evidence/initial-rule-review.md) retains broader wrappers and advisory supplied-evidence
+semantics. No paid A2 evaluation has run or bundle been enabled. The [card](card.md) owns scope; the
+[epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed.
 
 Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
 never introduce a Jev denial or `needs_review`. An independently configured policy or supervisor retains its existing
@@ -88,32 +95,16 @@ native trial or paid Jev request. Keep only the merged `done/` card when consumi
   decorators and callbacks; do not impose the rejected local-helper-only scope. Revise the
   [evidence contract](evidence/initial-rule-review.md) to separate compatibility retention, independent boundary
   responsibilities and trusted surface/exception facts. A warning does not establish that deletion is safe.
-- [ ] Establish corpus feasibility for this family: count independently human-labeled positive/negative changes in each
-  split. Marker/delegation searches cannot count unmarked semantic violations. Narrow the quality claim if natural
-  evidence is sparse. Finalize rule/pack/decision versions, applicability and atomic Noul questions before runtime
-  admission; the offline draft questions and 17 proposed labels are not acceptance evidence.
 - [x] Bind the candidate to [coding standards §5](../../../developer/coding_standards.md#5-interface-changes), including
   justified exceptions and surface distinctions. A missing marker comment is not itself a violation. Define positive,
   compliant and insufficient-context examples before coding; exclude rules whose required facts the hook cannot supply.
 - [x] Define the consumer outcomes: not applicable, evaluated without a warning, warning, uncertain and unavailable.
   Only a covered, valid answer can support an assessed outcome. Give uncertainty and unavailable evidence visible fixed
   diagnostics without inventing a violation, model justification, denial or review request.
-- [ ] Build a local corpus manifest with source revisions, rule versions and human-adjudicated labels. Reconstruct
-  hook-shaped actions: full proposed Write content, Edit old/new strings with replacement semantics, and bounded Codex
-  apply_patch envelopes. Record each reconstruction assumption; exclude PR-level context unavailable at the hook. Keep
-  CLI whole-diff metrics separate. Native transcript actions are an optional cohort requiring separate selection,
-  sanitization and data authorization; do not inspect or upload transcripts merely because they exist.
-- [ ] Include constructed positives and counterexamples where history is sparse, with explicit provenance and separate
-  metrics. Cover legitimate adapters/decorators, justified exceptions, missing context, injections and multilingual
-  comments. Constructed cases test behavior but do not establish real-world prevalence, precision or warning burden.
-- [ ] Split calibration and held-out examples by originating change before tuning; keep sibling hunks and repeated
-  variants together; group constructed mutations by seed/template family too. Do not split one import commit's hunks to
-  manufacture independent positives. Record disagreements, exclusions and empty strata. Merged history and another
-  model's verdict are not labels.
-- [ ] Declare minimum sample counts, per-rule false-positive/miss limits, coverage floor and pack-wide warning-rate
-  ceiling before looking at held-out results. Choose thresholds on calibration data, not a transferred probability of
-  0.8. Record uncertainty intervals and the response to a failed gate: revise/re-evaluate, narrow scope or stop
-  shipping.
+- [x] Retain a versioned manifest of 17 constructed hook-shaped actions with reconstruction assumptions, provenance and
+  human outcomes/question labels. It covers adapters/decorators, exceptions, missing context, injection and a
+  multilingual variant. Keep related mutations within their seven families and each family within one split. These
+  fixtures establish neither real-world prevalence nor warning quality; no historical cohort is implied.
 - [x] Add a dry-run/fixture-first evaluation harness under `scripts/experiments/jev/`, with tests flat in
   `tests/src/scripts/`. Follow A1's path-based loader in `tests/src/scripts/test_jev_probe.py`; the existing
   `codex_probe.load_script` is fixed to `codex-hooks/`. Store methodology, manifests, labels and sanitized results under
@@ -124,9 +115,9 @@ keeps source families in one split, binds adjudications to evidence and semantic
 notes from model inputs, and applies the declared host applicability table before building size-checked A1 payloads.
 Prompt wording has a separate identity. The saved-response evaluator now binds corpus membership/splits, predictions,
 settings and adjudications independently; it reports per-cohort/per-repetition confusion, abstentions, coverage,
-question calibration, latency and known/unknown cost. Shared definitions preserve the existing payload hashes. The
+question calibration, latency and known/unknown cost. Question changes invalidate the corresponding payload hashes. The
 outcome combiner requires explicit question bands and preserves coverage gaps and contradictions. There is no live mode
-or quality acceptance verdict. Human labels, real predictions and approved numerical gates remain outstanding.
+or quality acceptance verdict. Constructed labels are now complete; real predictions and numerical gates remain open.
 
 The 2026-10-15 review follow-up passed 148 focused outcome, harness, regression and label-isolation tests. Coverage
 includes distinct per-question bands, shared host diagnostics, held-out edits preserving calibration captures,
@@ -139,7 +130,7 @@ Saved-prediction schema 2 requires the expected resolved model plus original HTT
 retain bounded failure text, reason counts, separate host-label comparisons and pipeline misses, and evaluator source
 hashes. Corpus identity binds membership/families/splits; observations bind the content actually scored. This replaces
 schema 1's draft fixture format; this card records no paid A2 captures. Rule and decision versions validate against
-their shared owners. Human adjudication and quality acceptance remain open.
+their shared owners. Constructed adjudication is complete; representative evidence and quality acceptance remain open.
 
 Aggregate validation passed: `make test-unit` (11,076 passed, 117 deselected), `make test-regression` (1,924 passed) and
 `make pre-commit`. The CLI fixture smoke kept three host decisions separate from nine model candidates, marked eight
@@ -150,46 +141,140 @@ records 20,757 provider tokens. No paid A2 request or native trial ran.
 The first full unit run failed the existing `test_deadline_reports_timeout` assertion once. Its six-test watchdog module
 and the full unit rerun passed without source or test changes.
 
-**Decision gate:** the broader family is selected. Implement and verify the revised evidence contract, including the
-host-owned origin of surface/exception facts, before hook wiring; do not populate those facts from action comments or
-infer absent interfaces. Numeric quality gates and human labels are outstanding; record them in
-`evidence/evaluation-plan.md` before live evaluation. Offline work may proceed with clearly provisional examples. The A1
-captures are transport fixtures, not A2 quality evidence.
+### Human review and runtime evidence continuation
 
-## Slice 2: complete action evidence and bounded dispatch
+- [x] Prepare a review packet bound to current rule semantics, corpus membership/splits and exact case evidence.
+  Withhold proposed outcomes, reviewer rationales, reconstruction notes, prior human labels and model responses; retain
+  IDs and provenance without claiming a fully blinded independent study.
+- [x] Validate human review import into a new corpus: pending rows preserve prior labels, explicit replacements require
+  acknowledgment, and changed evidence or unresolved disputes/exclusions stop the import. Retain notes in the review
+  ledger, with the corpus referencing it; do not promote authored proposals to human truth.
+- [x] Record the current cohort/family inventory and prepare a concrete runtime evidence proposal against the existing
+  owners. The proposal remains unimplemented; it does not satisfy action preparation or activation checks below.
+- [x] Import all 17 human constructed outcomes, retaining unknown question answers, reviewer references and notes.
+  Recount positive/negative families in the [feasibility checkpoint](evidence/corpus-feasibility.md); no review remains
+  pending. AI-assisted judgments do not imply independently blinded review.
+- [ ] Decide additional acquisition scope versus a constructed-only smoke-test claim at the feasibility gate below.
+- [x] Revise the rule to advisory supplied-evidence semantics and version its criteria, review packet and decision
+  settings. Keep structural gaps unavailable and materially ambiguous boundary evidence uncertain; do not import model
+  proposals as human labels.
+
+2026-10-15 continuation verification: 235 focused rule-pack, probe, evaluation, review and integrity tests passed. The
+tracked packet matches regenerated JSON content; importing its 17 pending rows preserves the source corpus exactly as
+JSON without creating labels. The original preparation report still reproduces byte-for-byte. Independent review found
+an attribution/output-size amplification edge; bounded reviewer/reference fields and an exact emitted-size check now
+cover completed and pending imports, including Unicode expansion and empty stdout on failure. The stale-adjudication
+recovery is documented in the review guide. No runtime policy code or provider call is part of this slice.
+
+2026-10-16 advisory revision: rule `draft-3`, evidence contract 4 and decision version `draft-2` replace the previous
+semantic standard. Warnings identify covered retention without a justification established in the supplied evidence;
+they do not prove an unseen requirement absent. Required names/signatures/identities may justify pure aliases, while an
+ordinary caller using an old name does not alone establish that requirement. The runtime proposal replaces exact-file
+enumeration with a project default and scoped exceptions; its resolver and runtime scope representation remain pending.
+Packet-label correctness and practical warning usefulness require separate evaluation.
+
+Verification: 238 focused rule-pack, probe, evaluator, review, host-diagnostic and integrity tests passed. The new
+regression rejects prior labels, review packets, captures and settings after a semantic revision. Regenerated packet and
+preparation JSON reproduce, pending import preserves the corpus, and worksheet/source hashes match. At that checkpoint,
+all 17 action, scope, provenance and split records were unchanged and unadjudicated. Independent review verified these
+identities and found a stale checklist scope requirement and ambiguous absent-justification prose; both are corrected.
+No paid request or native trial ran.
+
+2026-10-16 human review: eight retained ledgers complete all 17 constructed outcomes across seven families. The
+[review guide](evidence/human-review.md) links each batch and its exact judgments, question answers and notes; the
+[feasibility checkpoint](evidence/corpus-feasibility.md) records counts and limits. Each question has nine known
+calibration answers. Held-out has four known coverage answers and three known retention/boundary answers; `partial-edit`
+retains two unknown answers. Four host reviews have null answer objects. Held-out has only one positive family.
+
+The user confirmed these judgments after AI-assisted discussion, not independent blinded review. The blank packet
+remains reproducible; each import preserves earlier labels and all action, scope, provenance, split and payload
+identities. No model answer sheet supplies human labels. These constructed judgments establish neither historical
+accuracy nor model quality, and do not satisfy runtime admission.
+
+Pre-merge verification: 239 focused tests pass, including
+[`test_bug_272_jev_review_relocation.py`](../../../../tests/regression/test_bug_272_jev_review_relocation.py).
+Corpus-relative ledger references survive a card move with replayed labels and adjudication identity unchanged. The
+[review guide](evidence/human-review.md) records the reference migration and remaining provenance limits.
+
+Validation note: the seventh batch pushed this checklist above the local token screen. The size checker automatically
+obtained an Anthropic token count before failing for missing cached evidence; that document-specific request had not
+been separately approved. The repeated review summaries were then condensed below the local screen, preserving the
+ledgers. Subsequent token checks use the network-restricted sandbox and already-prepared dependencies. The local
+end-of-file hook runs separately because the sandbox forbids its write-mode reads of unchanged `.agents` files. No Jev
+evaluation or native trial was dispatched.
+
+## Slice 2: feasibility before runtime work
+
+- [ ] Review a bounded local real-action acquisition scope before collection: revisions or selected native actions,
+  reconstruction/sanitization, retained data, exclusions and source-family splits. Keep CLI whole diffs separate. No
+  transcript inspection, repository collection or provider dispatch is authorized by this checklist.
+- [ ] Measure supplied interface evidence, trusted governance and symbol-exception mapping on that cohort before
+  implementing the runtime proposal. Count covered, unknown, ambiguous, unsupported and refused actions with reasons;
+  missing context cannot be filled by undeclared repository reads. Finalize rule/contract versions against these
+  results.
+- [ ] Compare existing marker checks and a bounded AST baseline on identical evidence and applicability. Obtain a
+  separate human caller/contract review of warning usefulness; keep that extra context out of model inputs and the
+  original packet labels. Require usefulness as well as coverage, misses and warning burden.
+- [ ] Review minimum positive/negative family counts and numerical gates under the
+  [evaluation plan](evidence/evaluation-plan.md#before-real-evaluation-or-runtime-admission), including interval
+  treatment and failed-gate responses. Empty strata cannot pass; no thresholds are selected here.
+- [ ] Prepare a separately authorized synthetic calibration capture for the nine model candidates, then select bands
+  from calibration responses only and freeze settings. Prepare a separately authorized capture for the four held-out
+  model candidates afterward. Record exact manifests, repetitions, caps and isolated homes; exhausted A1 approvals do
+  not apply. These exposed scenarios permit a limited output check, not unseen-scenario generalization.
+- [ ] Review the evidence and choose proceed, revise/narrow or stop before Slices 3–5. Constructed-only results support
+  a smoke test, not runtime quality. Any runtime go-ahead requires representative action coverage, attributable policy
+  facts and useful warnings meeting the predeclared feasibility gates.
+
+## Slice 3: complete action evidence and bounded dispatch
+
+- [ ] After the feasibility decision, implement and verify the owner-approved project default, scoped exceptions and
+  pinned-authority limits. Same effective applicability may batch across surfaces; ambiguous exception mapping or mixed
+  applicability remains unavailable. Version runtime scope explicitly. Reconcile the coding-standards `future 1.0` /
+  `0.x` wording before selecting a production default; this proposal selects none.
 
 - [ ] Add a small action-scoped preparation seam shared by hooks and the explicit CLI check. Retain a bounded complete
   action envelope before legacy presentation truncation. Run existing policies/resolvers once per file in their current
   test-first order, then compose the whole action before A2 dispatch. Register A2 as an explicit deferred warning phase,
   not another eager regular policy. Merge its attributed decisions/state without rerunning earlier policies.
+
 - [ ] Skip A2 entirely when any file already denies or leaves unresolved `needs_review`, including an independent
   supervisor denial. Record `skipped_blocked`, zero attempts and no assessed verdict. For a multi-file atomic patch, an
   otherwise clean first file cannot trigger Jev before a later denial is known. Preserve existing audit and state
   persistence rules; the skip must not suppress a blocking diagnostic or imply that A2 reviewed the action.
+
 - [ ] Represent full action identity, evaluated evidence identity, file/path attribution and completeness separately.
   For Claude, preserve Write content and Edit old/new text plus replacement semantics. For Codex/CLI patches, retain
   file boundaries, rename metadata and the relevant hunks. Never treat a truncated prefix or a fingerprint as coverage.
+
 - [ ] Admit only the rule's declared evidence scope. Missing context, unsupported/binary/combined patches, unsafe paths,
   ambiguity and oversized actions produce explicit unavailable coverage. Record deletions and other non-applicable
   operations as such; do not count them as reviewed. Do not read arbitrary repository files to fill gaps implicitly.
-- [ ] Resolve surface/exception facts from an attributed host-owned policy/evidence source and bind their exact content
-  to the evaluated evidence identity. Unknown public stability or exception status is unavailable; approved exceptions
-  make this prohibition inapplicable. The fixture corpus's invented scope facts are not a production source. Broader
+
+- [ ] Resolve effective applicability and scoped exceptions from an attributed host-owned policy source and bind their
+  exact content to the evaluated evidence identity. Preserve actual surface facts where supported; a complete approved
+  project default can establish applicability without fabricating a surface class. Unknown governance or ambiguous
+  exception mapping remains unavailable. The fixture corpus's invented scope facts are not a production source. Broader
   wrapper support does not authorize repository crawling or an undisclosed expansion beyond supplied action evidence.
+
 - [ ] Batch all applicable file/rule questions over one bounded state. The first implementation permits at most one
   physical Jev request per native action, `max_attempts=1`, with no automatic splitting. If the complete eligible batch
   exceeds A1 admission, send nothing and identify the uncovered action; no silent subset of files or rules.
+
 - [ ] Reuse `hook_review_budget` through `review_deadline`/`review_scope`; do not start a second hook deadline. A2 runs
   after existing reviews and uses only their remaining allowance. Set a conservative five-second A2 stage default and
   maximum, including A2 preparation, credentials and I/O; this is a product limit, not a measured latency guarantee. It
   can only shorten the shared 55-second window. No remaining allowance means no dispatch; no reset per file/rule. Give
   an explicit CLI check its own bounded scope using the same stage limit.
+
 - [ ] Bridge the synchronous entry point to A1's async client once per action. Keep loop ownership explicit, propagate
   cancellation and release resources. Follow `SyncAdapter._check_no_running_loop` before creating a coroutine, without
   using its text-completion API. Exercise an already-running loop, exhausted shared budget and expiry during I/O through
   clock/transport fixtures; no thread escape or nested event loop may extend the deadline.
+
 - [ ] Treat state text as data. Fixed rule instructions and immutable IDs cannot be replaced by comments, filenames or
   content in the action. Validate exact question coverage and file/rule mapping before composing any warning.
+
 - [ ] Convert A1 errors and unexpected consumer evaluation failures into bounded unavailable diagnostics even under
   engine `fail_mode=closed`. Preserve any independently valid attempt accounting. Keep cancellation distinct from a
   clean assessment; a missing response or malformed answer cannot populate the clean-result cache.
@@ -199,7 +284,7 @@ The stage limit is a consumer choice, not an A1 latency guarantee. Running A2 la
 budget; it may reduce A2 coverage on slow reviews. Report that skip without extending the hook or relabeling completed
 independent reviews as unavailable. Measure the coverage/latency tradeoff in the evaluation.
 
-## Slice 3: activation, cache and audit
+## Slice 4: activation, cache and audit
 
 - [ ] Add a new `src/forge/policy/registry.py` if needed to generalize registration, delegating deterministic bundles to
   their current implementations. Update engine construction, CLI list/choices and `core/ops/policy.py` together.
@@ -254,7 +339,7 @@ independent reviews as unavailable. Measure the coverage/latency tradeoff in the
 - [ ] Run the focused policy/CLI and telemetry integration checks during this slice. Confirm trace show/explain, costs
   by model/verb and session activity agree on injected attempts, with no synthetic proxy traffic or double charge.
 
-## Slice 4: warnings the model and operator can inspect
+## Slice 5: warnings the model and operator can inspect
 
 - [ ] Produce structured `warning_findings` with stable rule/path attribution and legacy warning strings; keep
   `violations` for denials. Fixed rule text may use `provenance=policy`; action excerpts remain attributed input data.
@@ -286,25 +371,13 @@ independent reviews as unavailable. Measure the coverage/latency tradeoff in the
   trial plan. Model receipt of the substantive rule/evidence must be observed; stderr or an operator `Hook` notice alone
   is insufficient. Preserve the distinction between native-runtime quota and Jev API cost in the run record.
 
-## Slice 5: authorized quality evaluation and release decision
+## Slice 6: release decision
 
-- [ ] Prepare the exact evaluation manifest after offline checks pass: approved corpus selection/sanitization, payload
-  hashes, source cohorts, reconstruction recipes, versions, calibration/held-out split, repetitions, timeout, maximum
-  physical requests and dated price assumptions. Include all controls and retries; the first pass disables retries.
-- [ ] Obtain explicit data-sharing and paid-run authorization for that manifest. A1's four-request and 25-request
-  approvals are exhausted and do not authorize repository data. Use an isolated `FORGE_HOME`, clear cached runtime
-  configuration and copy no user telemetry/session history into it.
-- [ ] Run the authorized cases with ZDR, a physical request cap and a reported-cost stop check. Missing cost remains
-  unknown; estimated spend and a post-response check are not a guaranteed invoice cap. Persist interrupted/failed
-  attempts and stop rather than silently repeating them under the same allowance.
-- [ ] Report per-rule confusion counts, false-positive/miss rates, calibration, coverage/uncertainty, aggregate warning
-  frequency, sample counts, latency and reported cost against the deterministic baseline on the same corpus. Separate
-  historical, transcript-derived and constructed cohorts, including tune/held-out results and repeated-input
-  variability. Empty positive strata cannot pass a miss-rate gate; do not tune against the held-out set and still call
-  it held out.
-- [ ] Apply the predeclared quality gates. Publish a supported-rule/context matrix and failures in `evidence/`; remove
-  or narrow rules that fail, with a fresh evaluation when needed. Offline transport/formatter tests alone cannot close
-  this acceptance gate. A later opted-in warning trial remains separately authorized and cannot imply quota savings.
+- [ ] Reconcile final runtime behavior with the pre-runtime evidence, approved quality gates and supported-context
+  matrix. Publish failures and any required new evaluation under `evidence/`; runtime contract/model changes invalidate
+  affected results. Do not duplicate or silently relax the [evaluation plan](evidence/evaluation-plan.md).
+- [ ] Require the integration, native-delivery and documentation checks below before release. A later opted-in warning
+  trial remains separately authorized; transport/formatter fixtures cannot establish quality or quota savings.
 
 ## Acceptance fixtures
 
@@ -404,11 +477,10 @@ Shared rule definitions, host applicability, fixed diagnostics and saved-respons
 activation command or hook dispatch and changes no A1 API or telemetry schema. No paid A2 evaluation or native trial
 ran.
 
-A2 and the epic remain `doing/`; A3 remains proposed. The next offline work is a case-hash-bound human review worksheet
-and corpus-feasibility assessment, alongside a concrete runtime fact-source/action-envelope contract. Human labels and
-numerical quality gates remain open; fixture proposals are not human adjudications or production thresholds. Runtime
-activation, audit/cache integration and native warning delivery remain unfinished. This handoff authorizes no new data
-collection or paid/native run.
+A2 and the epic remain `doing/`; A3 remains proposed. The 2026-10-16 continuation completes constructed human review and
+the runtime evidence proposal. The next [feasibility gate](#slice-2-feasibility-before-runtime-work) measures
+representative evidence coverage and useful warnings before implementing that proposal. Numerical gates, runtime
+activation, audit/cache integration and native delivery remain open. This handoff authorizes no collection or paid run.
 
 ## Execution evidence
 

@@ -1,8 +1,8 @@
 {
   "rule_id": "coding_standards.compatibility-wrapper",
-  "rule_version": "draft-2",
-  "evidence_contract_version": 3,
-  "prompt_sha256": "c8b51c065e4451230b7f28c3a4769b93cb9882322a9f40e50be8ff11c362c670",
+  "rule_version": "draft-3",
+  "evidence_contract_version": 4,
+  "prompt_sha256": "89578191c0d085e1e4e284fb50145d8fc255fa1bcd55f04e74a327aea488a572",
   "mode": "offline_preparation",
   "max_physical_requests": 0,
   "quality_accepted": false,
@@ -10,12 +10,11 @@
     "numeric_quality_gates_unset",
     "no_predictions_or_quality_evaluation",
     "live_execution_not_implemented",
-    "human_adjudication_incomplete",
     "no_historical_evidence"
   ],
   "cohorts": {
-    "constructed/calibration/unadjudicated": 12,
-    "constructed/held_out/unadjudicated": 5
+    "constructed/calibration/adjudicated": 12,
+    "constructed/held_out/adjudicated": 5
   },
   "preparation_counts": {
     "host_decision/not_applicable": 2,
@@ -26,139 +25,139 @@
   "cases": [
     {
       "id": "module-forwarding",
-      "case_sha256": "d2b346448ece407f103cf4c5b5d29f7b1bdd5054871e52e7a8560155b5215f36",
-      "label_status": "unadjudicated",
+      "case_sha256": "16e294ba92fc1192ef6a075fd47af72231032f428c21e34fd1dd2d54b6ae37ec",
+      "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "f37d6e187827efbaafd4b6092cfe50d560ab4ae666672ef775d347ece28f862b",
-      "request_bytes": 3238
+      "payload_sha256": "8bdd8ae8b6be78572edd47ab6aa122b9c4ba75cfe91d10c7f9c1047d68d1e0c0",
+      "request_bytes": 4389
     },
     {
       "id": "module-direct-update",
-      "case_sha256": "0ab7b27883d50f7e0a20fab72f72405853b96850690ce63d04603de99ec10137",
-      "label_status": "unadjudicated",
+      "case_sha256": "e29152bdbf0665a5aa7839f6ef10afde34009a83b5cee5833ef3e9185982cf17",
+      "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "ca4fc284d262202f4ce9f93311317ffc263ad7ee7434edac656247fdd82c0dda",
-      "request_bytes": 3184
+      "payload_sha256": "a54f6a1dd61e0760de872215cc2e748726180b92fc7de239a6f79036a9860ca0",
+      "request_bytes": 4335
     },
     {
       "id": "module-injection",
-      "case_sha256": "9b4754e476701ed4330bc9042782b88d73194e9851ebe4869094228c2b7ac0e4",
-      "label_status": "unadjudicated",
+      "case_sha256": "5d99db97005d021edad8bad9178e603d3478d5b1b93405cac2b1b69c7a3a4226",
+      "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "8cfde2d607bcbad5c02b60200815ca516238c3dc2322295cc64dd2bff56f33a0",
-      "request_bytes": 3584
+      "payload_sha256": "4f3ed711385733878353cf9535d134ecb416dd59c37ecb57acf74a2606493830",
+      "request_bytes": 4735
     },
     {
       "id": "method-argument-adapter",
-      "case_sha256": "3f292443d4fcc37ebdd6a10bc8d340cdc908892c56b32b1daddc800d8bfd3375",
-      "label_status": "unadjudicated",
+      "case_sha256": "e49cbc1f7d0131c93ed99e4d5c2d08dc0176c172f51eb3a8949558802b496283",
+      "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "4d40da4cf766bdb155d7f5a6eb980532c4034d6713e748a20ca3edf9302fff15",
-      "request_bytes": 3677
+      "payload_sha256": "a13d7768b671bdcd31cbced377e96300d99a5479b1c1ab5194736278fc47df3e",
+      "request_bytes": 4828
     },
     {
       "id": "validation-boundary",
-      "case_sha256": "ad196d3129b404fcf0aea9ba382bb47febb2e2fabd23149ed50091eb5b7f7b73",
-      "label_status": "unadjudicated",
+      "case_sha256": "c0bbf4ed9e5c11d4ed463d9b0906b5f07c06eda876ff90e184e5641aaeec3b81",
+      "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "37e33804babeb618e9edb2eb50c03b5257e303d1893b53ddceb2c8ff2c19e678",
-      "request_bytes": 5110
+      "payload_sha256": "7648697106127ab654400391be13dc3fdcc1dd72e68af3a6916550e15e1203f0",
+      "request_bytes": 6261
     },
     {
       "id": "validation-gratuitous",
-      "case_sha256": "d84886246ae16fbcba956294a5eaed15bc959ac38e23c9c5727924e33c30a2ea",
-      "label_status": "unadjudicated",
+      "case_sha256": "2634654ece0db0bdf8379b9c285fe19e9b131167c8972c541e31df25beb75883",
+      "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "451e767a7e7194bb194f6733ddbfa827925e3c16b80320cd0e50c452f1da98ea",
-      "request_bytes": 5183
+      "payload_sha256": "6da7b393582f5ba57962215dfc189049c152538751b39bb245db0058f20b05f1",
+      "request_bytes": 6334
     },
     {
       "id": "preview-alias",
-      "case_sha256": "3a0b39a0b7693169050289770bd630cf0f333dfdb50ce2ecc1b336527806a529",
-      "label_status": "unadjudicated",
+      "case_sha256": "7e9b1af800c746d845d723a7dfb75a1cfa2e9a3d6c50aa4a8eb2d7f36d21f6a1",
+      "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "f4ff59029ea0fe719c8dd5fb8c1248d46da015d082cf40cba9fc5e8d98b8111c",
-      "request_bytes": 3099
+      "payload_sha256": "d7104657091f783ec44b0f6120a7be9fff73d25b12a5f4f32286808f40cd5a22",
+      "request_bytes": 4250
     },
     {
       "id": "stable-alias",
-      "case_sha256": "880649431ded3b23e53c9cff6bd1f1c76e119501d86cd3a14255f513a62409bf",
-      "label_status": "unadjudicated",
+      "case_sha256": "cd37bc6c2d3eeb834e5ac66534ee8b1e6960632540d5428498c64e505ed7a23d",
+      "label_status": "adjudicated",
       "preparation": "host_decision",
       "host_outcome": "not_applicable",
       "host_reason": "stable_surface"
     },
     {
       "id": "preview-approved-exception",
-      "case_sha256": "fbc96529edfad1056e7979e21b6273dbce09c2cc0b32c6222d9bcee15ad8b1d6",
-      "label_status": "unadjudicated",
+      "case_sha256": "6ea445651da669ee390da3c7d836c066107f1902a3d2e5ef639cf2cd0e350df2",
+      "label_status": "adjudicated",
       "preparation": "host_decision",
       "host_outcome": "not_applicable",
       "host_reason": "approved_preview_exception"
     },
     {
       "id": "unknown-public-status",
-      "case_sha256": "c9cf692d7701ac125aaf37887bab81c31d131f5d3aeb7b9a0a8a96f2b83f79c4",
-      "label_status": "unadjudicated",
+      "case_sha256": "8533b24b7829996ab56feef463a059ee62346a153d4837b0f2aacacfdf10b06b",
+      "label_status": "adjudicated",
       "preparation": "host_decision",
       "host_outcome": "unavailable",
       "host_reason": "unknown_surface"
     },
     {
       "id": "callback-protocol",
-      "case_sha256": "743d343c42b4df5668e71bcc720bde68801f4aa55cf58cc1b07e422cb4dbe680",
-      "label_status": "unadjudicated",
+      "case_sha256": "ba79983c7a53c03c0c4e184f6fe639c54da0c2a76e7c9859c268f3ffc527d550",
+      "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "dd766590158d6780c3f1431f9a756e7e4984ad54e5b583667b1ebcde6e427469",
-      "request_bytes": 4779
+      "payload_sha256": "478cc723c4ec8a393ffb3c586e42349cc23c2be83daf5b28c276e2524d629fd7",
+      "request_bytes": 5930
     },
     {
       "id": "decorator-instrumentation",
-      "case_sha256": "d9f60ab21a0f003d0c899344cf16cc25266d65fd252954f3e54b1639d0bd1bcd",
-      "label_status": "unadjudicated",
+      "case_sha256": "609cd48a1a83e6a2d0593005d02d55afbb5a4383d0adf2366f506176fb520ca6",
+      "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "551453b0fa7cf4235434d0123a84f4dd27c7ba7a4459c55415b699c1e564fda5",
-      "request_bytes": 3399
+      "payload_sha256": "5177f79699114d70568092d4426a33b56824d344ec4912675589d66a90f527d4",
+      "request_bytes": 4550
     },
     {
       "id": "write-without-history",
-      "case_sha256": "4dfc9172a08b90db2f59da266828280970a02fe381fd7e515219ddb84912317b",
-      "label_status": "unadjudicated",
+      "case_sha256": "6278ba9ad3d9c7fb8470b330485cda5c03689540556b5dd7b77c687a1bfd7469",
+      "label_status": "adjudicated",
       "preparation": "host_decision",
       "host_outcome": "unavailable",
       "host_reason": "write_without_prior_interface_evidence"
     },
     {
       "id": "partial-edit",
-      "case_sha256": "d8b46e7d92c06473fb6446f0d06cb2870d9c0635460492c6255bb30be84057d8",
-      "label_status": "unadjudicated",
+      "case_sha256": "674fc6de1fbdeb72af5a51959b339ce5940fe4d3cace414c344e5c733343bb88",
+      "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "06354deb55d6733af231e31b7ecb6e1bf3536f4032b9a70ca6655ad371a066ee",
-      "request_bytes": 3013
+      "payload_sha256": "7b6d13414747688455ce30d96267d6e2d755fc4dd43eef71ebc7c9ea469fb53d",
+      "request_bytes": 4164
     },
     {
       "id": "return-shape-adapter",
-      "case_sha256": "b429b81e0ef621ff9700b9ace8d35e00bbec71e487b077f983a5e7c275f7a616",
-      "label_status": "unadjudicated",
+      "case_sha256": "d57fd194f32e397e8e8c19151fce465ee1e4ad40951e43cbbb7e55c458b37ef8",
+      "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "6a20f4721ce7164566d74559de2f29da8ed28d0694a978f76c70ad2191fc62e8",
-      "request_bytes": 3418
+      "payload_sha256": "c858b0479492031f101a6e203c094996dbb441e79806be54684afdebbdf049ee",
+      "request_bytes": 4569
     },
     {
       "id": "return-shape-direct-update",
-      "case_sha256": "c1b5621f9815d06e38d3727fd4c53b2711bfe7a8c3b39f450052fc9269b7eb3c",
-      "label_status": "unadjudicated",
+      "case_sha256": "82f0c26ca9bcd281c334fa9ec5d62ecf82a4eccb4b697e491529cbeacd0db414",
+      "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "c6bbee2619ad931ad4f31c2b94f815968c6b7df7560b14984a789e01b45881b5",
-      "request_bytes": 3309
+      "payload_sha256": "e905ad8ded5141a456dc48cc85021f3349b150d6dc4dfbfe95d496ee77d6c3b2",
+      "request_bytes": 4460
     },
     {
       "id": "multi-file-wrapper",
-      "case_sha256": "50f002b80618884bce18781644b270050260de4fa232e023af929a7619f3b196",
-      "label_status": "unadjudicated",
+      "case_sha256": "dc722d956bb8c39f8a54e0166d439a86ae5904ef25310552c7e27d81bb4ddd7f",
+      "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "a04dfabae5b8465e86914814408bb0764b151c6e8d15fa4808df8c83384af9ef",
-      "request_bytes": 3237
+      "payload_sha256": "59ee19712ad99191ebb88392c9b836d3ae9763d0a27965fc9207b82de2bb9fcd",
+      "request_bytes": 4388
     }
   ]
 }

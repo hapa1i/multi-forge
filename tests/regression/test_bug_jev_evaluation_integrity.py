@@ -196,16 +196,18 @@ def test_infrastructure_failures_and_insufficient_evidence_remain_distinct(evalu
 
 
 @pytest.mark.parametrize(
-    ("constant", "header", "new_value"),
+    ("constant", "header"),
     [
-        ("RULE_ID", "rule_id", "coding_standards.changed-rule"),
-        ("RULE_VERSION", "rule_version", "draft-3"),
-        ("CONTRACT_VERSION", "evidence_contract_version", 4),
+        ("RULE_ID", "rule_id"),
+        ("RULE_VERSION", "rule_version"),
+        ("CONTRACT_VERSION", "evidence_contract_version"),
     ],
 )
-def test_corpus_headers_follow_current_shared_contract(evaluator, inputs, monkeypatch, constant, header, new_value):
+def test_corpus_headers_follow_current_shared_contract(evaluator, inputs, monkeypatch, constant, header):
     corpus, _, _ = inputs
     raw = corpus.model_dump()
+    current = getattr(evaluator, constant)
+    new_value = current + 1 if isinstance(current, int) else current + "-next"
     monkeypatch.setattr(evaluator, constant, new_value)
     with pytest.raises(ValueError):
         evaluator.Corpus.model_validate(raw)
@@ -216,11 +218,52 @@ def test_corpus_headers_follow_current_shared_contract(evaluator, inputs, monkey
 def test_settings_reject_previous_combiner_version(evaluator, inputs, monkeypatch):
     _, _, settings = inputs
     raw = settings.model_dump()
-    monkeypatch.setattr(evaluator, "DECISION_VERSION", "draft-2")
+    new_version = evaluator.DECISION_VERSION + "-next"
+    monkeypatch.setattr(evaluator, "DECISION_VERSION", new_version)
     with pytest.raises(ValueError):
         evaluator.EvaluationSettings.model_validate(raw)
-    raw["decision_version"] = "draft-2"
-    assert evaluator.EvaluationSettings.model_validate(raw).decision_version == "draft-2"
+    raw["decision_version"] = new_version
+    assert evaluator.EvaluationSettings.model_validate(raw).decision_version == new_version
+
+
+def test_rule_revision_requires_fresh_reviews_labels_predictions_and_settings(evaluator, inputs, monkeypatch):
+    corpus, saved, settings = inputs
+    previous_packet = evaluator.ReviewPacket.model_validate(evaluator.review_packet(corpus))
+    changed_questions = evaluator.questions()
+    changed_questions["coverage"].criteria["true"] += " A newly ratified evidence requirement applies."
+    monkeypatch.setattr(evaluator, "questions", lambda: changed_questions)
+    monkeypatch.setattr(evaluator, "RULE_VERSION", evaluator.RULE_VERSION + "-next")
+    monkeypatch.setattr(evaluator, "CONTRACT_VERSION", evaluator.CONTRACT_VERSION + 1)
+    monkeypatch.setattr(evaluator, "DECISION_VERSION", evaluator.DECISION_VERSION + "-next")
+
+    migrated = corpus.model_copy(deep=True)
+    migrated.rule_version = evaluator.RULE_VERSION
+    migrated.evidence_contract_version = evaluator.CONTRACT_VERSION
+    assert evaluator.corpus_digest(migrated) == saved["corpus_sha256"]
+    with pytest.raises(ValueError, match="Stale adjudication"):
+        evaluator.prepare(migrated)
+    for case in migrated.cases:
+        case.adjudication = None
+    with pytest.raises(ValueError, match="rule contract changed; regenerate"):
+        evaluator.import_review(migrated, previous_packet)
+
+    predictions = evaluator.SavedPredictions.model_validate(saved)
+    with pytest.raises(ValueError, match="Settings decision version"):
+        evaluator.evaluate(migrated, predictions, settings)
+    current_settings = evaluator.EvaluationSettings.model_validate(
+        {**settings.model_dump(), "decision_version": evaluator.DECISION_VERSION}
+    )
+    with pytest.raises(ValueError, match="membership/splits or prompt"):
+        evaluator.evaluate(migrated, predictions, current_settings)
+    # Updating only the manifest header must not make old physical observations valid for new semantics.
+    predictions.prompt_sha256 = evaluator.prompt_digest()
+    with pytest.raises(ValueError, match="Stale prediction evidence or payload"):
+        evaluator.evaluate(migrated, predictions, current_settings)
+
+    fresh = evaluator.ReviewPacket.model_validate(evaluator.review_packet(migrated))
+    assert all(row.review.status == "pending" and row.review.outcome is None for row in fresh.cases)
+    assert evaluator.import_review(migrated, fresh) == migrated.model_dump()
+    assert all(case.adjudication is not None for case in corpus.cases)
 
 
 def test_missing_observations_count_as_unknown_latency(evaluator, inputs):
