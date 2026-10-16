@@ -13,8 +13,9 @@ no requirement exists elsewhere. Previous question/case hashes are superseded. T
 [third](human-review-2026-10-16-batch-3.json), [fourth](human-review-2026-10-16-batch-4.json),
 [fifth](human-review-2026-10-16-batch-5.json) and [sixth](human-review-2026-10-16-batch-6.json) 2026-10-16 ledgers
 record confirmed human adjudications for all 12 calibration cases under the new criteria. The
-[seventh ledger](human-review-2026-10-16-batch-7.json) adds the first two held-out adjudications; three held-out cases
-remain pending.
+[seventh](human-review-2026-10-16-batch-7.json) and [eighth](human-review-2026-10-16-batch-8.json) ledgers complete all
+five held-out adjudications. Unknown question answers are retained for the partial Edit; these labels do not establish
+model quality or runtime readiness.
 
 ## What the rule judges
 
@@ -165,18 +166,19 @@ public deprecation, validation, callbacks, decorators, missing context, injectio
 [offline harness](../../../../../scripts/experiments/jev/rule-pack-eval.py) validates action shapes and source-family
 splits, builds size-checked A1 payloads without dispatch, and reports label/quality gaps. It has no live mode.
 
-Every example is constructed. All 12 calibration cases and two held-out cases now have confirmed human labels; three
-held-out cases remain unadjudicated. The proposed outcomes remain assistant-authored review aids, not ground truth.
-Paths are repository-relative fixture coordinates; these are not captured native tool calls. An adjudication must name
-the human reviewer and review reference and bind the semantic rule definition, applicability table, question types and
-true/false criteria, rule/contract versions, action, enumerated scope facts and source provenance. Human per-question
-answers may be recorded separately, with null for unresolved questions; final outcomes alone cannot calibrate each
-question. Reviewer notes, proposed labels, case names, families, splits and reconstruction prose are outside annotation
-identity. Evidence needed to justify a label belongs in the bound action or scope facts. The harness validates that
-binding; it cannot authenticate a reviewer or supply the review. Repeated variants stay in one split family. Historical
-examples must be grouped by originating commit; all examples from the initial import `3e0a636e` would remain together.
-No human-labeled natural positive count has been established for this broader rule. Empty natural strata cannot support
-real-world precision, miss-rate or warning-rate claims, regardless of how well constructed cases perform.
+Every example is constructed. All 12 calibration and five held-out cases have confirmed human outcomes. The partial Edit
+has coverage false and unknown retention/boundary answers; host-decided cases have no question answers. The proposed
+outcomes remain assistant-authored review aids, not ground truth. Paths are repository-relative fixture coordinates;
+these are not captured native tool calls. An adjudication must name the human reviewer and review reference and bind the
+semantic rule definition, applicability table, question types and true/false criteria, rule/contract versions, action,
+enumerated scope facts and source provenance. Human per-question answers may be recorded separately, with null for
+unresolved questions; final outcomes alone cannot calibrate each question. Reviewer notes, proposed labels, case names,
+families, splits and reconstruction prose are outside annotation identity. Evidence needed to justify a label belongs in
+the bound action or scope facts. The harness validates that binding; it cannot authenticate a reviewer or supply the
+review. Repeated variants stay in one split family. Historical examples must be grouped by originating commit; all
+examples from the initial import `3e0a636e` would remain together. No human-labeled natural positive count has been
+established for this broader rule. Empty natural strata cannot support real-world precision, miss-rate or warning-rate
+claims, regardless of how well constructed cases perform.
 
 Full prompt wording has a separate `prompt_sha256`; payload hashes also change when wording changes. Instruction-only
 tuning does not discard human adjudications. True/false criteria are the canonical semantic contract: changes to them

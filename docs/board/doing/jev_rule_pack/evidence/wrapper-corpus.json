@@ -534,7 +534,17 @@
         "outcome": "unavailable",
         "reason": "A changed forwarding line does not establish complete interface history, wrapper definitions or a replacement contract."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "unavailable",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-8.json",
+        "case_sha256": "674fc6de1fbdeb72af5a51959b339ce5940fe4d3cace414c344e5c733343bb88",
+        "question_answers": {
+          "coverage": false,
+          "compatibility_retention": null,
+          "independent_boundary": null
+        }
+      }
     },
     {
       "id": "return-shape-adapter",
@@ -564,7 +574,17 @@
         "outcome": "warning",
         "reason": "The migrated render caller consumes the replacement mapping. The retained describe function reconstructs the previous tuple return contract without an independent requirement established in the supplied evidence."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-8.json",
+        "case_sha256": "d57fd194f32e397e8e8c19151fce465ee1e4ad40951e43cbbb7e55c458b37ef8",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "return-shape-direct-update",
@@ -594,7 +614,17 @@
         "outcome": "no_warning",
         "reason": "The earlier tuple interface is removed and the visible caller consumes the replacement mapping directly."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "no_warning",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-8.json",
+        "case_sha256": "82f0c26ca9bcd281c334fa9ec5d62ecf82a4eccb4b697e491529cbeacd0db414",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": false,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "multi-file-wrapper",

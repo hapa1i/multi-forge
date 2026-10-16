@@ -14,12 +14,12 @@ evidence-bound review packets with proposals and rationales withheld. The
 [fifth](evidence/human-review-2026-10-16-batch-5.json) and [sixth](evidence/human-review-2026-10-16-batch-6.json)
 2026-10-16 ledgers record human adjudications for all 12 calibration cases: six warnings, three no warnings, two
 host-decided not-applicable outcomes and one host-decided unavailable outcome across four source families. The
-[seventh ledger](evidence/human-review-2026-10-16-batch-7.json) adds two held-out labels across two families: one no
-warning and one host-decided unavailable outcome. Three held-out cases remain pending. The
-[feasibility checkpoint](evidence/corpus-feasibility.md) records empty historical strata and sparse proposed held-out
-positives. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) defines a candidate owner-selected
-declaration and whole-action boundary before hook wiring; it is not implemented or approved runtime authority. The
-[evaluation plan](evidence/evaluation-plan.md) owns quality decisions, and the
+[seventh](evidence/human-review-2026-10-16-batch-7.json) and [eighth](evidence/human-review-2026-10-16-batch-8.json)
+ledgers complete all five held-out labels: one warning, two no warnings and two unavailable outcomes across three
+families. The [feasibility checkpoint](evidence/corpus-feasibility.md) records empty historical strata and only one
+held-out positive family. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) defines a candidate
+owner-selected declaration and whole-action boundary before hook wiring; it is not implemented or approved runtime
+authority. The [evaluation plan](evidence/evaluation-plan.md) owns quality decisions, and the
 [wrapper evidence contract](evidence/initial-rule-review.md) retains the user's broader wrapper scope. The 2026-10-16
 revision makes warnings advisory when covered retention lacks a justification established by the supplied evidence. The
 declaration proposal now uses an explicit project default and scoped exceptions, not uniform-file enumeration. The
@@ -205,12 +205,11 @@ all 17 action, scope, provenance and split records were unchanged and unadjudica
 identities and found a stale checklist scope requirement and ambiguous absent-justification prose; both are corrected.
 No paid request or native trial ran.
 
-2026-10-16 human review: the first six retained ledgers completed all 12 calibration labels; the seventh adds
-`decorator-instrumentation` as no warning and the host-decided `write-without-history` as unavailable. The
-[review guide](evidence/human-review.md) links each batch and its exact judgments, question answers and notes. The
-[feasibility checkpoint](evidence/corpus-feasibility.md) records the current cohort and family counts. Fourteen cases
-are reviewed and three held-out cases remain pending; the four host reviews have null question answers. Each semantic
-question has nine calibration answers and one held-out answer. No held-out warning has been adjudicated.
+2026-10-16 human review: eight retained ledgers complete all 17 constructed outcomes across seven families. The
+[review guide](evidence/human-review.md) links each batch and its exact judgments, question answers and notes; the
+[feasibility checkpoint](evidence/corpus-feasibility.md) records counts and limits. Each question has nine known
+calibration answers. Held-out has four known coverage answers and three known retention/boundary answers; `partial-edit`
+retains two unknown answers. Four host reviews have null answer objects. Held-out has only one positive family.
 
 The user confirmed these judgments after AI-assisted discussion, not independent blinded review. The blank packet
 remains reproducible; each import preserves earlier labels and all action, scope, provenance, split and payload
@@ -226,9 +225,9 @@ evaluation or native trial was dispatched.
 
 **Decision gate:** the broader family is selected. Implement and verify the revised evidence contract, including the
 host-owned origin of surface/exception facts, before hook wiring; do not populate those facts from action comments or
-infer absent interfaces. Numeric quality gates and human labels are outstanding; record them in
-`evidence/evaluation-plan.md` before live evaluation. Offline work may proceed with clearly provisional examples. The A1
-captures are transport fixtures, not A2 quality evidence.
+infer absent interfaces. Constructed labels are complete; representative evidence and numeric quality gates remain open
+in `evidence/evaluation-plan.md` before live evaluation. The A1 captures are transport fixtures, not A2 quality
+evidence.
 
 ## Slice 2: complete action evidence and bounded dispatch
 

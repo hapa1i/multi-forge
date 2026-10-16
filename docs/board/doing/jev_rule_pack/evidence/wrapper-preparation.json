@@ -10,13 +10,11 @@
     "numeric_quality_gates_unset",
     "no_predictions_or_quality_evaluation",
     "live_execution_not_implemented",
-    "human_adjudication_incomplete",
     "no_historical_evidence"
   ],
   "cohorts": {
     "constructed/calibration/adjudicated": 12,
-    "constructed/held_out/adjudicated": 2,
-    "constructed/held_out/unadjudicated": 3
+    "constructed/held_out/adjudicated": 5
   },
   "preparation_counts": {
     "host_decision/not_applicable": 2,
@@ -132,7 +130,7 @@
     {
       "id": "partial-edit",
       "case_sha256": "674fc6de1fbdeb72af5a51959b339ce5940fe4d3cace414c344e5c733343bb88",
-      "label_status": "unadjudicated",
+      "label_status": "adjudicated",
       "preparation": "model_input",
       "payload_sha256": "7b6d13414747688455ce30d96267d6e2d755fc4dd43eef71ebc7c9ea469fb53d",
       "request_bytes": 4164
@@ -140,7 +138,7 @@
     {
       "id": "return-shape-adapter",
       "case_sha256": "d57fd194f32e397e8e8c19151fce465ee1e4ad40951e43cbbb7e55c458b37ef8",
-      "label_status": "unadjudicated",
+      "label_status": "adjudicated",
       "preparation": "model_input",
       "payload_sha256": "c858b0479492031f101a6e203c094996dbb441e79806be54684afdebbdf049ee",
       "request_bytes": 4569
@@ -148,7 +146,7 @@
     {
       "id": "return-shape-direct-update",
       "case_sha256": "82f0c26ca9bcd281c334fa9ec5d62ecf82a4eccb4b697e491529cbeacd0db414",
-      "label_status": "unadjudicated",
+      "label_status": "adjudicated",
       "preparation": "model_input",
       "payload_sha256": "e905ad8ded5141a456dc48cc85021f3349b150d6dc4dfbfe95d496ee77d6c3b2",
       "request_bytes": 4460

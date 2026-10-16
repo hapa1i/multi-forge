@@ -1,9 +1,9 @@
 # A2 human review worksheet
 
-All 12 cases in the [calibration worksheet](review-calibration.md) and two held-out cases have human adjudications.
-Continue with the three pending cases in the [held-out worksheet](review-held-out.md). Both show the supplied action and
-enumerated scope facts, with the exact case hash. The [JSON packet](human-review-packet.json) remains a reproducible
-blank template containing canonical action strings, semantic criteria and pending review fields.
+All 17 constructed cases have human adjudications: 12 in the [calibration worksheet](review-calibration.md) and five in
+the [held-out worksheet](review-held-out.md). Both show the supplied action and enumerated scope facts, with the exact
+case hash. The [JSON packet](human-review-packet.json) remains a reproducible blank template containing canonical action
+strings, semantic criteria and pending review fields.
 
 The retained [2026-10-16 review ledger](human-review-2026-10-16.json) records the user's confirmed labels for
 `module-forwarding` (warning) and `module-direct-update` (no warning), imported into the corpus. Both belong to the same
@@ -18,10 +18,13 @@ applicable and `unknown-public-status` as unavailable, also with no question ans
 `multi-file-wrapper` as warning. All 12 calibration cases are now labeled across four families; the injection and
 multi-file variants add no new family. Three labels review host decisions, leaving nine human answers per question. The
 [seventh review ledger](human-review-2026-10-16-batch-7.json) records `decorator-instrumentation` as no warning and
-`write-without-history` as unavailable, with no question answers for the host-decided Write. Two held-out cases are
-labeled across two additional families, leaving three pending cases. Each question has one held-out human answer. The
-user confirmed these judgments after AI-assisted discussion; they are not independently blinded labels. No model
-predictions are supplied.
+`write-without-history` as unavailable, with no question answers for the host-decided Write. The
+[eighth review ledger](human-review-2026-10-16-batch-8.json) completes held-out review: `partial-edit` is unavailable,
+`return-shape-adapter` is warning and `return-shape-direct-update` is no warning. The partial Edit has coverage false
+and unknown retention/boundary answers; it is a model candidate, distinct from the host-decided Write. Held-out has four
+answer objects: four known coverage answers and three known answers for each other question. All seven source families
+are reviewed. The user confirmed these judgments after AI-assisted discussion; they are not independently blinded
+labels. No model predictions are supplied.
 
 The packet omits authored proposals/rationales, reviewer-only scope notes, reconstruction notes and previous
 adjudications. Case IDs and shared authorship remain visible and can hint at intended behavior; this is not a fully

@@ -1,9 +1,9 @@
 # A2 offline evaluation plan
 
 Status: the offline evaluator shipped through [PR #271](https://github.com/hapa1i/multi-forge/pull/271). Human
-adjudication has started; calibrated thresholds and numerical acceptance limits remain unset. The
-[merge handoff](../checklist.md#offline-evaluation-merge-and-next-gate) records validation and the next gate. This
-document authorizes no collection, provider request or native trial. A1's probe approvals do not carry over.
+adjudication is complete for the 17 constructed cases; calibrated thresholds and numerical acceptance limits remain
+unset. The [merge handoff](../checklist.md#offline-evaluation-merge-and-next-gate) records validation and the next gate.
+This document authorizes no collection, provider request or native trial. A1's probe approvals do not carry over.
 
 ## Scope and current evidence
 
@@ -15,11 +15,15 @@ held-out. Four cases are decided from fixture applicability/history facts; 13 re
 [fifth](human-review-2026-10-16-batch-5.json) and [sixth](human-review-2026-10-16-batch-6.json) 2026-10-16 ledgers
 record human adjudications for all 12 calibration cases: six warnings, three no warnings, two host-decided
 not-applicable outcomes and one host-decided unavailable outcome across four source families. The
-[seventh ledger](human-review-2026-10-16-batch-7.json) adds two held-out adjudications across two families: one no
-warning and one host-decided unavailable outcome. Three held-out cases remain pending; no held-out warning has been
-adjudicated. The four host-decided cases have no question answers and contribute no model observations; each question
-has nine calibration answers and one held-out answer. There is no human-labeled historical cohort or measured model
-accuracy.
+[seventh](human-review-2026-10-16-batch-7.json) and [eighth](human-review-2026-10-16-batch-8.json) ledgers complete all
+five held-out labels: one warning, two no warnings and two unavailable outcomes across three families. Only one held-out
+family supplies a positive label. The four host-decided cases have no question answers and contribute no model
+observations. Each question has nine known calibration answers. Held-out has four answer objects: coverage is known for
+all four, but `partial-edit` leaves retention and boundary unknown, so those questions have three known answers each.
+That partial Edit remains a model candidate; its unavailable human label is distinct from the host-decided Write. There
+is no human-labeled historical cohort or measured model accuracy. Preparation no longer reports incomplete adjudication;
+its remaining blockers are unset numeric gates, absent predictions/quality evaluation, unimplemented live execution and
+absent historical evidence. `quality_accepted` remains false.
 
 The shared `policy.rule_pack.definitions` module owns the draft-3 questions and contract version 4. The
 `policy.rule_pack.outcomes` module owns decision version `draft-2`. These modules are available for offline evaluation;

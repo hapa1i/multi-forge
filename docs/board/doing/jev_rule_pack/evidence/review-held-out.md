@@ -1,10 +1,10 @@
 # A2 human review: held-out
 
-Rendered from [human-review-packet.json](human-review-packet.json), with confirmed review status added. Two cases are
-reviewed and three remain pending. Read the [review instructions](human-review.md) and exact question criteria first. No
-model responses or authored proposals appear here. Rule `draft-3` / evidence contract 4 uses the advisory standard:
-absent supplied boundary justification can support a warning when interface evidence is otherwise complete. Case names
-may suggest author intent; they are not labels.
+Rendered from [human-review-packet.json](human-review-packet.json), with confirmed review status added. All five cases
+are reviewed. Read the [review instructions](human-review.md) and exact question criteria first. No model responses or
+authored proposals appear here. Rule `draft-3` / evidence contract 4 uses the advisory standard: absent supplied
+boundary justification can support a warning when interface evidence is otherwise complete. Case names may suggest
+author intent; they are not labels.
 
 Every action is constructed, with provenance `assistant-authored-wrapper-fixtures-2026-10-15`. The supplied scope facts
 are invented governance for these examples, not real repository declarations. Judge only the complete action shown and
@@ -94,8 +94,10 @@ After:
 return fetch_config(path)
 ```
 
-Human review: **pending**. Record outcome, coverage, compatibility retention, independent boundary and notes in the
-matching packet row.
+Human review: **reviewed, 2026-10-16**. Outcome: `unavailable`; coverage: `false`; compatibility retention: `null`;
+independent boundary: `null`. These unknown semantic answers remain in the model candidate's answer object; this is not
+a host-decided case with `question_answers: null`. The [retained ledger](human-review-2026-10-16-batch-8.json) holds the
+confirmed notes and case identity.
 
 ## return-shape-adapter
 
@@ -131,8 +133,9 @@ def render(values):
     return f"{summary['count']}: {summary['total']}"
 ```
 
-Human review: **pending**. Record outcome, coverage, compatibility retention, independent boundary and notes in the
-matching packet row.
+Human review: **reviewed, 2026-10-16**. Outcome: `warning`; coverage: `true`; compatibility retention: `true`;
+independent boundary: `false`. The [retained ledger](human-review-2026-10-16-batch-8.json) holds the confirmed notes and
+case identity.
 
 ## return-shape-direct-update
 
@@ -164,5 +167,6 @@ def render(values):
     return f"{summary['count']}: {summary['total']}"
 ```
 
-Human review: **pending**. Record outcome, coverage, compatibility retention, independent boundary and notes in the
-matching packet row.
+Human review: **reviewed, 2026-10-16**. Outcome: `no_warning`; coverage: `true`; compatibility retention: `false`;
+independent boundary: `false`. The [retained ledger](human-review-2026-10-16-batch-8.json) holds the confirmed notes and
+case identity.
