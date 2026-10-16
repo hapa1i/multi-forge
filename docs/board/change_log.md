@@ -8,6 +8,34 @@ Older entries are retained verbatim in [2026-08-19](archive/change_log_2026-08-1
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-16
+
+### Restore prompt-cache reuse on translated routes
+
+**Goal**: Preserve Claude Code's cacheable conversation prefix and report cache usage consistently.
+
+**Key changes**: Translate mid-conversation system messages into user reminders, gate client markers on the resolved
+backend, and preserve cache reads/writes plus streaming provider identity through responses and telemetry.
+
+**Verification**: [PR #273](https://github.com/hapa1i/multi-forge/pull/273) merged as `3573c147` with all five GitHub
+checks passing. Recorded checks include 11,029 unit tests, 1,904 regressions, full pre-commit and 66 passing targeted
+integrations; one stale LiteLLM streaming-cost expectation remains deferred. The
+[closeout](done/prompt_cache_correctness/checklist.md#merged-closeout) preserves the synthetic and native cache
+evidence, scope comparison and provider-side limitations.
+
+### Close the October 13 bug reconciliation
+
+**Goal**: Record the merged session, supervisor, installer and QA fixes with their final verification boundaries.
+
+**Key changes**: Restore bounded Stop evidence and reviewer isolation, preserve transcript and installation ownership,
+and validate QA inputs and prerequisites; retain supported relative Codex homes.
+
+**Verification**: [PR #266](https://github.com/hapa1i/multi-forge/pull/266) merged as `74eb9afa`, identical to reviewed
+head `4db2656a`, with all five GitHub checks passing. The
+[closeout](done/daily_bug_scan_reconciliation_2026_10_13/checklist.md#merged-closeout) retains the initial aggregate
+results and the later correction's 946 focused tests, 666 clean-wheel tests and 25 Docker installer tests, without
+attributing earlier aggregate results to the corrected head. Native and host-installation evidence limits remain.
+
 ## 2026-10-15
 
 ### Ship offline Jev rule evaluation

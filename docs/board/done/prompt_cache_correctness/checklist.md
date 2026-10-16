@@ -2,9 +2,10 @@
 
 ## Current focus
 
-Branch `prompt-caching` from `main` at `203e4404`. Implementation and verification are complete; PR #273 carries the
-probe and end-to-end evidence, and closeout follows merge. The [card](card.md) owns scope; the user's 2026-10-15
-decisions exclude Forge-placed markers, LiteLLM-specific work and provider pinning, and authorize bounded paid checks.
+Completed on 2026-10-16. [PR #273](https://github.com/hapa1i/multi-forge/pull/273) merged the `prompt-caching` branch,
+based on `main` at `203e4404`, as `3573c147b61b68b4b5be977038a808891594408b`. The [card](card.md) preserves scope; the
+user's 2026-10-15 decisions excluded Forge-placed markers, LiteLLM-specific work and provider pinning, and authorized
+the bounded paid checks recorded below. [Merged closeout](#merged-closeout) records final verification.
 
 ## Phase 0: Evidence
 
@@ -76,7 +77,9 @@ decisions exclude Forge-placed markers, LiteLLM-specific work and provider pinni
   visibility, downstream retention, passthrough headers, Sonnet 5.5, the paid cache canary, finish reason and the
   headless cost contract. 66 passed, 1 failed. `test_local_litellm_streaming_cost_unavailable` asserts that a local
   LiteLLM gateway reports no streaming cost, but LiteLLM 1.102.0 (bumped in #255) stamps `usage.cost` on streamed usage
-  (`_stamp_streaming_usage_cost`). The failure is independent of this card and LiteLLM-specific, so it is a follow-up.
+  (`_stamp_streaming_usage_cost`). The failure is independent of this card and LiteLLM-specific; the
+  [streaming-cost contract follow-up](../../proposed/litellm_streaming_cost_contract/card.md) owns its tests and
+  documentation reconciliation.
 
 - [x] Paid end-to-end check, about $0.49 of the $1 budget. Headless Claude Code 2.1.296 ran a seven-request `Read` tool
   loop through proxies under isolated `FORGE_HOME`s, with the environment from `build_claude_env`:
@@ -110,4 +113,28 @@ decisions exclude Forge-placed markers, LiteLLM-specific work and provider pinni
 ## Closeout
 
 - [x] Commit series split by intent; PR #273 with probe evidence and the role-semantics risk called out.
-- [ ] Change-log entry, design-doc check, card move to `done/` after merge.
+- [x] Verify runtime design, telemetry design and the end-user proxy guide against the merged implementation.
+- [x] Move the card to `done/` after merge; no inbound references required repointing.
+- [x] Record completion in the change log.
+
+## Merged closeout
+
+Closed on 2026-10-16 after [PR #273](https://github.com/hapa1i/multi-forge/pull/273) merged at
+`3573c147b61b68b4b5be977038a808891594408b`. The reviewed head was `d57a41d06ac21af0679c386d7da8657b23292bd4`; all five
+GitHub checks succeeded. Local comparison found all 44 implementation, test, documentation and card paths changed by the
+PR byte-identical between that head and the merge. The remaining changed path, `.file-token-counts.json`, differs only
+in the `docs/design.md` digest and count for intervening Jev work; the complete repository trees are not identical.
+
+The merged [runtime design](../../../design_runtime.md#7x-optional-always-on-proxy-audit-and-control),
+[telemetry design](../../../design_telemetry.md#314-cost-tracking-and-spend-caps) and
+[proxy guide](../../../end-user/proxy.md#prompt-caching) match the translator, catalog gate, cache-usage conversion and
+downstream writers. Verification remains the evidence in Phase 5: 11,029 unit tests, 1,904 regression tests, clean
+pre-commit, and targeted integration with 66 passed and one deferred LiteLLM streaming-cost failure. Closeout ran no
+additional model calls or tests.
+
+The pre-existing LiteLLM streaming-cost assertions in telemetry documentation remain part of the
+[separate follow-up](../../proposed/litellm_streaming_cost_contract/card.md); this closeout verifies the cache changes.
+
+The $0.59 synthetic probe and approximately $0.49 end-to-end check establish the recorded short-loop behavior, not a
+guaranteed cache rate or real-session saving. Provider-side cache misses, provider pinning and the role-semantics
+observation remain the limitations recorded above. LiteLLM-specific behavior stays outside this card's scope.

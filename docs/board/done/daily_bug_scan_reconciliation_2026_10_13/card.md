@@ -1,5 +1,8 @@
 # Reconcile daily bug scan findings
 
+Status: **done**, closed 2026-10-16. [PR #266](https://github.com/hapa1i/multi-forge/pull/266) merged as `74eb9afa` on
+2026-10-13. The [merged closeout](checklist.md#merged-closeout) records merge, validation and evidence limits.
+
 User-authorized single fix PR, activated 2026-10-13 from `2ec4a22a` on `fix/daily-bug-scan-reconciliation-2026-10-13`.
 
 The October 13 review reproduced six supervisor/Stop defects and sixteen older lifecycle, installer, and QA defects. Two
@@ -25,6 +28,6 @@ unproven bugs to fix in this PR.
 
 ## Execution ownership
 
-One work item and PR contains separate reviewable commits. Supervisor, lifecycle, installer, and QA implementation
-proceed in disjoint files; the integrator owns shared documentation reconciliation, the board, aggregate tests, and PR.
-No paid model probes are required. Keep the card in `doing/` until review and merge complete.
+One work item and PR contained separate reviewable commits. Supervisor, lifecycle, installer, and QA implementation used
+disjoint files; the integrator owned shared documentation reconciliation, the board, aggregate tests, and PR. No paid
+model probes were required. Review and merge are complete.

@@ -1,7 +1,8 @@
 # Execution checklist
 
-Base: `2ec4a22a`. Branch: `fix/daily-bug-scan-reconciliation-2026-10-13`. Current focus: exact reproductions, minimal
-fixes, and integrated verification.
+Base: `2ec4a22a`. Branch: `fix/daily-bug-scan-reconciliation-2026-10-13`. Completed through
+[PR #266](https://github.com/hapa1i/multi-forge/pull/266), merged as `74eb9afa` on 2026-10-13; board closeout recorded
+2026-10-16.
 
 ## Implementation
 
@@ -47,8 +48,8 @@ fixes, and integrated verification.
 - [x] Full pre-commit and board/link checks pass.
 - [x] Design and end-user docs match changed contracts.
 - [x] Independent final review resolved.
-- [ ] Review and merge the single PR with validation and remaining evidence limits.
-- [ ] After merge, record closeout and move this card to `done/`.
+- [x] Review and merge the single PR with validation and remaining evidence limits.
+- [x] After merge, record closeout and move this card to `done/`.
 
 ## Evidence
 
@@ -133,3 +134,19 @@ The follow-up Docker installer suite passed 25 tests through
 Its new absolute/relative hook cycles initially hit unrelated duplicate skills in the shared fixture; excluding skills
 from those hook-specific cycles resolved the fixture conflict. Both cycles now verify status/sync, cleanup preservation,
 and disable. `make pre-commit` and diff whitespace checks passed after the correction.
+
+## Merged closeout
+
+2026-10-16: [PR #266](https://github.com/hapa1i/multi-forge/pull/266) merged on 2026-10-13 at 20:01:04 UTC as
+`74eb9afa26a9d78063aa508a726bd3ddd87bd329`. All five GitHub checks passed. The merged tree is identical to final
+reviewed head `4db2656a827dfe1b92a1c20a3dad558833919a5a`, including the relative Codex-home correction.
+
+The validation above retains its original attribution: aggregate results belong to `64d0f3be`, while the later
+installer/GC, clean-wheel and Docker checks cover the correction. No new behavioral tests or native/provider probes ran
+for this documentation closeout. Native quota exhaustion, live cancellation and global-tool/minimal-GUI-PATH behavior
+remain outside the recorded evidence.
+
+Checked the shipped documentation for session cleanup and compaction, launch arguments, Stop evidence, reviewer
+isolation, installer ownership and QA prerequisites/reuse. The session, installation and subprocess design docs,
+end-user config/session/native-supervision/manual-testing guides, testing guidelines and QA skill retain those
+contracts. No further design changes were needed. Moved the card to `done/`; no inbound links referenced its old path.

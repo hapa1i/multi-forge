@@ -1,7 +1,10 @@
 # Prompt-cache correctness on translated proxy routes
 
-Status: **doing** on branch `prompt-caching`, based on `main` at `203e4404`. The [execution checklist](checklist.md)
-tracks slices, evidence and closeout.
+Status: **done** on 2026-10-16. [PR #273](https://github.com/hapa1i/multi-forge/pull/273) merged to `main` at
+`3573c147b61b68b4b5be977038a808891594408b`. The [execution checklist](checklist.md#merged-closeout) records the reviewed
+head, verification and deferred LiteLLM follow-up. This card preserves the problem and evidence from execution;
+[runtime design](../../../design_runtime.md) and [telemetry design](../../../design_telemetry.md) define shipped
+behavior.
 
 ## Problem and outcome
 
