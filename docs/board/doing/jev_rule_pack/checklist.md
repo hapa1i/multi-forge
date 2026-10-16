@@ -9,9 +9,10 @@ override guards. Execution continues on `codex/jev-rule-pack-evidence` from `mai
 
 The [human review worksheet](evidence/human-review.md) exposes 17 constructed cases, and the harness exports/imports
 evidence-bound review packets with proposals and rationales withheld. The
-[first](evidence/human-review-2026-10-16.json), [second](evidence/human-review-2026-10-16-batch-2.json) and
-[third](evidence/human-review-2026-10-16-batch-3.json) 2026-10-16 ledgers record six confirmed human labels: four
-warnings and two no warnings across three source families. Six calibration and five held-out cases remain pending. The
+[first](evidence/human-review-2026-10-16.json), [second](evidence/human-review-2026-10-16-batch-2.json),
+[third](evidence/human-review-2026-10-16-batch-3.json) and [fourth](evidence/human-review-2026-10-16-batch-4.json)
+2026-10-16 ledgers record eight confirmed human labels: five warnings, two no warnings and one host-decided
+not-applicable outcome across four source families. Four calibration and five held-out cases remain pending. The
 [feasibility checkpoint](evidence/corpus-feasibility.md) records empty historical strata and sparse proposed held-out
 positives. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) defines a candidate owner-selected
 declaration and whole-action boundary before hook wiring; it is not implemented or approved runtime authority. The
@@ -220,6 +221,13 @@ warning. Both have coverage and compatibility retention true; independent bounda
 `validation-boundary`. The third ledger preserves the supplied notes after AI-assisted discussion. Six calibration cases
 are now labeled across three families, with six calibration and five held-out cases still pending. No quality or
 runtime-acceptance gate is satisfied.
+
+2026-10-16 fourth human review: the user confirmed `preview-alias` as warning, with coverage and compatibility retention
+true and independent boundary false. They confirmed `stable-alias` as not applicable under the stable-surface host rule,
+with `question_answers: null` and an explanation. The fourth ledger preserves the supplied notes after AI-assisted
+discussion. Eight calibration cases are now labeled across four families; each question has seven answers because the
+host-decided case contributes none. Four calibration and five held-out cases remain pending. The host result is not a
+model success or a no-warning label; no quality or runtime-acceptance gate is satisfied.
 
 **Decision gate:** the broader family is selected. Implement and verify the revised evidence contract, including the
 host-owned origin of surface/exception facts, before hook wiring; do not populate those facts from action comments or

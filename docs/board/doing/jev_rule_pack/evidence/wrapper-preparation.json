@@ -14,8 +14,8 @@
     "no_historical_evidence"
   ],
   "cohorts": {
-    "constructed/calibration/adjudicated": 6,
-    "constructed/calibration/unadjudicated": 6,
+    "constructed/calibration/adjudicated": 8,
+    "constructed/calibration/unadjudicated": 4,
     "constructed/held_out/unadjudicated": 5
   },
   "preparation_counts": {
@@ -76,7 +76,7 @@
     {
       "id": "preview-alias",
       "case_sha256": "7e9b1af800c746d845d723a7dfb75a1cfa2e9a3d6c50aa4a8eb2d7f36d21f6a1",
-      "label_status": "unadjudicated",
+      "label_status": "adjudicated",
       "preparation": "model_input",
       "payload_sha256": "d7104657091f783ec44b0f6120a7be9fff73d25b12a5f4f32286808f40cd5a22",
       "request_bytes": 4250
@@ -84,7 +84,7 @@
     {
       "id": "stable-alias",
       "case_sha256": "cd37bc6c2d3eeb834e5ac66534ee8b1e6960632540d5428498c64e505ed7a23d",
-      "label_status": "unadjudicated",
+      "label_status": "adjudicated",
       "preparation": "host_decision",
       "host_outcome": "not_applicable",
       "host_reason": "stable_surface"

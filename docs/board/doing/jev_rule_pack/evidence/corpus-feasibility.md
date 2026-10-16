@@ -1,15 +1,15 @@
 # A2 corpus feasibility checkpoint
 
 2026-10-16. Inventory of the existing [constructed corpus](wrapper-corpus.json), at source SHA-256
-`1355dc363e19e6ec361a1a5d1e028c44ee435e56cdd2f1a2a25ae1c96706a965`. No historical examples or native transcripts were
-collected for this checkpoint. The counts distinguish authored fixtures and preparation results from the six confirmed
+`70e5944ab104a2ca5220a03c502e29dda029906c84a9bf3eb09c987c99780fae`. No historical examples or native transcripts were
+collected for this checkpoint. The counts distinguish authored fixtures and preparation results from the eight confirmed
 human adjudications.
 
 ## Evidence available
 
 | Cohort and split        | Cases | Families | Model candidates | Host decisions | Human labels |
 | ----------------------- | ----- | -------- | ---------------- | -------------- | ------------ |
-| Constructed calibration | 12    | 4        | 9                | 3              | 6            |
+| Constructed calibration | 12    | 4        | 9                | 3              | 8            |
 | Constructed held-out    | 5     | 3        | 4                | 1              | 0            |
 | Historical calibration  | 0     | 0        | 0                | 0              | 0            |
 | Historical held-out     | 0     | 0        | 0                | 0              | 0            |
@@ -17,11 +17,14 @@ human adjudications.
 The [first 2026-10-16 ledger](human-review-2026-10-16.json) records `module-forwarding` as warning and
 `module-direct-update` as no warning. The [second ledger](human-review-2026-10-16-batch-2.json) adds warning labels for
 `module-injection` and `method-argument-adapter`. The [third ledger](human-review-2026-10-16-batch-3.json) records
-`validation-boundary` as no warning and `validation-gratuitous` as warning. Each question now has six human answers in
-calibration and zero in held-out. The four warning labels span three families: `module-rename`, `argument-adaptation`
-and `validation-adaptation`. The two no-warning labels span `module-rename` and `validation-adaptation`. These are three
-labeled families in total, and the injection variant adds no independent family. The user confirmed these judgments
-after AI-assisted discussion; they are not independently blinded labels. Six calibration and five held-out cases remain
+`validation-boundary` as no warning and `validation-gratuitous` as warning. The
+[fourth ledger](human-review-2026-10-16-batch-4.json) records `preview-alias` as warning and `stable-alias` as not
+applicable. The host-decided `stable-alias` has no question answers; each question now has seven human answers in
+calibration and zero in held-out. The five warning labels span four families: `module-rename`, `argument-adaptation`,
+`validation-adaptation` and `public-alias`. The two no-warning labels span `module-rename` and `validation-adaptation`.
+These are four labeled families in total, and the injection variant adds no independent family. The `stable-alias` label
+checks host applicability; it is not a model success or a no-warning label. The user confirmed these judgments after
+AI-assisted discussion; they are not independently blinded labels. Four calibration and five held-out cases remain
 pending.
 
 The host resolves calibration's stable surface and approved preview exception as not applicable, and its unknown surface
@@ -52,7 +55,7 @@ No historical positive or negative has been adjudicated. Earlier marker/delegati
 semantic labels or evidence that all unmarked wrappers were found. They cannot fill an empty historical stratum.
 Repetitions of a constructed input would measure variation, not add independent examples.
 
-The present corpus includes six reviewed behavioral fixtures, with 11 labels still unresolved. It cannot support a
+The present corpus includes eight reviewed constructed cases, with nine labels still unresolved. It cannot support a
 production-quality or historical-accuracy claim, even if every constructed prediction were correct. Keep the broader
 wrapper family selected by the user; narrow the evidence claim to these constructed actions until representative
 evidence exists. Do not treat this limitation as permission to activate the bundle.

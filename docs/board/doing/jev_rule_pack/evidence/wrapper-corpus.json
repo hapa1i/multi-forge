@@ -272,7 +272,17 @@
         "outcome": "warning",
         "reason": "The complete action retains the old preview name through its replacement, with no approved exception or supplied independent requirement. A named protocol could justify a pure alias, but none is established in this packet."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-4.json",
+        "case_sha256": "7e9b1af800c746d845d723a7dfb75a1cfa2e9a3d6c50aa4a8eb2d7f36d21f6a1",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "stable-alias",
@@ -302,7 +312,13 @@
         "outcome": "not_applicable",
         "reason": "The supplied public_stable classification places this interface outside the no-default-shim prohibition. This does not verify deprecation or migration correctness."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "not_applicable",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-4.json",
+        "case_sha256": "cd37bc6c2d3eeb834e5ac66534ee8b1e6960632540d5428498c64e505ed7a23d",
+        "question_answers": null
+      }
     },
     {
       "id": "preview-approved-exception",

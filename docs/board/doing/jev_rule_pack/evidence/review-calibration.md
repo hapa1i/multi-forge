@@ -1,13 +1,13 @@
 # A2 human review: calibration
 
-Evidence rendered from [human-review-packet.json](human-review-packet.json). Six of these 12 cases have confirmed human
-reviews in the [first](human-review-2026-10-16.json), [second](human-review-2026-10-16-batch-2.json) and
-[third](human-review-2026-10-16-batch-3.json) 2026-10-16 ledgers; six remain pending. Read the
-[review instructions](human-review.md) and exact question criteria first. No model responses or proposed labels appear
-here. The first six outcomes below were confirmed by the user after AI-assisted discussion, not independent blinded
-review. Rule `draft-3` / evidence contract 4 uses the advisory standard: absent supplied boundary justification can
-support a warning when interface evidence is otherwise complete. Case names may suggest author intent; they are not
-labels.
+Evidence rendered from [human-review-packet.json](human-review-packet.json). Eight of these 12 cases have confirmed
+human reviews in the [first](human-review-2026-10-16.json), [second](human-review-2026-10-16-batch-2.json),
+[third](human-review-2026-10-16-batch-3.json) and [fourth](human-review-2026-10-16-batch-4.json) 2026-10-16 ledgers;
+four remain pending. Read the [review instructions](human-review.md) and exact question criteria first. No model
+responses or proposed labels appear here. The first eight outcomes below were confirmed by the user after AI-assisted
+discussion, not independent blinded review. Rule `draft-3` / evidence contract 4 uses the advisory standard: absent
+supplied boundary justification can support a warning when interface evidence is otherwise complete. Case names may
+suggest author intent; they are not labels.
 
 Every action is constructed, with provenance `assistant-authored-wrapper-fixtures-2026-10-15`. The supplied scope facts
 are invented governance for these examples, not real repository declarations. Judge only the complete action shown and
@@ -398,8 +398,9 @@ def dump_model(model):
 export_model = dump_model
 ```
 
-Human review: **pending**. Record outcome, coverage, compatibility retention, independent boundary and notes in the
-matching packet row.
+Human review: **reviewed, 2026-10-16**. Outcome: `warning`; coverage: `true`; compatibility retention: `true`;
+independent boundary: `false`. The [fourth ledger](human-review-2026-10-16-batch-4.json) holds the confirmed notes and
+case identity.
 
 ## stable-alias
 
@@ -425,8 +426,9 @@ def dump_model(model):
 export_model = dump_model
 ```
 
-Human review: **pending**. Record outcome, coverage, compatibility retention, independent boundary and notes in the
-matching packet row.
+Human review: **reviewed, 2026-10-16**. Outcome: `not_applicable`; `question_answers: null`. The stable-surface host
+rule decides applicability before any model request, so no semantic question answers are recorded. The
+[fourth ledger](human-review-2026-10-16-batch-4.json) holds the confirmed explanation and case identity.
 
 ## preview-approved-exception
 
