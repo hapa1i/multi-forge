@@ -348,7 +348,13 @@
         "outcome": "not_applicable",
         "reason": "An explicit preview compatibility exception makes the no-default-shim prohibition inapplicable; this does not verify implementation of the exception."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "not_applicable",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-5.json",
+        "case_sha256": "6ea445651da669ee390da3c7d836c066107f1902a3d2e5ef639cf2cd0e350df2",
+        "question_answers": null
+      }
     },
     {
       "id": "unknown-public-status",
@@ -378,7 +384,13 @@
         "outcome": "unavailable",
         "reason": "The action alone cannot establish public stability or exception approval."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "unavailable",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-5.json",
+        "case_sha256": "8533b24b7829996ab56feef463a059ee62346a153d4837b0f2aacacfdf10b06b",
+        "question_answers": null
+      }
     },
     {
       "id": "callback-protocol",

@@ -14,8 +14,8 @@
     "no_historical_evidence"
   ],
   "cohorts": {
-    "constructed/calibration/adjudicated": 8,
-    "constructed/calibration/unadjudicated": 4,
+    "constructed/calibration/adjudicated": 10,
+    "constructed/calibration/unadjudicated": 2,
     "constructed/held_out/unadjudicated": 5
   },
   "preparation_counts": {
@@ -92,7 +92,7 @@
     {
       "id": "preview-approved-exception",
       "case_sha256": "6ea445651da669ee390da3c7d836c066107f1902a3d2e5ef639cf2cd0e350df2",
-      "label_status": "unadjudicated",
+      "label_status": "adjudicated",
       "preparation": "host_decision",
       "host_outcome": "not_applicable",
       "host_reason": "approved_preview_exception"
@@ -100,7 +100,7 @@
     {
       "id": "unknown-public-status",
       "case_sha256": "8533b24b7829996ab56feef463a059ee62346a153d4837b0f2aacacfdf10b06b",
-      "label_status": "unadjudicated",
+      "label_status": "adjudicated",
       "preparation": "host_decision",
       "host_outcome": "unavailable",
       "host_reason": "unknown_surface"
