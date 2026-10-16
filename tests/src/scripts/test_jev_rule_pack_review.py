@@ -151,7 +151,7 @@ def test_existing_adjudication_requires_an_explicit_replacement(evaluator, corpu
         lambda data: data["cases"][0].update(split="held_out"),
         lambda data: data["cases"][0]["provenance"].update(origin="altered-provenance"),
         lambda data: data["rule"].update(definition="Altered rule"),
-        lambda data: data["rule"].update(evidence_contract_version=3.0),
+        lambda data: data["rule"].update(evidence_contract_version=float(data["rule"]["evidence_contract_version"])),
         lambda data: data.update(corpus_sha256="0" * 64),
         lambda data: data.update(schema_version=2),
         lambda data: data["rule"]["questions"]["coverage"]["criteria"].update(true="Altered criterion"),

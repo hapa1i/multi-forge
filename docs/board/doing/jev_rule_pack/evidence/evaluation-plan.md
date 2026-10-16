@@ -12,8 +12,8 @@ The [candidate contract](initial-rule-review.md) owns the broader compatibility-
 held-out. Four cases are decided from fixture applicability/history facts; 13 require semantic assessment. Every
 proposed label remains unadjudicated. There is no human-labeled historical cohort or measured model accuracy.
 
-The shared `policy.rule_pack.definitions` module owns the unchanged draft-2 questions and contract version 3. The
-`policy.rule_pack.outcomes` module owns decision version `draft-1`. These modules are available for offline evaluation;
+The shared `policy.rule_pack.definitions` module owns the draft-3 questions and contract version 4. The
+`policy.rule_pack.outcomes` module owns decision version `draft-2`. These modules are available for offline evaluation;
 they do not register a bundle, enable a session or dispatch a request. Runtime surface/exception authority remains a
 separate gate.
 
@@ -39,6 +39,13 @@ threshold. Evaluate coverage first:
 | True             | True                    | Uncertain            | Uncertain                        |
 | True             | True                    | True                 | No warning: required boundary    |
 | True             | True                    | False                | Warning                          |
+
+The 2026-10-16 semantic revision makes a warning advisory: covered retention with no justification established by the
+supplied evidence. Missing structural/history/policy evidence remains unavailable. Materially ambiguous or conflicting
+supplied boundary evidence remains uncertain; no justification at all is not such a conflict. A required protocol name,
+signature or identity can justify a pure alias without additional behavior. The warning makes no claim about unseen
+requirements. Updated question/case/payload hashes invalidate old packets and predictions; decision version `draft-2`
+rejects old threshold settings even though the composition table is unchanged. No thresholds are yet calibrated.
 
 Validate answer IDs/types through A1's contract before composition or collecting calibration probabilities. Malformed
 answers and saved failures are unavailable. Fixed diagnostic text describes the assessment without inventing a provider
@@ -93,7 +100,7 @@ or approved quality gates:
 ```json
 {
   "schema_version": 1,
-  "decision_version": "draft-1",
+  "decision_version": "draft-2",
   "thresholds": {
     "coverage": {"false_max": 0.1, "true_min": 0.9},
     "compatibility_retention": {"false_max": 0.1, "true_min": 0.9},
@@ -145,6 +152,12 @@ differ. Neither another model's answer nor a proposed label enters the confusion
 and absent historical evidence remain visible. The current evaluator does not implement a release verdict.
 
 ## Before real evaluation or runtime admission
+
+Measure two different claims. Packet-label accuracy measures adherence to the supplied-evidence rule. A warning can be
+correct under that rule yet unhelpful when later caller review discovers an unseen legitimate requirement. Measure
+warning usefulness and false alarms separately against a reviewed caller/contract record; that extra review context must
+not silently enter model payloads or replace packet-bound labels. Also measure how often real hook actions supply
+complete interface evidence. Constructed full-definition examples do not establish that coverage.
 
 1. A human reviewer must adjudicate outcomes and per-question answers against the exact case hashes, recording reviewer,
    reference, disagreements and exclusions. Count independent positive/negative source families in each cohort/split.

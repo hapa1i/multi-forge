@@ -2,7 +2,9 @@
 
 Rendered from [human-review-packet.json](human-review-packet.json). These 5 cases remain pending. Read the
 [review instructions](human-review.md) and exact question criteria first. No model responses or proposed labels appear
-here. Case names may suggest author intent; they are retained for identity, not treated as labels.
+here. Rule `draft-3` / evidence contract 4 uses the advisory standard: absent supplied boundary justification can
+support a warning when interface evidence is otherwise complete. Case names may suggest author intent; they are not
+labels.
 
 Every action is constructed, with provenance `assistant-authored-wrapper-fixtures-2026-10-15`. The supplied scope facts
 are invented governance for these examples, not real repository declarations. Judge only the complete action shown and
@@ -10,7 +12,7 @@ these facts; unavailable evidence must remain unknown. No additional file conten
 
 ## decorator-instrumentation
 
-Family: `decorator-instrumentation`. Case SHA-256: `d9f60ab21a0f003d0c899344cf16cc25266d65fd252954f3e54b1639d0bd1bcd`.
+Family: `decorator-instrumentation`. Case SHA-256: `609cd48a1a83e6a2d0593005d02d55afbb5a4383d0adf2366f506176fb520ca6`.
 
 Surface: `internal`; compatibility decision: `not_approved`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -54,7 +56,7 @@ matching packet row.
 
 ## write-without-history
 
-Family: `insufficient-context`. Case SHA-256: `4dfc9172a08b90db2f59da266828280970a02fe381fd7e515219ddb84912317b`.
+Family: `insufficient-context`. Case SHA-256: `6278ba9ad3d9c7fb8470b330485cda5c03689540556b5dd7b77c687a1bfd7469`.
 
 Surface: `internal`; compatibility decision: `not_approved`. Runtime/tool: `claude_code` / `Write`.
 
@@ -72,7 +74,7 @@ matching packet row.
 
 ## partial-edit
 
-Family: `insufficient-context`. Case SHA-256: `d8b46e7d92c06473fb6446f0d06cb2870d9c0635460492c6255bb30be84057d8`.
+Family: `insufficient-context`. Case SHA-256: `674fc6de1fbdeb72af5a51959b339ce5940fe4d3cace414c344e5c733343bb88`.
 
 Surface: `internal`; compatibility decision: `not_approved`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -95,7 +97,7 @@ matching packet row.
 
 ## return-shape-adapter
 
-Family: `return-shape-adaptation`. Case SHA-256: `b429b81e0ef621ff9700b9ace8d35e00bbec71e487b077f983a5e7c275f7a616`.
+Family: `return-shape-adaptation`. Case SHA-256: `d57fd194f32e397e8e8c19151fce465ee1e4ad40951e43cbbb7e55c458b37ef8`.
 
 Surface: `internal`; compatibility decision: `not_approved`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -132,7 +134,7 @@ matching packet row.
 
 ## return-shape-direct-update
 
-Family: `return-shape-adaptation`. Case SHA-256: `c1b5621f9815d06e38d3727fd4c53b2711bfe7a8c3b39f450052fc9269b7eb3c`.
+Family: `return-shape-adaptation`. Case SHA-256: `82f0c26ca9bcd281c334fa9ec5d62ecf82a4eccb4b697e491529cbeacd0db414`.
 
 Surface: `internal`; compatibility decision: `not_approved`. Runtime/tool: `claude_code` / `Edit`.
 

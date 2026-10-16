@@ -13,9 +13,11 @@ withheld, and the harness exports/imports evidence-bound review packets. All cas
 positives. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) defines a candidate owner-selected
 declaration and whole-action boundary before hook wiring; it is not implemented or approved runtime authority. The
 [evaluation plan](evidence/evaluation-plan.md) owns quality decisions, and the
-[wrapper evidence contract](evidence/initial-rule-review.md) retains the user's broader wrapper scope. The merged slices
-do not complete A2 or enable Jev checks. No paid A2 evaluation has run. The [card](card.md) owns scope; the
-[epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed and will use a separate
+[wrapper evidence contract](evidence/initial-rule-review.md) retains the user's broader wrapper scope. The 2026-10-16
+revision makes warnings advisory when covered retention lacks a justification established by the supplied evidence. The
+declaration proposal now uses an explicit project default and scoped exceptions, not uniform-file enumeration. The
+merged slices do not complete A2 or enable Jev checks. No paid A2 evaluation has run. The [card](card.md) owns scope;
+the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed and will use a separate
 execution branch.
 
 Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
@@ -127,7 +129,7 @@ keeps source families in one split, binds adjudications to evidence and semantic
 notes from model inputs, and applies the declared host applicability table before building size-checked A1 payloads.
 Prompt wording has a separate identity. The saved-response evaluator now binds corpus membership/splits, predictions,
 settings and adjudications independently; it reports per-cohort/per-repetition confusion, abstentions, coverage,
-question calibration, latency and known/unknown cost. Shared definitions preserve the existing payload hashes. The
+question calibration, latency and known/unknown cost. Question changes invalidate the corresponding payload hashes. The
 outcome combiner requires explicit question bands and preserves coverage gaps and contradictions. There is no live mode
 or quality acceptance verdict. Human labels, real predictions and approved numerical gates remain outstanding.
 
@@ -166,8 +168,14 @@ and the full unit rerun passed without source or test changes.
 - [ ] Obtain human outcomes and per-question labels, resolve disputes/exclusions, and recount independently labeled
   positive/negative families. Record feasibility and any required additional acquisition scope before selecting
   numerical quality gates.
-- [ ] Review the proposed uniform-file declaration and pinned-authority limits, then implement declaration/evidence
-  fixtures before hook wiring. Mixed or missing facts must remain unavailable; fixture scope is not production policy.
+- [x] Revise the rule to advisory supplied-evidence semantics and version its criteria, review packet and decision
+  settings. Keep structural gaps unavailable and materially ambiguous boundary evidence uncertain; do not import model
+  proposals as human labels.
+- [ ] Implement and verify the proposed owner-approved project default, scoped exceptions and pinned-authority limits
+  before hook wiring. Same effective applicability may batch across surface classes; ambiguous exception attribution or
+  mixed applicability remains unavailable. Version the runtime scope representation instead of fabricating fixture
+  surface facts. Reconcile the coding-standards `future 1.0` / `0.x` wording before selecting an actual project default;
+  the proposal selects no production policy.
 
 2026-10-15 continuation verification: 235 focused rule-pack, probe, evaluation, review and integrity tests passed. The
 tracked packet matches regenerated JSON content; importing its 17 pending rows preserves the source corpus exactly as
@@ -175,6 +183,20 @@ JSON without creating labels. The original preparation report still reproduces b
 an attribution/output-size amplification edge; bounded reviewer/reference fields and an exact emitted-size check now
 cover completed and pending imports, including Unicode expansion and empty stdout on failure. The stale-adjudication
 recovery is documented in the review guide. No runtime policy code or provider call is part of this slice.
+
+2026-10-16 advisory revision: rule `draft-3`, evidence contract 4 and decision version `draft-2` replace the previous
+semantic standard. Warnings identify covered retention without a justification established in the supplied evidence;
+they do not prove an unseen requirement absent. Required names/signatures/identities may justify pure aliases, while an
+ordinary caller using an old name does not alone establish that requirement. The runtime proposal replaces exact-file
+enumeration with a project default and scoped exceptions; its resolver and runtime scope representation remain pending.
+Packet-label correctness and practical warning usefulness require separate evaluation.
+
+Verification: 238 focused rule-pack, probe, evaluator, review, host-diagnostic and integrity tests passed. The new
+regression rejects prior labels, review packets, captures and settings after a semantic revision. Regenerated packet and
+preparation JSON reproduce, pending import preserves the corpus, and worksheet/source hashes match. All 17 action,
+scope, provenance and split records are unchanged and unadjudicated. Independent review verified these identities and
+found a stale checklist scope requirement and ambiguous absent-justification prose; both are corrected. No paid request
+or native trial ran.
 
 **Decision gate:** the broader family is selected. Implement and verify the revised evidence contract, including the
 host-owned origin of surface/exception facts, before hook wiring; do not populate those facts from action comments or
@@ -198,9 +220,10 @@ captures are transport fixtures, not A2 quality evidence.
 - [ ] Admit only the rule's declared evidence scope. Missing context, unsupported/binary/combined patches, unsafe paths,
   ambiguity and oversized actions produce explicit unavailable coverage. Record deletions and other non-applicable
   operations as such; do not count them as reviewed. Do not read arbitrary repository files to fill gaps implicitly.
-- [ ] Resolve surface/exception facts from an attributed host-owned policy/evidence source and bind their exact content
-  to the evaluated evidence identity. Unknown public stability or exception status is unavailable; approved exceptions
-  make this prohibition inapplicable. The fixture corpus's invented scope facts are not a production source. Broader
+- [ ] Resolve effective applicability and scoped exceptions from an attributed host-owned policy source and bind their
+  exact content to the evaluated evidence identity. Preserve actual surface facts where supported; a complete approved
+  project default can establish applicability without fabricating a surface class. Unknown governance or ambiguous
+  exception mapping remains unavailable. The fixture corpus's invented scope facts are not a production source. Broader
   wrapper support does not authorize repository crawling or an undisclosed expansion beyond supplied action evidence.
 - [ ] Batch all applicable file/rule questions over one bounded state. The first implementation permits at most one
   physical Jev request per native action, `max_attempts=1`, with no automatic splitting. If the complete eligible batch

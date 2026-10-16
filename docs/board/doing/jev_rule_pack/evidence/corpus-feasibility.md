@@ -1,7 +1,7 @@
 # A2 corpus feasibility checkpoint
 
-2026-10-15. Inventory of the existing [constructed corpus](wrapper-corpus.json), at source SHA-256
-`a2e3f931a17b400f0f4422bd329ca793ebe6916e5b437083c1ae6a9c280c018d`. No historical examples or native transcripts were
+2026-10-16. Inventory of the existing [constructed corpus](wrapper-corpus.json), at source SHA-256
+`827cfec682dbbb474eb7cced74250f0ee2ccb55afc3fca1c684a33a7add5d288`. No historical examples or native transcripts were
 collected for this checkpoint. Counts describe the authored fixtures, not independently established semantic truth.
 
 ## Evidence available
@@ -34,7 +34,8 @@ The seven declared source families do not overlap between splits, and related mo
 together. Family separation prevents that direct leakage; it does not prove independence. All examples were authored in
 one assistant-created collection with common conventions. The held-out candidate-positive count is especially sparse:
 its one proposed warning is a return-shape adaptation. No observed precision, miss rate, warning burden or real-world
-prevalence follows from this inventory.
+prevalence follows from this inventory. The revised advisory rule measures whether supplied evidence justifies a
+warning; its packet labels cannot establish whether caller review would find the warning useful.
 
 No historical positive or negative has been adjudicated. Earlier marker/delegation searches are discovery hints, not
 semantic labels or evidence that all unmarked wrappers were found. They cannot fill an empty historical stratum.

@@ -4,9 +4,9 @@
   "corpus_sha256": "fb7cf615a4a0f03952a071b711755e8c1dee9b173e6e1587f3a93d55c0a22a69",
   "rule": {
     "rule_id": "coding_standards.compatibility-wrapper",
-    "rule_version": "draft-2",
-    "evidence_contract_version": 3,
-    "definition": "Warn on retaining an earlier interface around its replacement contrary to the applicable clean-break policy. Require complete evidence of retention and whether an independent boundary requires this retained interface. Useful behavior alone does not justify retaining it; an independent requirement can arise in the same change. Unknown evidence is not compliance, and a warning does not establish that deletion is safe.",
+    "rule_version": "draft-3",
+    "evidence_contract_version": 4,
+    "definition": "Warn when supplied evidence establishes retention of an earlier interface around its replacement under the applicable clean-break policy but does not establish why that interface must remain. Require complete relevant interface history, adequate replacement evidence and known surface/exception facts. Materially ambiguous or conflicting supplied boundary evidence remains uncertain. A current independent requirement can concern a name, signature or callable identity without extra behavior, and can arise in the same change. A warning does not establish that a boundary is absent or that deletion is safe.",
     "applicability": {
       "internal": {
         "not_approved": "applicable",
@@ -33,8 +33,8 @@
       "coverage": {
         "type": "noul",
         "criteria": {
-          "true": "Complete relevant before/after definitions and known surface/exception context establish whether an earlier interface is retained. For a retained wrapper, its complete definition, replacement contract and enough context to determine whether an independent boundary requires retaining that interface are supplied. No independent responsibility need exist. A complete clean break or independently added wrapper can establish no retention.",
-          "false": "At least one required definition, interface history, policy fact or boundary fact is missing or ambiguous."
+          "true": "The action supplies complete relevant before/after interface definitions and history, plus known surface/exception facts, sufficient to establish whether an earlier interface is retained. For retention, the complete proposed wrapper and a replacement definition or adequate explicit interface contract are supplied. A newly introduced replacement need not have an earlier definition. A complete clean break or independently added wrapper can establish no retention. No proof about unseen consumers is required; absent boundary justification alone does not make coverage false.",
+          "false": "Required interface history, complete relevant definitions, adequate replacement evidence or applicable scope facts are missing or ambiguous. A partial forwarding line or Write without prior-interface evidence is insufficient. Missing boundary justification alone is not such a gap."
         }
       },
       "compatibility_retention": {
@@ -47,8 +47,8 @@
       "independent_boundary": {
         "type": "noul",
         "criteria": {
-          "true": "Supplied contract, registration, caller or test evidence establishes an independent requirement for this retained interface and its protocol, validation, instrumentation or other responsibility. The requirement may arise in the same change. Useful behavior or a new test alone does not justify keeping an old interface when the replacement could own that behavior without losing the boundary.",
-          "false": "The covered evidence establishes either no retained wrapper or compatibility-only retention with no independent requirement for the retained interface. Adding gratuitous validation or instrumentation does not create such a requirement. Missing purpose evidence cannot establish this outcome."
+          "true": "Supplied contract, registration, caller or test evidence establishes a current independent requirement for this retained interface. The requirement can concern its name, signature or callable identity alone, including a pure alias or forwarding function, or protocol, validation, instrumentation or another responsibility. It may arise in the same change. It must justify retaining this interface beyond an ordinary caller still using the old name. Useful behavior or a new test alone is insufficient when the replacement could own that behavior without losing the supplied required boundary.",
+          "false": "Covered evidence establishes no retained interface, or establishes retention without an independent boundary justification established by the supplied action. Absence of supplied justification may satisfy this criterion; it does not prove that no requirement exists elsewhere. Gratuitous validation, instrumentation or unsupported approval claims do not establish a boundary. Materially ambiguous or conflicting supplied boundary evidence is excluded from this criterion and remains uncertain."
         }
       }
     }
@@ -58,7 +58,7 @@
   "cases": [
     {
       "id": "module-forwarding",
-      "case_sha256": "d2b346448ece407f103cf4c5b5d29f7b1bdd5054871e52e7a8560155b5215f36",
+      "case_sha256": "16e294ba92fc1192ef6a075fd47af72231032f428c21e34fd1dd2d54b6ae37ec",
       "family": "module-rename",
       "split": "calibration",
       "provenance": {
@@ -93,7 +93,7 @@
     },
     {
       "id": "module-direct-update",
-      "case_sha256": "0ab7b27883d50f7e0a20fab72f72405853b96850690ce63d04603de99ec10137",
+      "case_sha256": "e29152bdbf0665a5aa7839f6ef10afde34009a83b5cee5833ef3e9185982cf17",
       "family": "module-rename",
       "split": "calibration",
       "provenance": {
@@ -128,7 +128,7 @@
     },
     {
       "id": "module-injection",
-      "case_sha256": "9b4754e476701ed4330bc9042782b88d73194e9851ebe4869094228c2b7ac0e4",
+      "case_sha256": "5d99db97005d021edad8bad9178e603d3478d5b1b93405cac2b1b69c7a3a4226",
       "family": "module-rename",
       "split": "calibration",
       "provenance": {
@@ -163,7 +163,7 @@
     },
     {
       "id": "method-argument-adapter",
-      "case_sha256": "3f292443d4fcc37ebdd6a10bc8d340cdc908892c56b32b1daddc800d8bfd3375",
+      "case_sha256": "e49cbc1f7d0131c93ed99e4d5c2d08dc0176c172f51eb3a8949558802b496283",
       "family": "argument-adaptation",
       "split": "calibration",
       "provenance": {
@@ -198,7 +198,7 @@
     },
     {
       "id": "validation-boundary",
-      "case_sha256": "ad196d3129b404fcf0aea9ba382bb47febb2e2fabd23149ed50091eb5b7f7b73",
+      "case_sha256": "c0bbf4ed9e5c11d4ed463d9b0906b5f07c06eda876ff90e184e5641aaeec3b81",
       "family": "validation-adaptation",
       "split": "calibration",
       "provenance": {
@@ -233,7 +233,7 @@
     },
     {
       "id": "validation-gratuitous",
-      "case_sha256": "d84886246ae16fbcba956294a5eaed15bc959ac38e23c9c5727924e33c30a2ea",
+      "case_sha256": "2634654ece0db0bdf8379b9c285fe19e9b131167c8972c541e31df25beb75883",
       "family": "validation-adaptation",
       "split": "calibration",
       "provenance": {
@@ -268,7 +268,7 @@
     },
     {
       "id": "preview-alias",
-      "case_sha256": "3a0b39a0b7693169050289770bd630cf0f333dfdb50ce2ecc1b336527806a529",
+      "case_sha256": "7e9b1af800c746d845d723a7dfb75a1cfa2e9a3d6c50aa4a8eb2d7f36d21f6a1",
       "family": "public-alias",
       "split": "calibration",
       "provenance": {
@@ -303,7 +303,7 @@
     },
     {
       "id": "stable-alias",
-      "case_sha256": "880649431ded3b23e53c9cff6bd1f1c76e119501d86cd3a14255f513a62409bf",
+      "case_sha256": "cd37bc6c2d3eeb834e5ac66534ee8b1e6960632540d5428498c64e505ed7a23d",
       "family": "public-alias",
       "split": "calibration",
       "provenance": {
@@ -338,7 +338,7 @@
     },
     {
       "id": "preview-approved-exception",
-      "case_sha256": "fbc96529edfad1056e7979e21b6273dbce09c2cc0b32c6222d9bcee15ad8b1d6",
+      "case_sha256": "6ea445651da669ee390da3c7d836c066107f1902a3d2e5ef639cf2cd0e350df2",
       "family": "public-alias",
       "split": "calibration",
       "provenance": {
@@ -373,7 +373,7 @@
     },
     {
       "id": "unknown-public-status",
-      "case_sha256": "c9cf692d7701ac125aaf37887bab81c31d131f5d3aeb7b9a0a8a96f2b83f79c4",
+      "case_sha256": "8533b24b7829996ab56feef463a059ee62346a153d4837b0f2aacacfdf10b06b",
       "family": "public-alias",
       "split": "calibration",
       "provenance": {
@@ -408,7 +408,7 @@
     },
     {
       "id": "callback-protocol",
-      "case_sha256": "743d343c42b4df5668e71bcc720bde68801f4aa55cf58cc1b07e422cb4dbe680",
+      "case_sha256": "ba79983c7a53c03c0c4e184f6fe639c54da0c2a76e7c9859c268f3ffc527d550",
       "family": "argument-adaptation",
       "split": "calibration",
       "provenance": {
@@ -443,7 +443,7 @@
     },
     {
       "id": "decorator-instrumentation",
-      "case_sha256": "d9f60ab21a0f003d0c899344cf16cc25266d65fd252954f3e54b1639d0bd1bcd",
+      "case_sha256": "609cd48a1a83e6a2d0593005d02d55afbb5a4383d0adf2366f506176fb520ca6",
       "family": "decorator-instrumentation",
       "split": "held_out",
       "provenance": {
@@ -478,7 +478,7 @@
     },
     {
       "id": "write-without-history",
-      "case_sha256": "4dfc9172a08b90db2f59da266828280970a02fe381fd7e515219ddb84912317b",
+      "case_sha256": "6278ba9ad3d9c7fb8470b330485cda5c03689540556b5dd7b77c687a1bfd7469",
       "family": "insufficient-context",
       "split": "held_out",
       "provenance": {
@@ -511,7 +511,7 @@
     },
     {
       "id": "partial-edit",
-      "case_sha256": "d8b46e7d92c06473fb6446f0d06cb2870d9c0635460492c6255bb30be84057d8",
+      "case_sha256": "674fc6de1fbdeb72af5a51959b339ce5940fe4d3cace414c344e5c733343bb88",
       "family": "insufficient-context",
       "split": "held_out",
       "provenance": {
@@ -546,7 +546,7 @@
     },
     {
       "id": "return-shape-adapter",
-      "case_sha256": "b429b81e0ef621ff9700b9ace8d35e00bbec71e487b077f983a5e7c275f7a616",
+      "case_sha256": "d57fd194f32e397e8e8c19151fce465ee1e4ad40951e43cbbb7e55c458b37ef8",
       "family": "return-shape-adaptation",
       "split": "held_out",
       "provenance": {
@@ -581,7 +581,7 @@
     },
     {
       "id": "return-shape-direct-update",
-      "case_sha256": "c1b5621f9815d06e38d3727fd4c53b2711bfe7a8c3b39f450052fc9269b7eb3c",
+      "case_sha256": "82f0c26ca9bcd281c334fa9ec5d62ecf82a4eccb4b697e491529cbeacd0db414",
       "family": "return-shape-adaptation",
       "split": "held_out",
       "provenance": {
@@ -616,7 +616,7 @@
     },
     {
       "id": "multi-file-wrapper",
-      "case_sha256": "50f002b80618884bce18781644b270050260de4fa232e023af929a7619f3b196",
+      "case_sha256": "dc722d956bb8c39f8a54e0166d439a86ae5904ef25310552c7e27d81bb4ddd7f",
       "family": "module-rename",
       "split": "calibration",
       "provenance": {

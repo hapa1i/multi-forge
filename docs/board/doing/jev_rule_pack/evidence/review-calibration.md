@@ -2,7 +2,9 @@
 
 Rendered from [human-review-packet.json](human-review-packet.json). These 12 cases remain pending. Read the
 [review instructions](human-review.md) and exact question criteria first. No model responses or proposed labels appear
-here. Case names may suggest author intent; they are retained for identity, not treated as labels.
+here. Rule `draft-3` / evidence contract 4 uses the advisory standard: absent supplied boundary justification can
+support a warning when interface evidence is otherwise complete. Case names may suggest author intent; they are not
+labels.
 
 Every action is constructed, with provenance `assistant-authored-wrapper-fixtures-2026-10-15`. The supplied scope facts
 are invented governance for these examples, not real repository declarations. Judge only the complete action shown and
@@ -10,7 +12,7 @@ these facts; unavailable evidence must remain unknown. No additional file conten
 
 ## module-forwarding
 
-Family: `module-rename`. Case SHA-256: `d2b346448ece407f103cf4c5b5d29f7b1bdd5054871e52e7a8560155b5215f36`.
+Family: `module-rename`. Case SHA-256: `16e294ba92fc1192ef6a075fd47af72231032f428c21e34fd1dd2d54b6ae37ec`.
 
 Surface: `internal`; compatibility decision: `not_approved`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -44,7 +46,7 @@ matching packet row.
 
 ## module-direct-update
 
-Family: `module-rename`. Case SHA-256: `0ab7b27883d50f7e0a20fab72f72405853b96850690ce63d04603de99ec10137`.
+Family: `module-rename`. Case SHA-256: `e29152bdbf0665a5aa7839f6ef10afde34009a83b5cee5833ef3e9185982cf17`.
 
 Surface: `internal`; compatibility decision: `not_approved`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -75,7 +77,7 @@ matching packet row.
 
 ## module-injection
 
-Family: `module-rename`. Case SHA-256: `9b4754e476701ed4330bc9042782b88d73194e9851ebe4869094228c2b7ac0e4`.
+Family: `module-rename`. Case SHA-256: `5d99db97005d021edad8bad9178e603d3478d5b1b93405cac2b1b69c7a3a4226`.
 
 Surface: `internal`; compatibility decision: `not_approved`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -113,7 +115,7 @@ matching packet row.
 
 ## method-argument-adapter
 
-Family: `argument-adaptation`. Case SHA-256: `3f292443d4fcc37ebdd6a10bc8d340cdc908892c56b32b1daddc800d8bfd3375`.
+Family: `argument-adaptation`. Case SHA-256: `e49cbc1f7d0131c93ed99e4d5c2d08dc0176c172f51eb3a8949558802b496283`.
 
 Surface: `internal`; compatibility decision: `not_approved`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -155,7 +157,7 @@ matching packet row.
 
 ## validation-boundary
 
-Family: `validation-adaptation`. Case SHA-256: `ad196d3129b404fcf0aea9ba382bb47febb2e2fabd23149ed50091eb5b7f7b73`.
+Family: `validation-adaptation`. Case SHA-256: `c0bbf4ed9e5c11d4ed463d9b0906b5f07c06eda876ff90e184e5641aaeec3b81`.
 
 Surface: `internal`; compatibility decision: `not_approved`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -259,7 +261,7 @@ matching packet row.
 
 ## validation-gratuitous
 
-Family: `validation-adaptation`. Case SHA-256: `d84886246ae16fbcba956294a5eaed15bc959ac38e23c9c5727924e33c30a2ea`.
+Family: `validation-adaptation`. Case SHA-256: `2634654ece0db0bdf8379b9c285fe19e9b131167c8972c541e31df25beb75883`.
 
 Surface: `internal`; compatibility decision: `not_approved`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -365,7 +367,7 @@ matching packet row.
 
 ## preview-alias
 
-Family: `public-alias`. Case SHA-256: `3a0b39a0b7693169050289770bd630cf0f333dfdb50ce2ecc1b336527806a529`.
+Family: `public-alias`. Case SHA-256: `7e9b1af800c746d845d723a7dfb75a1cfa2e9a3d6c50aa4a8eb2d7f36d21f6a1`.
 
 Surface: `public_preview`; compatibility decision: `not_approved`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -392,7 +394,7 @@ matching packet row.
 
 ## stable-alias
 
-Family: `public-alias`. Case SHA-256: `880649431ded3b23e53c9cff6bd1f1c76e119501d86cd3a14255f513a62409bf`.
+Family: `public-alias`. Case SHA-256: `cd37bc6c2d3eeb834e5ac66534ee8b1e6960632540d5428498c64e505ed7a23d`.
 
 Surface: `public_stable`; compatibility decision: `approved`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -419,7 +421,7 @@ matching packet row.
 
 ## preview-approved-exception
 
-Family: `public-alias`. Case SHA-256: `fbc96529edfad1056e7979e21b6273dbce09c2cc0b32c6222d9bcee15ad8b1d6`.
+Family: `public-alias`. Case SHA-256: `6ea445651da669ee390da3c7d836c066107f1902a3d2e5ef639cf2cd0e350df2`.
 
 Surface: `public_preview`; compatibility decision: `approved`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -446,7 +448,7 @@ matching packet row.
 
 ## unknown-public-status
 
-Family: `public-alias`. Case SHA-256: `c9cf692d7701ac125aaf37887bab81c31d131f5d3aeb7b9a0a8a96f2b83f79c4`.
+Family: `public-alias`. Case SHA-256: `8533b24b7829996ab56feef463a059ee62346a153d4837b0f2aacacfdf10b06b`.
 
 Surface: `unknown`; compatibility decision: `unknown`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -473,7 +475,7 @@ matching packet row.
 
 ## callback-protocol
 
-Family: `argument-adaptation`. Case SHA-256: `743d343c42b4df5668e71bcc720bde68801f4aa55cf58cc1b07e422cb4dbe680`.
+Family: `argument-adaptation`. Case SHA-256: `ba79983c7a53c03c0c4e184f6fe639c54da0c2a76e7c9859c268f3ffc527d550`.
 
 Surface: `internal`; compatibility decision: `not_approved`. Runtime/tool: `claude_code` / `Edit`.
 
@@ -571,7 +573,7 @@ matching packet row.
 
 ## multi-file-wrapper
 
-Family: `module-rename`. Case SHA-256: `50f002b80618884bce18781644b270050260de4fa232e023af929a7619f3b196`.
+Family: `module-rename`. Case SHA-256: `dc722d956bb8c39f8a54e0166d439a86ae5904ef25310552c7e27d81bb4ddd7f`.
 
 Surface: `internal`; compatibility decision: `not_approved`. Runtime/tool: `codex` / `apply_patch`.
 

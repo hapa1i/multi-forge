@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "rule_id": "coding_standards.compatibility-wrapper",
-  "rule_version": "draft-2",
-  "evidence_contract_version": 3,
+  "rule_version": "draft-3",
+  "evidence_contract_version": 4,
   "cases": [
     {
       "id": "module-forwarding",
@@ -30,7 +30,7 @@
       "reconstruction": "Authored directly as one synthetic hook action; no repository history or transcript was copied. Supplied strings are the complete intended fixture fragments, not a claim that arbitrary live Edit strings are complete.",
       "proposal": {
         "outcome": "warning",
-        "reason": "The old module-level interface remains solely as forwarding to its replacement. No local-function restriction applies."
+        "reason": "The complete action retains the old module-level interface through its replacement, without establishing an independent justification for retaining it. This is a review prompt, not proof that unseen callers do not require the interface."
       },
       "adjudication": null
     },
@@ -180,7 +180,7 @@
       "reconstruction": "Authored as one synthetic Edit. Both images include the pre-existing InputCommand exception contract and parser registration, a separate inspect_document consumer with its exception contract, and unchanged tests for both consumers. Replacement definitions and caller migrations are supplied in full. No external project history or API is asserted.",
       "proposal": {
         "outcome": "warning",
-        "reason": "decode_json already supplies the command BlankDocument contract; the inspection consumer accepts both JSONDecodeError and BlankDocument through ValueError. The retained parse_document duplicates validation without preserving any independently required boundary. Caller review is still required before removal."
+        "reason": "decode_json already supplies the shown command BlankDocument contract; the inspection consumer accepts both JSONDecodeError and BlankDocument through ValueError. The retained parse_document duplicates validation without a separate justification established by the supplied contracts. Caller review remains necessary before removal."
       },
       "adjudication": null
     },
@@ -210,7 +210,7 @@
       "reconstruction": "Authored directly as one synthetic hook action; no repository history or transcript was copied. Supplied strings are the complete intended fixture fragments, not a claim that arbitrary live Edit strings are complete.",
       "proposal": {
         "outcome": "warning",
-        "reason": "A declared preview interface is renamed while its old alias remains without an approved exception."
+        "reason": "The complete action retains the old preview name through its replacement, with no approved exception or supplied independent requirement. A named protocol could justify a pure alias, but none is established in this packet."
       },
       "adjudication": null
     },
@@ -418,7 +418,7 @@
       "reconstruction": "Authored directly as one synthetic hook action; no repository history or transcript was copied. Supplied strings are the complete intended fixture fragments, not a claim that arbitrary live Edit strings are complete.",
       "proposal": {
         "outcome": "unavailable",
-        "reason": "A changed forwarding line does not establish a complete wrapper, replacement contract or compatibility purpose."
+        "reason": "A changed forwarding line does not establish complete interface history, wrapper definitions or a replacement contract."
       },
       "adjudication": null
     },
@@ -448,7 +448,7 @@
       "reconstruction": "Authored directly as one synthetic hook action; no repository history or transcript was copied. Supplied strings are the complete intended fixture fragments, not a claim that arbitrary live Edit strings are complete.",
       "proposal": {
         "outcome": "warning",
-        "reason": "The migrated render caller consumes the replacement mapping. The retained describe function reconstructs only the previous tuple return contract, with no separately required boundary behavior."
+        "reason": "The migrated render caller consumes the replacement mapping. The retained describe function reconstructs the previous tuple return contract without an independent requirement established in the supplied evidence."
       },
       "adjudication": null
     },
@@ -505,7 +505,7 @@
       "reconstruction": "Authored directly as one complete synthetic two-file apply_patch action. The old wrapper and its replacement bodies are present; this does not assert that arbitrary patch hunks provide complete definitions.",
       "proposal": {
         "outcome": "warning",
-        "reason": "The internal old interface remains around its moved replacement. Both complete function bodies are supplied in the same atomic patch; no same-file restriction applies."
+        "reason": "The old internal interface remains around its moved replacement. Both complete function bodies are supplied in the same patch without an established boundary justification; the warning still requires caller and compatibility review."
       },
       "adjudication": null
     }

@@ -16,23 +16,32 @@ replacement definitions or boundary requirements.
 
 The [selected evidence contract](initial-rule-review.md) and the packet's `rule` object define what is being judged. The
 broader family includes functions, methods, aliases, decorators and callbacks. Delegation is not by itself a violation.
-A warning identifies compatibility retention contrary to the applicable clean-break policy; it never proves that
-deletion is safe.
+A warning identifies covered compatibility retention under the clean-break policy without an independent justification
+established in the supplied evidence. It never proves that no requirement exists elsewhere or that deletion is safe.
 
 Use the exact true/false criteria in the packet for these three questions:
 
-1. `coverage`: does the supplied action establish the relevant interface history, replacement contract and enough
-   boundary context to assess retention? Missing facts cannot be filled from the author rationale or imagined callers.
+1. `coverage`: does the supplied action establish the relevant interface history and replacement contract, with known
+   applicable scope facts? Require complete retained-interface definitions and an adequate replacement definition or
+   explicit contract. Missing structural facts cannot be filled from the author rationale or imagined callers.
 2. `compatibility_retention`: does the action retain an earlier interface through a replacement? Forwarding alone is
    insufficient; a complete clean break can establish no retention.
-3. `independent_boundary`: does supplied evidence establish an independent need for the retained interface? Useful
-   behavior alone is insufficient. Missing purpose evidence does not prove the absence of a requirement.
+3. `independent_boundary`: does supplied evidence establish an independent need for the retained interface? A required
+   protocol name, signature or identity can justify even a pure alias. Useful behavior alone is insufficient. For an
+   otherwise covered action, the absence of supplied justification supports false; materially ambiguous or conflicting
+   supplied boundary evidence stays unresolved. False does not establish the absence of requirements outside the packet.
 
 Record `true`, `false` or `null` for each question. `null` means the human cannot determine that answer from the
-supplied evidence. Do not turn it into `false` to complete a row. Final outcomes use `warning`, `no_warning`,
-`uncertain`, `unavailable` or `not_applicable`. Apply the rule's surface/exception table too: host-decided cases need
-human review, even though they would make no model request. A disagreement with host applicability must stay visible in
-the labels and evaluation report.
+supplied evidence. Do not turn it into `false` to complete a row; distinguish an unresolved supplied contract from no
+justification being supplied at all. Final outcomes use `warning`, `no_warning`, `uncertain`, `unavailable` or
+`not_applicable`. Apply the rule's surface/exception table too: host-decided cases need human review, even though they
+would make no model request. A disagreement with host applicability must stay visible in the labels and evaluation
+report.
+
+The 2026-10-16 revision uses rule `draft-3`, evidence contract 4 and decision version `draft-2`. It changes the meaning
+of a warning and supersedes the previous packet/case hashes. No previous proposals or another model's answer sheet have
+been imported as human labels. Evaluate the packet's evidence standard separately from whether a later caller review
+would find the warning useful; an unseen legitimate requirement can make a correctly raised advisory warning unhelpful.
 
 ## Record a review
 

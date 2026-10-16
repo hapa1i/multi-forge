@@ -5,22 +5,23 @@ or dispatch described here is implemented. This document authorizes no repositor
 trial. The [selected rule contract](initial-rule-review.md) and [evaluation plan](evaluation-plan.md) retain their
 human-label, quality and admission gates.
 
-## Smallest supported scope
+## Project policy and action evidence
 
 Use a declaration explicitly selected by the project owner when activating one session. Copy its exact bytes into a
-session artifact and bind the snapshot to the acknowledgment. The declaration supplies intended policy authority for
-exact files; the action supplies code evidence. Neither source can substitute for the other.
+session artifact and bind the snapshot to the acknowledgment. The declaration supplies an explicit project-scoped
+clean-break default and scoped exceptions; the action supplies code evidence. Neither source substitutes for the other.
+The owner does not enumerate every file or claim that every interface in a file has the same surface classification.
 
-For this first contract, a file declaration must apply uniformly to every interface in that file. Every relevant file in
-one action must resolve to the same surface/exception pair. Mixed interfaces within a file, mixed facts across files,
-missing entries and unknown applicable facts produce unavailable with zero dispatch. Do not select convenient files or
-apply an internal classification inferred from a path. This limits evidence admission, not the selected wrapper family:
-methods, aliases, callbacks, decorators and module functions remain candidates when their evidence is covered.
+Keep surface classification separate from effective rule applicability. Internal interfaces and public-preview
+interfaces without an approved exception have the same clean-break requirement and can share an applicable batch.
+Applying an owner-approved project default establishes that requirement without asserting that an interface is internal
+because of its path or public because it is importable. Known stable surfaces and approved public-preview exceptions
+remain outside this rule; an unknown or conflicting governance decision remains unavailable.
 
-Known stable surfaces remain not applicable even when exception status is unknown, following the shared table. The
-uniform-action restriction preserves the existing single `scope_facts` object and three questions. Supporting different
-facts per symbol or file would require explicit scope mapping and reviewed question/evidence changes; it is not implicit
-in this proposal.
+The proposed resolver must attribute exceptions to the affected interfaces before batching. Matching only a filename
+cannot exempt unrelated helpers. Methods, aliases, callbacks, decorators and module functions remain within the selected
+wrapper family when their supplied evidence and applicability are covered. A demonstrated protocol requirement is
+semantic boundary evidence, not an approved governance exception.
 
 ## Existing seams and proposed owners
 
@@ -44,31 +45,42 @@ projections while retaining the existing contexts for existing policy evaluation
 
 ## Owner-selected declaration
 
-Accept one bounded UTF-8 JSON document, schema version 1, with no includes, executable expressions, inferred entries,
-wildcards or inheritance. Proposed local limits are 64 KiB and 256 exact file entries. These are implementation bounds,
-not paid request allowances. Reject duplicate JSON keys, unknown fields, invalid Unicode, excessive nesting and any
-ambiguous or unsupported version atomically.
+Accept one bounded UTF-8 JSON document, schema version 1, with no includes, executable expressions, glob precedence or
+inherited declarations. Proposed local limits are 64 KiB and 256 exception entries; the exception bound does not limit
+the number of project files governed by the default. These are implementation bounds, not paid request allowances.
+Reject duplicate JSON keys, unknown fields, invalid Unicode, excessive nesting and any unsupported version atomically.
 
 The document records a declaration ID/revision, the selected rule/contract versions, an attributed owner and a review
-reference. Each entry contains:
+reference. Its proposed fields are:
 
-- An exact worktree-relative file path and `uniform_scope: true`, asserting that the policy applies to all interfaces in
-  that file, including the proposed change. This is an owner assertion, not a conclusion obtained by reading code.
-- One surface from the shared applicability vocabulary: internal, public preview, public stable or unknown.
-- One compatibility decision: not approved, approved or unknown. An internal approved exception is invalid under the
-  selected rule. An approved preview exception requires an attributed decision reference.
-- A bounded local basis/reference for reviewing the assertion. This text is provenance, not additional model evidence.
+- `project_scope`: the selected session worktree root, represented as `.` in the document and bound to its canonical
+  identity at activation. Outside-worktree actions are not covered. There is one project scope, not a directory rule
+  hierarchy.
+- `default_applicability`: explicitly `clean_break_required` or `unknown`. The first requires the owner's affirmative
+  statement that the declaration accounts for every stable designation and approved compatibility exception in this
+  project scope. Missing or incomplete authority resolves to unknown; there is no automatic default from silence.
+- `exceptions`: entries with a unique ID, selector, public surface classification, compatibility decision and attributed
+  decision reference. `public_stable` is outside the rule regardless of exception status. `public_preview` requires an
+  explicitly approved exception. `internal/approved` remains invalid; do not manufacture an exception to encode a
+  callback or protocol requirement.
+- Bounded local basis and policy/review references. These explain the owner's decision but are not additional model
+  evidence. The loader does not open referenced documents or discover declarations elsewhere in the repository.
 
-Require explicit resolved values. An omitted file or field never means internal, preview or no exception. An owner may
-resolve the coding-standard defaults while authoring a declaration only after affirming that the declaration is complete
-for the exact scope and that absence of a stable designation/exception is meaningful there. The loader does not search
-for declarations or apply defaults from silence. A file with both public and internal interfaces cannot honestly claim a
-uniform surface and is unsupported by this initial format.
+Exception selectors use an exact normalized path, or `path::qualified_symbol`, with no wildcards. Duplicate selectors,
+overlapping ancestor/descendant symbol scopes, path-only and symbol entries for the same file, conflicting declarations
+and unsupported selector forms reject the declaration atomically; do not select a winner by entry order or an implicit
+specificity rule. A path-only entry records a known exception somewhere in that file, not a claim that every interface
+there is exempt. Its conservative runtime treatment is described below.
 
-At activation, display the exact admitted paths, their facts, source digest, declaration revision and review reference.
-Disclose that supplied action content and enumerated policy facts are sent to the provider, then require the session's
-paid-data acknowledgment. The owner is selecting governing policy, not labeling example outcomes. No model or agent
-action can create authority by placing an approval comment in a file. Accepting the declaration does not prove its
+The project default must be an owner decision under the governing policy, not a guess from a version number or an
+assistant's interpretation of contradictory documentation. The declaration's completeness statement makes absence of an
+exception meaningful within its scope; absence of an entry alone does not. This is governance authority for the session,
+not proof of every interface's public/private status.
+
+At activation, display the project scope, explicit default, exceptions, source digest, declaration revision and review
+reference. Disclose that supplied action content and enumerated policy facts are sent to the provider, then require the
+session's paid-data acknowledgment. The owner is selecting governing policy, not labeling example outcomes. No model or
+agent action can create authority by placing an approval comment in a file. Accepting the declaration does not prove its
 factual accuracy or supply a human calibration label.
 
 The trusted boundary is the operator and trusted local configuration writers, matching the existing acknowledgment.
@@ -102,10 +114,49 @@ cached results; it must not revive an earlier grant from overrides. Bound snapsh
 decision-log entries. Retain referenced artifacts for audit under the later A2 retention/deletion owner; disable revokes
 dispatch permission without erasing evidence. That lifecycle must be implemented and tested before activation ships.
 
-Only the resolved enumerated facts enter model state. Declaration prose, owner names, review references, local source
-paths and absolute worktree paths remain local. The evaluated evidence identity binds the declaration hash and selected
-entries locally. Adding declaration prose or auxiliary files to provider payloads would require a revised data scope,
-disclosure and acknowledgment; this proposal does not authorize it.
+Only resolved enumerated applicability facts and supported surface facts enter model state. Declaration prose, owner
+names, review references, local source paths and absolute worktree paths remain local. The evaluated evidence identity
+binds the declaration hash and selected entries locally. Adding declaration prose or auxiliary files to provider
+payloads would require a revised data scope, disclosure and acknowledgment; this proposal does not authorize it.
+
+## Deterministic applicability mapping
+
+Resolve a path under the pinned project default unless an exception might affect it. Preserve the resolution's basis:
+default, identified exception, unknown or conflict. A default-derived applicable result does not populate a fabricated
+`surface=internal` or `surface=public_preview`. Record actual surface classification only when the declaration supports
+it. Known applicability and known surface are distinct facts.
+
+For the initial Python symbol mapping, a `file::qualified_symbol` exception can apply only to a uniquely identified
+complete declaration in the supplied before/after text. Qualified names use lexical class/function ancestry, not
+underscore conventions or guessed exports. Require exact name matching and enough supplied enclosing syntax to establish
+that ancestry. Partial method hunks, dynamically constructed interfaces, duplicate declarations, unsupported syntax and
+an alias whose declaration cannot be uniquely attributed remain ambiguous. Do not read a file body to resolve them.
+Non-Python actions touching a symbol exception remain unavailable until their mapping is implemented.
+
+A symbol exception covers the named interface, not every nested helper or adjacent declaration. The mapper must account
+for each changed interface and preserve before/after names when one is renamed or replaced. An affected exceptional
+interface cannot lose its exception merely because its name changes in the proposed action. If its identity cannot be
+carried across the change from supplied evidence, refuse dispatch. Source and destination governance are both checked
+for moves. Supporting definitions can remain evidence without automatically becoming exception targets.
+
+An action touching a path-only exception is unavailable with zero dispatch in this initial proposal. That narrow
+conservative refusal permits an owner to record a known exception before precise symbol mapping exists, without
+declaring all helpers exempt or silently assessing the exception under the project default. A symbol-scoped exception in
+a touched file likewise requires enough evidence to prove whether the action intersects it; an unmatched partial hunk
+cannot default to applicable merely because its selector text is absent.
+
+Batch by effective applicability, not equal surface labels. All applicable changed interfaces may share one bounded
+request, including internal and non-exempt preview interfaces. An action whose changed interfaces are all explicitly
+outside this rule is host-decided not applicable. Mixed applicable/not-applicable interfaces, or any unknown or
+conflicting mapping, produce unavailable with zero dispatch in the first runtime version. Do not exempt unrelated
+helpers, ignore an exceptional interface or send only the convenient subset. Later per-interface questions may lift this
+restriction only with explicit attribution and a reviewed evidence contract.
+
+This requires a new runtime scope representation carrying project authority, per-interface resolution and exception
+mapping. The current offline corpus still has one explicit `scope_facts` pair and treats `surface=unknown` as
+unavailable. Do not reinterpret that pair or relabel unknown surfaces to implement the project default. Version and
+validate the runtime representation and adapt the question/evidence boundary explicitly before wiring it; retain
+existing offline semantics until a separately reviewed contract migration changes them.
 
 ## One complete action envelope
 
@@ -145,16 +196,15 @@ and symlink components. For a new destination, inspect only its existing parent 
 for the supplied targets, never file-body reads or repository enumeration. An unresolvable path or observed metadata
 race is unavailable. The check does not lock the filesystem through the later native tool execution.
 
-A move requires declared, matching facts at both the source and destination; its old interface and proposed location
-must not silently acquire different policy. Deletions stay in the full identity and attribution record. A deletion-only
-action is not applicable, not a model success. For a mixed action, a deleted source may supply relevant interface
-history only when that text is actually present in the supplied envelope. A bodyless delete cannot invent it.
+A move requires compatible effective applicability at both the source and destination; its old interface and proposed
+location must not silently acquire different policy. Deletions stay in the full identity and attribution record. A
+deletion-only action is not applicable, not a model success. For a mixed action, a deleted source may supply relevant
+interface history only when that text is actually present in the supplied envelope. A bodyless delete cannot invent it.
 
-Resolve declarations for every non-delete operation and every move endpoint, and apply one uniform facts pair to the
-whole action. Missing, mixed or ambiguous facts make the action unavailable with zero dispatch. If any applicable
-operation is locally unsupported, send none of the action. Host-decided inapplicability still follows the shared table;
-the proposed preparation layer must account for every operation and never call a partly covered action clean. This
-preserves the current question contract without extending it to per-file governance.
+Resolve applicability for every non-delete operation and every move endpoint using the mapping above. If any applicable
+operation is locally unsupported, send none of the action. The preparation layer must account for every operation and
+never call a partly covered action clean. Relevant wrapper, replacement and boundary evidence comes from the supplied
+action; the governance declaration cannot substitute a prose claim for that evidence.
 
 ## Evidence identity and orchestration boundary
 
@@ -174,14 +224,15 @@ or fallback. Failure to acquire facts or evidence must never add a Jev denial or
 ## Offline proof and remaining review
 
 Fixtures can now exercise snapshot selection, immutable source bytes, replacement/revocation, malformed declarations,
-copied grants, unknown/mixed scope, move endpoints, path rejection, unchanged source-file edits, complete long inputs,
-`replace_all`, unsupported operations and all-or-nothing preparation without credentials or a client. They must also
-prove that action comments cannot alter scope and declaration prose never enters a model payload. These are planned
-implementation checks, not completed tests or model-quality evidence.
+copied grants, default-derived applicability, mixed surface classes with the same applicability, exact exceptions,
+unrelated helpers, incomplete selector attribution, unknown/conflicting applicability, move endpoints, path rejection,
+unchanged source-file edits, complete long inputs, `replace_all`, unsupported operations and all-or-nothing preparation
+without credentials or a client. They must also prove that action comments cannot alter scope and declaration prose
+never enters a model payload. These are planned implementation checks, not completed tests or model-quality evidence.
 
-The proposed initial limitation needs explicit contract review before runtime admission: owner-attested, exact-file
-uniform scope, one facts pair per action, and pinned authority that changes only by replacement/revocation. If useful
-actions require mixed scopes, revise the evidence/question contract and evaluation corpus before widening admission. No
-production declaration or quality threshold is selected here. Human adjudication and numerical quality choices remain
-owned by the evaluation plan; live payload approval and native delivery remain separate gates. Offline fixtures and a
-reviewable implementation of this contract can proceed without deciding those later gates.
+The project-default proposal supersedes exact-file enumeration and uniform surface declarations. Its declaration loader,
+deterministic exception mapping and runtime scope representation remain unimplemented and need verification before
+runtime admission. Pinned authority still changes only by replacement/revocation. No production declaration or quality
+threshold is selected here. Human adjudication and numerical quality choices remain owned by the evaluation plan; live
+payload approval and native delivery remain separate gates. Offline fixtures and a reviewable implementation of this
+contract can proceed without deciding those later gates.

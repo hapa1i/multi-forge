@@ -11,6 +11,13 @@ outcome. It requires explicit per-question threshold bands and composes covered 
 uncertain or unavailable assessments with fixed diagnostics. Contradictory answers remain uncertain; missing coverage
 cannot establish compliance. These modules do not register or activate a bundle and do not dispatch requests.
 
+The provisional warning contract is advisory: complete supplied interface history and replacement evidence establish
+retention, but the supplied action does not establish an independent justification for keeping that interface. No
+repository-wide proof of absence is required. A named protocol, signature or callable identity can justify a pure alias;
+extra behavior alone does not. Missing structural/policy evidence remains unavailable, and materially ambiguous or
+conflicting supplied boundary evidence remains uncertain. Warnings ask for caller and compatibility review rather than
+claiming deletion is safe. Packet-label accuracy and practical warning usefulness are separate evaluation claims.
+
 The development harness `scripts/experiments/jev/rule-pack-eval.py` prepares bounded inputs or evaluates saved responses
 offline. Corpus/split, semantic evidence, prompt, prediction, settings and adjudication identities remain distinct.
 Reports compare host decisions with human labels, separate source cohorts and repetitions, preserve abstentions and
