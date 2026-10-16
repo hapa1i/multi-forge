@@ -29,8 +29,11 @@ The same harness exports human-review packets containing rule criteria and exact
 proposals, reviewer-only notes and existing labels. Import verifies contract, membership and content identity before
 emitting a new corpus. Pending rows preserve prior adjudications; replacements are explicit. Disputed/excluded rows
 block import instead of silently removing cases. The retained packet owns review notes, referenced by each imported
-adjudication. Named reviewers are provenance supplied by the operator, not authenticated identities. This workflow
-cannot establish that a human performed the review or turn fixture proposals into quality evidence.
+adjudication. Review references are paths relative to the retained corpus directory; keep the corpus and ledgers
+together when relocating evidence. The importer stores the reference without opening or hashing that file, so retain the
+reviewed Git revision to identify ledger contents. Named reviewers are provenance supplied by the operator, not
+authenticated identities. This workflow cannot establish that a human performed the review or turn fixture proposals
+into quality evidence.
 
 ## Consent and runtime boundary
 

@@ -5,7 +5,9 @@ handoffs. A1 shipped through [PR #268](https://github.com/hapa1i/multi-forge/pul
 2026-10-14. A2's foundations shipped through [PR #270](https://github.com/hapa1i/multi-forge/pull/270) as `9442c1e5` on
 2026-10-15. Its offline outcomes and evaluation shipped through
 [PR #271](https://github.com/hapa1i/multi-forge/pull/271) as `791d9872` on the same day. A2's quality, runtime
-fact-source, activation and native-delivery gates remain open. A3 remains proposed.
+fact-source, activation and native-delivery gates remain open. Its 17 constructed cases now have human labels; the next
+member-owned gate measures representative evidence coverage and warning usefulness before runtime implementation. A3
+remains proposed.
 
 ## Problem and outcome
 
@@ -36,7 +38,9 @@ execution branches when activated.
 
 Selected member: A2 establishes the first policy consumer and exercises warning delivery against A1's shipped boundary.
 Its [checklist](../jev_rule_pack/checklist.md) owns implementation, rule-quality gates and new data/spend decisions.
-Continuation branches remain scoped to A2; A2 does not make plan-alignment decisions for A3.
+Continuation branches remain scoped to A2; A2 does not make plan-alignment decisions for A3. Its
+[pre-runtime feasibility gate](../jev_rule_pack/checklist.md#slice-2-feasibility-before-runtime-work) owns the next
+proceed/revise/stop decision; constructed labels alone do not establish runtime quality.
 
 The independent [Claude feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), shipped as
 `e9c144eb` and is included on `main`. Its

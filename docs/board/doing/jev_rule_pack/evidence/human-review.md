@@ -66,9 +66,11 @@ would find the warning useful; an unseen legitimate requirement can make a corre
 ## Record a review
 
 Copy the JSON packet to a new review file and retain it as that batch's review ledger. Set top-level `reviewer` to the
-human who actually made the decisions and `review_reference` to the retained review record. An assistant may transcribe
-explicit human answers; it must not supply its own decisions under a human's name. The importer validates structure and
-evidence identity, not whether the named person performed the review.
+human who actually made the decisions. Set `review_reference` to the ledger's path relative to the retained corpus
+directory, such as `human-review-2026-10-16-batch-8.json`; keep the corpus and its ledgers together when moving the
+card. Do not include a board lane, repository root or absolute checkout path. The reference is provenance text: the
+importer copies it without opening the referenced file or authenticating the reviewer. An assistant may transcribe
+explicit human answers; it must not supply its own decisions under a human's name.
 
 For each completed case, edit only its `review` object:
 
@@ -86,6 +88,12 @@ record the exclusion and regenerate a packet; no case is silently dropped.
 
 For the next batch, leave already adjudicated cases pending in the new packet so import preserves their corpus labels.
 Keep the completed ledgers unchanged; do not resubmit their completed rows as new labels.
+
+The pre-merge reference migration changed only the eight ledgers' top-level references and replayed them into the
+corpus. Outcomes, question answers, notes, reviewers and case identities are unchanged. This intentionally changes the
+adjudication/report identity once, before any A2 model capture; moving the card with its evidence directory now leaves
+those references unchanged. The prior repository-relative references remain in Git history. Reports do not hash the
+ledger contents, so retain their reviewed Git revision; a reference alone does not detect later edits to review notes.
 
 You can also return decisions in conversation, naming the case ID, outcome, three question answers and notes. The exact
 packet case hash remains the reviewed identity. Confirm the final transcribed ledger before treating it as your review.
@@ -113,7 +121,8 @@ uv run python scripts/experiments/jev/rule-pack-eval.py /tmp/jev-reviewed-corpus
 Always redirect to a new file: shell redirection to the input path would truncate it before the program starts. The
 importer does not overwrite the source corpus or review packet. It rejects changed rule/evidence, stale hashes,
 missing/duplicate cases and implicit label replacement. An unchanged empty packet round-trips without creating any
-adjudication. There is no provider client or dispatch mode in this workflow.
+adjudication. When adopting a temporary output, place it with its retained ledgers so relative references resolve; the
+commands above do not copy the ledgers into `/tmp`. There is no provider client or dispatch mode in this workflow.
 
 Export also rejects existing adjudications whose case evidence has changed. Preserve the prior corpus and review ledger,
 then make a new corpus copy and explicitly clear only the invalidated `adjudication` fields to null, recording why.

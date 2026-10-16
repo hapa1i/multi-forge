@@ -15,15 +15,16 @@ Status: **doing**. The foundations shipped through [PR #270](https://github.com/
 [PR #271](https://github.com/hapa1i/multi-forge/pull/271) as `791d9872` on the same day. The
 [execution checklist](checklist.md) records the outstanding quality and activation gates. The
 [wrapper evidence contract](evidence/initial-rule-review.md) follows the user's 2026-10-15 choice to keep broader
-wrappers. It has 17 constructed hook-shaped examples and an offline evaluation harness, with human labels and quality
-gates still open. No paid A2 evaluation has run and the bundle is not yet registered for activation. The
-[merge handoff](checklist.md#offline-evaluation-merge-and-next-gate) records shipped scope and the next gate without
-closing A2. Implemented ownership is described in [rule-pack design](../../../design_rule_packs.md).
+wrappers. All 17 constructed hook-shaped examples now have human adjudications. Representative action coverage, warning
+usefulness and numerical quality gates remain open. No paid A2 evaluation has run and the bundle is not yet registered
+for activation. The [merge handoff](checklist.md#offline-evaluation-merge-and-next-gate) records shipped scope and the
+next gate without closing A2. Implemented ownership is described in [rule-pack design](../../../design_rule_packs.md).
 
-Continuation: `codex/jev-rule-pack-evidence` prepares [human review](evidence/human-review.md), records
-[corpus feasibility](evidence/corpus-feasibility.md) and proposes the
-[runtime evidence contract](evidence/runtime-evidence-contract.md). It does not enable the policy or supply human
-labels.
+Continuation: `codex/jev-rule-pack-evidence`, rebased onto `main` at `3573c147`, records the completed
+[human review](evidence/human-review.md) and [corpus feasibility](evidence/corpus-feasibility.md). Its next step is the
+[pre-runtime feasibility decision](checklist.md#slice-2-feasibility-before-runtime-work), before implementing the
+[runtime evidence proposal](evidence/runtime-evidence-contract.md). Constructed-only evidence can support a smoke test;
+it cannot authorize runtime implementation on a quality claim or activate the policy.
 
 ## Problem and outcome
 
@@ -68,13 +69,17 @@ stable rule citations, action evidence and semantic correctness.
 
 ## Acceptance and validation
 
-- Establish corpus feasibility and quality limits for the selected wrapper family before runtime admission. Reconstruct
-  historical changes into the Write/Edit or apply_patch actions the hook sees, with documented assumptions. Include
-  constructed positives when needed, labeled and measured separately; any native transcript cohort requires its own data
-  decision. Keep originating changes and mutation families within one calibration/held-out split. Evaluate per-rule
-  false positives and misses, insufficient evidence, calibration, pack-wide warning frequency, latency and API cost
-  against existing deterministic checks. Human adjudication supplies labels; merged history and another model's verdict
-  are not automatic ground truth.
+- Establish corpus feasibility and quality limits for the selected wrapper family before further runtime implementation.
+  Measure real-action evidence sufficiency, governance/exception mapping and practical warning usefulness first.
+  Reconstruct historical changes into the Write/Edit or apply_patch actions the hook sees, with documented assumptions.
+  Include constructed positives when needed, labeled and measured separately; any native transcript cohort requires its
+  own data decision. Keep originating changes and mutation families within one calibration/held-out split. Evaluate
+  per-rule false positives and misses, insufficient evidence, calibration, pack-wide warning frequency, latency and API
+  cost against existing marker checks and a bounded AST baseline using the same supplied evidence. Review warning
+  usefulness separately against caller/contract evidence that never enters the model payload. Human adjudication
+  supplies labels; merged history and another model's verdict are not automatic ground truth. Freeze question bands on
+  calibration responses only. The existing held-out scenarios were visible during draft-3 development and cannot
+  demonstrate generalization to unseen scenarios.
 - Unit/regression tests cover pack validation, applicability, deterministic-policy coexistence, batched answer mapping,
   multi-file attribution, consent/override boundaries, blocked-action suppression, stale cache, incomplete state,
   injected instructions and consumer-specific timeout/malformed-result diagnostics. Evaluation runs need distinct

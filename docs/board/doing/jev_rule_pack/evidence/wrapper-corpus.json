@@ -35,7 +35,7 @@
       "adjudication": {
         "outcome": "warning",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16.json",
+        "review_reference": "human-review-2026-10-16.json",
         "case_sha256": "16e294ba92fc1192ef6a075fd47af72231032f428c21e34fd1dd2d54b6ae37ec",
         "question_answers": {
           "coverage": true,
@@ -75,7 +75,7 @@
       "adjudication": {
         "outcome": "no_warning",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16.json",
+        "review_reference": "human-review-2026-10-16.json",
         "case_sha256": "e29152bdbf0665a5aa7839f6ef10afde34009a83b5cee5833ef3e9185982cf17",
         "question_answers": {
           "coverage": true,
@@ -115,7 +115,7 @@
       "adjudication": {
         "outcome": "warning",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-2.json",
+        "review_reference": "human-review-2026-10-16-batch-2.json",
         "case_sha256": "5d99db97005d021edad8bad9178e603d3478d5b1b93405cac2b1b69c7a3a4226",
         "question_answers": {
           "coverage": true,
@@ -155,7 +155,7 @@
       "adjudication": {
         "outcome": "warning",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-2.json",
+        "review_reference": "human-review-2026-10-16-batch-2.json",
         "case_sha256": "e49cbc1f7d0131c93ed99e4d5c2d08dc0176c172f51eb3a8949558802b496283",
         "question_answers": {
           "coverage": true,
@@ -195,7 +195,7 @@
       "adjudication": {
         "outcome": "no_warning",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-3.json",
+        "review_reference": "human-review-2026-10-16-batch-3.json",
         "case_sha256": "c0bbf4ed9e5c11d4ed463d9b0906b5f07c06eda876ff90e184e5641aaeec3b81",
         "question_answers": {
           "coverage": true,
@@ -235,7 +235,7 @@
       "adjudication": {
         "outcome": "warning",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-3.json",
+        "review_reference": "human-review-2026-10-16-batch-3.json",
         "case_sha256": "2634654ece0db0bdf8379b9c285fe19e9b131167c8972c541e31df25beb75883",
         "question_answers": {
           "coverage": true,
@@ -275,7 +275,7 @@
       "adjudication": {
         "outcome": "warning",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-4.json",
+        "review_reference": "human-review-2026-10-16-batch-4.json",
         "case_sha256": "7e9b1af800c746d845d723a7dfb75a1cfa2e9a3d6c50aa4a8eb2d7f36d21f6a1",
         "question_answers": {
           "coverage": true,
@@ -315,7 +315,7 @@
       "adjudication": {
         "outcome": "not_applicable",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-4.json",
+        "review_reference": "human-review-2026-10-16-batch-4.json",
         "case_sha256": "cd37bc6c2d3eeb834e5ac66534ee8b1e6960632540d5428498c64e505ed7a23d",
         "question_answers": null
       }
@@ -351,7 +351,7 @@
       "adjudication": {
         "outcome": "not_applicable",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-5.json",
+        "review_reference": "human-review-2026-10-16-batch-5.json",
         "case_sha256": "6ea445651da669ee390da3c7d836c066107f1902a3d2e5ef639cf2cd0e350df2",
         "question_answers": null
       }
@@ -387,7 +387,7 @@
       "adjudication": {
         "outcome": "unavailable",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-5.json",
+        "review_reference": "human-review-2026-10-16-batch-5.json",
         "case_sha256": "8533b24b7829996ab56feef463a059ee62346a153d4837b0f2aacacfdf10b06b",
         "question_answers": null
       }
@@ -423,7 +423,7 @@
       "adjudication": {
         "outcome": "no_warning",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-6.json",
+        "review_reference": "human-review-2026-10-16-batch-6.json",
         "case_sha256": "ba79983c7a53c03c0c4e184f6fe639c54da0c2a76e7c9859c268f3ffc527d550",
         "question_answers": {
           "coverage": true,
@@ -463,7 +463,7 @@
       "adjudication": {
         "outcome": "no_warning",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-7.json",
+        "review_reference": "human-review-2026-10-16-batch-7.json",
         "case_sha256": "609cd48a1a83e6a2d0593005d02d55afbb5a4383d0adf2366f506176fb520ca6",
         "question_answers": {
           "coverage": true,
@@ -501,7 +501,7 @@
       "adjudication": {
         "outcome": "unavailable",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-7.json",
+        "review_reference": "human-review-2026-10-16-batch-7.json",
         "case_sha256": "6278ba9ad3d9c7fb8470b330485cda5c03689540556b5dd7b77c687a1bfd7469",
         "question_answers": null
       }
@@ -537,7 +537,7 @@
       "adjudication": {
         "outcome": "unavailable",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-8.json",
+        "review_reference": "human-review-2026-10-16-batch-8.json",
         "case_sha256": "674fc6de1fbdeb72af5a51959b339ce5940fe4d3cace414c344e5c733343bb88",
         "question_answers": {
           "coverage": false,
@@ -577,7 +577,7 @@
       "adjudication": {
         "outcome": "warning",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-8.json",
+        "review_reference": "human-review-2026-10-16-batch-8.json",
         "case_sha256": "d57fd194f32e397e8e8c19151fce465ee1e4ad40951e43cbbb7e55c458b37ef8",
         "question_answers": {
           "coverage": true,
@@ -617,7 +617,7 @@
       "adjudication": {
         "outcome": "no_warning",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-8.json",
+        "review_reference": "human-review-2026-10-16-batch-8.json",
         "case_sha256": "82f0c26ca9bcd281c334fa9ec5d62ecf82a4eccb4b697e491529cbeacd0db414",
         "question_answers": {
           "coverage": true,
@@ -654,7 +654,7 @@
       "adjudication": {
         "outcome": "warning",
         "reviewer": "hapa1i",
-        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-6.json",
+        "review_reference": "human-review-2026-10-16-batch-6.json",
         "case_sha256": "dc722d956bb8c39f8a54e0166d439a86ae5904ef25310552c7e27d81bb4ddd7f",
         "question_answers": {
           "coverage": true,

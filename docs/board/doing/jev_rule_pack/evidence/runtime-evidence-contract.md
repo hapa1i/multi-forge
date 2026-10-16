@@ -2,8 +2,10 @@
 
 Status: proposed contract for offline implementation review. No declaration loader, action envelope, activation command
 or dispatch described here is implemented. This document authorizes no repository collection, provider request or native
-trial. The [selected rule contract](initial-rule-review.md) and [evaluation plan](evaluation-plan.md) retain their
-human-label, quality and admission gates.
+trial. All 17 constructed cases have human labels, but the
+[evaluation plan's feasibility stage](evaluation-plan.md#before-real-evaluation-or-runtime-admission) must establish
+representative action coverage, governance/exception mapping and practical warning usefulness before implementing this
+proposal. The [selected rule contract](initial-rule-review.md) retains its broader wrapper scope.
 
 ## Project policy and action evidence
 
@@ -223,16 +225,20 @@ or fallback. Failure to acquire facts or evidence must never add a Jev denial or
 
 ## Offline proof and remaining review
 
-Fixtures can now exercise snapshot selection, immutable source bytes, replacement/revocation, malformed declarations,
-copied grants, default-derived applicability, mixed surface classes with the same applicability, exact exceptions,
-unrelated helpers, incomplete selector attribution, unknown/conflicting applicability, move endpoints, path rejection,
-unchanged source-file edits, complete long inputs, `replace_all`, unsupported operations and all-or-nothing preparation
-without credentials or a client. They must also prove that action comments cannot alter scope and declaration prose
-never enters a model payload. These are planned implementation checks, not completed tests or model-quality evidence.
+After a recorded feasibility go-ahead, implementation fixtures must exercise snapshot selection, immutable source bytes,
+replacement/revocation, malformed declarations, copied grants, default-derived applicability, mixed surface classes with
+the same applicability, exact exceptions, unrelated helpers, incomplete selector attribution, unknown/conflicting
+applicability, move endpoints, path rejection, unchanged source-file edits, complete long inputs, `replace_all`,
+unsupported operations and all-or-nothing preparation without credentials or a client. They must also prove that action
+comments cannot alter scope and declaration prose never enters a model payload. These are planned implementation checks,
+not completed tests or model-quality evidence.
 
 The project-default proposal supersedes exact-file enumeration and uniform surface declarations. Its declaration loader,
 deterministic exception mapping and runtime scope representation remain unimplemented and need verification before
 runtime admission. Pinned authority still changes only by replacement/revocation. No production declaration or quality
-threshold is selected here. Human adjudication and numerical quality choices remain owned by the evaluation plan; live
-payload approval and native delivery remain separate gates. Offline fixtures and a reviewable implementation of this
-contract can proceed without deciding those later gates.
+threshold is selected here. The evaluation plan owns the completed constructed labels and pending numerical quality
+choices. First measure this proposal's real-action evidence and symbol-mapping limits through a bounded offline
+prototype or manual review under an approved acquisition scope; record unknown, ambiguous and refused cases. That
+feasibility work may proceed before runtime implementation, but this proposal supplies no data-collection authority.
+Production implementation waits for the explicit proceed/revise/stop decision. Live payload approval and native delivery
+remain separate gates.

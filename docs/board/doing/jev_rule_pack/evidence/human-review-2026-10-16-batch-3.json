@@ -54,7 +54,7 @@
     }
   },
   "reviewer": "hapa1i",
-  "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-3.json",
+  "review_reference": "human-review-2026-10-16-batch-3.json",
   "cases": [
     {
       "id": "module-forwarding",

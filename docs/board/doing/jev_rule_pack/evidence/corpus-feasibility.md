@@ -1,7 +1,7 @@
 # A2 corpus feasibility checkpoint
 
 2026-10-16. Inventory of the existing [constructed corpus](wrapper-corpus.json), at source SHA-256
-`737dc6f3e3fa7392d1d73fa3703013a37592555a2426b7d6f2a232678b585011`. No historical examples or native transcripts were
+`b09bd0eb4df6a26adff4d27316f78179e5fc48910f2ff033c9da18582a3ea0b9`. No historical examples or native transcripts were
 collected for this checkpoint. The counts distinguish authored fixtures and preparation results from the 17 confirmed
 human adjudications.
 
@@ -57,10 +57,12 @@ not establish that their proposed judgments are correct.
 
 The seven declared source families do not overlap between splits, and related module/multi-file variants remain
 together. Family separation prevents that direct leakage; it does not prove independence. All examples were authored in
-one assistant-created collection with common conventions. The held-out positive count is especially sparse: its one
-confirmed warning is a return-shape adaptation. No observed precision, miss rate, warning burden or real-world
-prevalence follows from this inventory. The revised advisory rule measures whether supplied evidence justifies a
-warning; its packet labels cannot establish whether caller review would find the warning useful.
+one assistant-created collection with common conventions. Held-out action evidence and authored proposals were visible
+while draft-3 semantics were developed. Their unseen model outputs can supply a limited check after calibration, not
+proof of generalization to unseen scenarios. Thresholds must use calibration responses only. The held-out positive count
+is especially sparse: its one confirmed warning is a return-shape adaptation. No observed precision, miss rate, warning
+burden or real-world prevalence follows from this inventory. The revised advisory rule measures whether supplied
+evidence justifies a warning; its packet labels cannot establish whether caller review would find the warning useful.
 
 No historical positive or negative has been adjudicated. Earlier marker/delegation searches are discovery hints, not
 semantic labels or evidence that all unmarked wrappers were found. They cannot fill an empty historical stratum.
@@ -76,10 +78,14 @@ permission to activate the bundle.
 Constructed adjudication is complete, with the partial Edit's two unknown semantic answers retained. The reviewed
 inventory has only one held-out positive family and no historical evidence. Either prepare a separately reviewed
 acquisition scope or retain the constructed-only claim. A future acquisition plan must name the repository revision
-range, reconstruction method, local data to retain and exclusions; native transcripts and provider dispatch require
-their own explicit decisions. This checkpoint does not collect or authorize either.
+range or selected native actions, reconstruction/sanitization, local data to retain and exclusions. Measure complete
+interface evidence, trusted governance, symbol-exception mapping and unknown/refusal counts before implementing the
+runtime proposal. Native transcripts and provider dispatch require their own explicit decisions. This checkpoint does
+not collect or authorize either.
 
-Minimum sample counts, acceptable false-positive/miss rates, coverage and warning-rate limits remain unset. Propose
-those choices against the reviewed inventory, freeze them before held-out model results, and follow the
-[evaluation plan](evaluation-plan.md#before-real-evaluation-or-runtime-admission). A blank review packet, a fixture
-report or a merged implementation PR does not satisfy that gate.
+Minimum sample counts, false-positive/miss limits, evidence/mapping coverage, practical warning usefulness and warning
+burden remain unset. The [evaluation plan](evaluation-plan.md#before-real-evaluation-or-runtime-admission) requires a
+separate caller/contract usefulness review and same-evidence regex/AST baselines. It places a separately authorized
+nine-case calibration capture before threshold freeze, then a separately authorized four-case held-out capture. Choose
+proceed, revise/narrow or stop from those results and representative evidence before runtime implementation. A
+constructed-only smoke test, blank packet or merged tooling PR cannot satisfy that decision.

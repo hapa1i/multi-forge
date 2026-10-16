@@ -34,7 +34,11 @@ The [feasibility checkpoint](corpus-feasibility.md) counts current families and 
 labels as truth. The [human review workflow](human-review.md) exports exact evidence with authored labels/rationales
 withheld, validates partial adjudications and retains disagreements/exclusions in the review ledger. The
 [runtime evidence proposal](runtime-evidence-contract.md) remains separate from fixture governance and does not activate
-the bundle.
+the bundle. The held-out action evidence and authored proposals were visible while draft-3 semantics were developed.
+Human review also followed AI-assisted discussion. Holding back model outputs supports a limited check after
+calibration; it does not make these scenarios unseen or establish rule generalization. Select question bands only on
+calibration responses. If future results motivate a rule change, version the contract and obtain new, unexposed
+evaluation scenarios before making a generalization claim.
 
 ## Decision contract
 
@@ -166,22 +170,70 @@ and absent historical evidence remain visible. The current evaluator does not im
 
 ## Before real evaluation or runtime admission
 
-Measure two different claims. Packet-label accuracy measures adherence to the supplied-evidence rule. A warning can be
-correct under that rule yet unhelpful when later caller review discovers an unseen legitimate requirement. Measure
-warning usefulness and false alarms separately against a reviewed caller/contract record; that extra review context must
-not silently enter model payloads or replace packet-bound labels. Also measure how often real hook actions supply
-complete interface evidence. Constructed full-definition examples do not establish that coverage.
+Finish this feasibility stage before implementing declaration resolution, action envelopes, activation, cache/audit or
+warning delivery. The existing transport, consent and offline-evaluation foundations are enough to prepare evidence;
+building runtime machinery first would leave its central evidence assumptions untested.
 
-1. A human reviewer must adjudicate outcomes and per-question answers against the exact case hashes, recording reviewer,
-   reference, disagreements and exclusions. Count independent positive/negative source families in each cohort/split.
-   Stop or narrow the claim when historical positives cannot support it; constructed cases cannot substitute for them.
-2. Review minimum positive/negative counts, family independence, false-positive/miss limits, coverage floor,
-   warning-rate ceiling and interval treatment. These numerical acceptance choices remain pending corpus feasibility.
-   Select question bands only on calibration responses, then freeze settings and split identities before inspecting
-   held-out results.
-3. Review a bounded live manifest containing exact payloads, repetitions, timeouts, request/cost limits, provenance,
-   sanitization and an isolated Forge home. Obtain explicit approval before dispatch. Any additional data acquisition or
-   provider request needs its own approved scope.
-4. Apply approved gates to captured responses, compare the deterministic baseline on the same eligible actions and
-   resolve failures. Runtime fact resolution, hooks, telemetry joins and native delivery remain separate acceptance
-   work.
+### Representative evidence and practical usefulness
+
+All 17 constructed cases have human outcomes, but the corpus has no historical cohort and only one held-out positive
+family. First choose a separately reviewed acquisition scope or retain a constructed-only smoke-test claim. The latter
+cannot establish runtime quality or authorize runtime implementation on that claim. An acquisition plan must name the
+repository revision range or selected native actions, reconstruction assumptions, sanitization, local data retained,
+exclusions and family split. Obtain the data decision before collection; native transcripts require explicit selection
+and authorization. Keep actual hook actions, reconstructed actions and CLI whole diffs separate. Merged history and
+marker searches are discovery sources, not semantic ground truth. Human reviewers must label acquired cases against
+exact hashes with per-question answers, reviewer/reference identity, disagreements and exclusions recorded before
+scoring. Keep each originating change and its related mutations within one split; recount positive/negative families.
+
+Measure the proposed runtime restrictions on the selected real actions without expanding their evidence. Count total
+actions, supported action shapes, complete before/after and replacement evidence, known governance, uniquely attributed
+symbol exceptions, unknown/conflicting facts, mixed applicability, oversize inputs and each local-refusal reason. Report
+both total-action and applicable-action denominators. Include representative partial method edits, aliases, renamed
+symbols and mixed public/private files; an easy full-definition fixture cannot establish mapping feasibility. Use only
+the selected action and separately attributed policy declaration; do not read undeclared file bodies to repair gaps.
+These local measurements may use an offline prototype or manual mapping review; production runtime wiring waits for the
+decision below.
+
+Measure two distinct judgments. Packet-label accuracy assesses adherence to the bounded supplied-evidence rule.
+Practical warning usefulness requires a separate human caller/contract review recording whether the warning exposes an
+unnecessary retained interface or an unseen legitimate requirement, the evidence for that conclusion and unresolved
+cases. Record useful warnings, unhelpful warnings and unresolved reviews with explicit denominators and review effort.
+Never silently add that wider context to model payloads or replace the original packet-bound labels. A high packet
+accuracy or low warning rate alone cannot pass this usefulness gate.
+
+Compare two deterministic baselines with Jev: today's marker/regex checks and a bounded structural AST detector. Fix
+each baseline's supported syntax and candidate rules before inspecting held-out outputs. Give all three the same action
+bytes, applicability facts and admission limits; report unsupported/unknown cases explicitly. The AST baseline must not
+use caller inventories unavailable to Jev or become an unbounded implementation of semantic boundary inference. Preserve
+the regex comparison because it measures improvement over today's policy. This update specifies the comparison; it adds
+no AST implementation or measured baseline results.
+
+### Capture order and decision gates
+
+1. Review independent positive/negative family counts and the required minimums for each evidence claim. Declare
+   false-positive and effective/pipeline-miss limits, real-action coverage and symbol-mapping floors,
+   practical-usefulness floor, warning-rate ceiling and uncertainty-interval treatment. Specify what unresolved
+   usefulness reviews count against and the response to each failure: revise/re-evaluate, narrow scope or stop. These
+   numerical choices remain unset until the inventory and claim support them; empty strata cannot pass.
+2. Prepare the first bounded synthetic capture for the nine calibration model candidates only. Review exact payloads,
+   repetitions, model snapshot, timeouts, physical request and cost limits including controls, dated price assumptions
+   and provenance. Use a fresh isolated `FORGE_HOME`, clear cached runtime configuration, and copy no session history or
+   user telemetry into it. Obtain explicit paid/data approval before dispatch; A1's exhausted approvals do not apply. A
+   separate real-action manifest requires its own approved data scope. A constructed capture can reveal contract/model
+   problems early while representative acquisition is being decided; it cannot substitute for that evidence.
+3. Run only the authorized requests with ZDR, retries disabled, a physical request cap and a reported-cost stop check.
+   Missing cost stays unknown; estimated spend and a post-response check cannot guarantee an invoice cap. Retain failed
+   and interrupted attempts without silently repeating them. Select prompt wording and question bands using calibration
+   responses only, then freeze prompt, settings, versions and split identities before inspecting held-out model outputs.
+4. Prepare and separately authorize the four held-out model candidates after that freeze. Keep the four host-decided
+   corpus cases outside provider captures. Report confusion, coverage, uncertain/unavailable reasons, calibration,
+   warning burden, latency, reported cost and repeated-input variation by cohort/split/family against both baselines.
+   Current held-out scenarios were exposed during rule development; these outputs are a limited check, not evidence of
+   generalization to unseen scenarios. Repetitions add observations, not independent examples.
+5. Review representative evidence sufficiency, governance/mapping refusals, useful warnings and model/baseline results
+   against the predeclared gates. Record proceed, revise/narrow or stop before runtime implementation. Constructed-only
+   success remains a smoke-test result. A runtime go-ahead needs the supported action/context matrix and evidence for
+   these feasibility gates; final runtime integrations, telemetry joins, native delivery and release verification remain
+   the separate checklist acceptance work. This document neither grants that go-ahead nor authorizes collection or
+   spend.

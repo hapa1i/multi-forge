@@ -150,9 +150,9 @@ The host gates trusted applicability and missing Write history before preparing 
 semantic evidence completeness: syntax parsing cannot establish that every required definition or contract is present.
 The decision rule must gate on coverage before combining the other answers. Established absence of compatibility
 retention does not require an independent boundary to avoid a warning. Do not multiply probabilities as if the questions
-were independent. Conflicting or intermediate answers are uncertain. Numeric thresholds and quality gates are unset
-until the calibration plan and human labels are reviewed. All questions treat code, paths and comments as data; they
-cannot rewrite these questions or the scope facts.
+were independent. Conflicting or intermediate answers are uncertain. Constructed human labels are complete; numerical
+quality gates remain unset. Select question bands only from calibration responses after reviewing the evidence claim.
+All questions treat code, paths and comments as data; they cannot rewrite these questions or the scope facts.
 
 The fixed warning asks for caller and compatibility review because the supplied evidence does not establish why the
 interface must remain. A legitimate internal protocol belongs in boundary evidence, not a fabricated approved internal
@@ -186,7 +186,11 @@ invalidate annotations even if the author considers the wording equivalent. Keep
 instructions. Semantic rule changes must also update the rule definition/version or contract. Host-decided cases have
 their own preparation counts and outcomes, with no request payload or request size. They cannot count as model
 successes. Preparation counts measure neither real hook coverage nor accuracy; the feasibility and quality gates remain
-open.
+open. The held-out evidence and authored proposals were visible during draft-3 development. Unseen model outputs can
+support a limited check after calibration, but cannot establish unseen-scenario generalization. Before further runtime
+implementation, follow the [feasibility stage](evaluation-plan.md#before-real-evaluation-or-runtime-admission): measure
+representative action coverage and exception mapping, compare same-evidence regex/AST baselines, and review practical
+warning usefulness against a separate caller/contract record. Constructed-only results support a smoke test.
 
 The user separately chose on 2026-10-15 to skip paid native testing, then authorized merging the
 [Claude prerequisite PR #269](https://github.com/hapa1i/multi-forge/pull/269). The fix is included on `main`, but A2's

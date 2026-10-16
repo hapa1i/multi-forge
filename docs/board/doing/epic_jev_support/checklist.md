@@ -9,13 +9,14 @@ shipped through [PR #271](https://github.com/hapa1i/multi-forge/pull/271) as `79
 [evidence report](../../done/jev_client_probes/evidence/2026-10-14/report.md) records successful ZDR-required routing,
 latency, accounting and limitations. A2's session-consent and explicit evaluation-identity foundations shipped through
 [PR #270](https://github.com/hapa1i/multi-forge/pull/270); the user selected broader wrappers on 2026-10-15. The next
-gate covers human adjudication, corpus feasibility and trusted runtime facts, owned by the
-[A2 handoff](../jev_rule_pack/checklist.md#offline-evaluation-merge-and-next-gate). Activation, dispatch and A2
-acceptance remain open. Its provisional corpus does not yet establish quality. A3 remains proposed. Neither decision
-quality nor quota savings has been evaluated.
+gate is A2's [pre-runtime feasibility decision](../jev_rule_pack/checklist.md#slice-2-feasibility-before-runtime-work).
+All 17 constructed cases have human adjudications; representative evidence coverage, trusted policy/symbol mapping and
+practical warning usefulness remain unmeasured. That gate precedes further runtime implementation. Activation, dispatch
+and acceptance remain open; constructed labels establish neither quality nor quota savings. A3 remains proposed.
 
-A2's continuation branch is `codex/jev-rule-pack-evidence` from `main` at `8a2e46d5`. Its checklist owns human-review
-material, corpus feasibility and the proposed runtime evidence contract; no additional member is activated.
+A2's continuation branch is `codex/jev-rule-pack-evidence`, rebased onto `main` at `3573c147` from its original
+`8a2e46d5` base. Its checklist owns the feasibility measurements and separate data/spend decisions; no additional member
+is activated.
 
 ## Activation and sequence
 
