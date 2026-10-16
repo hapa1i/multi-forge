@@ -5,8 +5,8 @@
 The offline outcome/evaluation slice shipped through [PR #271](https://github.com/hapa1i/multi-forge/pull/271), merged
 as `791d9872` on 2026-10-15. The [merge handoff](#offline-evaluation-merge-and-next-gate) records its verified scope. It
 builds on [PR #270](https://github.com/hapa1i/multi-forge/pull/270)'s explicit evaluation identity, session consent and
-override guards. Execution continues on `codex/jev-rule-pack-evidence`, rebased from its original `8a2e46d5` base onto
-`main` at `3573c147`.
+override guards. Human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485`.
+Execution continues on `codex/jev-rule-pack-feasibility` from that merged `main` head.
 
 All 17 constructed cases now have [human adjudications](evidence/human-review.md): 12 calibration and five held-out. The
 [feasibility checkpoint](evidence/corpus-feasibility.md) records seven families, empty historical strata and only one
@@ -16,10 +16,11 @@ only.
 
 The next [feasibility gate](#slice-2-feasibility-before-runtime-work) precedes declaration, dispatch, activation and
 feedback implementation. It measures real-action evidence coverage, exception mapping and warning usefulness against the
-[evaluation plan](evidence/evaluation-plan.md). The [runtime evidence proposal](evidence/runtime-evidence-contract.md)
-remains unimplemented and selects no production authority. The
-[wrapper evidence contract](evidence/initial-rule-review.md) retains broader wrappers and advisory supplied-evidence
-semantics. No paid A2 evaluation has run or bundle been enabled. The [card](card.md) owns scope; the
+[evaluation plan](evidence/evaluation-plan.md). The [current checkpoint](evidence/feasibility-progress.md) records the
+approved inventory's missing-source shortfall and constructed baseline signals. The
+[runtime evidence proposal](evidence/runtime-evidence-contract.md) remains unimplemented and selects no production
+authority. The [wrapper evidence contract](evidence/initial-rule-review.md) retains broader wrappers and advisory
+supplied-evidence semantics. No paid A2 evaluation has run or bundle been enabled. The [card](card.md) owns scope; the
 [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed.
 
 Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
@@ -205,7 +206,7 @@ evaluation or native trial was dispatched.
 
 ## Slice 2: feasibility before runtime work
 
-- [ ] Review a bounded local real-action acquisition scope before collection: revisions or selected native actions,
+- [x] Review a bounded local real-action acquisition scope before collection: revisions or selected native actions,
   reconstruction/sanitization, retained data, exclusions and source-family splits. Keep CLI whole diffs separate. No
   transcript inspection, repository collection or provider dispatch is authorized by this checklist.
 - [ ] Measure supplied interface evidence, trusted governance and symbol-exception mapping on that cohort before
@@ -225,6 +226,12 @@ evaluation or native trial was dispatched.
 - [ ] Review the evidence and choose proceed, revise/narrow or stop before Slices 3–5. Constructed-only results support
   a smoke test, not runtime quality. Any runtime go-ahead requires representative action coverage, attributable policy
   facts and useful warnings meeting the predeclared feasibility gates.
+
+The user approved the [bounded local study scope](evidence/feasibility-study-plan.md) on 2026-10-16: up to six inactive
+managed sessions and 120 sanitized native actions, retained privately. This approval excludes provider requests,
+publication, wider caller reads and the plan's draft numerical gates. The
+[synthetic calibration proposal](evidence/calibration-run-plan.md) has a separate manifest and spend decision. The
+selected native paths were missing, so no actions were collected; coverage and usefulness remain unmeasured.
 
 ## Slice 3: complete action evidence and bounded dispatch
 
@@ -444,7 +451,8 @@ Paths under `tests/src/policy/rule_pack/` and the A2 harness/integration test na
   alignment. Keep the epic active and A3 unactivated unless separately selected.
 - [x] Open the draft A2 PR with concise implemented scope, limitations, actual validation and outstanding acceptance
   gates. [PR #270](https://github.com/hapa1i/multi-forge/pull/270) and
-  [PR #271](https://github.com/hapa1i/multi-forge/pull/271) are attached to this task and merged.
+  [PR #271](https://github.com/hapa1i/multi-forge/pull/271) shipped the foundations; human review shipped through
+  [PR #272](https://github.com/hapa1i/multi-forge/pull/272).
 - [ ] After review/merge, record the merged head, finish design/end-user sync, add the completed-work change-log entry
   and propose durable notes for human review.
 - [ ] Move A2 to `done/` only when its acceptance gates are satisfied and the code is merged; repoint inbound links and
@@ -481,6 +489,20 @@ A2 and the epic remain `doing/`; A3 remains proposed. The 2026-10-16 continuatio
 the runtime evidence proposal. The next [feasibility gate](#slice-2-feasibility-before-runtime-work) measures
 representative evidence coverage and useful warnings before implementing that proposal. Numerical gates, runtime
 activation, audit/cache integration and native delivery remain open. This handoff authorizes no collection or paid run.
+
+## Human review merge and feasibility continuation
+
+2026-10-16: [PR #272](https://github.com/hapa1i/multi-forge/pull/272) merged as
+`64317485a8564684ab790974744be0ee978d3804`, with the reviewed changes from `53834cbd` and all five CI checks passing.
+Local verification passed 239 focused tests, all pre-commit hooks across the sandboxed run and separate local EOF rerun,
+the 691-source link audit and `git diff --check`. Eight retained ledgers reproduce all 17 judgments; the relocation
+regression preserves references, payloads and report identity after a card move.
+
+A2 and the epic remain `doing/`. `codex/jev-rule-pack-feasibility` starts from the merge to prepare bounded local
+acquisition, structural comparisons and a synthetic calibration capture. Human label provenance and held-out exposure
+limits remain unchanged. Collection and paid dispatch require their concrete scope decisions; runtime implementation
+waits for the Slice 2 decision. The prior token-count incident remains recorded above. No new A2 quality or native
+delivery claim follows from this merge.
 
 ## Execution evidence
 

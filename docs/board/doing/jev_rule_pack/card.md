@@ -20,7 +20,8 @@ usefulness and numerical quality gates remain open. No paid A2 evaluation has ru
 for activation. The [merge handoff](checklist.md#offline-evaluation-merge-and-next-gate) records shipped scope and the
 next gate without closing A2. Implemented ownership is described in [rule-pack design](../../../design_rule_packs.md).
 
-Continuation: `codex/jev-rule-pack-evidence`, rebased onto `main` at `3573c147`, records the completed
+Human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485`. Continuation:
+`codex/jev-rule-pack-feasibility` starts from that merged `main` head, retaining the completed
 [human review](evidence/human-review.md) and [corpus feasibility](evidence/corpus-feasibility.md). Its next step is the
 [pre-runtime feasibility decision](checklist.md#slice-2-feasibility-before-runtime-work), before implementing the
 [runtime evidence proposal](evidence/runtime-evidence-contract.md). Constructed-only evidence can support a smoke test;

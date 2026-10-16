@@ -35,6 +35,21 @@ reviewed Git revision to identify ledger contents. Named reviewers are provenanc
 authenticated identities. This workflow cannot establish that a human performed the review or turn fixture proposals
 into quality evidence.
 
+`scripts/experiments/jev/rule-pack-baselines.py` shares the evaluator's action admission and compares existing marker
+patterns with bounded Python AST retention signals. A candidate is a structural observation, not a warning or evidence
+that no independent boundary exists. Unsupported shapes remain explicit, and no repository reads supplement an action.
+
+`scripts/experiments/jev/rule-pack-capture.py` prepares the fixed constructed-calibration manifest. Its separately
+authorized live mode uses A1's credential/client owner with mandatory ZDR, one attempt per case, exact wire-payload
+checks and a physical request cap. It isolates Forge telemetry, records interrupted attempts before dispatch and exports
+the evaluator's saved-response schema. A changed manifest or implementation requires renewed review; this experiment
+does not implement runtime admission or authorize later held-out captures.
+
+`scripts/experiments/jev/rule-pack-inventory.py` owns the bounded development-only metadata inventory. It reads the
+approved default stores directly without invoking session repair, retains only allowlisted metadata privately and checks
+selected source paths without replacement scans. It does not extract native actions or establish governance, semantic
+coverage or usefulness. Runtime evidence acquisition remains separate.
+
 ## Consent and runtime boundary
 
 `policy/rule_pack/consent.py` binds the paid repository-data acknowledgment to the session instance and pack settings.

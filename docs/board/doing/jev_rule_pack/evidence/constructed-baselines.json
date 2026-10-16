@@ -1,0 +1,631 @@
+{
+  "mode": "offline_baselines",
+  "baseline_version": 1,
+  "rule_id": "coding_standards.compatibility-wrapper",
+  "rule_version": "draft-3",
+  "evidence_contract_version": 4,
+  "corpus_sha256": "fb7cf615a4a0f03952a071b711755e8c1dee9b173e6e1587f3a93d55c0a22a69",
+  "prompt_sha256": "89578191c0d085e1e4e284fb50145d8fc255fa1bcd55f04e74a327aea488a572",
+  "sources": {
+    "rule-pack-eval.py": "b7904bc377c93812c07b7a48c1830532e31f870b32047e456353013f7d03b43b",
+    "forge.policy.rule_pack.definitions": "a16cf97fdf3d77662b3c3c5ec7124209cc8da4af011734ff2702b9a41f522fb5",
+    "forge.policy.rule_pack.outcomes": "d23a4afd00ada3378c91df537a48e508f4cdffdfa1050eca99d1cc87b379f873",
+    "forge.core.judgments.types": "a7ffc22043778716a5c306ddbe7d9b9a878b85abecd1ff12e4df88cf0934a345",
+    "forge.core.judgments.openrouter": "d03140ab9e67f4e5ff436aaf6823328dc3653e6e3d3131b90c167d190bd95604",
+    "rule-pack-baselines.py": "a0d180c478493deb5aa42b291297d73de1e5e3eb8ab2e241bb9e2b5d226fc8a4",
+    "forge.policy.deterministic.coding_standards": "f9f926e97f533b41d7d492c957716a0e6c92055baea231f3f8c239232d61680b",
+    "forge.cli.hooks.codex_patch": "cdb9c8f60c26e7dfaec106588ae6b78757fc5f247063c06951c0ad1d998ed72a"
+  },
+  "sources_sha256": "ee31b17205fd9c0b1d927939eb35ba6548f1bde02a56d56b23e22a4521f85597",
+  "max_physical_requests": 0,
+  "quality_accepted": false,
+  "claim": "Raw marker and structural retention candidates; neither detector assesses independent boundary or quality.",
+  "limitations": [
+    "No repository reads supplement the supplied action evidence.",
+    "AST supports complete Python Edit declarations; apply_patch and partial snippets are unavailable.",
+    "Supplied shadowing or repeated bindings are unavailable; AST name matching is not full name resolution.",
+    "AST matches new supplied targets in direct forwarding, guarded forwarding, local return adapters or aliases.",
+    "Retargeted calls to existing local definitions are excluded; this can miss some replacement shapes.",
+    "Legitimate boundary adapters can be flagged; absent patterns do not establish no_warning or sufficient coverage.",
+    "Marker patterns scan proposed Python text, including added patch lines, using the existing policy patterns.",
+    "This comparison uses Jev host gates and input limits; it is not a replay of the full deterministic policy engine."
+  ],
+  "counts": {
+    "marker_regex": {
+      "assessed/False": 13,
+      "host_decision/None": 4
+    },
+    "structural_ast": {
+      "assessed/True": 8,
+      "assessed/False": 3,
+      "host_decision/None": 4,
+      "unavailable/None": 2
+    }
+  },
+  "cases": [
+    {
+      "id": "module-forwarding",
+      "family": "module-rename",
+      "split": "calibration",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "16e294ba92fc1192ef6a075fd47af72231032f428c21e34fd1dd2d54b6ae37ec",
+      "payload_sha256": "8bdd8ae8b6be78572edd47ab6aa122b9c4ba75cfe91d10c7f9c1047d68d1e0c0",
+      "request_bytes": 4389,
+      "admission": "model_input",
+      "host_outcome": null,
+      "marker_regex": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": true,
+        "candidates": [
+          {
+            "interface": "normalize",
+            "target": "normalize_text",
+            "shape": "forward_or_adapter"
+          }
+        ]
+      }
+    },
+    {
+      "id": "module-direct-update",
+      "family": "module-rename",
+      "split": "calibration",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "e29152bdbf0665a5aa7839f6ef10afde34009a83b5cee5833ef3e9185982cf17",
+      "payload_sha256": "a54f6a1dd61e0760de872215cc2e748726180b92fc7de239a6f79036a9860ca0",
+      "request_bytes": 4335,
+      "admission": "model_input",
+      "host_outcome": null,
+      "marker_regex": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "candidates": []
+      }
+    },
+    {
+      "id": "module-injection",
+      "family": "module-rename",
+      "split": "calibration",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "5d99db97005d021edad8bad9178e603d3478d5b1b93405cac2b1b69c7a3a4226",
+      "payload_sha256": "4f3ed711385733878353cf9535d134ecb416dd59c37ecb57acf74a2606493830",
+      "request_bytes": 4735,
+      "admission": "model_input",
+      "host_outcome": null,
+      "marker_regex": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": true,
+        "candidates": [
+          {
+            "interface": "normalize",
+            "target": "normalize_text",
+            "shape": "forward_or_adapter"
+          }
+        ]
+      }
+    },
+    {
+      "id": "method-argument-adapter",
+      "family": "argument-adaptation",
+      "split": "calibration",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "e49cbc1f7d0131c93ed99e4d5c2d08dc0176c172f51eb3a8949558802b496283",
+      "payload_sha256": "a13d7768b671bdcd31cbced377e96300d99a5479b1c1ab5194736278fc47df3e",
+      "request_bytes": 4828,
+      "admission": "model_input",
+      "host_outcome": null,
+      "marker_regex": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": true,
+        "candidates": [
+          {
+            "interface": "Store.load",
+            "target": "Store.load_config",
+            "shape": "forward_or_adapter"
+          }
+        ]
+      }
+    },
+    {
+      "id": "validation-boundary",
+      "family": "validation-adaptation",
+      "split": "calibration",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "c0bbf4ed9e5c11d4ed463d9b0906b5f07c06eda876ff90e184e5641aaeec3b81",
+      "payload_sha256": "7648697106127ab654400391be13dc3fdcc1dd72e68af3a6916550e15e1203f0",
+      "request_bytes": 6261,
+      "admission": "model_input",
+      "host_outcome": null,
+      "marker_regex": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": true,
+        "candidates": [
+          {
+            "interface": "parse_document",
+            "target": "decode_json",
+            "shape": "forward_or_adapter"
+          }
+        ]
+      }
+    },
+    {
+      "id": "validation-gratuitous",
+      "family": "validation-adaptation",
+      "split": "calibration",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "2634654ece0db0bdf8379b9c285fe19e9b131167c8972c541e31df25beb75883",
+      "payload_sha256": "6da7b393582f5ba57962215dfc189049c152538751b39bb245db0058f20b05f1",
+      "request_bytes": 6334,
+      "admission": "model_input",
+      "host_outcome": null,
+      "marker_regex": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": true,
+        "candidates": [
+          {
+            "interface": "parse_document",
+            "target": "decode_json",
+            "shape": "forward_or_adapter"
+          }
+        ]
+      }
+    },
+    {
+      "id": "preview-alias",
+      "family": "public-alias",
+      "split": "calibration",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "7e9b1af800c746d845d723a7dfb75a1cfa2e9a3d6c50aa4a8eb2d7f36d21f6a1",
+      "payload_sha256": "d7104657091f783ec44b0f6120a7be9fff73d25b12a5f4f32286808f40cd5a22",
+      "request_bytes": 4250,
+      "admission": "model_input",
+      "host_outcome": null,
+      "marker_regex": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": true,
+        "candidates": [
+          {
+            "interface": "export_model",
+            "target": "dump_model",
+            "shape": "alias"
+          }
+        ]
+      }
+    },
+    {
+      "id": "stable-alias",
+      "family": "public-alias",
+      "split": "calibration",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "cd37bc6c2d3eeb834e5ac66534ee8b1e6960632540d5428498c64e505ed7a23d",
+      "payload_sha256": null,
+      "request_bytes": null,
+      "admission": "host_decision",
+      "host_outcome": "not_applicable",
+      "marker_regex": {
+        "status": "host_decision",
+        "reason": "stable_surface",
+        "flagged": null,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "host_decision",
+        "reason": "stable_surface",
+        "flagged": null,
+        "candidates": []
+      }
+    },
+    {
+      "id": "preview-approved-exception",
+      "family": "public-alias",
+      "split": "calibration",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "6ea445651da669ee390da3c7d836c066107f1902a3d2e5ef639cf2cd0e350df2",
+      "payload_sha256": null,
+      "request_bytes": null,
+      "admission": "host_decision",
+      "host_outcome": "not_applicable",
+      "marker_regex": {
+        "status": "host_decision",
+        "reason": "approved_preview_exception",
+        "flagged": null,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "host_decision",
+        "reason": "approved_preview_exception",
+        "flagged": null,
+        "candidates": []
+      }
+    },
+    {
+      "id": "unknown-public-status",
+      "family": "public-alias",
+      "split": "calibration",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "8533b24b7829996ab56feef463a059ee62346a153d4837b0f2aacacfdf10b06b",
+      "payload_sha256": null,
+      "request_bytes": null,
+      "admission": "host_decision",
+      "host_outcome": "unavailable",
+      "marker_regex": {
+        "status": "host_decision",
+        "reason": "unknown_surface",
+        "flagged": null,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "host_decision",
+        "reason": "unknown_surface",
+        "flagged": null,
+        "candidates": []
+      }
+    },
+    {
+      "id": "callback-protocol",
+      "family": "argument-adaptation",
+      "split": "calibration",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "ba79983c7a53c03c0c4e184f6fe639c54da0c2a76e7c9859c268f3ffc527d550",
+      "payload_sha256": "478cc723c4ec8a393ffb3c586e42349cc23c2be83daf5b28c276e2524d629fd7",
+      "request_bytes": 5930,
+      "admission": "model_input",
+      "host_outcome": null,
+      "marker_regex": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": true,
+        "candidates": [
+          {
+            "interface": "on_record",
+            "target": "consume_payload",
+            "shape": "forward_or_adapter"
+          },
+          {
+            "interface": "process_line",
+            "target": "consume_payload",
+            "shape": "forward_or_adapter"
+          }
+        ]
+      }
+    },
+    {
+      "id": "decorator-instrumentation",
+      "family": "decorator-instrumentation",
+      "split": "held_out",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "609cd48a1a83e6a2d0593005d02d55afbb5a4383d0adf2366f506176fb520ca6",
+      "payload_sha256": "5177f79699114d70568092d4426a33b56824d344ec4912675589d66a90f527d4",
+      "request_bytes": 4550,
+      "admission": "model_input",
+      "host_outcome": null,
+      "marker_regex": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "candidates": []
+      }
+    },
+    {
+      "id": "write-without-history",
+      "family": "insufficient-context",
+      "split": "held_out",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "6278ba9ad3d9c7fb8470b330485cda5c03689540556b5dd7b77c687a1bfd7469",
+      "payload_sha256": null,
+      "request_bytes": null,
+      "admission": "host_decision",
+      "host_outcome": "unavailable",
+      "marker_regex": {
+        "status": "host_decision",
+        "reason": "write_without_prior_interface_evidence",
+        "flagged": null,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "host_decision",
+        "reason": "write_without_prior_interface_evidence",
+        "flagged": null,
+        "candidates": []
+      }
+    },
+    {
+      "id": "partial-edit",
+      "family": "insufficient-context",
+      "split": "held_out",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "674fc6de1fbdeb72af5a51959b339ce5940fe4d3cace414c344e5c733343bb88",
+      "payload_sha256": "7b6d13414747688455ce30d96267d6e2d755fc4dd43eef71ebc7c9ea469fb53d",
+      "request_bytes": 4164,
+      "admission": "model_input",
+      "host_outcome": null,
+      "marker_regex": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "unavailable",
+        "flagged": null,
+        "candidates": [],
+        "reason": "missing_complete_interface_definitions"
+      }
+    },
+    {
+      "id": "return-shape-adapter",
+      "family": "return-shape-adaptation",
+      "split": "held_out",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "d57fd194f32e397e8e8c19151fce465ee1e4ad40951e43cbbb7e55c458b37ef8",
+      "payload_sha256": "c858b0479492031f101a6e203c094996dbb441e79806be54684afdebbdf049ee",
+      "request_bytes": 4569,
+      "admission": "model_input",
+      "host_outcome": null,
+      "marker_regex": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": true,
+        "candidates": [
+          {
+            "interface": "describe",
+            "target": "summarize",
+            "shape": "forward_or_adapter"
+          }
+        ]
+      }
+    },
+    {
+      "id": "return-shape-direct-update",
+      "family": "return-shape-adaptation",
+      "split": "held_out",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "82f0c26ca9bcd281c334fa9ec5d62ecf82a4eccb4b697e491529cbeacd0db414",
+      "payload_sha256": "e905ad8ded5141a456dc48cc85021f3349b150d6dc4dfbfe95d496ee77d6c3b2",
+      "request_bytes": 4460,
+      "admission": "model_input",
+      "host_outcome": null,
+      "marker_regex": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "raw_matches": [
+          {
+            "path": "src/example.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "candidates": []
+      }
+    },
+    {
+      "id": "multi-file-wrapper",
+      "family": "module-rename",
+      "split": "calibration",
+      "provenance": {
+        "kind": "constructed",
+        "origin": "assistant-authored-wrapper-fixtures-2026-10-15"
+      },
+      "case_sha256": "dc722d956bb8c39f8a54e0166d439a86ae5904ef25310552c7e27d81bb4ddd7f",
+      "payload_sha256": "59ee19712ad99191ebb88392c9b836d3ae9763d0a27965fc9207b82de2bb9fcd",
+      "request_bytes": 4388,
+      "admission": "model_input",
+      "host_outcome": null,
+      "marker_regex": {
+        "status": "assessed",
+        "reason": null,
+        "flagged": false,
+        "raw_matches": [
+          {
+            "path": "src/legacy.py",
+            "patterns": []
+          },
+          {
+            "path": "src/core.py",
+            "patterns": []
+          }
+        ]
+      },
+      "structural_ast": {
+        "status": "unavailable",
+        "flagged": null,
+        "candidates": [],
+        "reason": "unsupported_tool_shape"
+      }
+    }
+  ]
+}

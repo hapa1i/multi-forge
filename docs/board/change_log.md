@@ -10,6 +10,21 @@ Older entries are retained verbatim in [2026-08-19](archive/change_log_2026-08-1
 
 ## 2026-10-16
 
+### Ship Jev human review and feasibility handoff
+
+**Goal**: Establish reviewed rule evidence before implementing runtime checks.
+
+**Key changes**: Added evidence-bound human review export/import, retained 17 confirmed constructed judgments, and
+clarified advisory wrapper semantics. Corpus-relative review references survive board moves. Real-action coverage,
+warning usefulness and calibration now precede runtime implementation; exposed held-out scenarios support only a limited
+output check.
+
+**Verification**: [PR #272](https://github.com/hapa1i/multi-forge/pull/272) merged as `64317485` with all five CI checks
+passing. Local validation passed 239 focused tests, full pre-commit across the sandboxed run and separate local EOF
+rerun, and the 691-source Markdown link audit. All eight ledgers replay and retain report identity after relocation. The
+[handoff](doing/jev_rule_pack/checklist.md#human-review-merge-and-feasibility-continuation) preserves remaining data,
+quality and runtime gates. A2 remains active; no paid A2 evaluation or native trial ran.
+
 ### Restore prompt-cache reuse on translated routes
 
 **Goal**: Preserve Claude Code's cacheable conversation prefix and report cache usage consistently.
