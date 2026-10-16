@@ -1,17 +1,18 @@
 # A2 human review worksheet
 
-Human adjudication has started. The [calibration worksheet](review-calibration.md) contains 12 cases: four reviewed and
-eight pending. The [held-out worksheet](review-held-out.md) contains five pending cases. Both show the supplied action
-and enumerated scope facts, with the exact case hash. The [JSON packet](human-review-packet.json) remains a reproducible
+Human adjudication has started. The [calibration worksheet](review-calibration.md) contains 12 cases: six reviewed and
+six pending. The [held-out worksheet](review-held-out.md) contains five pending cases. Both show the supplied action and
+enumerated scope facts, with the exact case hash. The [JSON packet](human-review-packet.json) remains a reproducible
 blank template containing canonical action strings, semantic criteria and pending review fields.
 
 The retained [2026-10-16 review ledger](human-review-2026-10-16.json) records the user's confirmed labels for
 `module-forwarding` (warning) and `module-direct-update` (no warning), imported into the corpus. Both belong to the same
 `module-rename` source family; they are not two independent families. The
 [second review ledger](human-review-2026-10-16-batch-2.json) adds warning labels for `module-injection` and
-`method-argument-adapter`. Four cases are now labeled across two families; the injection variant adds no new family. The
-remaining 13 cases have no human labels. The user confirmed these judgments after AI-assisted discussion; they are not
-independently blinded labels. No model predictions are supplied.
+`method-argument-adapter`. The [third review ledger](human-review-2026-10-16-batch-3.json) records `validation-boundary`
+as no warning and `validation-gratuitous` as warning. Six cases are now labeled across three families; the injection
+variant adds no new family. The remaining 11 cases have no human labels. The user confirmed these judgments after
+AI-assisted discussion; they are not independently blinded labels. No model predictions are supplied.
 
 The packet omits authored proposals/rationales, reviewer-only scope notes, reconstruction notes and previous
 adjudications. Case IDs and shared authorship remain visible and can hint at intended behavior; this is not a fully

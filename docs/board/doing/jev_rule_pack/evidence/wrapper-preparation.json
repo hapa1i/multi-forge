@@ -14,8 +14,8 @@
     "no_historical_evidence"
   ],
   "cohorts": {
-    "constructed/calibration/adjudicated": 4,
-    "constructed/calibration/unadjudicated": 8,
+    "constructed/calibration/adjudicated": 6,
+    "constructed/calibration/unadjudicated": 6,
     "constructed/held_out/unadjudicated": 5
   },
   "preparation_counts": {
@@ -60,7 +60,7 @@
     {
       "id": "validation-boundary",
       "case_sha256": "c0bbf4ed9e5c11d4ed463d9b0906b5f07c06eda876ff90e184e5641aaeec3b81",
-      "label_status": "unadjudicated",
+      "label_status": "adjudicated",
       "preparation": "model_input",
       "payload_sha256": "7648697106127ab654400391be13dc3fdcc1dd72e68af3a6916550e15e1203f0",
       "request_bytes": 6261
@@ -68,7 +68,7 @@
     {
       "id": "validation-gratuitous",
       "case_sha256": "2634654ece0db0bdf8379b9c285fe19e9b131167c8972c541e31df25beb75883",
-      "label_status": "unadjudicated",
+      "label_status": "adjudicated",
       "preparation": "model_input",
       "payload_sha256": "6da7b393582f5ba57962215dfc189049c152538751b39bb245db0058f20b05f1",
       "request_bytes": 6334

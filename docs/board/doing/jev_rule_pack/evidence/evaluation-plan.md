@@ -10,9 +10,10 @@ document authorizes no collection, provider request or native trial. A1's probe 
 The [candidate contract](initial-rule-review.md) owns the broader compatibility-wrapper semantics. The
 [corpus](wrapper-corpus.json) contains 17 constructed actions in seven source families: 12 calibration and five
 held-out. Four cases are decided from fixture applicability/history facts; 13 require semantic assessment. The
-[first](human-review-2026-10-16.json) and [second](human-review-2026-10-16-batch-2.json) 2026-10-16 ledgers record four
-human-adjudicated calibration cases: three warnings and one no warning across two source families. Eight calibration and
-five held-out cases remain pending. There is no human-labeled historical cohort or measured model accuracy.
+[first](human-review-2026-10-16.json), [second](human-review-2026-10-16-batch-2.json) and
+[third](human-review-2026-10-16-batch-3.json) 2026-10-16 ledgers record six human-adjudicated calibration cases: four
+warnings and two no warnings across three source families. Six calibration and five held-out cases remain pending. There
+is no human-labeled historical cohort or measured model accuracy.
 
 The shared `policy.rule_pack.definitions` module owns the draft-3 questions and contract version 4. The
 `policy.rule_pack.outcomes` module owns decision version `draft-2`. These modules are available for offline evaluation;

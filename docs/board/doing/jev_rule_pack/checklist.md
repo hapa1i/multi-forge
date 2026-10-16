@@ -8,9 +8,10 @@ builds on [PR #270](https://github.com/hapa1i/multi-forge/pull/270)'s explicit e
 override guards. Execution continues on `codex/jev-rule-pack-evidence` from `main` at `8a2e46d5`.
 
 The [human review worksheet](evidence/human-review.md) exposes 17 constructed cases, and the harness exports/imports
-evidence-bound review packets with proposals and rationales withheld. The [first](evidence/human-review-2026-10-16.json)
-and [second](evidence/human-review-2026-10-16-batch-2.json) 2026-10-16 ledgers record four confirmed human labels: three
-warnings and one no warning across two source families. Eight calibration and five held-out cases remain pending. The
+evidence-bound review packets with proposals and rationales withheld. The
+[first](evidence/human-review-2026-10-16.json), [second](evidence/human-review-2026-10-16-batch-2.json) and
+[third](evidence/human-review-2026-10-16-batch-3.json) 2026-10-16 ledgers record six confirmed human labels: four
+warnings and two no warnings across three source families. Six calibration and five held-out cases remain pending. The
 [feasibility checkpoint](evidence/corpus-feasibility.md) records empty historical strata and sparse proposed held-out
 positives. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) defines a candidate owner-selected
 declaration and whole-action boundary before hook wiring; it is not implemented or approved runtime authority. The
@@ -211,8 +212,14 @@ incomplete, and no model-quality or runtime-acceptance gate is satisfied.
 coverage and compatibility retention true and independent boundary false. The second ledger retains those judgments
 after AI-assisted discussion. There are now four labeled cases across two families: warning labels span `module-rename`
 and `argument-adaptation`, while the no-warning label is in `module-rename`. The injection variant adds no independent
-family. Eight calibration and five held-out cases remain pending; no additional verdicts or quality results are
-inferred.
+family. Eight calibration and five held-out cases remained pending at that checkpoint; no additional verdicts or quality
+results were inferred.
+
+2026-10-16 third human review: the user confirmed `validation-boundary` as no warning and `validation-gratuitous` as
+warning. Both have coverage and compatibility retention true; independent boundary is true only for
+`validation-boundary`. The third ledger preserves the supplied notes after AI-assisted discussion. Six calibration cases
+are now labeled across three families, with six calibration and five held-out cases still pending. No quality or
+runtime-acceptance gate is satisfied.
 
 **Decision gate:** the broader family is selected. Implement and verify the revised evidence contract, including the
 host-owned origin of surface/exception facts, before hook wiring; do not populate those facts from action comments or

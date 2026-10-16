@@ -192,7 +192,17 @@
         "outcome": "no_warning",
         "reason": "InputCommand requires BlankDocument, while the pre-existing inspection consumer requires JSONDecodeError for blank input. The retained parser supplies the command-specific validation around the generic decoder. Moving BlankDocument validation into decode_json would break the migrated inspection consumer."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "no_warning",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-3.json",
+        "case_sha256": "c0bbf4ed9e5c11d4ed463d9b0906b5f07c06eda876ff90e184e5641aaeec3b81",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": true
+        }
+      }
     },
     {
       "id": "validation-gratuitous",
@@ -222,7 +232,17 @@
         "outcome": "warning",
         "reason": "decode_json already supplies the shown command BlankDocument contract; the inspection consumer accepts both JSONDecodeError and BlankDocument through ValueError. The retained parse_document duplicates validation without a separate justification established by the supplied contracts. Caller review remains necessary before removal."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-3.json",
+        "case_sha256": "2634654ece0db0bdf8379b9c285fe19e9b131167c8972c541e31df25beb75883",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "preview-alias",

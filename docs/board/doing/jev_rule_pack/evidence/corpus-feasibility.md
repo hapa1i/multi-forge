@@ -1,26 +1,28 @@
 # A2 corpus feasibility checkpoint
 
 2026-10-16. Inventory of the existing [constructed corpus](wrapper-corpus.json), at source SHA-256
-`6795a4e317683a4e919f0309c193cc1af35dec3559e56e383163414f0dfab231`. No historical examples or native transcripts were
-collected for this checkpoint. The counts distinguish authored fixtures and preparation results from the four confirmed
+`1355dc363e19e6ec361a1a5d1e028c44ee435e56cdd2f1a2a25ae1c96706a965`. No historical examples or native transcripts were
+collected for this checkpoint. The counts distinguish authored fixtures and preparation results from the six confirmed
 human adjudications.
 
 ## Evidence available
 
 | Cohort and split        | Cases | Families | Model candidates | Host decisions | Human labels |
 | ----------------------- | ----- | -------- | ---------------- | -------------- | ------------ |
-| Constructed calibration | 12    | 4        | 9                | 3              | 4            |
+| Constructed calibration | 12    | 4        | 9                | 3              | 6            |
 | Constructed held-out    | 5     | 3        | 4                | 1              | 0            |
 | Historical calibration  | 0     | 0        | 0                | 0              | 0            |
 | Historical held-out     | 0     | 0        | 0                | 0              | 0            |
 
 The [first 2026-10-16 ledger](human-review-2026-10-16.json) records `module-forwarding` as warning and
 `module-direct-update` as no warning. The [second ledger](human-review-2026-10-16-batch-2.json) adds warning labels for
-`module-injection` and `method-argument-adapter`. Each question now has four human answers in calibration and zero in
-held-out. The three warning labels span two families, `module-rename` and `argument-adaptation`; the no-warning label is
-in `module-rename`. These are two labeled families in total, and the injection variant adds no independent family. The
-user confirmed these judgments after AI-assisted discussion; they are not independently blinded labels. Eight
-calibration and five held-out cases remain pending.
+`module-injection` and `method-argument-adapter`. The [third ledger](human-review-2026-10-16-batch-3.json) records
+`validation-boundary` as no warning and `validation-gratuitous` as warning. Each question now has six human answers in
+calibration and zero in held-out. The four warning labels span three families: `module-rename`, `argument-adaptation`
+and `validation-adaptation`. The two no-warning labels span `module-rename` and `validation-adaptation`. These are three
+labeled families in total, and the injection variant adds no independent family. The user confirmed these judgments
+after AI-assisted discussion; they are not independently blinded labels. Six calibration and five held-out cases remain
+pending.
 
 The host resolves calibration's stable surface and approved preview exception as not applicable, and its unknown surface
 as unavailable. It resolves the held-out Write without prior-interface evidence as unavailable. These are
@@ -50,7 +52,7 @@ No historical positive or negative has been adjudicated. Earlier marker/delegati
 semantic labels or evidence that all unmarked wrappers were found. They cannot fill an empty historical stratum.
 Repetitions of a constructed input would measure variation, not add independent examples.
 
-The present corpus includes four reviewed behavioral fixtures, with 13 labels still unresolved. It cannot support a
+The present corpus includes six reviewed behavioral fixtures, with 11 labels still unresolved. It cannot support a
 production-quality or historical-accuracy claim, even if every constructed prediction were correct. Keep the broader
 wrapper family selected by the user; narrow the evidence claim to these constructed actions until representative
 evidence exists. Do not treat this limitation as permission to activate the bundle.
