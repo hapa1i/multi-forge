@@ -1,0 +1,28 @@
+{
+  "period": "all",
+  "proxy_id": null,
+  "total_cost_micros": 460,
+  "total_cost_usd": 0.00046,
+  "total_requests": 9,
+  "reported_requests": 9,
+  "unavailable_requests": 0,
+  "skipped_legacy_schema": 0,
+  "interactive_cost_micros": 0,
+  "by_verb": {
+    "jev-rule-pack-calibration": {
+      "cost_micros": 460,
+      "reported": true,
+      "request_count": 9,
+      "invocations": 1
+    }
+  },
+  "by_model": {
+    "typesafe/jev-1.13-20260917": {
+      "cost_micros": 460,
+      "reported": true,
+      "input_tokens": 10985,
+      "output_tokens": 549,
+      "requests": 9
+    }
+  }
+}

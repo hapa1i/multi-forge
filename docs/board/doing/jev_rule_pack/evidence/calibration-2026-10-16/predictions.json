@@ -1,0 +1,318 @@
+{
+  "schema_version": 2,
+  "source_kind": "capture",
+  "source_reference": "capture.json",
+  "expected_model": "typesafe/jev-1.13-20260917",
+  "corpus_sha256": "fb7cf615a4a0f03952a071b711755e8c1dee9b173e6e1587f3a93d55c0a22a69",
+  "prompt_sha256": "89578191c0d085e1e4e284fb50145d8fc255fa1bcd55f04e74a327aea488a572",
+  "split": "calibration",
+  "repetitions": 1,
+  "predictions": [
+    {
+      "case_id": "module-forwarding",
+      "case_sha256": "16e294ba92fc1192ef6a075fd47af72231032f428c21e34fd1dd2d54b6ae37ec",
+      "payload_sha256": "8bdd8ae8b6be78572edd47ab6aa122b9c4ba75cfe91d10c7f9c1047d68d1e0c0",
+      "repetition": 1,
+      "response": {
+        "model": "typesafe/jev-1.13-20260917",
+        "answers": {
+          "coverage": {
+            "type": "noul",
+            "noul": 0.65
+          },
+          "compatibility_retention": {
+            "type": "noul",
+            "noul": 0.93
+          },
+          "independent_boundary": {
+            "type": "noul",
+            "noul": 0.09
+          }
+        },
+        "usage": {
+          "input_tokens": 1068,
+          "output_tokens": 61,
+          "cost": 4.4856e-05
+        },
+        "id": "gen-dec-1792178544-AaG0WqcHuvyfowKGQMb6",
+        "provider": "TypeSafe"
+      },
+      "failure": null,
+      "latency_ms": 724.5079999847803,
+      "status_code": 200,
+      "response_bytes": 331
+    },
+    {
+      "case_id": "module-direct-update",
+      "case_sha256": "e29152bdbf0665a5aa7839f6ef10afde34009a83b5cee5833ef3e9185982cf17",
+      "payload_sha256": "a54f6a1dd61e0760de872215cc2e748726180b92fc7de239a6f79036a9860ca0",
+      "repetition": 1,
+      "response": {
+        "model": "typesafe/jev-1.13-20260917",
+        "answers": {
+          "coverage": {
+            "type": "noul",
+            "noul": 0.51
+          },
+          "compatibility_retention": {
+            "type": "noul",
+            "noul": 0.24
+          },
+          "independent_boundary": {
+            "type": "noul",
+            "noul": 0.09
+          }
+        },
+        "usage": {
+          "input_tokens": 1058,
+          "output_tokens": 61,
+          "cost": 4.4436e-05
+        },
+        "id": "gen-dec-1792178544-y3U556LSe7KahfTIzDwO",
+        "provider": "TypeSafe"
+      },
+      "failure": null,
+      "latency_ms": 542.7615420194343,
+      "status_code": 200,
+      "response_bytes": 331
+    },
+    {
+      "case_id": "module-injection",
+      "case_sha256": "5d99db97005d021edad8bad9178e603d3478d5b1b93405cac2b1b69c7a3a4226",
+      "payload_sha256": "4f3ed711385733878353cf9535d134ecb416dd59c37ecb57acf74a2606493830",
+      "repetition": 1,
+      "response": {
+        "model": "typesafe/jev-1.13-20260917",
+        "answers": {
+          "coverage": {
+            "type": "noul",
+            "noul": 0.51
+          },
+          "compatibility_retention": {
+            "type": "noul",
+            "noul": 0.95
+          },
+          "independent_boundary": {
+            "type": "noul",
+            "noul": 0.08
+          }
+        },
+        "usage": {
+          "input_tokens": 1178,
+          "output_tokens": 61,
+          "cost": 4.9476e-05
+        },
+        "id": "gen-dec-1792178545-QNLWKm0Zd9zE9d8LGZII",
+        "provider": "TypeSafe"
+      },
+      "failure": null,
+      "latency_ms": 495.80666597466916,
+      "status_code": 200,
+      "response_bytes": 331
+    },
+    {
+      "case_id": "method-argument-adapter",
+      "case_sha256": "e49cbc1f7d0131c93ed99e4d5c2d08dc0176c172f51eb3a8949558802b496283",
+      "payload_sha256": "a13d7768b671bdcd31cbced377e96300d99a5479b1c1ab5194736278fc47df3e",
+      "repetition": 1,
+      "response": {
+        "model": "typesafe/jev-1.13-20260917",
+        "answers": {
+          "coverage": {
+            "type": "noul",
+            "noul": 0.72
+          },
+          "compatibility_retention": {
+            "type": "noul",
+            "noul": 0.9
+          },
+          "independent_boundary": {
+            "type": "noul",
+            "noul": 0.15
+          }
+        },
+        "usage": {
+          "input_tokens": 1168,
+          "output_tokens": 61,
+          "cost": 4.9056e-05
+        },
+        "id": "gen-dec-1792178545-TOscPTeyfOF7uk32K0My",
+        "provider": "TypeSafe"
+      },
+      "failure": null,
+      "latency_ms": 498.65008299821056,
+      "status_code": 200,
+      "response_bytes": 330
+    },
+    {
+      "case_id": "validation-boundary",
+      "case_sha256": "c0bbf4ed9e5c11d4ed463d9b0906b5f07c06eda876ff90e184e5641aaeec3b81",
+      "payload_sha256": "7648697106127ab654400391be13dc3fdcc1dd72e68af3a6916550e15e1203f0",
+      "repetition": 1,
+      "response": {
+        "model": "typesafe/jev-1.13-20260917",
+        "answers": {
+          "coverage": {
+            "type": "noul",
+            "noul": 0.59
+          },
+          "compatibility_retention": {
+            "type": "noul",
+            "noul": 0.74
+          },
+          "independent_boundary": {
+            "type": "noul",
+            "noul": 0.14
+          }
+        },
+        "usage": {
+          "input_tokens": 1488,
+          "output_tokens": 61,
+          "cost": 6.2496e-05
+        },
+        "id": "gen-dec-1792178546-QJtNLyxALH5k1rBssqKc",
+        "provider": "TypeSafe"
+      },
+      "failure": null,
+      "latency_ms": 463.59091700287536,
+      "status_code": 200,
+      "response_bytes": 331
+    },
+    {
+      "case_id": "validation-gratuitous",
+      "case_sha256": "2634654ece0db0bdf8379b9c285fe19e9b131167c8972c541e31df25beb75883",
+      "payload_sha256": "6da7b393582f5ba57962215dfc189049c152538751b39bb245db0058f20b05f1",
+      "repetition": 1,
+      "response": {
+        "model": "typesafe/jev-1.13-20260917",
+        "answers": {
+          "coverage": {
+            "type": "noul",
+            "noul": 0.61
+          },
+          "compatibility_retention": {
+            "type": "noul",
+            "noul": 0.89
+          },
+          "independent_boundary": {
+            "type": "noul",
+            "noul": 0.29
+          }
+        },
+        "usage": {
+          "input_tokens": 1503,
+          "output_tokens": 61,
+          "cost": 6.3126e-05
+        },
+        "id": "gen-dec-1792178546-Xc0PL5cDwF7Wv2s2oaeo",
+        "provider": "TypeSafe"
+      },
+      "failure": null,
+      "latency_ms": 484.36058301012963,
+      "status_code": 200,
+      "response_bytes": 331
+    },
+    {
+      "case_id": "preview-alias",
+      "case_sha256": "7e9b1af800c746d845d723a7dfb75a1cfa2e9a3d6c50aa4a8eb2d7f36d21f6a1",
+      "payload_sha256": "d7104657091f783ec44b0f6120a7be9fff73d25b12a5f4f32286808f40cd5a22",
+      "repetition": 1,
+      "response": {
+        "model": "typesafe/jev-1.13-20260917",
+        "answers": {
+          "coverage": {
+            "type": "noul",
+            "noul": 0.65
+          },
+          "compatibility_retention": {
+            "type": "noul",
+            "noul": 0.95
+          },
+          "independent_boundary": {
+            "type": "noul",
+            "noul": 0.12
+          }
+        },
+        "usage": {
+          "input_tokens": 1044,
+          "output_tokens": 61,
+          "cost": 4.3848e-05
+        },
+        "id": "gen-dec-1792178547-F7ayi8O4v0vr2OwcfKMd",
+        "provider": "TypeSafe"
+      },
+      "failure": null,
+      "latency_ms": 523.7540410016663,
+      "status_code": 200,
+      "response_bytes": 331
+    },
+    {
+      "case_id": "callback-protocol",
+      "case_sha256": "ba79983c7a53c03c0c4e184f6fe639c54da0c2a76e7c9859c268f3ffc527d550",
+      "payload_sha256": "478cc723c4ec8a393ffb3c586e42349cc23c2be83daf5b28c276e2524d629fd7",
+      "repetition": 1,
+      "response": {
+        "model": "typesafe/jev-1.13-20260917",
+        "answers": {
+          "coverage": {
+            "type": "noul",
+            "noul": 0.45
+          },
+          "compatibility_retention": {
+            "type": "noul",
+            "noul": 0.8
+          },
+          "independent_boundary": {
+            "type": "noul",
+            "noul": 0.16
+          }
+        },
+        "usage": {
+          "input_tokens": 1404,
+          "output_tokens": 61,
+          "cost": 5.8968e-05
+        },
+        "id": "gen-dec-1792178547-pnUkdNHcDBprZ2hY2aLM",
+        "provider": "TypeSafe"
+      },
+      "failure": null,
+      "latency_ms": 571.2583750137128,
+      "status_code": 200,
+      "response_bytes": 330
+    },
+    {
+      "case_id": "multi-file-wrapper",
+      "case_sha256": "dc722d956bb8c39f8a54e0166d439a86ae5904ef25310552c7e27d81bb4ddd7f",
+      "payload_sha256": "59ee19712ad99191ebb88392c9b836d3ae9763d0a27965fc9207b82de2bb9fcd",
+      "repetition": 1,
+      "response": {
+        "model": "typesafe/jev-1.13-20260917",
+        "answers": {
+          "coverage": {
+            "type": "noul",
+            "noul": 0.68
+          },
+          "compatibility_retention": {
+            "type": "noul",
+            "noul": 0.9
+          },
+          "independent_boundary": {
+            "type": "noul",
+            "noul": 0.11
+          }
+        },
+        "usage": {
+          "input_tokens": 1074,
+          "output_tokens": 61,
+          "cost": 4.5108e-05
+        },
+        "id": "gen-dec-1792178548-ZO1W8KKyBkmdOVn7nREh",
+        "provider": "TypeSafe"
+      },
+      "failure": null,
+      "latency_ms": 528.658583003562,
+      "status_code": 200,
+      "response_bytes": 330
+    }
+  ]
+}

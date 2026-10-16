@@ -1,8 +1,10 @@
 # A2 synthetic calibration capture
 
-Status: preparation only; no live run is authorized by this document. This is the first model observation for the
-already reviewed constructed corpus, not a runtime admission or representative-quality claim. The
-[evaluation plan](evaluation-plan.md#capture-order-and-decision-gates) owns the order and decision limits.
+Status: the user separately approved this exact nine-request manifest on 2026-10-16; its single run is complete and the
+allowance is consumed. The [capture result](calibration-2026-10-16/README.md) records a semantic calibration blocker.
+This is the first model observation for the already reviewed constructed corpus, not a runtime admission or
+representative-quality claim. The [evaluation plan](evaluation-plan.md#capture-order-and-decision-gates) owns the order
+and decision limits.
 
 ## Candidate and scope
 
@@ -27,7 +29,7 @@ digests checked before credential resolution. Prepared payloads range from 4,250
 PYTHON_DOTENV_DISABLED=1 uv run python scripts/experiments/jev/rule-pack-capture.py > /tmp/jev-calibration.json
 ```
 
-After explicit approval of that unchanged manifest, the execution command is:
+After explicit approval of that unchanged manifest, the completed run used:
 
 ```bash
 PYTHON_DOTENV_DISABLED=1 uv run python scripts/experiments/jev/rule-pack-capture.py \

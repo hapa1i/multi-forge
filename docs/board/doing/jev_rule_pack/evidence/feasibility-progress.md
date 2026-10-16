@@ -39,14 +39,19 @@ supplied action. Baseline supported syntax and source digests are recorded befor
 
 ## Synthetic capture boundary
 
-The [calibration plan](calibration-run-plan.md) prepares nine constructed cases with the three current questions, fixed
-Jev 1.13 snapshot, ZDR, no retries and a fresh isolated Forge home. It has a separate paid approval decision; local
-collection consent does not authorize it. The four held-out model candidates require a later manifest after calibration
-settings are frozen. Constructed observations cannot replace the missing representative evidence or justify runtime
-implementation.
+The user separately approved the [calibration plan](calibration-run-plan.md), and its nine constructed requests
+completed on the expected Jev 1.13 snapshot with ZDR required, no retries and isolated telemetry. The
+[capture result](calibration-2026-10-16/README.md) records $0.000461370 reported cost and a 523.75 ms median latency.
+
+The semantic calibration decision is **revise**: neither legitimate-boundary case can produce its human `no_warning`
+outcome under any allowed threshold bands. Boundary-positive scores are 0.14 and 0.16, below every allowed true cutoff.
+Threshold settings remain unset; no held-out manifest is prepared. Revisit the question/model fit before another
+separately approved capture. Constructed observations cannot replace the missing representative evidence or justify
+runtime implementation.
 
 ## Verification
 
 The combined rule-pack, A1 probe, evaluation/review, capture, baseline, inventory and regression selection passed 345
 tests. These tests use synthetic metadata and injected transports. The retained manifest and baseline report reproduce
-from the current source. No paid A2 request has run; numerical gates and runtime admission remain open.
+from the current source. All nine live response contracts, model/accounting guards and telemetry request-ID joins pass;
+numerical quality gates and runtime admission remain open.

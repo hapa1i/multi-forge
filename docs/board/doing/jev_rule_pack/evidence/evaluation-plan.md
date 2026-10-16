@@ -24,7 +24,10 @@ That partial Edit remains a model candidate; its unavailable human label is dist
 is no human-labeled historical cohort or measured model accuracy. Preparation no longer reports incomplete adjudication;
 its retained report lists unset numeric gates, absent predictions/quality evaluation, unimplemented live execution and
 absent historical evidence. The separate [calibration capture harness](calibration-run-plan.md) now prepares a bounded
-live proposal; the evaluator itself remains offline. `quality_accepted` remains false.
+live proposal; the evaluator itself remains offline. The
+[first approved calibration capture](calibration-2026-10-16/README.md) is now complete. Its required-boundary scores
+cannot recover the human labels under any allowed bands, so settings remain unset and held-out capture is deferred.
+`quality_accepted` remains false.
 
 The shared `policy.rule_pack.definitions` module owns the draft-3 questions and contract version 4. The
 `policy.rule_pack.outcomes` module owns decision version `draft-2`. These modules are available for offline evaluation;

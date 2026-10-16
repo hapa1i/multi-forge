@@ -21,7 +21,9 @@ feedback implementation. It measures real-action evidence coverage, exception ma
 approved inventory's missing-source shortfall and constructed baseline signals. The
 [runtime evidence proposal](evidence/runtime-evidence-contract.md) remains unimplemented and selects no production
 authority. The [wrapper evidence contract](evidence/initial-rule-review.md) retains broader wrappers and advisory
-supplied-evidence semantics. No paid A2 evaluation has run or bundle been enabled. The [card](card.md) owns scope; the
+supplied-evidence semantics. The [first approved calibration capture](evidence/calibration-2026-10-16/README.md)
+completed, but required-boundary scores cannot support the human labels under any allowed bands. Settings remain unset
+and runtime work remains gated. No bundle is enabled. The [card](card.md) owns scope; the
 [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed.
 
 Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
@@ -131,7 +133,7 @@ implemented ownership.
 Saved-prediction schema 2 requires the expected resolved model plus original HTTP status and response byte size. Reports
 retain bounded failure text, reason counts, separate host-label comparisons and pipeline misses, and evaluator source
 hashes. Corpus identity binds membership/families/splits; observations bind the content actually scored. This replaces
-schema 1's draft fixture format; this card records no paid A2 captures. Rule and decision versions validate against
+schema 1's draft fixture format; no paid A2 capture existed at that stage. Rule and decision versions validate against
 their shared owners. Constructed adjudication is complete; representative evidence and quality acceptance remain open.
 
 Aggregate validation passed: `make test-unit` (11,076 passed, 117 deselected), `make test-regression` (1,924 passed) and
@@ -233,6 +235,11 @@ managed sessions and 120 sanitized native actions, retained privately. This appr
 publication, wider caller reads and the plan's draft numerical gates. The
 [synthetic calibration proposal](evidence/calibration-run-plan.md) has a separate manifest and spend decision. The
 selected native paths were missing, so no actions were collected; coverage and usefulness remain unmeasured.
+
+The separately approved nine-request calibration is complete. Its [result](evidence/calibration-2026-10-16/README.md)
+records transport success and a **revise** calibration decision: threshold tuning cannot recover the two
+required-boundary labels. Do not freeze settings or advance to held-out capture until the question/model fit is
+revisited. The compound capture/settings/held-out checklist item remains open.
 
 ## Slice 3: complete action evidence and bounded dispatch
 
