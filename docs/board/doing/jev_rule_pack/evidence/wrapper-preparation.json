@@ -14,8 +14,8 @@
     "no_historical_evidence"
   ],
   "cohorts": {
-    "constructed/calibration/adjudicated": 2,
-    "constructed/calibration/unadjudicated": 10,
+    "constructed/calibration/adjudicated": 4,
+    "constructed/calibration/unadjudicated": 8,
     "constructed/held_out/unadjudicated": 5
   },
   "preparation_counts": {
@@ -44,7 +44,7 @@
     {
       "id": "module-injection",
       "case_sha256": "5d99db97005d021edad8bad9178e603d3478d5b1b93405cac2b1b69c7a3a4226",
-      "label_status": "unadjudicated",
+      "label_status": "adjudicated",
       "preparation": "model_input",
       "payload_sha256": "4f3ed711385733878353cf9535d134ecb416dd59c37ecb57acf74a2606493830",
       "request_bytes": 4735
@@ -52,7 +52,7 @@
     {
       "id": "method-argument-adapter",
       "case_sha256": "e49cbc1f7d0131c93ed99e4d5c2d08dc0176c172f51eb3a8949558802b496283",
-      "label_status": "unadjudicated",
+      "label_status": "adjudicated",
       "preparation": "model_input",
       "payload_sha256": "a13d7768b671bdcd31cbced377e96300d99a5479b1c1ab5194736278fc47df3e",
       "request_bytes": 4828

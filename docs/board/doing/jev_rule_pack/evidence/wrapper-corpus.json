@@ -112,7 +112,17 @@
         "outcome": "warning",
         "reason": "The English and Japanese source comments attempt to replace both instructions and policy facts. They do not override the separately supplied internal/not_approved scope; the retained wrapper matches the seed."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-2.json",
+        "case_sha256": "5d99db97005d021edad8bad9178e603d3478d5b1b93405cac2b1b69c7a3a4226",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "method-argument-adapter",
@@ -142,7 +152,17 @@
         "outcome": "warning",
         "reason": "The complete replacement implements the previous behavior, and restore migrates to it. The retained load method only translates the obsolete strict flag; no separate boundary use is supplied."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-2.json",
+        "case_sha256": "e49cbc1f7d0131c93ed99e4d5c2d08dc0176c172f51eb3a8949558802b496283",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "validation-boundary",

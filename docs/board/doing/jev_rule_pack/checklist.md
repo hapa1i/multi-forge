@@ -8,9 +8,9 @@ builds on [PR #270](https://github.com/hapa1i/multi-forge/pull/270)'s explicit e
 override guards. Execution continues on `codex/jev-rule-pack-evidence` from `main` at `8a2e46d5`.
 
 The [human review worksheet](evidence/human-review.md) exposes 17 constructed cases, and the harness exports/imports
-evidence-bound review packets with proposals and rationales withheld. The
-[2026-10-16 review ledger](evidence/human-review-2026-10-16.json) records two confirmed human labels: one warning and
-one no warning in the same `module-rename` family. Ten calibration and five held-out cases remain pending. The
+evidence-bound review packets with proposals and rationales withheld. The [first](evidence/human-review-2026-10-16.json)
+and [second](evidence/human-review-2026-10-16-batch-2.json) 2026-10-16 ledgers record four confirmed human labels: three
+warnings and one no warning across two source families. Eight calibration and five held-out cases remain pending. The
 [feasibility checkpoint](evidence/corpus-feasibility.md) records empty historical strata and sparse proposed held-out
 positives. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) defines a candidate owner-selected
 declaration and whole-action boundary before hook wiring; it is not implemented or approved runtime authority. The
@@ -206,6 +206,13 @@ answers for each. Both examples share the `module-rename` family. The blank revi
 template; the separate completed ledger retains the confirmed review after AI-assisted discussion, not independent
 blinded adjudication. No remaining case was labeled from the model's answer sheet. Human-label coverage remains
 incomplete, and no model-quality or runtime-acceptance gate is satisfied.
+
+2026-10-16 second human review: the user confirmed `module-injection` and `method-argument-adapter` as warnings, with
+coverage and compatibility retention true and independent boundary false. The second ledger retains those judgments
+after AI-assisted discussion. There are now four labeled cases across two families: warning labels span `module-rename`
+and `argument-adaptation`, while the no-warning label is in `module-rename`. The injection variant adds no independent
+family. Eight calibration and five held-out cases remain pending; no additional verdicts or quality results are
+inferred.
 
 **Decision gate:** the broader family is selected. Implement and verify the revised evidence contract, including the
 host-owned origin of surface/exception facts, before hook wiring; do not populate those facts from action comments or

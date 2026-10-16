@@ -1,15 +1,17 @@
 # A2 human review worksheet
 
-Human adjudication has started. The [calibration worksheet](review-calibration.md) contains 12 cases: two reviewed and
-ten pending. The [held-out worksheet](review-held-out.md) contains five pending cases. Both show the supplied action and
-enumerated scope facts, with the exact case hash. The [JSON packet](human-review-packet.json) remains a reproducible
+Human adjudication has started. The [calibration worksheet](review-calibration.md) contains 12 cases: four reviewed and
+eight pending. The [held-out worksheet](review-held-out.md) contains five pending cases. Both show the supplied action
+and enumerated scope facts, with the exact case hash. The [JSON packet](human-review-packet.json) remains a reproducible
 blank template containing canonical action strings, semantic criteria and pending review fields.
 
 The retained [2026-10-16 review ledger](human-review-2026-10-16.json) records the user's confirmed labels for
 `module-forwarding` (warning) and `module-direct-update` (no warning), imported into the corpus. Both belong to the same
-`module-rename` source family; they are not two independent families. The remaining 15 cases have no human labels. The
-user confirmed these judgments after AI-assisted discussion; they are not independently blinded labels. No model
-predictions are supplied.
+`module-rename` source family; they are not two independent families. The
+[second review ledger](human-review-2026-10-16-batch-2.json) adds warning labels for `module-injection` and
+`method-argument-adapter`. Four cases are now labeled across two families; the injection variant adds no new family. The
+remaining 13 cases have no human labels. The user confirmed these judgments after AI-assisted discussion; they are not
+independently blinded labels. No model predictions are supplied.
 
 The packet omits authored proposals/rationales, reviewer-only scope notes, reconstruction notes and previous
 adjudications. Case IDs and shared authorship remain visible and can hint at intended behavior; this is not a fully
@@ -69,8 +71,8 @@ pending rows; it does not clear prior labels. If a case cannot be settled, use `
 and explanatory notes. Either status blocks the entire import. Resolve the issue or explicitly revise corpus membership,
 record the exclusion and regenerate a packet; no case is silently dropped.
 
-For the next batch, leave the two already adjudicated cases pending in the new packet so import preserves their corpus
-labels. Keep the completed first-batch ledger unchanged; do not resubmit its completed rows as new labels.
+For the next batch, leave already adjudicated cases pending in the new packet so import preserves their corpus labels.
+Keep the completed ledgers unchanged; do not resubmit their completed rows as new labels.
 
 You can also return decisions in conversation, naming the case ID, outcome, three question answers and notes. The exact
 packet case hash remains the reviewed identity. Confirm the final transcribed ledger before treating it as your review.
