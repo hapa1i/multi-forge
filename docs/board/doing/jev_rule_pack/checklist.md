@@ -6,7 +6,8 @@ The offline outcome/evaluation slice shipped through [PR #271](https://github.co
 as `791d9872` on 2026-10-15. The [merge handoff](#offline-evaluation-merge-and-next-gate) records its verified scope. It
 builds on [PR #270](https://github.com/hapa1i/multi-forge/pull/270)'s explicit evaluation identity, session consent and
 override guards. Human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485`.
-Execution continues on `codex/jev-rule-pack-feasibility` from that merged `main` head.
+Execution continues in [draft PR #274](https://github.com/hapa1i/multi-forge/pull/274) on
+`codex/jev-rule-pack-feasibility` from that merged `main` head.
 
 All 17 constructed cases now have [human adjudications](evidence/human-review.md): 12 calibration and five held-out. The
 [feasibility checkpoint](evidence/corpus-feasibility.md) records seven families, empty historical strata and only one
