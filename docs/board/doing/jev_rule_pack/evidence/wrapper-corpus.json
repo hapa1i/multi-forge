@@ -460,7 +460,17 @@
         "outcome": "no_warning",
         "reason": "The decorator adds instrumentation to the unchanged handle implementation and caller. No replaced callable, name, argument or return interface is retained; the independent-boundary question is false because it asks specifically about a retained compatibility wrapper."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "no_warning",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-7.json",
+        "case_sha256": "609cd48a1a83e6a2d0593005d02d55afbb5a4383d0adf2366f506176fb520ca6",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": false,
+          "independent_boundary": false
+        }
+      }
     },
     {
       "id": "write-without-history",
@@ -488,7 +498,13 @@
         "outcome": "unavailable",
         "reason": "Write content supplies neither prior-interface history nor the replacement contract; it is not evidence that the target did not exist."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "unavailable",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-7.json",
+        "case_sha256": "6278ba9ad3d9c7fb8470b330485cda5c03689540556b5dd7b77c687a1bfd7469",
+        "question_answers": null
+      }
     },
     {
       "id": "partial-edit",

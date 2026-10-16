@@ -14,9 +14,12 @@ held-out. Four cases are decided from fixture applicability/history facts; 13 re
 [third](human-review-2026-10-16-batch-3.json), [fourth](human-review-2026-10-16-batch-4.json),
 [fifth](human-review-2026-10-16-batch-5.json) and [sixth](human-review-2026-10-16-batch-6.json) 2026-10-16 ledgers
 record human adjudications for all 12 calibration cases: six warnings, three no warnings, two host-decided
-not-applicable outcomes and one host-decided unavailable outcome across four source families. Five held-out cases remain
-pending. The three host-decided cases have no question answers and contribute no model observations; each question has
-nine human answers. There is no human-labeled historical cohort or measured model accuracy.
+not-applicable outcomes and one host-decided unavailable outcome across four source families. The
+[seventh ledger](human-review-2026-10-16-batch-7.json) adds two held-out adjudications across two families: one no
+warning and one host-decided unavailable outcome. Three held-out cases remain pending; no held-out warning has been
+adjudicated. The four host-decided cases have no question answers and contribute no model observations; each question
+has nine calibration answers and one held-out answer. There is no human-labeled historical cohort or measured model
+accuracy.
 
 The shared `policy.rule_pack.definitions` module owns the draft-3 questions and contract version 4. The
 `policy.rule_pack.outcomes` module owns decision version `draft-2`. These modules are available for offline evaluation;

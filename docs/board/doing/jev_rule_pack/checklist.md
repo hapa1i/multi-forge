@@ -13,11 +13,13 @@ evidence-bound review packets with proposals and rationales withheld. The
 [third](evidence/human-review-2026-10-16-batch-3.json), [fourth](evidence/human-review-2026-10-16-batch-4.json),
 [fifth](evidence/human-review-2026-10-16-batch-5.json) and [sixth](evidence/human-review-2026-10-16-batch-6.json)
 2026-10-16 ledgers record human adjudications for all 12 calibration cases: six warnings, three no warnings, two
-host-decided not-applicable outcomes and one host-decided unavailable outcome across four source families. Five held-out
-cases remain pending. The [feasibility checkpoint](evidence/corpus-feasibility.md) records empty historical strata and
-sparse proposed held-out positives. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) defines a
-candidate owner-selected declaration and whole-action boundary before hook wiring; it is not implemented or approved
-runtime authority. The [evaluation plan](evidence/evaluation-plan.md) owns quality decisions, and the
+host-decided not-applicable outcomes and one host-decided unavailable outcome across four source families. The
+[seventh ledger](evidence/human-review-2026-10-16-batch-7.json) adds two held-out labels across two families: one no
+warning and one host-decided unavailable outcome. Three held-out cases remain pending. The
+[feasibility checkpoint](evidence/corpus-feasibility.md) records empty historical strata and sparse proposed held-out
+positives. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) defines a candidate owner-selected
+declaration and whole-action boundary before hook wiring; it is not implemented or approved runtime authority. The
+[evaluation plan](evidence/evaluation-plan.md) owns quality decisions, and the
 [wrapper evidence contract](evidence/initial-rule-review.md) retains the user's broader wrapper scope. The 2026-10-16
 revision makes warnings advisory when covered retention lacks a justification established by the supplied evidence. The
 declaration proposal now uses an explicit project default and scoped exceptions, not uniform-file enumeration. The
@@ -203,47 +205,24 @@ all 17 action, scope, provenance and split records were unchanged and unadjudica
 identities and found a stale checklist scope requirement and ambiguous absent-justification prose; both are corrected.
 No paid request or native trial ran.
 
-2026-10-16 first human review: the user confirmed the corrected case identities and notes for `module-forwarding` and
-`module-direct-update`. Their retained ledger supplies one warning and one no-warning label, with all three question
-answers for each. Both examples share the `module-rename` family. The blank review packet remains a reproducible
-template; the separate completed ledger retains the confirmed review after AI-assisted discussion, not independent
-blinded adjudication. No remaining case was labeled from the model's answer sheet. Human-label coverage remains
-incomplete, and no model-quality or runtime-acceptance gate is satisfied.
+2026-10-16 human review: the first six retained ledgers completed all 12 calibration labels; the seventh adds
+`decorator-instrumentation` as no warning and the host-decided `write-without-history` as unavailable. The
+[review guide](evidence/human-review.md) links each batch and its exact judgments, question answers and notes. The
+[feasibility checkpoint](evidence/corpus-feasibility.md) records the current cohort and family counts. Fourteen cases
+are reviewed and three held-out cases remain pending; the four host reviews have null question answers. Each semantic
+question has nine calibration answers and one held-out answer. No held-out warning has been adjudicated.
 
-2026-10-16 second human review: the user confirmed `module-injection` and `method-argument-adapter` as warnings, with
-coverage and compatibility retention true and independent boundary false. The second ledger retains those judgments
-after AI-assisted discussion. There are now four labeled cases across two families: warning labels span `module-rename`
-and `argument-adaptation`, while the no-warning label is in `module-rename`. The injection variant adds no independent
-family. Eight calibration and five held-out cases remained pending at that checkpoint; no additional verdicts or quality
-results were inferred.
+The user confirmed these judgments after AI-assisted discussion, not independent blinded review. The blank packet
+remains reproducible; each import preserves earlier labels and all action, scope, provenance, split and payload
+identities. No model answer sheet supplies human labels. These constructed judgments establish neither historical
+accuracy nor model quality, and do not satisfy runtime admission.
 
-2026-10-16 third human review: the user confirmed `validation-boundary` as no warning and `validation-gratuitous` as
-warning. Both have coverage and compatibility retention true; independent boundary is true only for
-`validation-boundary`. The third ledger preserves the supplied notes after AI-assisted discussion. Six calibration cases
-are now labeled across three families, with six calibration and five held-out cases still pending. No quality or
-runtime-acceptance gate is satisfied.
-
-2026-10-16 fourth human review: the user confirmed `preview-alias` as warning, with coverage and compatibility retention
-true and independent boundary false. They confirmed `stable-alias` as not applicable under the stable-surface host rule,
-with `question_answers: null` and an explanation. The fourth ledger preserves the supplied notes after AI-assisted
-discussion. Eight calibration cases are now labeled across four families; each question has seven answers because the
-host-decided case contributes none. Four calibration and five held-out cases remain pending. The host result is not a
-model success or a no-warning label; no quality or runtime-acceptance gate is satisfied.
-
-2026-10-16 fifth human review: the user confirmed `preview-approved-exception` as not applicable under
-`approved_preview_exception` and `unknown-public-status` as unavailable under `unknown_surface`. Both use
-`question_answers: null`; the fifth ledger retains the supplied explanations after AI-assisted discussion. Ten
-calibration cases are now labeled across four families, including all three calibration host decisions. Each question
-still has seven answers. Two calibration and five held-out cases remain pending. These host labels are neither model
-successes nor model abstentions, and no quality or runtime-acceptance gate is satisfied.
-
-2026-10-16 sixth human review: the user confirmed `callback-protocol` as no warning and `multi-file-wrapper` as warning.
-Both have coverage and compatibility retention true; independent boundary is true only for `callback-protocol`. The
-sixth ledger retains the supplied notes after AI-assisted discussion. All 12 calibration cases are labeled across four
-families: six warnings span four families, and three no-warning labels span `module-rename`, `validation-adaptation` and
-`argument-adaptation`. Each question has nine answers; the three host reviews retain null question answers. Five
-held-out cases remain pending. No historical labels, model-quality result or runtime-acceptance gate is supplied by
-completing the constructed calibration labels.
+Validation note: the seventh batch pushed this checklist above the local token screen. The size checker automatically
+obtained an Anthropic token count before failing for missing cached evidence; that document-specific request had not
+been separately approved. The repeated review summaries were then condensed below the local screen, preserving the
+ledgers. Subsequent token checks use the network-restricted sandbox and already-prepared dependencies. The local
+end-of-file hook runs separately because the sandbox forbids its write-mode reads of unchanged `.agents` files. No Jev
+evaluation or native trial was dispatched.
 
 **Decision gate:** the broader family is selected. Implement and verify the revised evidence contract, including the
 host-owned origin of surface/exception facts, before hook wiring; do not populate those facts from action comments or

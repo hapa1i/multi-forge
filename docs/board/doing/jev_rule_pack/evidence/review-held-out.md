@@ -1,10 +1,10 @@
 # A2 human review: held-out
 
-Rendered from [human-review-packet.json](human-review-packet.json). These 5 cases remain pending. Read the
-[review instructions](human-review.md) and exact question criteria first. No model responses or proposed labels appear
-here. Rule `draft-3` / evidence contract 4 uses the advisory standard: absent supplied boundary justification can
-support a warning when interface evidence is otherwise complete. Case names may suggest author intent; they are not
-labels.
+Rendered from [human-review-packet.json](human-review-packet.json), with confirmed review status added. Two cases are
+reviewed and three remain pending. Read the [review instructions](human-review.md) and exact question criteria first. No
+model responses or authored proposals appear here. Rule `draft-3` / evidence contract 4 uses the advisory standard:
+absent supplied boundary justification can support a warning when interface evidence is otherwise complete. Case names
+may suggest author intent; they are not labels.
 
 Every action is constructed, with provenance `assistant-authored-wrapper-fixtures-2026-10-15`. The supplied scope facts
 are invented governance for these examples, not real repository declarations. Judge only the complete action shown and
@@ -51,8 +51,9 @@ def process(values):
     return [handle(value) for value in values]
 ```
 
-Human review: **pending**. Record outcome, coverage, compatibility retention, independent boundary and notes in the
-matching packet row.
+Human review: **reviewed, 2026-10-16**. Outcome: `no_warning`; coverage: `true`; compatibility retention: `false`;
+independent boundary: `false`. The [retained ledger](human-review-2026-10-16-batch-7.json) holds the confirmed notes and
+case identity.
 
 ## write-without-history
 
@@ -69,8 +70,9 @@ def load(path):
     return fetch_config(path)
 ```
 
-Human review: **pending**. Record outcome, coverage, compatibility retention, independent boundary and notes in the
-matching packet row.
+Human review: **reviewed, 2026-10-16**. Outcome: `unavailable`; `question_answers: null`. This host-decided Write lacks
+prior-interface evidence (`write_without_prior_interface_evidence`), so no model request is dispatched. The
+[retained ledger](human-review-2026-10-16-batch-7.json) holds the confirmed explanation and case identity.
 
 ## partial-edit
 

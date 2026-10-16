@@ -15,7 +15,8 @@
   ],
   "cohorts": {
     "constructed/calibration/adjudicated": 12,
-    "constructed/held_out/unadjudicated": 5
+    "constructed/held_out/adjudicated": 2,
+    "constructed/held_out/unadjudicated": 3
   },
   "preparation_counts": {
     "host_decision/not_applicable": 2,
@@ -115,7 +116,7 @@
     {
       "id": "decorator-instrumentation",
       "case_sha256": "609cd48a1a83e6a2d0593005d02d55afbb5a4383d0adf2366f506176fb520ca6",
-      "label_status": "unadjudicated",
+      "label_status": "adjudicated",
       "preparation": "model_input",
       "payload_sha256": "5177f79699114d70568092d4426a33b56824d344ec4912675589d66a90f527d4",
       "request_bytes": 4550
@@ -123,7 +124,7 @@
     {
       "id": "write-without-history",
       "case_sha256": "6278ba9ad3d9c7fb8470b330485cda5c03689540556b5dd7b77c687a1bfd7469",
-      "label_status": "unadjudicated",
+      "label_status": "adjudicated",
       "preparation": "host_decision",
       "host_outcome": "unavailable",
       "host_reason": "write_without_prior_interface_evidence"

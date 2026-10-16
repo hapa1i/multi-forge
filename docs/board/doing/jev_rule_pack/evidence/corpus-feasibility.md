@@ -1,8 +1,8 @@
 # A2 corpus feasibility checkpoint
 
 2026-10-16. Inventory of the existing [constructed corpus](wrapper-corpus.json), at source SHA-256
-`2ad9e7ccc6cafda5ed8a41dd00cc06877353d0f3e00ee606f80d0b7b27d842fe`. No historical examples or native transcripts were
-collected for this checkpoint. The counts distinguish authored fixtures and preparation results from the 12 confirmed
+`af3a970ab32f4d0e4fdd6dfd6341324694b6186de7dde4983f06c990bf14910a`. No historical examples or native transcripts were
+collected for this checkpoint. The counts distinguish authored fixtures and preparation results from the 14 confirmed
 human adjudications.
 
 ## Evidence available
@@ -10,7 +10,7 @@ human adjudications.
 | Cohort and split        | Cases | Families | Model candidates | Host decisions | Human labels |
 | ----------------------- | ----- | -------- | ---------------- | -------------- | ------------ |
 | Constructed calibration | 12    | 4        | 9                | 3              | 12           |
-| Constructed held-out    | 5     | 3        | 4                | 1              | 0            |
+| Constructed held-out    | 5     | 3        | 4                | 1              | 2            |
 | Historical calibration  | 0     | 0        | 0                | 0              | 0            |
 | Historical held-out     | 0     | 0        | 0                | 0              | 0            |
 
@@ -21,14 +21,17 @@ The [first 2026-10-16 ledger](human-review-2026-10-16.json) records `module-forw
 [fourth ledger](human-review-2026-10-16-batch-4.json) records `preview-alias` as warning and `stable-alias` as not
 applicable. The [fifth ledger](human-review-2026-10-16-batch-5.json) records `preview-approved-exception` as not
 applicable and `unknown-public-status` as unavailable. The [sixth ledger](human-review-2026-10-16-batch-6.json) records
-`callback-protocol` as no warning and `multi-file-wrapper` as warning. The three host-decided cases have no question
-answers; each question now has nine human answers in calibration and zero in held-out. The six warning labels span four
-families: `module-rename`, `argument-adaptation`, `validation-adaptation` and `public-alias`. The three no-warning
-labels span `module-rename`, `validation-adaptation` and `argument-adaptation`. These are four labeled families in
-total, and the injection and multi-file variants add no independent family. The two not-applicable labels and the
-unavailable label check host applicability; they are not model successes, no-warning labels or model abstentions. The
-user confirmed these judgments after AI-assisted discussion; they are not independently blinded labels. All calibration
-cases are labeled; five held-out cases remain pending.
+`callback-protocol` as no warning and `multi-file-wrapper` as warning. The
+[seventh ledger](human-review-2026-10-16-batch-7.json) records `decorator-instrumentation` as no warning and
+`write-without-history` as unavailable. The four host-decided cases have no question answers; each question now has nine
+human answers in calibration and one in held-out. The six warning labels span four families: `module-rename`,
+`argument-adaptation`, `validation-adaptation` and `public-alias`. The three no-warning calibration labels span
+`module-rename`, `validation-adaptation` and `argument-adaptation`; held-out adds one no-warning label in
+`decorator-instrumentation` and one host review in `insufficient-context`. These are six labeled families in total, and
+the injection and multi-file variants add no independent family. The two not-applicable labels and two unavailable
+labels check host applicability/history; they are not model successes, no-warning labels or model abstentions. No
+held-out warning has been adjudicated. The user confirmed these judgments after AI-assisted discussion; they are not
+independently blinded labels. All calibration cases are labeled; three held-out cases remain pending.
 
 The host resolves calibration's stable surface and approved preview exception as not applicable, and its unknown surface
 as unavailable. It resolves the held-out Write without prior-interface evidence as unavailable. These are
@@ -58,17 +61,17 @@ No historical positive or negative has been adjudicated. Earlier marker/delegati
 semantic labels or evidence that all unmarked wrappers were found. They cannot fill an empty historical stratum.
 Repetitions of a constructed input would measure variation, not add independent examples.
 
-The present corpus includes 12 reviewed constructed cases, with five held-out labels still unresolved. It cannot support
-a production-quality or historical-accuracy claim, even if every constructed prediction were correct. Keep the broader
-wrapper family selected by the user; narrow the evidence claim to these constructed actions until representative
+The present corpus includes 14 reviewed constructed cases, with three held-out labels still unresolved. It cannot
+support a production-quality or historical-accuracy claim, even if every constructed prediction were correct. Keep the
+broader wrapper family selected by the user; narrow the evidence claim to these constructed actions until representative
 evidence exists. Do not treat this limitation as permission to activate the bundle.
 
 ## Next gate
 
-Continue with the five [held-out cases](review-held-out.md), following the [human review instructions](human-review.md),
-to adjudicate exact case hashes, including the host-decided Write. Record per-question answers, uncertainty and
-disagreements before inspecting predictions. An unresolved disagreement or proposed exclusion remains visible and blocks
-importing that packet; revising membership requires a new packet and explicit accounting for the excluded cases.
+Continue with the three pending [held-out cases](review-held-out.md), following the
+[human review instructions](human-review.md), to adjudicate exact case hashes. Record per-question answers, uncertainty
+and disagreements before inspecting predictions. An unresolved disagreement or proposed exclusion remains visible and
+blocks importing that packet; revising membership requires a new packet and explicit accounting for the excluded cases.
 
 After adjudication, recount positive/negative families in each split. If independent historical evidence is still
 absent, either prepare a separately reviewed acquisition scope or retain the constructed-only claim. A future
