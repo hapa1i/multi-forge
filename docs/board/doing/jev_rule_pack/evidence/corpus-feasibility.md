@@ -1,15 +1,15 @@
 # A2 corpus feasibility checkpoint
 
 2026-10-16. Inventory of the existing [constructed corpus](wrapper-corpus.json), at source SHA-256
-`89f37319e46ecdb13d1018d05af64a1623b109f8adb3fa64f7ca0739001284c8`. No historical examples or native transcripts were
-collected for this checkpoint. The counts distinguish authored fixtures and preparation results from the ten confirmed
+`2ad9e7ccc6cafda5ed8a41dd00cc06877353d0f3e00ee606f80d0b7b27d842fe`. No historical examples or native transcripts were
+collected for this checkpoint. The counts distinguish authored fixtures and preparation results from the 12 confirmed
 human adjudications.
 
 ## Evidence available
 
 | Cohort and split        | Cases | Families | Model candidates | Host decisions | Human labels |
 | ----------------------- | ----- | -------- | ---------------- | -------------- | ------------ |
-| Constructed calibration | 12    | 4        | 9                | 3              | 10           |
+| Constructed calibration | 12    | 4        | 9                | 3              | 12           |
 | Constructed held-out    | 5     | 3        | 4                | 1              | 0            |
 | Historical calibration  | 0     | 0        | 0                | 0              | 0            |
 | Historical held-out     | 0     | 0        | 0                | 0              | 0            |
@@ -20,13 +20,15 @@ The [first 2026-10-16 ledger](human-review-2026-10-16.json) records `module-forw
 `validation-boundary` as no warning and `validation-gratuitous` as warning. The
 [fourth ledger](human-review-2026-10-16-batch-4.json) records `preview-alias` as warning and `stable-alias` as not
 applicable. The [fifth ledger](human-review-2026-10-16-batch-5.json) records `preview-approved-exception` as not
-applicable and `unknown-public-status` as unavailable. These three host-decided cases have no question answers; each
-question still has seven human answers in calibration and zero in held-out. The five warning labels span four families:
-`module-rename`, `argument-adaptation`, `validation-adaptation` and `public-alias`. The two no-warning labels span
-`module-rename` and `validation-adaptation`. These are four labeled families in total, and the injection variant adds no
-independent family. The two not-applicable labels and the unavailable label check host applicability; they are not model
-successes, no-warning labels or model abstentions. The user confirmed these judgments after AI-assisted discussion; they
-are not independently blinded labels. Two calibration and five held-out cases remain pending.
+applicable and `unknown-public-status` as unavailable. The [sixth ledger](human-review-2026-10-16-batch-6.json) records
+`callback-protocol` as no warning and `multi-file-wrapper` as warning. The three host-decided cases have no question
+answers; each question now has nine human answers in calibration and zero in held-out. The six warning labels span four
+families: `module-rename`, `argument-adaptation`, `validation-adaptation` and `public-alias`. The three no-warning
+labels span `module-rename`, `validation-adaptation` and `argument-adaptation`. These are four labeled families in
+total, and the injection and multi-file variants add no independent family. The two not-applicable labels and the
+unavailable label check host applicability; they are not model successes, no-warning labels or model abstentions. The
+user confirmed these judgments after AI-assisted discussion; they are not independently blinded labels. All calibration
+cases are labeled; five held-out cases remain pending.
 
 The host resolves calibration's stable surface and approved preview exception as not applicable, and its unknown surface
 as unavailable. It resolves the held-out Write without prior-interface evidence as unavailable. These are
@@ -56,17 +58,17 @@ No historical positive or negative has been adjudicated. Earlier marker/delegati
 semantic labels or evidence that all unmarked wrappers were found. They cannot fill an empty historical stratum.
 Repetitions of a constructed input would measure variation, not add independent examples.
 
-The present corpus includes ten reviewed constructed cases, with seven labels still unresolved. It cannot support a
-production-quality or historical-accuracy claim, even if every constructed prediction were correct. Keep the broader
+The present corpus includes 12 reviewed constructed cases, with five held-out labels still unresolved. It cannot support
+a production-quality or historical-accuracy claim, even if every constructed prediction were correct. Keep the broader
 wrapper family selected by the user; narrow the evidence claim to these constructed actions until representative
 evidence exists. Do not treat this limitation as permission to activate the bundle.
 
 ## Next gate
 
-Continue the [human review worksheet](human-review.md) to adjudicate exact case hashes, including host-decided cases.
-Record per-question answers, uncertainty and disagreements before inspecting predictions. An unresolved disagreement or
-proposed exclusion remains visible and blocks importing that packet; revising membership requires a new packet and
-explicit accounting for the excluded cases.
+Continue with the five [held-out cases](review-held-out.md), following the [human review instructions](human-review.md),
+to adjudicate exact case hashes, including the host-decided Write. Record per-question answers, uncertainty and
+disagreements before inspecting predictions. An unresolved disagreement or proposed exclusion remains visible and blocks
+importing that packet; revising membership requires a new packet and explicit accounting for the excluded cases.
 
 After adjudication, recount positive/negative families in each split. If independent historical evidence is still
 absent, either prepare a separately reviewed acquisition scope or retain the constructed-only claim. A future

@@ -10,9 +10,10 @@ interface through its replacement on an applicable clean-break surface and the s
 justification for retaining it. This changes the semantic criteria, not just prompt wording. It does not establish that
 no requirement exists elsewhere. Previous question/case hashes are superseded. The
 [first](human-review-2026-10-16.json), [second](human-review-2026-10-16-batch-2.json),
-[third](human-review-2026-10-16-batch-3.json), [fourth](human-review-2026-10-16-batch-4.json) and
-[fifth](human-review-2026-10-16-batch-5.json) 2026-10-16 ledgers record ten subsequently confirmed human adjudications
-under the new criteria; two calibration and five held-out cases remain pending.
+[third](human-review-2026-10-16-batch-3.json), [fourth](human-review-2026-10-16-batch-4.json),
+[fifth](human-review-2026-10-16-batch-5.json) and [sixth](human-review-2026-10-16-batch-6.json) 2026-10-16 ledgers
+record confirmed human adjudications for all 12 calibration cases under the new criteria; five held-out cases remain
+pending.
 
 ## What the rule judges
 
@@ -163,7 +164,7 @@ public deprecation, validation, callbacks, decorators, missing context, injectio
 [offline harness](../../../../../scripts/experiments/jev/rule-pack-eval.py) validates action shapes and source-family
 splits, builds size-checked A1 payloads without dispatch, and reports label/quality gaps. It has no live mode.
 
-Every example is constructed. Ten calibration cases now have confirmed human labels; the remaining seven are
+Every example is constructed. All 12 calibration cases now have confirmed human labels; the five held-out cases remain
 unadjudicated. The proposed outcomes remain assistant-authored review aids, not ground truth. Paths are
 repository-relative fixture coordinates; these are not captured native tool calls. An adjudication must name the human
 reviewer and review reference and bind the semantic rule definition, applicability table, question types and true/false

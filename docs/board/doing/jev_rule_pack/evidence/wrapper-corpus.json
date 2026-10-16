@@ -420,7 +420,17 @@
         "outcome": "no_warning",
         "reason": "The retained on_record callable preserves its Record argument interface around consume_payload. The unchanged RecordBus registration and delivery require a Record callback, while the new consumer and migrated process_line take strings. Extracting record.payload supplies an independently required protocol adaptation."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "no_warning",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-6.json",
+        "case_sha256": "ba79983c7a53c03c0c4e184f6fe639c54da0c2a76e7c9859c268f3ffc527d550",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": true
+        }
+      }
     },
     {
       "id": "decorator-instrumentation",
@@ -595,7 +605,17 @@
         "outcome": "warning",
         "reason": "The old internal interface remains around its moved replacement. Both complete function bodies are supplied in the same patch without an established boundary justification; the warning still requires caller and compatibility review."
       },
-      "adjudication": null
+      "adjudication": {
+        "outcome": "warning",
+        "reviewer": "hapa1i",
+        "review_reference": "docs/board/doing/jev_rule_pack/evidence/human-review-2026-10-16-batch-6.json",
+        "case_sha256": "dc722d956bb8c39f8a54e0166d439a86ae5904ef25310552c7e27d81bb4ddd7f",
+        "question_answers": {
+          "coverage": true,
+          "compatibility_retention": true,
+          "independent_boundary": false
+        }
+      }
     }
   ]
 }

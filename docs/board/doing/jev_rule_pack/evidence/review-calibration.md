@@ -1,14 +1,13 @@
 # A2 human review: calibration
 
-Evidence rendered from [human-review-packet.json](human-review-packet.json). Ten of these 12 cases have confirmed human
-reviews in the [first](human-review-2026-10-16.json), [second](human-review-2026-10-16-batch-2.json),
-[third](human-review-2026-10-16-batch-3.json), [fourth](human-review-2026-10-16-batch-4.json) and
-[fifth](human-review-2026-10-16-batch-5.json) 2026-10-16 ledgers; two remain pending. Read the
-[review instructions](human-review.md) and exact question criteria first. No model responses or proposed labels appear
-here. The first ten outcomes below were confirmed by the user after AI-assisted discussion, not independent blinded
-review. Rule `draft-3` / evidence contract 4 uses the advisory standard: absent supplied boundary justification can
-support a warning when interface evidence is otherwise complete. Case names may suggest author intent; they are not
-labels.
+Evidence rendered from [human-review-packet.json](human-review-packet.json). All 12 cases have confirmed human reviews
+in the [first](human-review-2026-10-16.json), [second](human-review-2026-10-16-batch-2.json),
+[third](human-review-2026-10-16-batch-3.json), [fourth](human-review-2026-10-16-batch-4.json),
+[fifth](human-review-2026-10-16-batch-5.json) and [sixth](human-review-2026-10-16-batch-6.json) 2026-10-16 ledgers. Read
+the [review instructions](human-review.md) and exact question criteria first. No model responses or proposed labels
+appear here. The outcomes below were confirmed by the user after AI-assisted discussion, not independent blinded review.
+Rule `draft-3` / evidence contract 4 uses the advisory standard: absent supplied boundary justification can support a
+warning when interface evidence is otherwise complete. Case names may suggest author intent; they are not labels.
 
 Every action is constructed, with provenance `assistant-authored-wrapper-fixtures-2026-10-15`. The supplied scope facts
 are invented governance for these examples, not real repository declarations. Judge only the complete action shown and
@@ -582,8 +581,9 @@ def test_record_subscription():
     assert received == ["event"]
 ```
 
-Human review: **pending**. Record outcome, coverage, compatibility retention, independent boundary and notes in the
-matching packet row.
+Human review: **reviewed, 2026-10-16**. Outcome: `no_warning`; coverage: `true`; compatibility retention: `true`;
+independent boundary: `true`. The [sixth ledger](human-review-2026-10-16-batch-6.json) holds the confirmed notes and
+case identity.
 
 ## multi-file-wrapper
 
@@ -612,5 +612,6 @@ Patch for reading; the JSON packet retains the exact command, including whitespa
 *** End Patch
 ```
 
-Human review: **pending**. Record outcome, coverage, compatibility retention, independent boundary and notes in the
-matching packet row.
+Human review: **reviewed, 2026-10-16**. Outcome: `warning`; coverage: `true`; compatibility retention: `true`;
+independent boundary: `false`. The [sixth ledger](human-review-2026-10-16-batch-6.json) holds the confirmed notes and
+case identity. This variant shares the `module-rename` family with the single-file examples.

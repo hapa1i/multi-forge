@@ -11,12 +11,12 @@ The [candidate contract](initial-rule-review.md) owns the broader compatibility-
 [corpus](wrapper-corpus.json) contains 17 constructed actions in seven source families: 12 calibration and five
 held-out. Four cases are decided from fixture applicability/history facts; 13 require semantic assessment. The
 [first](human-review-2026-10-16.json), [second](human-review-2026-10-16-batch-2.json),
-[third](human-review-2026-10-16-batch-3.json), [fourth](human-review-2026-10-16-batch-4.json) and
-[fifth](human-review-2026-10-16-batch-5.json) 2026-10-16 ledgers record ten human-adjudicated calibration cases: five
-warnings, two no warnings, two host-decided not-applicable outcomes and one host-decided unavailable outcome across four
-source families. Two calibration and five held-out cases remain pending. The three host-decided cases have no question
-answers and contribute no model observations; each question still has seven human answers. There is no human-labeled
-historical cohort or measured model accuracy.
+[third](human-review-2026-10-16-batch-3.json), [fourth](human-review-2026-10-16-batch-4.json),
+[fifth](human-review-2026-10-16-batch-5.json) and [sixth](human-review-2026-10-16-batch-6.json) 2026-10-16 ledgers
+record human adjudications for all 12 calibration cases: six warnings, three no warnings, two host-decided
+not-applicable outcomes and one host-decided unavailable outcome across four source families. Five held-out cases remain
+pending. The three host-decided cases have no question answers and contribute no model observations; each question has
+nine human answers. There is no human-labeled historical cohort or measured model accuracy.
 
 The shared `policy.rule_pack.definitions` module owns the draft-3 questions and contract version 4. The
 `policy.rule_pack.outcomes` module owns decision version `draft-2`. These modules are available for offline evaluation;

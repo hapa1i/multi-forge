@@ -10,14 +10,14 @@ override guards. Execution continues on `codex/jev-rule-pack-evidence` from `mai
 The [human review worksheet](evidence/human-review.md) exposes 17 constructed cases, and the harness exports/imports
 evidence-bound review packets with proposals and rationales withheld. The
 [first](evidence/human-review-2026-10-16.json), [second](evidence/human-review-2026-10-16-batch-2.json),
-[third](evidence/human-review-2026-10-16-batch-3.json), [fourth](evidence/human-review-2026-10-16-batch-4.json) and
-[fifth](evidence/human-review-2026-10-16-batch-5.json) 2026-10-16 ledgers record ten confirmed human labels: five
-warnings, two no warnings, two host-decided not-applicable outcomes and one host-decided unavailable outcome across four
-source families. Two calibration and five held-out cases remain pending. The
-[feasibility checkpoint](evidence/corpus-feasibility.md) records empty historical strata and sparse proposed held-out
-positives. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) defines a candidate owner-selected
-declaration and whole-action boundary before hook wiring; it is not implemented or approved runtime authority. The
-[evaluation plan](evidence/evaluation-plan.md) owns quality decisions, and the
+[third](evidence/human-review-2026-10-16-batch-3.json), [fourth](evidence/human-review-2026-10-16-batch-4.json),
+[fifth](evidence/human-review-2026-10-16-batch-5.json) and [sixth](evidence/human-review-2026-10-16-batch-6.json)
+2026-10-16 ledgers record human adjudications for all 12 calibration cases: six warnings, three no warnings, two
+host-decided not-applicable outcomes and one host-decided unavailable outcome across four source families. Five held-out
+cases remain pending. The [feasibility checkpoint](evidence/corpus-feasibility.md) records empty historical strata and
+sparse proposed held-out positives. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) defines a
+candidate owner-selected declaration and whole-action boundary before hook wiring; it is not implemented or approved
+runtime authority. The [evaluation plan](evidence/evaluation-plan.md) owns quality decisions, and the
 [wrapper evidence contract](evidence/initial-rule-review.md) retains the user's broader wrapper scope. The 2026-10-16
 revision makes warnings advisory when covered retention lacks a justification established by the supplied evidence. The
 declaration proposal now uses an explicit project default and scoped exceptions, not uniform-file enumeration. The
@@ -236,6 +236,14 @@ model success or a no-warning label; no quality or runtime-acceptance gate is sa
 calibration cases are now labeled across four families, including all three calibration host decisions. Each question
 still has seven answers. Two calibration and five held-out cases remain pending. These host labels are neither model
 successes nor model abstentions, and no quality or runtime-acceptance gate is satisfied.
+
+2026-10-16 sixth human review: the user confirmed `callback-protocol` as no warning and `multi-file-wrapper` as warning.
+Both have coverage and compatibility retention true; independent boundary is true only for `callback-protocol`. The
+sixth ledger retains the supplied notes after AI-assisted discussion. All 12 calibration cases are labeled across four
+families: six warnings span four families, and three no-warning labels span `module-rename`, `validation-adaptation` and
+`argument-adaptation`. Each question has nine answers; the three host reviews retain null question answers. Five
+held-out cases remain pending. No historical labels, model-quality result or runtime-acceptance gate is supplied by
+completing the constructed calibration labels.
 
 **Decision gate:** the broader family is selected. Implement and verify the revised evidence contract, including the
 host-owned origin of surface/exception facts, before hook wiring; do not populate those facts from action comments or

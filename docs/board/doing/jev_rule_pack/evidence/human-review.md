@@ -1,9 +1,9 @@
 # A2 human review worksheet
 
-Human adjudication has started. The [calibration worksheet](review-calibration.md) contains 12 cases: ten reviewed and
-two pending. The [held-out worksheet](review-held-out.md) contains five pending cases. Both show the supplied action and
-enumerated scope facts, with the exact case hash. The [JSON packet](human-review-packet.json) remains a reproducible
-blank template containing canonical action strings, semantic criteria and pending review fields.
+All 12 cases in the [calibration worksheet](review-calibration.md) have human adjudications. Continue with the five
+pending cases in the [held-out worksheet](review-held-out.md). Both show the supplied action and enumerated scope facts,
+with the exact case hash. The [JSON packet](human-review-packet.json) remains a reproducible blank template containing
+canonical action strings, semantic criteria and pending review fields.
 
 The retained [2026-10-16 review ledger](human-review-2026-10-16.json) records the user's confirmed labels for
 `module-forwarding` (warning) and `module-direct-update` (no warning), imported into the corpus. Both belong to the same
@@ -13,10 +13,12 @@ The retained [2026-10-16 review ledger](human-review-2026-10-16.json) records th
 as no warning and `validation-gratuitous` as warning. The [fourth review ledger](human-review-2026-10-16-batch-4.json)
 records `preview-alias` as warning and `stable-alias` as not applicable, with no question answers for that host-decided
 case. The [fifth review ledger](human-review-2026-10-16-batch-5.json) records `preview-approved-exception` as not
-applicable and `unknown-public-status` as unavailable, also with no question answers. Ten cases are now labeled across
-four families; the injection variant adds no new family. Three labels review host decisions, leaving seven human answers
-per question. The remaining seven cases have no human labels. The user confirmed these judgments after AI-assisted
-discussion; they are not independently blinded labels. No model predictions are supplied.
+applicable and `unknown-public-status` as unavailable, also with no question answers. The
+[sixth review ledger](human-review-2026-10-16-batch-6.json) records `callback-protocol` as no warning and
+`multi-file-wrapper` as warning. All 12 calibration cases are now labeled across four families; the injection and
+multi-file variants add no new family. Three labels review host decisions, leaving nine human answers per question. The
+five held-out cases have no human labels. The user confirmed these judgments after AI-assisted discussion; they are not
+independently blinded labels. No model predictions are supplied.
 
 The packet omits authored proposals/rationales, reviewer-only scope notes, reconstruction notes and previous
 adjudications. Case IDs and shared authorship remain visible and can hint at intended behavior; this is not a fully
