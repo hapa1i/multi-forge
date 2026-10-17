@@ -71,6 +71,8 @@ two issues recorded, and the missing-history case adds the consumer wording conc
 packet is complete, quality is accepted or an experiment is approved.
 
 Resolve the precedence rules before a diagnostic capture proposal. Adopting them requires a new diagnostic version,
-regenerated identities and renewed review against the changed wording. Retain the draft-2 ledgers at their current
-revision; do not silently carry their answers into a new packet. The active three-question contract and its prior
-captures remain unchanged.
+regenerated identities and renewed review of changed questions and the overall contract. The explicit carry command can
+retain answers only when their complete question context is unchanged, with source attribution recorded. The proposed
+presence/consumer/sufficiency changes would reopen 60 recorded answers; 32 retention, fact and transformation answers
+are candidates for reuse if no shared evidence changes. Retain the original draft-2 ledger and its compact batch
+history. The active three-question contract and its prior captures remain unchanged.

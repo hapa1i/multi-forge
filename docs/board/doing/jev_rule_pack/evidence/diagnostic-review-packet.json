@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "diagnostic_version": "draft-2",
   "contract": {
     "purpose": "Human review of diagnostic facts and exact transformations; no policy outcomes or runtime admission.",
@@ -276,7 +276,7 @@
           }
         }
       },
-      "case_sha256": "70f4b90a00ad8a5271da70cec1b0389ba73ab8be6fdb20fd1b12992b29465080",
+      "case_sha256": "73d13e1b8cc184ef095d07d75cb1e4e137813af7cdb5fb385aa42608b3449f2c",
       "review": {
         "status": "pending",
         "answers": {
@@ -292,7 +292,21 @@
           "parser.decoder_blank_guard": null
         },
         "notes": ""
-      }
+      },
+      "question_sha256": {
+        "parser.prior_definition": "89e3384e51414bec751a6dda69a06110d9cd87c68bfe76f47c3fe72808d66ed3",
+        "parser.proposed_definition": "3dca1082790a9a859d960bc012d756c6d85905d3689bfd1caf512f3abe4e6a3e",
+        "parser.replacement_definition": "ae09e1529cfa80d6a2f4eee8812e3c4f08b95e667cd3352e9801c93cdb42600b",
+        "parser.retention": "efe3d60bb53abc01fe000ffd152406f13f27c600c1e5b03c43fb0f6f7ea4e7df",
+        "parser.consumer_constraint": "bf832f33a03c0296fa6daeda88672b04e27597c5075f1090119a9fa3b6fcf80f",
+        "parser.replacement_satisfies": "8230429cac9efd32bdf57b855ec17dee161cf86b36921bc5b26ddd626ad57209",
+        "parser.register-replacement": "76fea44900acb059b4c041f1d15fd9cd49710df68b27f42fd02d70070d54b7aa",
+        "parser.move-guard": "64c35763dcbe6abc61d35854e0befce7433a0fa25368eb182980e555287a5175",
+        "parser.inspection_exception": "1ff3102e1aab459025ddf7e90f633e9f1d9c5f5401b93b9d886200171a438344",
+        "parser.decoder_blank_guard": "dc73ee70d7379919a5a751076156fbedda20e52b80f107857fdca748e0f64874"
+      },
+      "answer_sources": {},
+      "review_source": null
     },
     {
       "id": "validation-gratuitous",
@@ -551,7 +565,7 @@
           }
         }
       },
-      "case_sha256": "e4e6898a9cc5ad36f08853d87c86629a9caa8a705eedfb87c0e9018ba49840ed",
+      "case_sha256": "0d9a341afba862ba17c27bdec3575e21801428548284a179b007874c8b63524a",
       "review": {
         "status": "pending",
         "answers": {
@@ -567,7 +581,21 @@
           "parser.decoder_blank_guard": null
         },
         "notes": ""
-      }
+      },
+      "question_sha256": {
+        "parser.prior_definition": "62f49fb4410eef4fe79d3925e6d9262ea541861e23561143076bedf9d73d4560",
+        "parser.proposed_definition": "c095ce9cad7d069bed80d51804976b3f8c0bba84ffc7e61dc7b1633573f0052e",
+        "parser.replacement_definition": "2d2a75f15b5a9f06bc7ef3561f3489a43c22c7f0219ee9279f81b520d51b1219",
+        "parser.retention": "a9533d7d4014a068e03edcd872a4f3c68e1ccef2ee153b94a612c85b26e576d9",
+        "parser.consumer_constraint": "892c7584fc7be74ad271483b447e727a7b1dd98455d03ce21aed771fbfc8d1c9",
+        "parser.replacement_satisfies": "14a99a09393d5d4bef1d429c363bb206c5edda74c57fd4e2811d4b946a2c8043",
+        "parser.register-replacement": "e20e23eabc1ab83cce729e8583a65110718ea0852c8a4eac0ef178217170ccf8",
+        "parser.move-guard": "05e90b94c40bb440250a4d45bde01e0b425fcda05e8370741968b98b877bcc79",
+        "parser.inspection_exception": "5f422b5e560b5368b031bfea028c630309df637e867250e0874a65daced922c4",
+        "parser.decoder_blank_guard": "6d9faf82461f9a8450f1dc8efd84d72875ca9c3da37014420ca2bf9a4a3bcda0"
+      },
+      "answer_sources": {},
+      "review_source": null
     },
     {
       "id": "callback-protocol",
@@ -827,7 +855,7 @@
           }
         }
       },
-      "case_sha256": "13222521018a15be75bb6bffad2afbc898cf381aa48115defb5800306e59f8ef",
+      "case_sha256": "9ded128c88f27b374c2a45b9bb4cf6683f59383ba5e2c781527cf29fd71cc97b",
       "review": {
         "status": "pending",
         "answers": {
@@ -842,7 +870,20 @@
           "callback.published_argument": null
         },
         "notes": ""
-      }
+      },
+      "question_sha256": {
+        "callback.prior_definition": "287b9aae4b205c015b14fccdad8e964f24d768427957896f8e890b50091371cb",
+        "callback.proposed_definition": "583105bfae6b50da540d14382f906d0940dcc356a2379ba3812705e100cd87e2",
+        "callback.replacement_definition": "c00d1c7b389130a0f6b423f53b51f4dc16ffd83b94a9d153d438325c55a9f5ae",
+        "callback.retention": "9dd811cdc1371f390c8b738926a8dad96fd25bbd1d82584d3399c1aac93207c8",
+        "callback.consumer_constraint": "8ddb7a5b1e93784f0e712447dfee5a021cd75aeeaf2f7b6af3b730919bb7eb9a",
+        "callback.replacement_satisfies": "3a61c5b2df95ea7f7fa563594ca646b2ae3f9adcb63a1ab9c3c25edf46fe6e23",
+        "callback.register-replacement": "4d4780b3b3b1a3c91758e1b4742ce1146cd39a4df24d45f5bd20130ed3e6648f",
+        "callback.move-record-adaptation": "1c67248a8ef4593c861a0b9d92c84e0e2617a2e4249622de2dca4d99c3a49251",
+        "callback.published_argument": "5cc3e41733c85c19f6b9b19c402956e97d6bb94a750daf29c5dc721a56eee7ff"
+      },
+      "answer_sources": {},
+      "review_source": null
     },
     {
       "id": "method-argument-adapter",
@@ -1020,7 +1061,7 @@
           }
         }
       },
-      "case_sha256": "3bec04e2c6b56201bdd1b817a1208c5565c37abfb6b9b64080de9cd823862059",
+      "case_sha256": "389f32bb9557c6e85bb95772b4d689f1ec9451d5ab67401bfe7a4ca674317862",
       "review": {
         "status": "pending",
         "answers": {
@@ -1033,7 +1074,18 @@
           "loader.old-call-shape": null
         },
         "notes": ""
-      }
+      },
+      "question_sha256": {
+        "loader.prior_definition": "fe3198d979403defa66ad3eed5cde7a7f00e8931e69261a232bd61d60388c38f",
+        "loader.proposed_definition": "4df66fe89aca3d6cf3f7cacf86ed23ea5783ea02128cf5c733dedb309dfffaae",
+        "loader.replacement_definition": "246ede13d66858880bc76da9fc1e9bc32565924d37fa48dfd266f842156c5d82",
+        "loader.retention": "7f6b5f908957893c80c3f625eb0963c5fff671173b466bb7028e5deb835771bf",
+        "loader.consumer_constraint": "55158d3af418446eae38fb76645b94237936f39b05c9826e3d2ee1a1cf261abb",
+        "loader.replacement_satisfies": "a77f436348f0a026fd59ba5a7f34a471437eb4000973c9aa1fde999031033602",
+        "loader.old-call-shape": "12bd1cefcfdabdf4b31d606502ea256a2ac88c9edb6760d7b94ad87025ecd0ca"
+      },
+      "answer_sources": {},
+      "review_source": null
     },
     {
       "id": "module-forwarding",
@@ -1181,7 +1233,7 @@
           }
         }
       },
-      "case_sha256": "712d5553f44fbd0ef5607ad4f0547f85922b4001b938c2110907eb82e7cc7a0d",
+      "case_sha256": "824250c39d822d36fcfe0133fd1ae5daea055884999a5c45d4c1cbe7b90c1244",
       "review": {
         "status": "pending",
         "answers": {
@@ -1193,7 +1245,17 @@
           "normalizer.replacement_satisfies": null
         },
         "notes": ""
-      }
+      },
+      "question_sha256": {
+        "normalizer.prior_definition": "1028be3d4795a01a495c2b80f31f906d6d192c8be3dd16c7b467a66b46f6d2a5",
+        "normalizer.proposed_definition": "6bc2a9d6c7596bd884287048faca252586020edf2bef7a73e939ce7137237c4c",
+        "normalizer.replacement_definition": "5e3f1d2b3a240dc3ddee5aeb88ab83f00aed17d261bbf3aefff37048ca1a52ef",
+        "normalizer.retention": "f3cfbf2b53bd843f12e1b57f9eb00c73e88aec9d32fddeba6bda0c4f79521553",
+        "normalizer.consumer_constraint": "fba892778de90745f336e31ff55402b3a5f04c98447c365de8af7b56a7c185cb",
+        "normalizer.replacement_satisfies": "1b0c74ea1cb9265d83fe4ea24ff3601e99d8163ecd9ed07ece37bc79b9d8b7e5"
+      },
+      "answer_sources": {},
+      "review_source": null
     },
     {
       "id": "module-direct-update",
@@ -1306,7 +1368,7 @@
           }
         }
       },
-      "case_sha256": "db8dfb2c5cefc778eaad79126fae9343807a925994f94b62f47baae23b7a0b84",
+      "case_sha256": "9599343cc4183a9c9538310a03c4fcafabb07c2d3289371a862ee880ff510d0b",
       "review": {
         "status": "pending",
         "answers": {
@@ -1316,7 +1378,15 @@
           "normalizer.retention": null
         },
         "notes": ""
-      }
+      },
+      "question_sha256": {
+        "normalizer.prior_definition": "228ba7b4afdbb0706de28884d79d95cd5ded719887ade5490b94b86a21657bb3",
+        "normalizer.proposed_definition": "386c618863dc3da84e960fd3ac1eaf5c2a303fb360bb947efe0517d9a4a58bce",
+        "normalizer.replacement_definition": "f332acf902307c72a03dbcfeb9fd2c15333bb8fc727574e868b541999f7aca25",
+        "normalizer.retention": "22ce00c7db13d799b8daf59a6046e5d76b2732f0e5d71ef91018a10c08c20c79"
+      },
+      "answer_sources": {},
+      "review_source": null
     },
     {
       "id": "required-name-alias",
@@ -1539,7 +1609,7 @@
           }
         }
       },
-      "case_sha256": "c136bb9a8c67f6d9c58381f46a5ccc325795cd1f5bae0a4d99bd263efb1a36dd",
+      "case_sha256": "4a7b2c650b2b11fce8988ebcc6c94837daf2b01a49e894f3ceb18571185f01da",
       "review": {
         "status": "pending",
         "answers": {
@@ -1552,7 +1622,18 @@
           "export-entrypoint.remove-export-alias": null
         },
         "notes": ""
-      }
+      },
+      "question_sha256": {
+        "export-entrypoint.prior_definition": "7b0a333876aa54a4eb3f456d4f8fe99c5eecf3fd7d98dcca2ccd38de1797f9ef",
+        "export-entrypoint.proposed_definition": "63ab377aab3a037a1365724dc4c1f685f5b75d99f98b5e7e25b55eec94bdf45e",
+        "export-entrypoint.replacement_definition": "dc4225ee9a8fc5057aac2eaa803feae35aae66bce3a358d5a5b90a435773eb8d",
+        "export-entrypoint.retention": "6499cbfe9571384ec35b71b3eccfd7318be43576b644ac564cafa95cde1fe40a",
+        "export-entrypoint.consumer_constraint": "79b55041ad264ba020873db32b27741eed52ffadd123c99d2e9f87914e2642d9",
+        "export-entrypoint.replacement_satisfies": "ee1a97fce9480542433b594105aef3dfba813a780ec4b2d58041a17c7c4e66c3",
+        "export-entrypoint.remove-export-alias": "0330b7f3781b9871ec6ff247683d6dfc68723d228a68a4d52a2593453d8ac4ea"
+      },
+      "answer_sources": {},
+      "review_source": null
     },
     {
       "id": "mixed-retained-interfaces",
@@ -1933,7 +2014,7 @@
           }
         }
       },
-      "case_sha256": "a412558ff814c33ea437079d58e1f8f066fbc31524bca496fe566b20c1faf471",
+      "case_sha256": "ed4bddf59dd56d3cc8cc8c70ccf5d22b1794dbd6bbecafd222190316221dd637",
       "review": {
         "status": "pending",
         "answers": {
@@ -1954,7 +2035,26 @@
           "callback.published_argument": null
         },
         "notes": ""
-      }
+      },
+      "question_sha256": {
+        "callback.prior_definition": "015136bafd2bc29951603e2cdb8e142057fc5399272829bb581f3301897e6997",
+        "callback.proposed_definition": "36ff511b0b66d17a0fcf9068a0eaeb1d561d7d7942ca6a1bf4be9d8ec57f2783",
+        "callback.replacement_definition": "c8b8efb9bcf7d8f37e0d876a499c4e1440bd83d890514963c162547ca4a991e5",
+        "callback.retention": "ab35576c0f925f0f01a7280386763aa85ceb32c8bd4f4eb684c0fc58dcc642b6",
+        "callback.consumer_constraint": "679e2001a5fe10370cbb9c2fc7aedefeb8b60ecfe7175dd3c5a026e2a3fe7e08",
+        "callback.replacement_satisfies": "138308abb63802d560620bc32bb7885ac83cd5fe3e3314434463be5e00a95342",
+        "normalizer.prior_definition": "ea74b77dde86974dffead53ea5af12eef7a23f899dbc2c3d463413490961d21b",
+        "normalizer.proposed_definition": "01a04f34cdbeca0d067864bb9fc9705d50fc07f35df512ecf388447506f185b0",
+        "normalizer.replacement_definition": "3d1892f175b0143b74b131dcd38159cda59a9bfad0fee4db10b0ce3a6b684e9d",
+        "normalizer.retention": "621445a3c04732356b185d983f4b1b920b8f96bd46ad2626103ee5e93d7cdf2c",
+        "normalizer.consumer_constraint": "17e97246555f1e1f96f3c641faffd397ddd1bc210938915d29b02356cbce78ae",
+        "normalizer.replacement_satisfies": "b098b64b207afdedeef1f742512ded9b38aeb75b92109e9454f7994fb19f96c3",
+        "callback.register-payload-consumer": "9cea9c2d923b750760ca8049a62d99177e28a155f84b12513ba45fc2d5880bf6",
+        "normalizer.remove-normalize-forwarder": "109d5845e87c94d0eda955c0fdcbe55d11eb1793ed4e9134a92ba8a5f8a4a3fd",
+        "callback.published_argument": "97abd17e197e8d9677539128b85d6ec516ee3bf41331c975575933b9e8d2a064"
+      },
+      "answer_sources": {},
+      "review_source": null
     },
     {
       "id": "module-forwarding-without-history",
@@ -2092,7 +2192,7 @@
           }
         }
       },
-      "case_sha256": "96466e11e18bae9d5f2a28c48e7b21904c7dcf5b0f99c94f4128bb269b634cfd",
+      "case_sha256": "cce2737ffa5629b1bbda243a0ee4b1b01766cb8aa3eb9a6a8f4258776ce40ba9",
       "review": {
         "status": "pending",
         "answers": {
@@ -2104,7 +2204,17 @@
           "normalizer.replacement_satisfies": null
         },
         "notes": ""
-      }
+      },
+      "question_sha256": {
+        "normalizer.prior_definition": "d4dc6827ca4920ea05f45c630632490ce122dd6751918501c337548255797657",
+        "normalizer.proposed_definition": "95175d19aa365f95ef5428972330276be8ba8d16026b122883e2f13298226c9d",
+        "normalizer.replacement_definition": "dc15494dec2abd62bd611c02b8aafe2393108744ab9a6b82d636205e2eecfa3b",
+        "normalizer.retention": "b41f8a96b884ebec4d37ef258d881bb95b1fc693175948a2abbd24c0040ae45f",
+        "normalizer.consumer_constraint": "c85a71a611e9133434b5893599e103f189304dad4ec5fbdc26cfca03a97ec4bc",
+        "normalizer.replacement_satisfies": "030853887ea3c5cd8895b56907f61d10019d1651baa87674c63585b95f822df0"
+      },
+      "answer_sources": {},
+      "review_source": null
     },
     {
       "id": "module-forwarding-without-replacement",
@@ -2247,7 +2357,7 @@
           }
         }
       },
-      "case_sha256": "46d67bfb8e405b886fe5e6da908664bbcba05d553c4ff5e1c5b343b4720d33f7",
+      "case_sha256": "d09b3bae34396c7cb9cf236187b23e4bedec0e34742862222eac2cece4b29d7c",
       "review": {
         "status": "pending",
         "answers": {
@@ -2259,7 +2369,17 @@
           "normalizer.replacement_satisfies": null
         },
         "notes": ""
-      }
+      },
+      "question_sha256": {
+        "normalizer.prior_definition": "1c9b4465b16c0e85baa0413c753d67086b0f1e996e1ada499cad88d8ef10179a",
+        "normalizer.proposed_definition": "797cdbdcecb676cc9f18e794acf2caa74614bd752cdee8f5c4f0a62c061f8846",
+        "normalizer.replacement_definition": "2d760737c9f96eb34003717e8e48c79f697db619ea8c460142b9e0bed4f93ad8",
+        "normalizer.retention": "b196b0aaac72f8a1cb2fd548bc7cfc9410440364ec39d381acc2c1fe88807afb",
+        "normalizer.consumer_constraint": "61269324a64736681387a1fdad49649f861b3ff41eb7905ab1eabae0ce745c93",
+        "normalizer.replacement_satisfies": "d1353f60f53dc3d2382fa5656d8902c77b846dd74aaea1915074192dcae78d6d"
+      },
+      "answer_sources": {},
+      "review_source": null
     },
     {
       "id": "module-forwarding-partial-definition",
@@ -2381,7 +2501,7 @@
           }
         }
       },
-      "case_sha256": "40554530f54bfc5a16cb7fb3276cd5d556e3fa8385a883818ed19a05e35e0a37",
+      "case_sha256": "7d607f174681a0b0d7ee701b3d4bfdb925fb1d0bd57514d239ab11a1c8f9ba8d",
       "review": {
         "status": "pending",
         "answers": {
@@ -2393,7 +2513,17 @@
           "normalizer.replacement_satisfies": null
         },
         "notes": ""
-      }
+      },
+      "question_sha256": {
+        "normalizer.prior_definition": "6068b37852d3a20c0c82e2a63e65d5c9c8a888fe09d15de693445420960c9d19",
+        "normalizer.proposed_definition": "c1496ffd07264d8ad1a17915912ee659de7b242a82264659865f0061687cb854",
+        "normalizer.replacement_definition": "382da337c21003f7170c29696fee2b8a86b343448f923ba58fd3d8a6334245ca",
+        "normalizer.retention": "8e5243e5dadb328629b34e258a167168e6203757a4d385a63d79c39cb704705e",
+        "normalizer.consumer_constraint": "8e99ea6f1fb8cf204b05d73a935473b46fede3afd989396e5e8d37dbf47ce2eb",
+        "normalizer.replacement_satisfies": "07ecb8847636ad2fdea117eed4917098a293ab24b71564146731933f7f1b1b39"
+      },
+      "answer_sources": {},
+      "review_source": null
     },
     {
       "id": "callback-protocol-injection",
@@ -2653,7 +2783,7 @@
           }
         }
       },
-      "case_sha256": "0443957120d1237cb2f949e9403db3b5122c36d6c83f24b61cab6e50bace1d3c",
+      "case_sha256": "9626030b1e98793e5b3576b3e81a97134636703129f13790db9781519cf54766",
       "review": {
         "status": "pending",
         "answers": {
@@ -2668,14 +2798,29 @@
           "callback.published_argument": null
         },
         "notes": ""
-      }
+      },
+      "question_sha256": {
+        "callback.prior_definition": "72892b0b30869f3c8c50b5238d885635c5f40078a117dc6cbef9308af45bcdff",
+        "callback.proposed_definition": "884b57ea7632cd385dc5bb0c5aea75117e87ccc5cad3a5f37da8f6aa17e41114",
+        "callback.replacement_definition": "61163a34c8b9d217baec967f7bff630418fc4b29e296786518e11cb64cd10758",
+        "callback.retention": "de01f9ddd01ac3da766b722a492d3a41f2ce891eb813792ab133636e24974fc1",
+        "callback.consumer_constraint": "8ac4f90db11d70249055388d0e316c38af365e82554a30ea638f50f892768e69",
+        "callback.replacement_satisfies": "34e96360b1cd5b0e895a74a24f7ff7a9f507df2f47a15a0955f91b4341895cf9",
+        "callback.register-replacement": "97cf048949e3233985f7848b648fc2c2e28b455c8624af27f8f5bab7b167fe77",
+        "callback.move-record-adaptation": "7284c0b8e07bbcb9291199f48c8d6bcaf86d9767cbc6cf3776c030d62cac23dc",
+        "callback.published_argument": "e98c24fe5b1c848d27b984c44a669deb9fdbb5597086d4dc42ce650f78365c55"
+      },
+      "answer_sources": {},
+      "review_source": null
     }
   ],
-  "packet_sha256": "14291ac7a21f5009c716f827aebb9fec5a6eb0629925933c794c3643f17055c9",
+  "packet_sha256": "0fea8c6b52a125578253b362a2097eb890c5ab99fc025d3db55809ec2f07adf2",
   "reviewer": null,
   "review_reference": null,
   "contract_review": {
     "status": "pending",
     "notes": ""
-  }
+  },
+  "review_sources": {},
+  "contract_review_source": null
 }

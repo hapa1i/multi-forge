@@ -12,12 +12,14 @@ Case names, shared authorship and prior discussion can reveal intended contrasts
 review.
 
 The [latest partial ledger](diagnostic-review-2026-10-17-batch-6.json) records 92 answers across all 12 reviewed cases
-and preserves the [previous ledger](diagnostic-review-2026-10-17-batch-5.json). Three answers remain null: the
-missing-history control's consumer constraint and replacement sufficiency, and the missing-replacement control's
-replacement sufficiency. The fragment review explicitly selects `not_supplied` but flags overlapping criteria for two
-presence answers. The contract is `reviewed` with unresolved
+and preserves every earlier answer and note. The [compact history](diagnostic-review-history.json), together with that
+unchanged ledger, reconstructs all six original batches byte-for-byte without relying on branch history. Three answers
+remain null: the missing-history control's consumer constraint and replacement sufficiency, and the missing-replacement
+control's replacement sufficiency. The fragment review explicitly selects `not_supplied` but flags overlapping criteria
+for two presence answers. The contract is `reviewed` with unresolved
 [option-precedence concerns](diagnostic-option-precedence.md); this is not a completed or accepted-quality packet. The
-blank packet and worksheets remain unchanged for further review.
+question wording and supplied evidence remain unchanged. The current template uses separate semantic identities; the
+original reviewed ledger retains its original hashes and validates without being rewritten.
 
 ## Start with the validation pair
 
@@ -86,14 +88,14 @@ would not establish automatic target selection, representative-action coverage o
 ## Record answers
 
 Copy the JSON template to a new ledger alongside it. Set `reviewer` to the human who makes the judgments and
-`review_reference` to that ledger's relative path, such as `diagnostic-review-2026-10-17.json`. These fields record
+`review_reference` to that ledger's relative path, such as `diagnostic-review-next.json`. These fields record
 attribution; the validator cannot authenticate the reviewer or determine whether an answer came from a human.
 
-Edit only top-level `reviewer`, `review_reference`, `contract_review`, and each case's `review` object. Set a case
-status to `reviewed`, fill the settled entries in `answers`, and explain evidence or unresolved answers in `notes`.
-Partial answers may remain null. Leave untouched cases `pending` with null answers. Mark a problem `disputed`, with
-explanatory notes and null answers, so it remains visible. Retain every case; no import into the active corpus is
-implemented.
+For a fresh packet, edit only top-level `reviewer`, `review_reference`, `contract_review`, and each case's `review`
+object. Set a case status to `reviewed`, fill the settled entries in `answers`, and explain evidence or unresolved
+answers in `notes`. Partial answers may remain null. Leave untouched cases `pending` with null answers. Mark a problem
+`disputed`, with explanatory notes and null answers, so it remains visible. Retain every case; no import into the active
+corpus is implemented.
 
 You can instead return answers in conversation, naming the case ID and hash, question IDs, option keys and notes. An
 assistant may transcribe explicit human decisions into a new ledger; it must not supply its own answers under the
@@ -114,6 +116,14 @@ uv run python scripts/experiments/jev/rule-pack-diagnostic.py --case validation-
   > /tmp/jev-diagnostic-validation.md
 ```
 
+Repository worksheets use the pinned Markdown formatter and plugins in `.pre-commit-config.yaml`. When regenerating a
+tracked worksheet, format it with the configured hook before comparing bytes:
+
+```bash
+uv run pre-commit run mdformat --files \
+  docs/board/doing/jev_rule_pack/evidence/diagnostic-review/validation-boundary.md
+```
+
 Validate a retained partial ledger:
 
 ```bash
@@ -121,9 +131,32 @@ uv run python scripts/experiments/jev/rule-pack-diagnostic.py \
   --validate-review /tmp/jev-diagnostic-completed.json
 ```
 
-Validation compares exact evidence, annotations, criteria, transformations and membership with a newly generated packet,
-then reports case status, fully answered cases, answered/unanswered questions and contract status. A case marked
-`reviewed` may still have unresolved questions; that status does not mean all its answers are complete. Changing
-immutable material requires regeneration and new review; old labels are not migrated. `quality_accepted` remains false
-even for a completed ledger. The script has no provider, capture, scoring or active-corpus import command. Human review
-precedes any separate paid-run proposal.
+Validation checks the ledger's own identities and compares diagnostic evidence, annotations, criteria, transformations
+and membership with the current packet. Active-rule references and source-case hashes are provenance, so an unrelated
+active prompt change does not invalidate diagnostic answers. A case marked `reviewed` may still have unresolved
+questions.
+
+When diagnostic wording or evidence changes, explicitly prepare a new partial ledger:
+
+```bash
+uv run python scripts/experiments/jev/rule-pack-diagnostic.py \
+  --carry-review docs/board/doing/jev_rule_pack/evidence/diagnostic-review-2026-10-17-batch-6.json \
+  > /tmp/jev-diagnostic-carried.json
+```
+
+Only answers with unchanged question context carry forward. That context binds supplied action and scope facts, the
+instruction guard, targets/selectors, transformations/observations, and the question's instructions and criteria.
+Changed answers return to null; changed overall semantics or routing also reopens contract review. Source attribution
+and notes remain available in the carry receipt, which records reuse rather than a new human judgment. Preserve the
+source ledger. Review the emitted packet before recording new judgments and set its `review_reference` to the new
+ledger's relative path.
+
+Partially reused cases have status `carried`; their original notes live in the referenced receipt. After a human reviews
+the revised case, set status `reviewed`, record that person's notes and attribution, and clear `review_source` for that
+case. If the human corrects a previously carried answer, also remove its `answer_sources` entry; keep bindings for
+unchanged inherited answers. A new overall contract review clears `contract_review_source`. Remove a receipt from
+`review_sources` only when no answer, case or contract still references it. These explicit changes distinguish new human
+judgments from reused ones; they do not authorize changing question evidence or criteria.
+
+`quality_accepted` remains false even for a completed ledger. The script has no provider, capture, scoring or
+active-corpus import command. Human review precedes any separate paid-run proposal.

@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "purpose": "Compact provenance for cumulative human diagnostic reviews. This is a lossless consolidation, not a new review or approval.",
+  "final_ledger": {
+    "filename": "diagnostic-review-2026-10-17-batch-6.json",
+    "file_sha256": "94831b64bce114f44ecb39ed06cc3d6e314704ef79e2155cf23a0d6f2e5fcbfd",
+    "bytes": 206863
+  },
+  "packet_sha256": "14291ac7a21f5009c716f827aebb9fec5a6eb0629925933c794c3643f17055c9",
+  "diagnostic_version": "draft-2",
+  "reviewer": "hapa1i",
+  "question_count": 95,
+  "object_sha256_format": {
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "sort_keys": true,
+    "separators": [
+      ",",
+      ":"
+    ],
+    "allow_nan": false
+  },
+  "reconstruction": {
+    "verified": "Every original batch was reconstructed byte-for-byte and checked against its file_sha256 before consolidation.",
+    "requires": "The unchanged final_ledger file identified above, not branch history or a newly generated packet.",
+    "steps": [
+      "Copy the final ledger, preserving JSON object insertion order. Reset every case review to status=pending, all existing answer keys=null, and notes=\"\". Reset contract_review to status=pending and notes=\"\".",
+      "Process batches in order. Set review_reference from the batch. For each newly_reviewed_cases entry, copy the exact review object from the matching final-ledger case. Previously copied reviews remain unchanged.",
+      "When a batch includes contract_review_from_final, copy final_ledger.contract_review. Otherwise retain the preceding contract review.",
+      "After each batch, serialize the current object using the serialization settings below and check its original file_sha256. The original filename is metadata and need not be restored on disk."
+    ],
+    "serialization": {
+      "encoding": "UTF-8",
+      "ensure_ascii": false,
+      "indent": 2,
+      "sort_keys": false,
+      "trailing_newline": true
+    }
+  },
+  "batches": [
+    {
+      "batch": 1,
+      "original_filename": "diagnostic-review-2026-10-17.json",
+      "file_sha256": "46275cf46f8a48e7b3a3b187ff1bbc013bed9465667d6a2d6bc011cf75e673e5",
+      "bytes": 197188,
+      "recorded_in_commit": "d717e4387e003f45720a2fa4da637c49f0103338",
+      "review_reference": "diagnostic-review-2026-10-17.json",
+      "answered_questions": 20,
+      "reviewed_cases": 2,
+      "contract_status": "pending",
+      "newly_reviewed_cases": [
+        {
+          "id": "validation-boundary",
+          "case_sha256": "70f4b90a00ad8a5271da70cec1b0389ba73ab8be6fdb20fd1b12992b29465080",
+          "review_sha256": "7a31e18b86b307c4f75e7da420d13c01e630fb71698b047bd10812c06c456774",
+          "answered_questions": 10
+        },
+        {
+          "id": "validation-gratuitous",
+          "case_sha256": "e4e6898a9cc5ad36f08853d87c86629a9caa8a705eedfb87c0e9018ba49840ed",
+          "review_sha256": "7295ca38e81bb769fce8724e243ccdfb130aaabff2123a937af9c1c16e27c263",
+          "answered_questions": 10
+        }
+      ]
+    },
+    {
+      "batch": 2,
+      "original_filename": "diagnostic-review-2026-10-17-batch-2.json",
+      "file_sha256": "1b6bcabf9d21b4be77ce6df78bedf5729aed0a197d58761557601216b2725050",
+      "bytes": 201388,
+      "recorded_in_commit": "4eb1ddc5d08962565235a0be8dd5db12b3368db8",
+      "review_reference": "diagnostic-review-2026-10-17-batch-2.json",
+      "answered_questions": 36,
+      "reviewed_cases": 4,
+      "contract_status": "pending",
+      "newly_reviewed_cases": [
+        {
+          "id": "callback-protocol",
+          "case_sha256": "13222521018a15be75bb6bffad2afbc898cf381aa48115defb5800306e59f8ef",
+          "review_sha256": "328191d35d78fec0ffe4e1a7a73d9888b737ddf0d1e8f423904d56f454bef014",
+          "answered_questions": 9
+        },
+        {
+          "id": "method-argument-adapter",
+          "case_sha256": "3bec04e2c6b56201bdd1b817a1208c5565c37abfb6b9b64080de9cd823862059",
+          "review_sha256": "2242bd697ee0b3e5263776fc39d0123d6b23bac36ef75aee9223f2d76222c136",
+          "answered_questions": 7
+        }
+      ]
+    },
+    {
+      "batch": 3,
+      "original_filename": "diagnostic-review-2026-10-17-batch-3.json",
+      "file_sha256": "37f8e2f9e087d7d03ec5b81c6b62135f4c832eb74324edd3580a31474fcde1bd",
+      "bytes": 202249,
+      "recorded_in_commit": "1797973468e18f6d3104c4382f6ebb3c14197115",
+      "review_reference": "diagnostic-review-2026-10-17-batch-3.json",
+      "answered_questions": 46,
+      "reviewed_cases": 6,
+      "contract_status": "pending",
+      "newly_reviewed_cases": [
+        {
+          "id": "module-forwarding",
+          "case_sha256": "712d5553f44fbd0ef5607ad4f0547f85922b4001b938c2110907eb82e7cc7a0d",
+          "review_sha256": "6607dba8d890b69c6c4bbdbcd255607a03623fb8b30696c9024aba33fd2b6d8b",
+          "answered_questions": 6
+        },
+        {
+          "id": "module-direct-update",
+          "case_sha256": "db8dfb2c5cefc778eaad79126fae9343807a925994f94b62f47baae23b7a0b84",
+          "review_sha256": "868b45583fed121204571c2b58b5f276dfa3141470cc5ad69c51ec805c5cd86b",
+          "answered_questions": 4
+        }
+      ]
+    },
+    {
+      "batch": 4,
+      "original_filename": "diagnostic-review-2026-10-17-batch-4.json",
+      "file_sha256": "888cfe2378cc74fbd32944622a891047ee7eff8b2982a75249067c6719efa6c6",
+      "bytes": 203442,
+      "recorded_in_commit": "ae66e6e8c228d5439f64ffad7a7fb8016549bdf4",
+      "review_reference": "diagnostic-review-2026-10-17-batch-4.json",
+      "answered_questions": 68,
+      "reviewed_cases": 8,
+      "contract_status": "pending",
+      "newly_reviewed_cases": [
+        {
+          "id": "required-name-alias",
+          "case_sha256": "c136bb9a8c67f6d9c58381f46a5ccc325795cd1f5bae0a4d99bd263efb1a36dd",
+          "review_sha256": "061df57384728b846617f5b87ac0ba08f90db28fe778c1a6191ee87dc3602137",
+          "answered_questions": 7
+        },
+        {
+          "id": "mixed-retained-interfaces",
+          "case_sha256": "a412558ff814c33ea437079d58e1f8f066fbc31524bca496fe566b20c1faf471",
+          "review_sha256": "4a805af87dd303f0caa566ee5eff77d709635efd6e7b9cff3c078effa256d01c",
+          "answered_questions": 15
+        }
+      ]
+    },
+    {
+      "batch": 5,
+      "original_filename": "diagnostic-review-2026-10-17-batch-5.json",
+      "file_sha256": "5f677d1c6dee456d2e63093997b4e0dd36e2fa5ee6fc50cdfb52ea71bc939fdf",
+      "bytes": 205550,
+      "recorded_in_commit": "03376e2d2d947a3b23b27f066916ed77b0240a13",
+      "review_reference": "diagnostic-review-2026-10-17-batch-5.json",
+      "answered_questions": 83,
+      "reviewed_cases": 10,
+      "contract_status": "reviewed",
+      "newly_reviewed_cases": [
+        {
+          "id": "module-forwarding-partial-definition",
+          "case_sha256": "40554530f54bfc5a16cb7fb3276cd5d556e3fa8385a883818ed19a05e35e0a37",
+          "review_sha256": "6452f61c7093a0d148e0287d6a1c77a7805dd83f63bf302d34b6f9ebe0b3d201",
+          "answered_questions": 6
+        },
+        {
+          "id": "callback-protocol-injection",
+          "case_sha256": "0443957120d1237cb2f949e9403db3b5122c36d6c83f24b61cab6e50bace1d3c",
+          "review_sha256": "6a9342ead933e33baa2d8204ad2f994cf4495729fb3a9f4fcaeb0d276e998ebf",
+          "answered_questions": 9
+        }
+      ],
+      "contract_review_from_final": {
+        "review_sha256": "f9a2b9f4520edee1aa63be5342bb5593f7eb908339886480e4496b30c44de490"
+      }
+    },
+    {
+      "batch": 6,
+      "original_filename": "diagnostic-review-2026-10-17-batch-6.json",
+      "file_sha256": "94831b64bce114f44ecb39ed06cc3d6e314704ef79e2155cf23a0d6f2e5fcbfd",
+      "bytes": 206863,
+      "recorded_in_commit": "03376e2d2d947a3b23b27f066916ed77b0240a13",
+      "review_reference": "diagnostic-review-2026-10-17-batch-6.json",
+      "answered_questions": 92,
+      "reviewed_cases": 12,
+      "contract_status": "reviewed",
+      "newly_reviewed_cases": [
+        {
+          "id": "module-forwarding-without-history",
+          "case_sha256": "96466e11e18bae9d5f2a28c48e7b21904c7dcf5b0f99c94f4128bb269b634cfd",
+          "review_sha256": "9a077d306d20da1b14f15de1bd17725eefca2fca95de5699df64bd7ddb7925b9",
+          "answered_questions": 4
+        },
+        {
+          "id": "module-forwarding-without-replacement",
+          "case_sha256": "46d67bfb8e405b886fe5e6da908664bbcba05d553c4ff5e1c5b343b4720d33f7",
+          "review_sha256": "3906ad08a40a3f3e7ba67ae95be9d98b6062acd0ba40842a95f7abb48a450bfc",
+          "answered_questions": 5
+        }
+      ]
+    }
+  ]
+}

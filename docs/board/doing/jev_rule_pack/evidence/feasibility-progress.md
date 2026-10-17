@@ -99,8 +99,9 @@ unresolved [option-precedence concerns](diagnostic-option-precedence.md). The la
 the consumer question's reference to continued use of an old interface as an unclear history prerequisite. The
 fragment's explicit `not_supplied` choices are recorded with its caveat: prior/proposed presence also fits the current
 `ambiguous` wording. Those two answers are not uniquely determined by the current criteria. The proposed clarification
-changes no packet or label; adoption would require a new diagnostic version and renewed review. The blank packet, active
-rule labels and paid-call boundary are unchanged, and quality remains unaccepted.
+changes no question or label; adoption would require a new diagnostic version and renewed review of changed questions
+and the contract. Supplied evidence, active-rule labels and the paid-call boundary are unchanged, and quality remains
+unaccepted. The review-identity tooling update below preserves the original ledger while separating its provenance.
 
 The earlier direct-update coverage score of 0.47 does not establish why the model failed. Coverage already explicitly
 allowed a complete clean break, and the provider supplied no rationale. Confusion between an absent proposed symbol and
@@ -125,3 +126,17 @@ answers. Executable transformation results remain test evidence, separate from h
 
 The draft-2 clarification passed 406 focused tests, including eight regressions for exact registration substitutions,
 fixed consumer behavior, required-alias and target isolation, stale-packet rejection, and pending review labels.
+
+The PR review follow-up passed 453 focused tests. Diagnostic answer identity now excludes unrelated active-rule
+provenance, and explicit carry-forward retains only unchanged question contexts with source receipts. The original
+92-answer ledger remains byte-identical and validates directly; three answers remain null. Schema-2 template identities
+were regenerated without changing any of the 95 questions or 12 actions/annotation sets. The
+[compact history](diagnostic-review-history.json) reconstructs every original batch byte-for-byte from the final ledger,
+replacing five full snapshots and saving 1,001,324 bytes net.
+
+Capture proposals now retain identity across implementation-only edits. A dispatch recorded in retained A2 journals
+prevents accidental replay before credential access; deliberate repeats need a separately reviewed new proposal ID. New
+journals also record checkout dirtiness. The guard covers retained journals, not unretained/deleted evidence or
+concurrent launches, and cannot grant spending authority. Historical captures and approved manifests remain unchanged.
+No additional paid call or native acquisition ran. The next study still needs a bounded stopping rule, a separately
+approved model comparison and a revised availability-first acquisition scope with source-exclusion counts.

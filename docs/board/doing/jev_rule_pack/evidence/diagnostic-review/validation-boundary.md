@@ -2,9 +2,9 @@
 
 [Review instructions](../diagnostic-human-review.md)
 
-Packet SHA-256: `14291ac7a21f5009c716f827aebb9fec5a6eb0629925933c794c3643f17055c9`
+Packet SHA-256: `0fea8c6b52a125578253b362a2097eb890c5ab99fc025d3db55809ec2f07adf2`
 
-Case SHA-256: `70f4b90a00ad8a5271da70cec1b0389ba73ab8be6fdb20fd1b12992b29465080`
+Case SHA-256: `73d13e1b8cc184ef095d07d75cb1e4e137813af7cdb5fb385aa42608b3449f2c`
 
 Derived families: validation-adaptation. All answers are pending. Target annotations await human review.
 

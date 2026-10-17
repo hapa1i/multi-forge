@@ -248,18 +248,16 @@ clarification did not resolve the blocker: boundary scores remain 0.15/0.28, and
 0.48/0.47. All three human no-warning cases remain unrecoverable under allowed settings. Both nine-request allowances
 are consumed; keep settings unset and review decomposition or model/rule fit before further paid work.
 
-The [offline diagnostic proposal](evidence/decomposition-diagnostic-proposal.md) separates code-fact extraction,
-constrained contract comparisons and coverage. It requires attributed targets and new human review before a separately
-versioned experiment; it changes no active rule or label and does not satisfy the feasibility gate.
+The [offline diagnostic proposal](evidence/decomposition-diagnostic-proposal.md) tests fact extraction and constrained
+contract comparisons using attributed targets. It needs reviewed questions and separate experiment approval; feasibility
+remains open.
 
-The [diagnostic human-review packet](evidence/diagnostic-human-review.md) contains 12 synthetic cases and 95 questions.
-The [latest partial ledger](evidence/diagnostic-review-2026-10-17-batch-6.json) records 92 human answers across all 12
-reviewed cases. Three answers remain null in the missing-history and missing-replacement controls. Contract review
-supports the decomposition and no-retention routing while flagging unresolved
-[option-precedence concerns](evidence/diagnostic-option-precedence.md), including overlap affecting two recorded
-fragment answers and unclear history requirements in the consumer question. Resolve these before a capture proposal; a
-wording revision needs new identities and renewed review. The separate offline validator preserves partial answers and
-rejects stale evidence; no active labels, thresholds or paid manifest change.
+The [diagnostic packet](evidence/diagnostic-human-review.md) has 95 questions across 12 synthetic cases, all reviewed in
+the [latest ledger](evidence/diagnostic-review-2026-10-17-batch-6.json): 92 answers and three nulls in the
+missing-history/replacement controls. The reviewer supports decomposition and no-retention routing while flagging
+[precedence concerns](evidence/diagnostic-option-precedence.md), including two fragment answers and consumer history
+requirements. Resolve these before capture. Wording changes need renewed question and contract review; explicit carry
+preserves only unchanged contexts and source attribution. Active labels, thresholds and paid manifests remain unchanged.
 
 ## Slice 3: complete action evidence and bounded dispatch
 

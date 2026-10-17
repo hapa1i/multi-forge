@@ -393,6 +393,11 @@ def test_cli_exports_validates_and_renders_without_credentials_network_or_source
     monkeypatch.setattr(sys, "argv", ["diagnostic", "--validate-review", str(review_path)])
     diagnostic.main()
     assert capsys.readouterr().err == ""
+    monkeypatch.setattr(sys, "argv", ["diagnostic", "--carry-review", str(review_path)])
+    diagnostic.main()
+    carried = capsys.readouterr()
+    assert json.loads(carried.out)["schema_version"] == 2
+    assert carried.err == ""
     monkeypatch.setattr(sys, "argv", ["diagnostic", "--case", "validation-boundary"])
     diagnostic.main()
     rendered = capsys.readouterr()

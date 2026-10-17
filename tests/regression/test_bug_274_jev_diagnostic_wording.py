@@ -135,10 +135,7 @@ def test_old_wording_identity_is_rejected_even_with_consistent_hashes(diagnostic
                     row["question"]["criteria"][
                         "not_supplied"
                     ] = "No definition or adequate explicit interface contract for the named symbol is supplied."
-            case["case_sha256"] = diagnostic.digest(
-                {key: value for key, value in case.items() if key not in {"case_sha256", "review"}}
-            )
-    stale["packet_sha256"] = diagnostic.digest(diagnostic.immutable(stale))
+    diagnostic.reviews.stamp_packet(stale)
     assert stale["packet_sha256"] != packet["packet_sha256"]
     with pytest.raises(ValueError, match="regenerate and review again"):
         diagnostic.validate_review(stale)

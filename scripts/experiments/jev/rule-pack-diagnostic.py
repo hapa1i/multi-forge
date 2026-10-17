@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import argparse
-import copy
 import hashlib
 import importlib.util
 import json
 import sys
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any
 
 from forge.core.judgments.types import ChoiceQuestion
@@ -69,6 +68,13 @@ def load_evaluator() -> Any:
 
 
 evaluator = load_evaluator()
+review_spec = importlib.util.spec_from_file_location(
+    "jev_diagnostic_review", Path(__file__).with_name("diagnostic_review.py")
+)
+assert review_spec and review_spec.loader
+reviews = importlib.util.module_from_spec(review_spec)
+sys.modules[review_spec.name] = reviews
+review_spec.loader.exec_module(reviews)
 
 
 def digest(value: Any) -> str:
@@ -87,7 +93,10 @@ def target(target_id: str, prior: str, replacement: str, selectors: list[str]) -
 
 
 def transform(
-    name: str, target_id: str, replacements: list[tuple[str, str]], observations: list[str]
+    name: str,
+    target_id: str,
+    replacements: list[tuple[str, str]],
+    observations: list[str],
 ) -> dict[str, Any]:
     return {
         "id": name,
@@ -98,11 +107,18 @@ def transform(
     }
 
 
-def original_annotations(case_id: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def original_annotations(
+    case_id: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Specify lookup targets and fixed transformations, never expected answers."""
     if case_id.startswith("validation-"):
         targets = [
-            target("parser", "parse_document", "decode_json", ["InputCommand.run", "make_command", "inspect_document"])
+            target(
+                "parser",
+                "parse_document",
+                "decode_json",
+                ["InputCommand.run", "make_command", "inspect_document"],
+            )
         ]
         transforms = [
             transform(
@@ -117,7 +133,12 @@ def original_annotations(case_id: str) -> tuple[list[dict[str, Any]], list[dict[
         if case_id == "validation-boundary":
             replacements.append(("def decode_json(raw):\n", "def decode_json(raw):\n" + guard))
         transforms.append(
-            transform("move-guard", "parser", replacements, ["test_command_contract()", "test_inspection_contract()"])
+            transform(
+                "move-guard",
+                "parser",
+                replacements,
+                ["test_command_contract()", "test_inspection_contract()"],
+            )
         )
         return targets, transforms
     if case_id == "callback-protocol":
@@ -140,7 +161,10 @@ def original_annotations(case_id: str) -> tuple[list[dict[str, Any]], list[dict[
                 "move-record-adaptation",
                 "callback",
                 [
-                    ("received.append(payload.strip())", "received.append(payload.payload.strip())"),
+                    (
+                        "received.append(payload.strip())",
+                        "received.append(payload.payload.strip())",
+                    ),
                     ("consume_payload(record.payload)", "consume_payload(record)"),
                 ],
                 [
@@ -171,7 +195,12 @@ def original_annotations(case_id: str) -> tuple[list[dict[str, Any]], list[dict[
 
 
 def add_question(
-    result: dict[str, Any], target_id: str, name: str, prompt: str, criteria: dict[str, str], **binding: Any
+    result: dict[str, Any],
+    target_id: str,
+    name: str,
+    prompt: str,
+    criteria: dict[str, str],
+    **binding: Any,
 ) -> None:
     key = f"{target_id}.{name}"
     if key in result:
@@ -186,7 +215,11 @@ def add_question(
 def questions_for(case: dict[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for item in case["targets"]:
-        tid, prior, replacement = item["id"], item["prior_symbol"], item["replacement_symbol"]
+        tid, prior, replacement = (
+            item["id"],
+            item["prior_symbol"],
+            item["replacement_symbol"],
+        )
         for name, image, symbol in (
             ("prior_definition", "old_string", prior),
             ("proposed_definition", "new_string", prior),
@@ -443,7 +476,11 @@ def build_packet() -> dict[str, Any]:
             change["result_sha256"] = digest(apply_transform(case, change))
         case["questions"] = questions_for(case)
         case["case_sha256"] = digest(case)
-        case["review"] = {"status": "pending", "answers": {key: None for key in case["questions"]}, "notes": ""}
+        case["review"] = {
+            "status": "pending",
+            "answers": {key: None for key in case["questions"]},
+            "notes": "",
+        }
     packet = {
         "schema_version": 1,
         "diagnostic_version": DIAGNOSTIC_VERSION,
@@ -468,97 +505,27 @@ def build_packet() -> dict[str, Any]:
     packet["reviewer"] = None
     packet["review_reference"] = None
     packet["contract_review"] = {"status": "pending", "notes": ""}
+    reviews.stamp_packet(packet)
     return packet
 
 
 def immutable(packet: dict[str, Any]) -> dict[str, Any]:
-    value = copy.deepcopy(packet)
-    for key in ("reviewer", "review_reference", "packet_sha256", "contract_review"):
-        value.pop(key, None)
-    for case in value["cases"]:
-        case.pop("review", None)
-    return value
+    return reviews.semantic_packet(packet)
+
+
+def carry_review(packet: dict[str, Any]) -> dict[str, Any]:
+    """Explicitly migrate a saved review onto today's diagnostic questions."""
+    return reviews.carry_review(packet, build_packet())
 
 
 def validate_review(packet: dict[str, Any]) -> dict[str, Any]:
-    """Check a retained partial ledger without importing labels into the active corpus."""
-    evaluator._canonical_bytes(packet)
-    expected = build_packet()
-    if (
-        not isinstance(packet, dict)
-        or not isinstance(packet.get("cases"), list)
-        or not all(isinstance(case, dict) for case in packet["cases"])
-    ):
-        raise ValueError("A diagnostic review must contain an object and a list of case objects")
-    if set(packet) != set(expected) or digest(immutable(packet)) != expected["packet_sha256"]:
-        raise ValueError("Diagnostic evidence, questions, targets or membership changed; regenerate and review again")
-    if packet["packet_sha256"] != expected["packet_sha256"]:
-        raise ValueError("Stale diagnostic packet hash")
-    contract_review = packet["contract_review"]
-    if (
-        not isinstance(contract_review, dict)
-        or set(contract_review) != {"status", "notes"}
-        or not isinstance(contract_review["status"], str)
-        or contract_review["status"] not in {"pending", "reviewed", "disputed"}
-        or not isinstance(contract_review["notes"], str)
-        or len(contract_review["notes"]) > 4000
-        or (contract_review["status"] != "pending" and not contract_review["notes"].strip())
-    ):
-        raise ValueError("Invalid contract_review; a reviewed or disputed contract requires notes")
-    reviewed = 0
-    disputed = 0
-    answered_questions = 0
-    fully_answered_cases = 0
-    total_questions = sum(len(case["questions"]) for case in expected["cases"])
-    for case, template in zip(packet["cases"], expected["cases"], strict=True):
-        if set(case) != set(template):
-            raise ValueError(f"Unexpected case fields: {case['id']}")
-        review = case["review"]
-        if (
-            not isinstance(review, dict)
-            or set(review) != {"status", "answers", "notes"}
-            or not isinstance(review["answers"], dict)
-            or set(review["answers"]) != set(template["questions"])
-        ):
-            raise ValueError(f"Invalid review fields: {case['id']}")
-        if not isinstance(review["status"], str) or review["status"] not in {"pending", "reviewed", "disputed"}:
-            raise ValueError(f"Invalid review status: {case['id']}")
-        if not isinstance(review["notes"], str) or len(review["notes"]) > 4000:
-            raise ValueError(f"Invalid review notes: {case['id']}")
-        for key, answer in review["answers"].items():
-            if answer is not None and (
-                not isinstance(answer, str) or answer not in template["questions"][key]["question"]["criteria"]
-            ):
-                raise ValueError(f"Invalid answer: {case['id']}/{key}")
-            if review["status"] != "reviewed" and answer is not None:
-                raise ValueError(f"Unreviewed case cannot carry answers: {case['id']}")
-        if review["status"] != "pending" and not review["notes"].strip():
-            raise ValueError(f"Reviewed/disputed cases require notes: {case['id']}")
-        reviewed += review["status"] == "reviewed"
-        disputed += review["status"] == "disputed"
-        answered = sum(answer is not None for answer in review["answers"].values())
-        answered_questions += answered
-        fully_answered_cases += answered == len(review["answers"])
-    for key in ("reviewer", "review_reference"):
-        value = packet[key]
-        if value is not None and (not isinstance(value, str) or not value.strip() or len(value) > 256):
-            raise ValueError(f"Invalid {key}")
-        if (reviewed or disputed or contract_review["status"] != "pending") and value is None:
-            raise ValueError("A reviewed ledger requires a human reviewer and review_reference")
-    reference = packet["review_reference"]
-    if reference and (PurePosixPath(reference).is_absolute() or ".." in PurePosixPath(reference).parts):
-        raise ValueError("review_reference must stay relative to the evidence directory")
-    return {
-        "packet_sha256": expected["packet_sha256"],
-        "contract_status": contract_review["status"],
-        "reviewed_cases": reviewed,
-        "fully_answered_cases": fully_answered_cases,
-        "answered_questions": answered_questions,
-        "unanswered_questions": total_questions - answered_questions,
-        "disputed_cases": disputed,
-        "pending_cases": len(expected["cases"]) - reviewed - disputed,
-        "quality_accepted": False,
-    }
+    """Validate current semantics without requiring current active-rule provenance."""
+    result = reviews.validate_packet(packet)
+    if reviews.semantic_packet(packet) != reviews.semantic_packet(build_packet()):
+        raise ValueError(
+            "Diagnostic semantics changed; regenerate and review again or explicitly carry unchanged answers"
+        )
+    return result
 
 
 def render_case(packet: dict[str, Any], case: dict[str, Any]) -> str:
@@ -592,13 +559,26 @@ def render_case(packet: dict[str, Any], case: dict[str, Any]) -> str:
         "",
     ]
     for name in ("old_string", "new_string"):
-        lines.extend([f"### {name}", "", "```python", case["action"]["tool_input"][name].rstrip(), "```", ""])
+        lines.extend(
+            [
+                f"### {name}",
+                "",
+                "```python",
+                case["action"]["tool_input"][name].rstrip(),
+                "```",
+                "",
+            ]
+        )
     lines.extend(
         [
             "## Targets and exact transformations",
             "",
             "```json",
-            json.dumps({"targets": case["targets"], "transforms": case["transforms"]}, indent=2, ensure_ascii=False),
+            json.dumps(
+                {"targets": case["targets"], "transforms": case["transforms"]},
+                indent=2,
+                ensure_ascii=False,
+            ),
             "```",
             "",
             "## Questions",
@@ -614,7 +594,16 @@ def render_case(packet: dict[str, Any], case: dict[str, Any]) -> str:
         lines.extend([f"### {key}", "", question["instructions"].removeprefix(GUARD), ""])
         lines.extend(f"- `{option}`: {criteria}" for option, criteria in question["criteria"].items())
         lines.extend(["", "Human answer: `null` (pending).", ""])
-    lines.extend(["## Review fields", "", "```json", json.dumps(case["review"], indent=2), "```", ""])
+    lines.extend(
+        [
+            "## Review fields",
+            "",
+            "```json",
+            json.dumps(case["review"], indent=2),
+            "```",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -622,11 +611,29 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--case", help="Render one case as Markdown")
-    group.add_argument("--validate-review", type=Path, help="Validate a partial review ledger without importing labels")
+    group.add_argument(
+        "--carry-review",
+        type=Path,
+        help="Emit a new packet carrying only unchanged human answers",
+    )
+    group.add_argument(
+        "--validate-review",
+        type=Path,
+        help="Validate a partial review ledger without importing labels",
+    )
     args = parser.parse_args()
     try:
         packet = build_packet()
-        if args.case:
+        if args.carry_review:
+            print(
+                json.dumps(
+                    carry_review(evaluator._read_json(args.carry_review, 2_000_000)),
+                    ensure_ascii=False,
+                    indent=2,
+                    allow_nan=False,
+                )
+            )
+        elif args.case:
             selected = next((case for case in packet["cases"] if case["id"] == args.case), None)
             if selected is None:
                 raise ValueError(f"Unknown diagnostic case: {args.case}")

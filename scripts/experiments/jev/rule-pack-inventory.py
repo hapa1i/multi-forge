@@ -213,6 +213,7 @@ def _metadata(key: str, row: dict[str, Any], worktrees: set[str], active: dict[s
             raise Refusal("unconfirmed_native_cwd")
         if row.get("claude_session_id") != native_id or row.get("codex_thread_id"):
             raise Refusal("index_native_identity_mismatch")
+        # Encode the recorded, confirmed launch cwd lexically; resolving it would admit a different source path.
         expected = home / ".claude/projects" / cwd.replace("/", "-").replace(".", "-").replace("_", "-")
         expected = expected / f"{native_id}.jsonl"
     else:

@@ -34,6 +34,8 @@ from forge.runtime_config import reset_runtime_config
 
 ROOT = Path(__file__).resolve().parents[3]
 CORPUS = ROOT / "docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json"
+CAPTURE_EVIDENCE = CORPUS.parent
+MAX_JOURNAL_BYTES = 32_000_000
 ENDPOINT = "https://openrouter.ai/api/alpha/decisions"
 EXPECTED_MODEL = "typesafe/jev-1.13-20260917"
 PRICE_PER_TOKEN = 0.000000042
@@ -85,7 +87,45 @@ def implementation_hashes() -> dict[str, str]:
     return {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}
 
 
-def manifest() -> dict[str, Any]:
+def proposal_identity(plan: dict[str, Any]) -> str:
+    """Keep a proposal stable across implementation edits, including historical manifests without an ID."""
+    if not isinstance(plan, dict):
+        raise ValueError("Expected a capture manifest object")
+    if "proposal_id" in plan:
+        identifier = plan["proposal_id"]
+        if not isinstance(identifier, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,79}", identifier):
+            raise ValueError("proposal_id must contain 1-80 lowercase letters, digits or hyphens")
+        return identifier
+    content = {key: value for key, value in plan.items() if key != "implementation_sha256"}
+    return "calibration-" + hashlib.sha256(evaluator._canonical_bytes(content)).hexdigest()
+
+
+def refuse_consumed_proposal(plan: dict[str, Any]) -> None:
+    """Reject replay visible in retained A2 journals; this is not a global authorization ledger."""
+    identifier = proposal_identity(plan)
+    for path in sorted(CAPTURE_EVIDENCE.glob("*/capture.json")):
+        try:
+            journal = read_json(path, MAX_JOURNAL_BYTES)
+            if not isinstance(journal, dict) or not isinstance(journal.get("manifest"), dict):
+                raise ValueError("Expected a capture journal with a manifest")
+            if proposal_identity(journal["manifest"]) != identifier:
+                continue
+            count = journal.get("physical_requests")
+            attempts = journal.get("attempts")
+            if type(count) is not int or count < 0 or not isinstance(attempts, list):
+                raise ValueError("Invalid dispatch accounting")
+            if any(not isinstance(row, dict) or type(row.get("dispatched")) is not bool for row in attempts):
+                raise ValueError("Invalid attempt accounting")
+        except (OSError, ValueError, TypeError, RecursionError) as exc:
+            raise ValueError(f"Cannot verify retained capture journal {path}; inspect and repair its evidence") from exc
+        if count or any(row["dispatched"] for row in attempts):
+            raise ValueError(
+                f"Proposal {identifier} already dispatched requests in {path}. "
+                "There is no resume; prepare and obtain separate approval for a new --proposal-id before repeating."
+            )
+
+
+def manifest(proposal_id: str | None = None) -> dict[str, Any]:
     """Build the fixed nine-request proposal without credential access or network I/O."""
     corpus = evaluator.Corpus.model_validate(read_json(CORPUS))
     prepared = evaluator.prepare(corpus, include_payloads=True)
@@ -111,7 +151,7 @@ def manifest() -> dict[str, Any]:
         raise ValueError("The fixed calibration membership changed; revise and review the capture plan")
     if any(len(entry["payload"]["questions"]) != 3 for entry in requests):
         raise ValueError("The approved cost bound requires three questions per request")
-    return {
+    plan = {
         "schema_version": 1,
         "stage": "constructed_calibration",
         "endpoint": ENDPOINT,
@@ -138,6 +178,10 @@ def manifest() -> dict[str, Any]:
         "forge_home": "new isolated directory under output",
         "requests": requests,
     }
+    if proposal_id is not None:
+        plan["proposal_id"] = proposal_id
+    plan["proposal_id"] = proposal_identity(plan)
+    return plan
 
 
 def redact(text: str, secret: str) -> str:
@@ -314,7 +358,8 @@ def predictions(journal: dict[str, Any]) -> dict[str, Any]:
 
 async def run_live(plan: dict[str, Any], output: Path) -> int:
     """Run only an unchanged approved proposal, without retries or resume."""
-    if evaluator._canonical_bytes(plan) != evaluator._canonical_bytes(manifest()):
+    refuse_consumed_proposal(plan)
+    if evaluator._canonical_bytes(plan) != evaluator._canonical_bytes(manifest(plan.get("proposal_id"))):
         raise ValueError("Manifest differs from the current fixed proposal; regenerate and review it")
     if not output.is_absolute() or output.exists():
         raise ValueError("Choose a new absolute output directory")
@@ -331,6 +376,11 @@ async def run_live(plan: dict[str, Any], output: Path) -> int:
         "revision": subprocess.run(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, capture_output=True, text=True
         ).stdout.strip(),
+        "dirty": bool(
+            subprocess.run(
+                ["git", "status", "--porcelain"], cwd=ROOT, check=True, capture_output=True, text=True
+            ).stdout
+        ),
         "implementation_sha256": implementation_hashes(),
         "manifest": plan,
         "run_id": identity.run_id,
@@ -397,12 +447,15 @@ def main() -> int:
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--proposal-id", help="Name a new proposal for separate review; preparation only")
     args = parser.parse_args()
     if args.live != bool(args.manifest and args.output) or (not args.live and (args.manifest or args.output)):
         parser.error("--live requires a reviewed --manifest and a new absolute --output directory")
+    if args.live and args.proposal_id:
+        parser.error("--proposal-id is preparation-only; execution uses the reviewed manifest's proposal_id")
     try:
         if not args.live:
-            print(json.dumps(manifest(), indent=2, ensure_ascii=False, allow_nan=False))
+            print(json.dumps(manifest(args.proposal_id), indent=2, ensure_ascii=False, allow_nan=False))
             return 0
         return asyncio.run(run_live(read_json(args.manifest), args.output))
     except (OSError, ValueError, JudgmentError, NoApiKeyError, RecursionError, OverflowError) as exc:

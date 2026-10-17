@@ -21,7 +21,10 @@ uv run python scripts/experiments/jev/rule-pack-diagnostic.py --validate-review 
 
 The [diagnostic review guide](../../../docs/board/doing/jev_rule_pack/evidence/diagnostic-human-review.md) links the
 pending worksheets. This packet has separate criteria and identities; old human labels do not answer its new questions.
-Validation checks a retained partial ledger without importing labels into the active corpus. There is no live mode.
+Validation checks a retained partial ledger without importing labels into the active corpus. Active-rule provenance is
+separate from diagnostic answer identity. `--carry-review <ledger.json>` explicitly prepares a new partial ledger,
+retaining only unchanged question contexts and their source attribution; changed answers and contract decisions reopen.
+The review guide describes source bindings and new human review. There is no live mode.
 
 Compare the same action evidence with marker and AST signals without dispatching requests:
 
@@ -40,14 +43,21 @@ Prepare A2's nine-request constructed calibration manifest without credential ac
 PYTHON_DOTENV_DISABLED=1 uv run python scripts/experiments/jev/rule-pack-capture.py > /tmp/jev-calibration.json
 ```
 
-The [current calibration plan](../../../docs/board/doing/jev_rule_pack/evidence/calibration-boundary-run-plan.md)
-records its exact scope, dated price and planning allowance. Only after that manifest is approved, run the same script
-with `--live --manifest /tmp/jev-calibration.json --output /tmp/jev-calibration-capture`. It requires a new absolute
-output directory, isolates `FORGE_HOME`, disables retries and stops at the first failure or model/accounting drift. Its
+Both retained calibration approvals are consumed. The
+[completed calibration plan](../../../docs/board/doing/jev_rule_pack/evidence/calibration-boundary-run-plan.md) records
+historical scope, dated price and allowance; it does not authorize a repeat. The runner refuses proposal identities
+already dispatched in retained A2 journals before accessing credentials. A separately reviewed repeat needs a new
+proposal identity, supplied during generation with `--proposal-id <new-id>`. Creating that identity does not approve
+spending.
+
+Only after a new exact manifest receives approval, run the same script with
+`--live --manifest /tmp/jev-calibration.json --output /tmp/jev-calibration-capture`. It requires a new absolute output
+directory, isolates `FORGE_HOME`, disables retries and stops at the first failure or model/accounting drift. Its
 `capture.json` journal is authoritative; `predictions.json` uses evaluator schema 2. The journal binds source bytes and
-revision and retains sanitized bodies, original response sizes/status and elapsed client-call time, including local
-journal I/O. Unknown cost remains unknown. There is no resume or held-out mode; a continuation needs a new request
-scope.
+revision, dirty checkout status and retains sanitized bodies, original response sizes/status and elapsed client-call
+time, including local journal I/O. Unknown cost remains unknown. The replay check covers retained A2 journals;
+unretained, deleted or concurrent runs are outside that local guard. It is not an authorization system. There is no
+resume or held-out mode; a continuation needs a new request scope.
 
 Real native actions are a separate local-only acquisition under the
 [feasibility study plan](../../../docs/board/doing/jev_rule_pack/evidence/feasibility-study-plan.md). Its approval does

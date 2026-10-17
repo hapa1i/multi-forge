@@ -7,6 +7,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -15,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture
-def capture(monkeypatch):
+def capture(monkeypatch, tmp_path):
     spec = importlib.util.spec_from_file_location(
         "jev_rule_pack_capture", ROOT / "scripts/experiments/jev/rule-pack-capture.py"
     )
@@ -23,6 +24,8 @@ def capture(monkeypatch):
     module = importlib.util.module_from_spec(spec)
     monkeypatch.setitem(sys.modules, spec.name, module)
     spec.loader.exec_module(module)
+    # Fixture dispatches have no relationship to the consumed production calibration proposals.
+    monkeypatch.setattr(module, "CAPTURE_EVIDENCE", tmp_path / "retained-evidence")
     return module
 
 
@@ -63,6 +66,7 @@ def test_manifest_has_only_nine_adjudicated_calibration_payloads(capture, monkey
     monkeypatch.setattr(sys, "argv", ["rule-pack-capture.py"])
     assert capture.main() == 0
     plan = json.loads(capsys.readouterr().out)
+    assert plan["proposal_id"].startswith("calibration-")
     assert {row["case_id"] for row in plan["requests"]} == capture.CALIBRATION_CASES
     assert len(plan["requests"]) == plan["max_physical_requests"] == 9
     assert plan["estimated_max_usd"] == pytest.approx(0.036288)
@@ -151,6 +155,7 @@ async def test_offline_live_path_isolates_restores_and_exports(capture, mock_cre
     assert "private-account" not in text
     record = json.loads(text)
     assert record["physical_requests"] == 9
+    assert type(record["dirty"]) is bool
     assert all(row["dispatched"] and row["failure"] is None for row in record["attempts"])
     saved = capture.evaluator.SavedPredictions.model_validate_json((tmp_path / "output/predictions.json").read_text())
     assert len(saved.predictions) == 9
@@ -303,6 +308,45 @@ def test_cli_requires_explicit_complete_live_selection(capture, monkeypatch, arg
     with pytest.raises(SystemExit) as error:
         capture.main()
     assert error.value.code == 2
+
+
+def test_explicit_proposal_id_is_preparation_only(capture, monkeypatch, capsys):
+    monkeypatch.setattr(capture.CredentialManager, "default", lambda: pytest.fail("No credential access allowed"))
+    monkeypatch.setattr(sys, "argv", ["rule-pack-capture.py", "--proposal-id", "reviewed-repeat-2"])
+    assert capture.main() == 0
+    assert json.loads(capsys.readouterr().out)["proposal_id"] == "reviewed-repeat-2"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["rule-pack-capture.py", "--live", "--manifest", "x", "--output", "/tmp/x", "--proposal-id", "override"],
+    )
+    with pytest.raises(SystemExit) as error:
+        capture.main()
+    assert error.value.code == 2
+    assert "preparation-only" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("value", ["", "has spaces", "A", "../escape", "x" * 81, None, 17])
+def test_invalid_proposal_id_refuses(capture, value):
+    with pytest.raises(ValueError, match="proposal_id must contain"):
+        capture.proposal_identity({"proposal_id": value})
+
+
+@pytest.mark.parametrize("status,dirty", [("", False), (" M scripts/experiments/jev/rule-pack-capture.py\n", True)])
+@pytest.mark.asyncio
+async def test_journal_records_checkout_dirtiness(capture, mock_credentials, monkeypatch, tmp_path, status, dirty):
+    def git_metadata(args, **kwargs):
+        assert kwargs == {"cwd": ROOT, "check": True, "capture_output": True, "text": True}
+        return SimpleNamespace(stdout="fixture-revision\n" if args == ["git", "rev-parse", "HEAD"] else status)
+
+    monkeypatch.setattr(capture.subprocess, "run", git_metadata)
+    mock_transport(capture, monkeypatch, lambda request: httpx.Response(401, json={"error": "synthetic"}))
+    output = tmp_path / "output"
+    assert await capture.run_live(capture.manifest(), output) == 1
+    journal = capture.read_json(output / "capture.json")
+    assert journal["dirty"] is dirty
+    assert journal["revision"] == "fixture-revision"
+    assert journal["implementation_sha256"] == capture.implementation_hashes()
 
 
 def test_redaction_handles_escaped_keys_secrets_and_numeric_accounts(capture):
