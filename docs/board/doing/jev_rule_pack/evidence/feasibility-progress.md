@@ -68,17 +68,23 @@ Human-selected targets would isolate reasoning after selection, not demonstrate 
 and controls need human review and separate identities; the active contract and labels remain unchanged. No further
 capture is prepared or authorized.
 
-The [diagnostic packet](diagnostic-human-review.md) now contains 12 synthetic cases and 95 unanswered Choice questions.
-It preserves the six original action inputs and adds six controls, including a two-target action and matched missing
-evidence. Target hints, selector bindings and exact transformations are hash-bound and await human review. The offline
+The [blank diagnostic packet](diagnostic-human-review.md) contains 12 synthetic cases and 95 Choice questions. It
+preserves the six original action inputs and adds six controls, including a two-target action and matched missing
+evidence. Target hints, selector bindings and exact transformations are hash-bound for human review. The offline
 validator reports partial answers and contract status without importing labels or accepting quality. No diagnostic
 capture manifest or provider run is included.
 
 The walkthrough exposed ambiguous direct-replacement and completeness wording. Diagnostic `draft-2` permits only the
 named registration edit for the selected target, preserves required lookup names, and distinguishes attributable
 fragments from absent or ambiguously attributed evidence. The packet and all worksheets are regenerated with new
-identities. All 95 answers and contract review remain pending; the user's agreement on the interpretation is not
-imported as labels. Action evidence, transformations, active rule criteria and existing adjudications are unchanged.
+identities. At regeneration, all 95 answers and contract review remained pending; agreement on the interpretation was
+not imported as labels. Action evidence, transformations, active rule criteria and existing adjudications are unchanged.
+
+The [first diagnostic ledger](diagnostic-review-2026-10-17.json) records the user's subsequent review of
+`validation-boundary` and `validation-gratuitous`, including their target anchors and transformations. All 20 supplied
+answers match the draft-2 identities and validate. Both cases establish consumer constraints; the replacement satisfies
+them directly only in the gratuitous case. Ten cases and 75 answers remain pending, as does the overall contract review.
+The blank packet, active rule labels and paid-call boundary are unchanged.
 
 ## Verification
 

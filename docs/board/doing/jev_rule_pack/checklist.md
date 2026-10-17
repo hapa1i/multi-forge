@@ -252,9 +252,11 @@ The [offline diagnostic proposal](evidence/decomposition-diagnostic-proposal.md)
 constrained contract comparisons and coverage. It requires attributed targets and new human review before a separately
 versioned experiment; it changes no active rule or label and does not satisfy the feasibility gate.
 
-The [diagnostic human-review packet](evidence/diagnostic-human-review.md) is prepared with 12 synthetic cases and 95
-pending question answers. Criteria and target annotations also await review. The separate offline validator preserves
-partial answers and rejects stale evidence; no active labels, thresholds or paid manifest change.
+The [diagnostic human-review packet](evidence/diagnostic-human-review.md) contains 12 synthetic cases and 95 questions.
+The [first partial ledger](evidence/diagnostic-review-2026-10-17.json) records 20 human answers and reviewed annotations
+for the validation pair. The other ten cases, 75 answers and overall contract review remain pending. The separate
+offline validator preserves partial answers and rejects stale evidence; no active labels, thresholds or paid manifest
+change.
 
 ## Slice 3: complete action evidence and bounded dispatch
 
