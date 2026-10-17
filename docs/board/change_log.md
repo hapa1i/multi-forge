@@ -8,6 +8,21 @@ Older entries are retained verbatim in [2026-08-19](archive/change_log_2026-08-1
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-17
+
+### Ship the Jev feasibility checkpoint
+
+**Goal**: Preserve experimental evidence and human review before deciding whether to implement further runtime behavior.
+
+**Key changes**: Added bounded local inventory and constructed baselines, retained two separately approved calibration
+captures, and added diagnostic review with reusable answer identities and compact provenance. The capture runner refuses
+known consumed proposals before credential access. A2 remains active; no runtime policy is enabled.
+
+**Verification**: [PR #274](https://github.com/hapa1i/multi-forge/pull/274) merged as `09984440` after all five CI
+checks passed on reviewed head `f51bcde8`; 453 focused tests passed locally. The
+[handoff](doing/jev_rule_pack/evidence/pr-274-merge-handoff.md) preserves 92 diagnostic answers, three nulls, unresolved
+wording and remaining feasibility gates. No further paid capture or native trial is authorized.
+
 ## 2026-10-16
 
 ### Ship Jev human review and feasibility handoff

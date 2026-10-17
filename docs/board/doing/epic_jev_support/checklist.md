@@ -14,9 +14,10 @@ All 17 constructed cases have human adjudications; representative evidence cover
 practical warning usefulness remain unmeasured. That gate precedes further runtime implementation. Activation, dispatch
 and acceptance remain open; constructed labels establish neither quality nor quota savings. A3 remains proposed.
 
-A2's human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485` with all five
-checks passing. Its continuation branch is `codex/jev-rule-pack-feasibility`, starting from that merged `main` head. Its
-checklist owns the feasibility measurements and separate data/spend decisions; no additional member is activated.
+A2's human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485`. Its
+[PR #274 experimental handoff](../jev_rule_pack/evidence/pr-274-merge-handoff.md) records the merged feasibility tooling
+and unresolved evidence limits. A2 owns the next stopping rule, model-comparison plan and revised acquisition scope,
+with separate data/spend decisions; no additional member is activated.
 
 ## Activation and sequence
 
@@ -96,6 +97,10 @@ as reviewed head `cd008613`. It changes no A1 API or telemetry schema. Its saved
 and metric definitions belong to A2; they supply no quality evidence for A3. The
 [A2 handoff](../jev_rule_pack/checklist.md#offline-evaluation-merge-and-next-gate) records validation and remaining
 acceptance gates. A2 and the epic remain active; A3 is not activated.
+
+Feasibility handoff, 2026-10-17: PR #274 merged as `09984440`. It changes no A1 API or telemetry schema and establishes
+no consumer quality or runtime admission. The [A2 handoff](../jev_rule_pack/evidence/pr-274-merge-handoff.md) preserves
+review provenance and the next gates. A2 and the epic remain active; A3 remains proposed.
 
 ## Coordination acceptance
 

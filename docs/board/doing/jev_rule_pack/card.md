@@ -24,12 +24,12 @@ is not registered for activation. The [merge handoff](checklist.md#offline-evalu
 shipped scope and the next gate without closing A2. Implemented ownership is described in
 [rule-pack design](../../../design_rule_packs.md).
 
-Human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485`. Continuation:
-`codex/jev-rule-pack-feasibility` starts from that merged `main` head, retaining the completed
-[human review](evidence/human-review.md) and [corpus feasibility](evidence/corpus-feasibility.md). Its next step is the
-[pre-runtime feasibility decision](checklist.md#slice-2-feasibility-before-runtime-work), before implementing the
-[runtime evidence proposal](evidence/runtime-evidence-contract.md). Constructed-only evidence can support a smoke test;
-it cannot authorize runtime implementation on a quality claim or activate the policy.
+Human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485`. The
+[PR #274 experimental checkpoint](evidence/pr-274-merge-handoff.md) merged as `09984440` on 2026-10-17. A2 remains
+active at the [pre-runtime feasibility gate](checklist.md#slice-2-feasibility-before-runtime-work). A stopping rule,
+bounded model comparison and revised acquisition scope need separate review before further experiments. The
+[runtime evidence proposal](evidence/runtime-evidence-contract.md) remains unimplemented; constructed-only evidence
+cannot establish runtime quality or activate the policy.
 
 ## Problem and outcome
 
