@@ -2,9 +2,9 @@
 
 [Review instructions](../diagnostic-human-review.md)
 
-Packet SHA-256: `294641448f7bc35b830d0c232ebdfec4c00ac8a8533db00bc2fb1b96499aa947`
+Packet SHA-256: `14291ac7a21f5009c716f827aebb9fec5a6eb0629925933c794c3643f17055c9`
 
-Case SHA-256: `f5f0347da6c7d3ebffa0d7a6be6acf2b8b524c1361b10c58f57476c75aa32573`
+Case SHA-256: `c136bb9a8c67f6d9c58381f46a5ccc325795cd1f5bae0a4d99bd263efb1a36dd`
 
 Derived families: registered-alias. All answers are pending. Target annotations await human review.
 
@@ -196,9 +196,12 @@ The shared instruction guard applies to every question:
 In old_string, is the definition or explicit interface contract of export_model complete?
 
 - `complete`: The named definition or explicit interface contract is supplied in full for this comparison.
-- `partial`: A fragment of the named definition is supplied, but required parts are visibly omitted.
-- `not_supplied`: No definition or adequate explicit interface contract for the named symbol is supplied.
-- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding completeness; do not invent context.
+- `partial`: An attributable fragment of the named definition is supplied with required parts visibly omitted, and no
+  adequate explicit interface contract supplies the missing information.
+- `not_supplied`: Neither an attributable definition fragment nor an adequate explicit interface contract for the named
+  symbol is supplied.
+- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding attribution or completeness; target hints
+  alone cannot establish attribution.
 
 Human answer: `null` (pending).
 
@@ -207,9 +210,12 @@ Human answer: `null` (pending).
 In new_string, is the definition or explicit interface contract of export_model complete?
 
 - `complete`: The named definition or explicit interface contract is supplied in full for this comparison.
-- `partial`: A fragment of the named definition is supplied, but required parts are visibly omitted.
-- `not_supplied`: No definition or adequate explicit interface contract for the named symbol is supplied.
-- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding completeness; do not invent context.
+- `partial`: An attributable fragment of the named definition is supplied with required parts visibly omitted, and no
+  adequate explicit interface contract supplies the missing information.
+- `not_supplied`: Neither an attributable definition fragment nor an adequate explicit interface contract for the named
+  symbol is supplied.
+- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding attribution or completeness; target hints
+  alone cannot establish attribution.
 
 Human answer: `null` (pending).
 
@@ -218,9 +224,12 @@ Human answer: `null` (pending).
 In new_string, is the definition or explicit interface contract of dump_model complete?
 
 - `complete`: The named definition or explicit interface contract is supplied in full for this comparison.
-- `partial`: A fragment of the named definition is supplied, but required parts are visibly omitted.
-- `not_supplied`: No definition or adequate explicit interface contract for the named symbol is supplied.
-- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding completeness; do not invent context.
+- `partial`: An attributable fragment of the named definition is supplied with required parts visibly omitted, and no
+  adequate explicit interface contract supplies the missing information.
+- `not_supplied`: Neither an attributable definition fragment nor an adequate explicit interface contract for the named
+  symbol is supplied.
+- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding attribution or completeness; target hints
+  alone cannot establish attribution.
 
 Human answer: `null` (pending).
 
@@ -258,15 +267,22 @@ Human answer: `null` (pending).
 ### export-entrypoint.replacement_satisfies
 
 For export_model and the SAME selected consumers (ENTRYPOINTS, dispatch_plugin, test_registered_export, preview_model,
-test_preview_model), does dump_model as written satisfy every independently established constraint when used directly,
-without the retained name binding or adapter, and with the selected consumers unchanged? Consider required name/identity
-as well as behavior. Do not borrow a different target's contract or presume the preceding question's answer.
+test_preview_model), can dump_model as written satisfy every independently established constraint without relying on the
+retained name binding or adapter? When complete supplied evidence shows no independent constraint, choose not_applicable
+before comparing implementations. Missing structural evidence remains not_supplied. No registration wiring change is
+specified for this target. Do not redirect a required lookup to the replacement or create another alias. Keep consumer
+behavior, tests, required lookup names/keys and callable identities fixed, apart from the explicitly permitted wiring
+edit. Do not change the replacement body or adapt arguments/results. Evaluate only this target's selected constraints;
+unrelated transformation observations are not additional boundary evidence. Do not presume another question's answer.
 
-- `satisfies`: The replacement directly satisfies all independently established constraints without the retained
-  binding/adapter and without changing the selected consumers.
-- `does_not_satisfy`: Supplied evidence demonstrates a constraint that still needs the retained binding/adapter when the
-  selected consumers remain unchanged, even if an alias refers to the same callable object.
-- `not_applicable`: No independent constraint is established, or complete history establishes no retained interface.
+- `satisfies`: With only the explicitly permitted wiring edit, the replacement satisfies every selected independent
+  constraint without relying on the retained binding/adapter. Consumer behavior, tests and required
+  names/keys/identities remain fixed.
+- `does_not_satisfy`: Supplied evidence establishes an independent constraint the replacement cannot satisfy under those
+  same permitted changes without the retained binding/adapter. A required name supplied only by the retained alias still
+  needs that alias, even when both names refer to one callable.
+- `not_applicable`: Complete supplied evidence shows no independent constraint, or complete history establishes no
+  retained interface.
 - `not_supplied`: Missing structural evidence prevents comparing the replacement with the selected constraint.
 - `ambiguous`: Conflicting or unclear supplied evidence prevents this comparison.
 

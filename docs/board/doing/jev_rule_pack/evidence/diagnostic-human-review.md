@@ -1,7 +1,7 @@
 # A2 diagnostic human review
 
 Review whether the proposed questions isolate code facts, consumer constraints and concrete transformations. This is a
-separate `draft-1` diagnostic contract, following the [decomposition proposal](decomposition-diagnostic-proposal.md).
+separate `draft-2` diagnostic contract, following the [decomposition proposal](decomposition-diagnostic-proposal.md).
 The active rule, its 17 human labels and both captures remain unchanged. No provider call or runtime admission is part
 of this packet.
 
@@ -19,6 +19,13 @@ before selecting answers. The requirement question asks whether a consumer impos
 that constraint already justifies keeping the wrapper. The replacement question then asks whether the replacement
 satisfies that same constraint. Transformations ask about exact supplied code changes, not an unrestricted redesign.
 
+For `replacement_satisfies`, the validation cases explicitly permit the callable-argument edit in
+`register-replacement`: pass `decode_json` instead of `parse_document` to `InputCommand`. Consumer behavior and tests
+stay fixed. Each permitted registration edit is bound to its own target; unrelated transformation observations add no
+boundary evidence. Required lookup names and keys cannot be rewritten, so the alias control still requires
+`export_model`. Where complete evidence shows no independent constraint, the answer is `not_applicable`; missing
+structural evidence remains `not_supplied`.
+
 | Review group       | Cases                                                                                                                                              |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Consumer contracts | [callback](diagnostic-review/callback-protocol.md), [method adapter](diagnostic-review/method-argument-adapter.md)                                 |
@@ -35,6 +42,11 @@ evidence from `module-forwarding`; the empty before-image and body-only fragment
 about runtime-admitted tool calls. An absent named definition differs from a supplied but incomplete definition. In a
 complete clean break, the proposed old name can be absent while the before/after history is still complete; do not turn
 that absence into a missing-history judgment.
+
+`partial` requires an attributable definition fragment with required portions missing and no adequate explicit contract
+filling the gap. `not_supplied` means neither an attributable fragment nor an adequate contract is present. `ambiguous`
+covers unresolved attribution or completeness. A case name or target hint cannot establish that a bare return line
+belongs to the named function. The later fragment control still needs human review on that point.
 
 Targets, selectors and source anchors are assistant-prepared lookup hints awaiting human review. They do not assert that
 a named symbol or requirement exists. The original actions are preserved, including definitions that do not match the

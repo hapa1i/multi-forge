@@ -2,9 +2,9 @@
 
 [Review instructions](../diagnostic-human-review.md)
 
-Packet SHA-256: `294641448f7bc35b830d0c232ebdfec4c00ac8a8533db00bc2fb1b96499aa947`
+Packet SHA-256: `14291ac7a21f5009c716f827aebb9fec5a6eb0629925933c794c3643f17055c9`
 
-Case SHA-256: `325b07446db35ec5544f74596582b824b9b3f1a5bbfabdea8a64eb9c64ab1927`
+Case SHA-256: `db8dfb2c5cefc778eaad79126fae9343807a925994f94b62f47baae23b7a0b84`
 
 Derived families: module-rename. All answers are pending. Target annotations await human review.
 
@@ -98,9 +98,12 @@ The shared instruction guard applies to every question:
 In old_string, is the definition or explicit interface contract of normalize complete?
 
 - `complete`: The named definition or explicit interface contract is supplied in full for this comparison.
-- `partial`: A fragment of the named definition is supplied, but required parts are visibly omitted.
-- `not_supplied`: No definition or adequate explicit interface contract for the named symbol is supplied.
-- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding completeness; do not invent context.
+- `partial`: An attributable fragment of the named definition is supplied with required parts visibly omitted, and no
+  adequate explicit interface contract supplies the missing information.
+- `not_supplied`: Neither an attributable definition fragment nor an adequate explicit interface contract for the named
+  symbol is supplied.
+- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding attribution or completeness; target hints
+  alone cannot establish attribution.
 
 Human answer: `null` (pending).
 
@@ -109,9 +112,12 @@ Human answer: `null` (pending).
 In new_string, is the definition or explicit interface contract of normalize complete?
 
 - `complete`: The named definition or explicit interface contract is supplied in full for this comparison.
-- `partial`: A fragment of the named definition is supplied, but required parts are visibly omitted.
-- `not_supplied`: No definition or adequate explicit interface contract for the named symbol is supplied.
-- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding completeness; do not invent context.
+- `partial`: An attributable fragment of the named definition is supplied with required parts visibly omitted, and no
+  adequate explicit interface contract supplies the missing information.
+- `not_supplied`: Neither an attributable definition fragment nor an adequate explicit interface contract for the named
+  symbol is supplied.
+- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding attribution or completeness; target hints
+  alone cannot establish attribution.
 
 Human answer: `null` (pending).
 
@@ -120,9 +126,12 @@ Human answer: `null` (pending).
 In new_string, is the definition or explicit interface contract of normalize_text complete?
 
 - `complete`: The named definition or explicit interface contract is supplied in full for this comparison.
-- `partial`: A fragment of the named definition is supplied, but required parts are visibly omitted.
-- `not_supplied`: No definition or adequate explicit interface contract for the named symbol is supplied.
-- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding completeness; do not invent context.
+- `partial`: An attributable fragment of the named definition is supplied with required parts visibly omitted, and no
+  adequate explicit interface contract supplies the missing information.
+- `not_supplied`: Neither an attributable definition fragment nor an adequate explicit interface contract for the named
+  symbol is supplied.
+- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding attribution or completeness; target hints
+  alone cannot establish attribution.
 
 Human answer: `null` (pending).
 

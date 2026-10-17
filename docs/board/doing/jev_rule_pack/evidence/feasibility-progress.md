@@ -74,6 +74,12 @@ evidence. Target hints, selector bindings and exact transformations are hash-bou
 validator reports partial answers and contract status without importing labels or accepting quality. No diagnostic
 capture manifest or provider run is included.
 
+The walkthrough exposed ambiguous direct-replacement and completeness wording. Diagnostic `draft-2` permits only the
+named registration edit for the selected target, preserves required lookup names, and distinguishes attributable
+fragments from absent or ambiguously attributed evidence. The packet and all worksheets are regenerated with new
+identities. All 95 answers and contract review remain pending; the user's agreement on the interpretation is not
+imported as labels. Action evidence, transformations, active rule criteria and existing adjudications are unchanged.
+
 ## Verification
 
 The combined rule-pack, A1 probe, evaluation/review, capture, baseline, inventory and regression selection passed 347
@@ -90,3 +96,6 @@ capture completed all nine attempts without transport, answer-contract, model or
 Diagnostic preparation passed 398 focused tests, including 51 new packet/identity/validator and executable-fixture
 checks. The JSON packet reproduces exactly; all 12 worksheets preserve its evidence, criteria, targets and pending
 answers. Executable transformation results remain test evidence, separate from human adjudications.
+
+The draft-2 clarification passed 406 focused tests, including eight regressions for exact registration substitutions,
+fixed consumer behavior, required-alias and target isolation, stale-packet rejection, and pending review labels.

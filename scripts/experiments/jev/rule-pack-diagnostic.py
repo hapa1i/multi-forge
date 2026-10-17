@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[3]
 EVIDENCE = ROOT / "docs/board/doing/jev_rule_pack/evidence"
 CORPUS = EVIDENCE / "wrapper-corpus.json"
 CONTROLS = EVIDENCE / "diagnostic-controls.json"
-DIAGNOSTIC_VERSION = "draft-1"
+DIAGNOSTIC_VERSION = "draft-2"
 ORIGINAL_IDS = (
     "validation-boundary",
     "validation-gratuitous",
@@ -33,9 +33,18 @@ GUARD = (
 )
 PRESENCE = {
     "complete": "The named definition or explicit interface contract is supplied in full for this comparison.",
-    "partial": "A fragment of the named definition is supplied, but required parts are visibly omitted.",
-    "not_supplied": "No definition or adequate explicit interface contract for the named symbol is supplied.",
-    "ambiguous": "Conflicting or unclear supplied evidence prevents deciding completeness; do not invent context.",
+    "partial": (
+        "An attributable fragment of the named definition is supplied with required parts visibly omitted, "
+        "and no adequate explicit interface contract supplies the missing information."
+    ),
+    "not_supplied": (
+        "Neither an attributable definition fragment nor an adequate explicit interface contract "
+        "for the named symbol is supplied."
+    ),
+    "ambiguous": (
+        "Conflicting or unclear supplied evidence prevents deciding attribution or completeness; "
+        "target hints alone cannot establish attribution."
+    ),
 }
 PRESERVATION = {
     "preserves": "All named observations finish normally and all their assertions "
@@ -236,32 +245,61 @@ def questions_for(case: dict[str, Any]) -> dict[str, Any]:
             },
             **binding,
         )
+        registrations = [
+            change
+            for change in case["transforms"]
+            if change["target_id"] == tid and change["id"] in {"register-replacement", "register-payload-consumer"}
+        ]
+        if len(registrations) > 1:
+            raise ValueError(f"Ambiguous registration substitution for {case['id']}/{tid}")
+        comparison_binding = dict(binding)
+        if registrations:
+            registration_id = registrations[0]["id"]
+            comparison_binding["transform_id"] = registration_id
+            wiring = (
+                f"Permit only the callable-argument substitution in transformation {registration_id}'s replacements. "
+                "That exact wiring edit is allowed even inside a selected registration helper. "
+                "An unused retained definition may remain, but it cannot supply the replacement's behavior. "
+            )
+        else:
+            wiring = (
+                "No registration wiring change is specified for this target. "
+                "Do not redirect a required lookup to the replacement or create another alias. "
+            )
         add_question(
             result,
             tid,
             "replacement_satisfies",
             (
                 f"For {prior} and the SAME selected consumers ({selector}), "
-                f"does {replacement} as written satisfy every "
-                "independently established constraint when used directly, without "
-                "the retained name binding or adapter, "
-                "and with the selected consumers unchanged? Consider required name/identity as well as behavior. "
-                "Do not borrow a different target's contract or presume the preceding question's answer."
+                f"can {replacement} as written satisfy every independently established constraint "
+                "without relying on the retained name binding or adapter? "
+                "When complete supplied evidence shows no independent constraint, choose not_applicable "
+                "before comparing implementations. Missing structural evidence remains not_supplied. "
+                + wiring
+                + "Keep consumer behavior, tests, required lookup names/keys and callable identities fixed, "
+                "apart from the explicitly permitted wiring edit. Do not change the replacement body or adapt "
+                "arguments/results. Evaluate only this target's selected constraints; unrelated transformation "
+                "observations are not additional boundary evidence. Do not presume another question's answer."
             ),
             {
-                "satisfies": "The replacement directly satisfies all independently established "
-                "constraints without the retained binding/adapter and without "
-                "changing the selected consumers.",
-                "does_not_satisfy": "Supplied evidence demonstrates a constraint that still needs the "
-                "retained binding/adapter when the selected consumers remain "
-                "unchanged, even if an alias refers to the same callable object.",
-                "not_applicable": "No independent constraint is established, or complete history "
+                "satisfies": (
+                    "With only the explicitly permitted wiring edit, the replacement satisfies every selected "
+                    "independent constraint without relying on the retained binding/adapter. Consumer behavior, "
+                    "tests and required names/keys/identities remain fixed."
+                ),
+                "does_not_satisfy": (
+                    "Supplied evidence establishes an independent constraint the replacement cannot satisfy under "
+                    "those same permitted changes without the retained binding/adapter. A required name supplied "
+                    "only by the retained alias still needs that alias, even when both names refer to one callable."
+                ),
+                "not_applicable": "Complete supplied evidence shows no independent constraint, or complete history "
                 "establishes no retained interface.",
                 "not_supplied": "Missing structural evidence prevents comparing the replacement "
                 "with the selected constraint.",
                 "ambiguous": "Conflicting or unclear supplied evidence prevents this comparison.",
             },
-            **binding,
+            **comparison_binding,
         )
     for change in case["transforms"]:
         qualifier = ""
