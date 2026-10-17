@@ -11,10 +11,10 @@ new controls; all source actions are synthetic. No held-out case, native session
 Case names, shared authorship and prior discussion can reveal intended contrasts; this is not blinded independent
 review.
 
-The [latest partial ledger](diagnostic-review-2026-10-17-batch-2.json) records the human review of the validation pair,
-callback and method adapter: 36 answers are settled and 59 remain unanswered. It preserves the
-[first ledger](diagnostic-review-2026-10-17.json). The overall contract review remains pending. The blank packet and
-worksheets remain unchanged for further review.
+The [latest partial ledger](diagnostic-review-2026-10-17-batch-3.json) records human review of all six original cases:
+46 answers are settled and 49 remain unanswered across the six added controls. It preserves the
+[previous ledger](diagnostic-review-2026-10-17-batch-2.json). The four-question no-retention routing is reviewed; the
+overall contract review remains pending. The blank packet and worksheets remain unchanged for further review.
 
 ## Start with the validation pair
 

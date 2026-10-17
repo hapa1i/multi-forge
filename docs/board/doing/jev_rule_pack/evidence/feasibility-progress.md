@@ -80,13 +80,19 @@ fragments from absent or ambiguously attributed evidence. The packet and all wor
 identities. At regeneration, all 95 answers and contract review remained pending; agreement on the interpretation was
 not imported as labels. Action evidence, transformations, active rule criteria and existing adjudications are unchanged.
 
-The [cumulative diagnostic ledger](diagnostic-review-2026-10-17-batch-2.json) records the user's review of the
-validation pair, `callback-protocol` and `method-argument-adapter`, including their target anchors and transformations.
-All 36 supplied answers match the draft-2 identities and validate; the first pair's answers and notes are preserved.
-Both validation cases establish consumer constraints; the replacement satisfies them directly only in the gratuitous
-case. The callback replacement fails the supplied protocol, while the method's historical-call probe establishes a
-changed call shape without establishing a current consumer requirement. Eight cases and 59 answers remain pending, as
-does the overall contract review. The blank packet, active rule labels and paid-call boundary are unchanged.
+The [cumulative diagnostic ledger](diagnostic-review-2026-10-17-batch-3.json) records the user's review of all six
+original diagnostic cases, including their target anchors and transformations. All 46 supplied answers match the draft-2
+identities and validate; earlier answers and notes are preserved. Both validation cases establish consumer constraints;
+the replacement satisfies them directly only in the gratuitous case. The callback replacement fails the supplied
+protocol, while the method's historical-call probe establishes a changed call shape without establishing a current
+consumer requirement. The forwarding case shows ordinary continued use; the direct update establishes no retention
+despite the old name's absence from the proposed image. The user reviewed the direct update's four-question routing. Six
+control cases and 49 answers remain pending, as does the overall contract review. The blank packet, active rule labels
+and paid-call boundary are unchanged.
+
+The earlier direct-update coverage score of 0.47 does not establish why the model failed. Coverage already explicitly
+allowed a complete clean break, and the provider supplied no rationale. Confusion between an absent proposed symbol and
+missing history remains a diagnostic hypothesis, not a demonstrated cause.
 
 ## Verification
 
