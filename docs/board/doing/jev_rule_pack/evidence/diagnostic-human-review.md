@@ -54,13 +54,14 @@ that absence into a missing-history judgment.
 `partial` requires an attributable definition fragment with required portions missing and no adequate explicit contract
 filling the gap. `not_supplied` means neither an attributable fragment nor an adequate contract is present. `ambiguous`
 covers unresolved attribution or completeness. A case name or target hint cannot establish that a bare return line
-belongs to the named function. The later fragment control still needs human review on that point.
+belongs to the named function. The fragment review selects `not_supplied` while flagging the unresolved overlap with
+`ambiguous` for its prior/proposed definition questions.
 
-Targets, selectors and source anchors are assistant-prepared lookup hints awaiting human review. They do not assert that
-a named symbol or requirement exists. The original actions are preserved, including definitions that do not match the
-requested lookup. Questions combined for one target must concern that target's selected consumers; a second wrapper's
-contract cannot justify the first one. The mixed action joins `argument-adaptation` and `module-rename`, and all their
-variants remain dependent examples rather than independent families.
+Targets, selectors and source anchors are assistant-prepared lookup hints reviewed in the current ledger. They do not
+assert that a named symbol or requirement exists. The original actions are preserved, including definitions that do not
+match the requested lookup. Questions combined for one target must concern that target's selected consumers; a second
+wrapper's contract cannot justify the first one. The mixed action joins `argument-adaptation` and `module-rename`, and
+all their variants remain dependent examples rather than independent families.
 
 ## What to decide
 
