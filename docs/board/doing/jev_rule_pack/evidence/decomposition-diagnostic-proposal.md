@@ -8,8 +8,10 @@ capture. They do not establish that Jev cannot answer simpler questions or suppo
 This offline proposal changes no active questions, criteria, versions, labels or settings. It contains no runnable
 manifest or paid allowance. The existing broad-wrapper, supplied-evidence warning standard remains the target.
 
-The [diagnostic review packet](diagnostic-human-review.md) is now prepared: six original calibration actions and six
-controls, with separate target-bound questions and all human answers pending. Contract review is still open.
+The [diagnostic review packet](diagnostic-human-review.md) contains six original calibration actions and six controls,
+with separate target-bound questions. Human review has covered all 12 cases and recorded 92 answers; three remain null.
+The reviewer supports the decomposition and flags [option-precedence concerns](diagnostic-option-precedence.md) to
+resolve before capture.
 
 ## What needs explaining
 

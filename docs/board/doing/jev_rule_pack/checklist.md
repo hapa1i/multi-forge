@@ -253,11 +253,13 @@ constrained contract comparisons and coverage. It requires attributed targets an
 versioned experiment; it changes no active rule or label and does not satisfy the feasibility gate.
 
 The [diagnostic human-review packet](evidence/diagnostic-human-review.md) contains 12 synthetic cases and 95 questions.
-The [latest partial ledger](evidence/diagnostic-review-2026-10-17-batch-4.json) records 68 human answers and reviewed
-annotations for all six original cases plus the required-name alias and mixed-target controls. The direct update's
-four-question routing is reviewed. Four control cases, 27 answers and overall contract review remain pending. The
-separate offline validator preserves partial answers and rejects stale evidence; no active labels, thresholds or paid
-manifest change.
+The [latest partial ledger](evidence/diagnostic-review-2026-10-17-batch-6.json) records 92 human answers across all 12
+reviewed cases. Three answers remain null in the missing-history and missing-replacement controls. Contract review
+supports the decomposition and no-retention routing while flagging unresolved
+[option-precedence concerns](evidence/diagnostic-option-precedence.md), including overlap affecting two recorded
+fragment answers and unclear history requirements in the consumer question. Resolve these before a capture proposal; a
+wording revision needs new identities and renewed review. The separate offline validator preserves partial answers and
+rejects stale evidence; no active labels, thresholds or paid manifest change.
 
 ## Slice 3: complete action evidence and bounded dispatch
 

@@ -80,16 +80,27 @@ fragments from absent or ambiguously attributed evidence. The packet and all wor
 identities. At regeneration, all 95 answers and contract review remained pending; agreement on the interpretation was
 not imported as labels. Action evidence, transformations, active rule criteria and existing adjudications are unchanged.
 
-The [cumulative diagnostic ledger](diagnostic-review-2026-10-17-batch-4.json) records the user's review of all six
-original diagnostic cases plus the required-name alias and mixed-target controls, including their target anchors and
-transformations. All 68 supplied answers match the draft-2 identities and validate; earlier answers and notes are
-preserved. Both validation cases establish consumer constraints; the replacement satisfies them directly only in the
-gratuitous case. The callback replacement fails the supplied protocol, while the method's historical-call probe
-establishes a changed call shape without establishing a current consumer requirement. The forwarding case shows ordinary
-continued use; the direct update establishes no retention despite the old name's absence from the proposed image. The
-user reviewed the direct update's four-question routing. The alias control requires the retained lookup name; the mixed
-case keeps each target's consumer constraints separate. Four control cases and 27 answers remain pending, as does the
-overall contract review. The blank packet, active rule labels and paid-call boundary are unchanged.
+The [cumulative diagnostic ledger](diagnostic-review-2026-10-17-batch-6.json) records the user's review of all 12 cases,
+including the missing-history, missing-replacement, fragment and instruction-injection controls. All 92 supplied answers
+match the draft-2 identities and validate; earlier answers and notes are preserved. Both validation cases establish
+consumer constraints; the replacement satisfies them directly only in the gratuitous case. The callback replacement
+fails the supplied protocol, while the method's historical-call probe establishes a changed call shape without
+establishing a current consumer requirement. The forwarding case shows ordinary continued use; the direct update
+establishes no retention despite the old name's absence from the proposed image. The user reviewed the direct update's
+four-question routing. The alias control requires the retained lookup name; the mixed case keeps each target's consumer
+constraints separate. The injection review preserves the callback answers because action comments cannot supply
+authority. The missing-history control records absent prior definition and retention evidence; the missing-replacement
+control records absent replacement and retention evidence despite complete prior/proposed definitions and ordinary
+consumer use. Their remaining three answers are explicitly null pending clarification of consumer evidence requirements
+and replacement-comparison precedence.
+
+The contract status is `reviewed`, retaining the user's approval of decomposition and no-retention routing alongside two
+unresolved [option-precedence concerns](diagnostic-option-precedence.md). The later missing-history review also flags
+the consumer question's reference to continued use of an old interface as an unclear history prerequisite. The
+fragment's explicit `not_supplied` choices are recorded with its caveat: prior/proposed presence also fits the current
+`ambiguous` wording. Those two answers are not uniquely determined by the current criteria. The proposed clarification
+changes no packet or label; adoption would require a new diagnostic version and renewed review. The blank packet, active
+rule labels and paid-call boundary are unchanged, and quality remains unaccepted.
 
 The earlier direct-update coverage score of 0.47 does not establish why the model failed. Coverage already explicitly
 allowed a complete clean break, and the provider supplied no rationale. Confusion between an absent proposed symbol and
