@@ -2,9 +2,9 @@
 
 [Review instructions](../diagnostic-human-review.md)
 
-Packet SHA-256: `0fea8c6b52a125578253b362a2097eb890c5ab99fc025d3db55809ec2f07adf2`
+Packet SHA-256: `05281aaa9120e749f576180af62e9ba17096df1a079dae8bd3b8a84fbe331033`
 
-Case SHA-256: `9599343cc4183a9c9538310a03c4fcafabb07c2d3289371a862ee880ff510d0b`
+Case SHA-256: `a3ab978d3adfc840ae9043db27ae353a734ee302eef3a54dd7a5123a38c8e3cc`
 
 Derived families: module-rename. All answers are pending. Target annotations await human review.
 
@@ -97,13 +97,13 @@ The shared instruction guard applies to every question:
 
 In old_string, is the definition or explicit interface contract of normalize complete?
 
-- `complete`: The named definition or explicit interface contract is supplied in full for this comparison.
-- `partial`: An attributable fragment of the named definition is supplied with required parts visibly omitted, and no
-  adequate explicit interface contract supplies the missing information.
-- `not_supplied`: Neither an attributable definition fragment nor an adequate explicit interface contract for the named
-  symbol is supplied.
-- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding attribution or completeness; target hints
-  alone cannot establish attribution.
+- `complete`: The named definition or adequate explicit interface contract is supplied in full for this comparison.
+- `partial`: Attribution is established, required portions are visibly missing, and no adequate explicit contract fills
+  the gap.
+- `not_supplied`: No supplied code or explicit contract attributes definition material to the named symbol. A call to
+  the symbol, an unattributed body fragment or a lookup hint alone does not supply its definition.
+- `ambiguous`: Supplied code or explicit contract provides competing or conflicting evidence about attribution or
+  completeness. Merely lacking an attribution link is not_supplied.
 
 Human answer: `null` (pending).
 
@@ -111,13 +111,13 @@ Human answer: `null` (pending).
 
 In new_string, is the definition or explicit interface contract of normalize complete?
 
-- `complete`: The named definition or explicit interface contract is supplied in full for this comparison.
-- `partial`: An attributable fragment of the named definition is supplied with required parts visibly omitted, and no
-  adequate explicit interface contract supplies the missing information.
-- `not_supplied`: Neither an attributable definition fragment nor an adequate explicit interface contract for the named
-  symbol is supplied.
-- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding attribution or completeness; target hints
-  alone cannot establish attribution.
+- `complete`: The named definition or adequate explicit interface contract is supplied in full for this comparison.
+- `partial`: Attribution is established, required portions are visibly missing, and no adequate explicit contract fills
+  the gap.
+- `not_supplied`: No supplied code or explicit contract attributes definition material to the named symbol. A call to
+  the symbol, an unattributed body fragment or a lookup hint alone does not supply its definition.
+- `ambiguous`: Supplied code or explicit contract provides competing or conflicting evidence about attribution or
+  completeness. Merely lacking an attribution link is not_supplied.
 
 Human answer: `null` (pending).
 
@@ -125,13 +125,13 @@ Human answer: `null` (pending).
 
 In new_string, is the definition or explicit interface contract of normalize_text complete?
 
-- `complete`: The named definition or explicit interface contract is supplied in full for this comparison.
-- `partial`: An attributable fragment of the named definition is supplied with required parts visibly omitted, and no
-  adequate explicit interface contract supplies the missing information.
-- `not_supplied`: Neither an attributable definition fragment nor an adequate explicit interface contract for the named
-  symbol is supplied.
-- `ambiguous`: Conflicting or unclear supplied evidence prevents deciding attribution or completeness; target hints
-  alone cannot establish attribution.
+- `complete`: The named definition or adequate explicit interface contract is supplied in full for this comparison.
+- `partial`: Attribution is established, required portions are visibly missing, and no adequate explicit contract fills
+  the gap.
+- `not_supplied`: No supplied code or explicit contract attributes definition material to the named symbol. A call to
+  the symbol, an unattributed body fragment or a lookup hint alone does not supply its definition.
+- `ambiguous`: Supplied code or explicit contract provides competing or conflicting evidence about attribution or
+  completeness. Merely lacking an attribution link is not_supplied.
 
 Human answer: `null` (pending).
 

@@ -1,17 +1,18 @@
 # Diagnose A2 question decomposition and model fit
 
-Proposed, 2026-10-17. Prepare a separate diagnostic experiment before rewriting the active rule or making another
-wording-only capture. The [two completed captures](feasibility-progress.md#synthetic-capture-boundary) leave the current
-classifier unsuitable for runtime: legal thresholds cannot recover the three human `no_warning` outcomes in the second
-capture. They do not establish that Jev cannot answer simpler questions or support a different rule.
+Proposed 2026-10-17; experiment planning updated 2026-10-18. Prepare a separate diagnostic experiment before rewriting
+the active rule or making another wording-only capture. The
+[two completed captures](feasibility-progress.md#synthetic-capture-boundary) leave the current classifier unsuitable for
+runtime: legal thresholds cannot recover the three human `no_warning` outcomes in the second capture. They do not
+establish that Jev cannot answer simpler questions or support a different rule.
 
 This offline proposal changes no active questions, criteria, versions, labels or settings. It contains no runnable
 manifest or paid allowance. The existing broad-wrapper, supplied-evidence warning standard remains the target.
 
 The [diagnostic review packet](diagnostic-human-review.md) contains six original calibration actions and six controls,
-with separate target-bound questions. Human review has covered all 12 cases and recorded 92 answers; three remain null.
-The reviewer supports the decomposition and flags [option-precedence concerns](diagnostic-option-precedence.md) to
-resolve before capture.
+with separate target-bound questions. Draft-2 human review covered all 12 cases and recorded 92 answers. The
+[adopted precedence rules](diagnostic-option-precedence.md) produce diagnostic draft 3: 32 unchanged answers carry
+forward, while 63 questions and the overall contract need renewed human review before capture.
 
 ## What needs explaining
 
@@ -108,27 +109,16 @@ original adjudications under their original semantic identities. The existing ru
 questions; the evaluator binds those active definitions. A diagnostic experiment needs its own versioned packet,
 manifest and report contract, reusing A1's transport and answer validation without rewriting old captures.
 
-The eventual fixed plan should pair current three-question requests with diagnostic requests for the selected original
-cases, repeat identical payloads, and interleave arms in a declared order. Bind payloads, selected snapshot, code,
-annotations, labels and scoring rules before dispatch. Report repetitions within cases and families, not as additional
-independent examples. Keep incomplete controls separate from the original all-complete cohort. The exact request count,
-cost bound and separate approval come after packet review; neither consumed nine-request allowance applies.
+The [bounded feasibility plan](bounded-feasibility-plan.md) now owns the experimental arms, request ceilings, ordering,
+scoring, hard stops and stronger-model comparison. It replaces this proposal's earlier suggestion to pair diagnostic
+requests with fresh active three-question requests. The two-model diagnostic comparison tests model fit on the same
+reviewed evidence; it cannot measure a causal improvement from decomposition or from the previous boundary instruction.
+Historical captures remain separate context, not contemporaneous controls.
 
-Use predeclared per-case distinctions to decide the next step, rather than selecting thresholds to hide difficult cases:
+Repeated failure on an explicit fact ends this Jev/candidate pairing under the plan's predeclared rule. Neither a model
+comparison nor an inconclusive run automatically authorizes another Jev wording round. Facts, structural gaps, consumer
+constraints and transformation outcomes remain separate metrics; no diagnostic outcome combiner is being admitted.
 
-| Observation                                 | Next decision                                      |
-| ------------------------------------------- | -------------------------------------------------- |
-| Repeated errors on explicit code facts      | Stop this Jev/candidate pairing or compare a model |
-| Facts right; transformation answers wrong   | Reconsider model fit for contract reasoning        |
-| Facts/transformations right; boundary wrong | Review question composition and decision semantics |
-| Human targets work; automatic ones fail     | Resolve evidence selection before runtime work     |
-| Coverage fails on matched controls          | Resolve coverage independently of boundary scores  |
-| All diagnostic distinctions hold            | Investigate further; no runtime admission          |
-
-Here, right and wrong mean agreement with the human-reviewed fact or transformation outcome. Correctly predicting that a
-substitution breaks a required contract is a successful diagnostic answer.
-
-A model comparison should use the same reviewed evidence and observable answers, with a separately assessed latency,
-cost and data contract. No alternative model is selected or shown superior by the present evidence. A diagnostic pass
-would still leave representative native-action coverage, governance mapping and useful warnings unmeasured. The
-[local acquisition shortfall](feasibility-progress.md#approved-local-inventory) remains an independent gate.
+A diagnostic pass would still leave representative native-action coverage, governance mapping and useful warnings
+unmeasured. The [local acquisition shortfall](feasibility-progress.md#approved-local-inventory) remains an independent
+gate. Revised acquisition needs its own scope decision, and neither prior nine-request allowance applies to this study.

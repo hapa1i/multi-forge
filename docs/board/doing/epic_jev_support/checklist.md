@@ -16,8 +16,9 @@ and acceptance remain open; constructed labels establish neither quality nor quo
 
 A2's human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485`. Its
 [PR #274 experimental handoff](../jev_rule_pack/evidence/pr-274-merge-handoff.md) records the merged feasibility tooling
-and unresolved evidence limits. A2 owns the next stopping rule, model-comparison plan and revised acquisition scope,
-with separate data/spend decisions; no additional member is activated.
+and unresolved evidence limits. A2's [bounded study proposal](../jev_rule_pack/evidence/bounded-feasibility-plan.md)
+owns the next hard stop, model comparison and revised acquisition scope. Renewed diagnostic review and separate
+data/spend decisions remain open; no additional member is activated.
 
 ## Activation and sequence
 

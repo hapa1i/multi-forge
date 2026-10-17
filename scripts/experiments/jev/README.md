@@ -24,7 +24,10 @@ pending worksheets. This packet has separate criteria and identities; old human 
 Validation checks a retained partial ledger without importing labels into the active corpus. Active-rule provenance is
 separate from diagnostic answer identity. `--carry-review <ledger.json>` explicitly prepares a new partial ledger,
 retaining only unchanged question contexts and their source attribution; changed answers and contract decisions reopen.
-The review guide describes source bindings and new human review. There is no live mode.
+The review guide describes source bindings and new human review. Diagnostic draft 3 carries 32 unchanged answers and
+leaves 63 questions pending after the precedence clarification. The
+[bounded study plan](../../../docs/board/doing/jev_rule_pack/evidence/bounded-feasibility-plan.md) proposes hard stops
+and a stronger-model reference arm; it is not an executable or approved capture manifest. There is no live mode.
 
 Compare the same action evidence with marker and AST signals without dispatching requests:
 

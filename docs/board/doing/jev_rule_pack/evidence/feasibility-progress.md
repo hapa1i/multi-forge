@@ -140,3 +140,21 @@ journals also record checkout dirtiness. The guard covers retained journals, not
 concurrent launches, and cannot grant spending authority. Historical captures and approved manifests remain unchanged.
 No additional paid call or native acquisition ran. The next study still needs a bounded stopping rule, a separately
 approved model comparison and a revised availability-first acquisition scope with source-exclusion counts.
+
+## 2026-10-18: resolved wording and bounded follow-up
+
+Diagnostic `draft-3` applies the [definition/consumer/sufficiency precedence](diagnostic-option-precedence.md). The
+[carried review](diagnostic-review-2026-10-18-carried.json) retains 32 unchanged answers and leaves 63 pending,
+including the three original nulls; overall contract review is pending. Its packet identity is
+`05281aaa9120e749f576180af62e9ba17096df1a079dae8bd3b8a84fbe331033`. The draft-2 human ledger remains byte-identical,
+with its original answers and caveats. Actions, scope, annotations, transformations and the instruction guard are
+unchanged; no human answer was inferred from the wording decision.
+
+The [bounded follow-up plan](bounded-feasibility-plan.md) proposes a finite paired diagnostic comparison, per-arm
+semantic hard stops and a whole-study technical stop. It replaces the prospective active-prompt control, not historical
+evidence. The stronger-model candidate and revised availability-first acquisition remain proposals requiring separate
+review and authorization. No capture manifest, provider request or new native collection is part of this change.
+
+The combined rule-pack, probe, evaluation/review, capture, baseline, inventory and regression selection passed 454
+tests, including the changed question groups and exact review carry boundary. The active rule, its 17 labels, settings
+and historical captures remain unchanged. Runtime feasibility is still open.

@@ -252,12 +252,12 @@ The [offline diagnostic proposal](evidence/decomposition-diagnostic-proposal.md)
 contract comparisons using attributed targets. It needs reviewed questions and separate experiment approval; feasibility
 remains open.
 
-The [diagnostic packet](evidence/diagnostic-human-review.md) has 95 questions across 12 synthetic cases, all reviewed in
-the [latest ledger](evidence/diagnostic-review-2026-10-17-batch-6.json): 92 answers and three nulls in the
-missing-history/replacement controls. The reviewer supports decomposition and no-retention routing while flagging
-[precedence concerns](evidence/diagnostic-option-precedence.md), including two fragment answers and consumer history
-requirements. Resolve these before capture. Wording changes need renewed question and contract review; explicit carry
-preserves only unchanged contexts and source attribution. Active labels, thresholds and paid manifests remain unchanged.
+Diagnostic draft 3 applies the [precedence clarification](evidence/diagnostic-option-precedence.md). Its
+[carried ledger](evidence/diagnostic-review-2026-10-18-carried.json) retains 32 answers; 63 questions and contract
+review are pending. The [review guide](evidence/diagnostic-human-review.md) separates unchanged answers from renewed
+judgments. The [bounded feasibility plan](evidence/bounded-feasibility-plan.md) proposes hard stops, a stronger-model
+comparison and revised acquisition; its gates and spending need separate approval. Original evidence, active labels and
+settings remain unchanged. Runtime work stays gated.
 
 ## Slice 3: complete action evidence and bounded dispatch
 

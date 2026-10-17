@@ -14,6 +14,10 @@ calls. Record those decisions separately.
 The [first acquisition result](feasibility-progress.md#approved-local-inventory) records missing selected sources and
 zero native content reads. The implementation currently stops at metadata and source-path admission.
 
+This document retains the original acquisition and broader runtime-feasibility criteria. The 2026-10-18
+[bounded follow-up proposal](bounded-feasibility-plan.md) specifies the next diagnostic study and an availability-first
+acquisition revision. That revision requires a new scope decision; the original approval does not authorize a new scan.
+
 ## First acquisition: native action sufficiency
 
 The first question is whether the evidence a hook receives can support the rule often enough to justify runtime work.

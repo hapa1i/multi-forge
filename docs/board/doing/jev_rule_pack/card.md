@@ -26,10 +26,11 @@ shipped scope and the next gate without closing A2. Implemented ownership is des
 
 Human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485`. The
 [PR #274 experimental checkpoint](evidence/pr-274-merge-handoff.md) merged as `09984440` on 2026-10-17. A2 remains
-active at the [pre-runtime feasibility gate](checklist.md#slice-2-feasibility-before-runtime-work). A stopping rule,
-bounded model comparison and revised acquisition scope need separate review before further experiments. The
-[runtime evidence proposal](evidence/runtime-evidence-contract.md) remains unimplemented; constructed-only evidence
-cannot establish runtime quality or activate the policy.
+active at the [pre-runtime feasibility gate](checklist.md#slice-2-feasibility-before-runtime-work). The
+[bounded study plan](evidence/bounded-feasibility-plan.md) proposes a hard stop, stronger-model comparison and revised
+acquisition scope. Diagnostic draft 3 needs [renewed human review](evidence/diagnostic-human-review.md); neither the
+plan nor provider calls are approved. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) remains
+unimplemented; constructed-only evidence cannot establish runtime quality or activate the policy.
 
 ## Problem and outcome
 

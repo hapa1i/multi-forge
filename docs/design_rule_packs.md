@@ -64,6 +64,12 @@ rewriting their human evidence. Diagnostic answers remain distinct from policy o
 dispatch or quality-scoring mode. Target selection and new predicates require human review, and successful diagnostic
 reasoning would not establish runtime evidence acquisition.
 
+Diagnostic definition presence distinguishes absent attribution from competing evidence; target hints cannot supply
+attribution. Consumer questions examine the proposed target and selected consumers independently of missing history.
+Replacement sufficiency checks behavior only after an independent consumer constraint is established. Separate
+structural and retention questions still record missing evidence, so an inapplicable comparison does not establish
+coverage.
+
 ## Consent and runtime boundary
 
 `policy/rule_pack/consent.py` binds the paid repository-data acknowledgment to the session instance and pack settings.

@@ -1,7 +1,7 @@
 # A2 diagnostic human review
 
 Review whether the proposed questions isolate code facts, consumer constraints and concrete transformations. This is a
-separate `draft-2` diagnostic contract, following the [decomposition proposal](decomposition-diagnostic-proposal.md).
+separate `draft-3` diagnostic contract, following the [decomposition proposal](decomposition-diagnostic-proposal.md).
 The active rule, its 17 human labels and both captures remain unchanged. No provider call or runtime admission is part
 of this packet.
 
@@ -11,17 +11,28 @@ new controls; all source actions are synthetic. No held-out case, native session
 Case names, shared authorship and prior discussion can reveal intended contrasts; this is not blinded independent
 review.
 
-The [latest partial ledger](diagnostic-review-2026-10-17-batch-6.json) records 92 answers across all 12 reviewed cases
-and preserves every earlier answer and note. The [compact history](diagnostic-review-history.json), together with that
-unchanged ledger, reconstructs all six original batches byte-for-byte without relying on branch history. Three answers
-remain null: the missing-history control's consumer constraint and replacement sufficiency, and the missing-replacement
-control's replacement sufficiency. The fragment review explicitly selects `not_supplied` but flags overlapping criteria
-for two presence answers. The contract is `reviewed` with unresolved
-[option-precedence concerns](diagnostic-option-precedence.md); this is not a completed or accepted-quality packet. The
-question wording and supplied evidence remain unchanged. The current template uses separate semantic identities; the
-original reviewed ledger retains its original hashes and validates without being rewritten.
+The [draft-3 carried ledger](diagnostic-review-2026-10-18-carried.json) retains **32 unchanged human answers** and
+leaves **63 questions pending**: 60 reopened answers plus the three previously unsettled answers. The overall contract
+review is pending. Presence, consumer-constraint and replacement-sufficiency wording changed under the
+[adopted precedence rules](diagnostic-option-precedence.md). Actions, scope facts, target annotations, transformations,
+the instruction guard and retention/fact questions are unchanged. No new human judgments have been recorded.
 
-## Start with the validation pair
+The unchanged [draft-2 source ledger](diagnostic-review-2026-10-17-batch-6.json) preserves all 92 original answers,
+three nulls, notes and caveats. Its [compact history](diagnostic-review-history.json) reconstructs all six original
+batches. It is historical evidence, not a valid completed review of draft 3. Carry receipts retain its attribution and
+notes; do not edit that source file. Blank worksheets show pending placeholders for every question; use the carried
+ledger to distinguish the 63 renewed judgments from the 32 unchanged answers.
+
+The changed fields are each target's three `*_definition` questions, plus `consumer_constraint` and
+`replacement_satisfies` where present. Retention, literal-fact and exact-transformation answers carry unchanged. Review
+the new criteria against the evidence; the original answers in receipts are provenance, not suggested replacements.
+
+Start the renewed wording review with the missing-history, missing-replacement and fragment controls, then revisit
+changed questions in the validation pair and remaining cases. The
+[bounded feasibility plan](bounded-feasibility-plan.md) requires settled, hash-bound answers and contract review before
+any capture manifest. Preparing this packet does not approve its numerical gates or spending.
+
+## Reading the validation pair
 
 Read [validation-boundary](diagnostic-review/validation-boundary.md) and
 [validation-gratuitous](diagnostic-review/validation-gratuitous.md) first. Review the criteria and target annotations
@@ -33,8 +44,13 @@ For `replacement_satisfies`, the validation cases explicitly permit the callable
 `register-replacement`: pass `decode_json` instead of `parse_document` to `InputCommand`. Consumer behavior and tests
 stay fixed. Each permitted registration edit is bound to its own target; unrelated transformation observations add no
 boundary evidence. Required lookup names and keys cannot be rewritten, so the alias control still requires
-`export_model`. Where complete evidence shows no independent constraint, the answer is `not_applicable`; missing
-structural evidence remains `not_supplied`.
+`export_model`. Apply the branches in order: complete history proving no retention makes the comparison
+`not_applicable`; otherwise establish whether the selected consumers impose a constraint. Missing or conflicting
+consumer/interface evidence stays `not_supplied` or `ambiguous`. Complete relevant evidence showing no constraint makes
+the comparison `not_applicable` without requiring replacement behavior. An established constraint requires enough
+replacement and binding evidence for comparison. Missing history alone does not block a current-consumer question;
+missing replacement evidence matters only when there is a constraint to compare. These answers do not establish overall
+coverage or admit a warning.
 
 | Review group       | Cases                                                                                                                                              |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -54,10 +70,10 @@ complete clean break, the proposed old name can be absent while the before/after
 that absence into a missing-history judgment.
 
 `partial` requires an attributable definition fragment with required portions missing and no adequate explicit contract
-filling the gap. `not_supplied` means neither an attributable fragment nor an adequate contract is present. `ambiguous`
-covers unresolved attribution or completeness. A case name or target hint cannot establish that a bare return line
-belongs to the named function. The fragment review selects `not_supplied` while flagging the unresolved overlap with
-`ambiguous` for its prior/proposed definition questions.
+filling the gap. `not_supplied` includes an unattributed body fragment or a call with no definition/contract for the
+named symbol. `ambiguous` requires competing or conflicting supplied evidence about attribution or completeness; a
+missing attribution link alone is `not_supplied`. Case names and target hints cannot attribute a bare return line. The
+original fragment answers keep their historical caveat; their changed criteria now require renewed human review.
 
 Targets, selectors and source anchors are assistant-prepared lookup hints reviewed in the current ledger. They do not
 assert that a named symbol or requirement exists. The original actions are preserved, including definitions that do not
