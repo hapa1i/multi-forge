@@ -35,6 +35,35 @@ reviewed Git revision to identify ledger contents. Named reviewers are provenanc
 authenticated identities. This workflow cannot establish that a human performed the review or turn fixture proposals
 into quality evidence.
 
+`scripts/experiments/jev/rule-pack-baselines.py` shares the evaluator's action admission and compares existing marker
+patterns with bounded Python AST retention signals. A candidate is a structural observation, not a warning or evidence
+that no independent boundary exists. Unsupported shapes remain explicit, and no repository reads supplement an action.
+
+`scripts/experiments/jev/rule-pack-capture.py` prepares the fixed constructed-calibration manifest. Its separately
+authorized live mode uses A1's credential/client owner with mandatory ZDR, one attempt per case, exact wire-payload
+checks and a physical request cap. It isolates Forge telemetry, records interrupted attempts before dispatch and exports
+the evaluator's saved-response schema. A proposal identity survives implementation-only changes; any dispatch recorded
+for it in retained A2 journals prevents replay before credentials are read. A deliberately repeated proposal needs a new
+identity and separate approval. This local guard does not track unretained or concurrent runs. Journals record the Git
+revision and dirty state alongside authoritative source-byte digests. A changed manifest or implementation requires
+renewed review; this experiment does not implement runtime admission or authorize later held-out captures.
+
+`scripts/experiments/jev/rule-pack-inventory.py` owns the bounded development-only metadata inventory. It reads the
+approved default stores directly without invoking session repair, retains only allowlisted metadata privately and checks
+selected source paths without replacement scans. It does not extract native actions or establish governance, semantic
+coverage or usefulness. Runtime evidence acquisition remains separate.
+
+`scripts/experiments/jev/rule-pack-diagnostic.py` prepares a separate versioned human-review packet and renders exact
+synthetic evidence, reviewable target hints and proposed transformations. Its development-only `diagnostic_review.py`
+helper owns semantic identities, source receipts, validation and explicit answer carry-forward. It validates partial
+review ledgers against the current packet without importing labels into the active corpus. Diagnostic semantic
+identities exclude active-rule provenance but bind supplied evidence, scope facts, guard, targets, transformations and
+question text. An explicit carry-forward command reuses unchanged question reviews, retains source attribution and
+reopens changed answers and overall contract review when needed. It validates retained schema-1 ledgers without
+rewriting their human evidence. Diagnostic answers remain distinct from policy outcomes; this tool has no provider
+dispatch or quality-scoring mode. Target selection and new predicates require human review, and successful diagnostic
+reasoning would not establish runtime evidence acquisition.
+
 ## Consent and runtime boundary
 
 `policy/rule_pack/consent.py` binds the paid repository-data acknowledgment to the session instance and pack settings.

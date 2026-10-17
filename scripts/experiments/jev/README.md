@@ -11,6 +11,71 @@ explicit replacement and disagreement/exclusion handling. These commands do not 
 
 Shared module ownership is in [rule-pack design](../../../docs/design_rule_packs.md).
 
+Prepare the separate decomposition diagnostic packet without credentials or dispatch:
+
+```bash
+uv run python scripts/experiments/jev/rule-pack-diagnostic.py > /tmp/jev-diagnostic-review.json
+uv run python scripts/experiments/jev/rule-pack-diagnostic.py --case validation-boundary
+uv run python scripts/experiments/jev/rule-pack-diagnostic.py --validate-review /tmp/jev-diagnostic-review.json
+```
+
+The [diagnostic review guide](../../../docs/board/doing/jev_rule_pack/evidence/diagnostic-human-review.md) links the
+pending worksheets. This packet has separate criteria and identities; old human labels do not answer its new questions.
+Validation checks a retained partial ledger without importing labels into the active corpus. Active-rule provenance is
+separate from diagnostic answer identity. `--carry-review <ledger.json>` explicitly prepares a new partial ledger,
+retaining only unchanged question contexts and their source attribution; changed answers and contract decisions reopen.
+The review guide describes source bindings and new human review. There is no live mode.
+
+Compare the same action evidence with marker and AST signals without dispatching requests:
+
+```bash
+uv run python scripts/experiments/jev/rule-pack-baselines.py \
+  docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json > /tmp/jev-baselines.json
+```
+
+These are raw candidate signals, not semantic judgments. The AST detector supports complete Python `Edit` declarations;
+partial edits and patches remain unsupported. Required callback/validation adapters can also be flagged. Neither
+baseline reads the supplied file path or uses human labels to choose a signal.
+
+Prepare A2's nine-request constructed calibration manifest without credential access:
+
+```bash
+PYTHON_DOTENV_DISABLED=1 uv run python scripts/experiments/jev/rule-pack-capture.py > /tmp/jev-calibration.json
+```
+
+Both retained calibration approvals are consumed. The
+[completed calibration plan](../../../docs/board/doing/jev_rule_pack/evidence/calibration-boundary-run-plan.md) records
+historical scope, dated price and allowance; it does not authorize a repeat. The runner refuses proposal identities
+already dispatched in retained A2 journals before accessing credentials. A separately reviewed repeat needs a new
+proposal identity, supplied during generation with `--proposal-id <new-id>`. Creating that identity does not approve
+spending.
+
+Only after a new exact manifest receives approval, run the same script with
+`--live --manifest /tmp/jev-calibration.json --output /tmp/jev-calibration-capture`. It requires a new absolute output
+directory, isolates `FORGE_HOME`, disables retries and stops at the first failure or model/accounting drift. Its
+`capture.json` journal is authoritative; `predictions.json` uses evaluator schema 2. The journal binds source bytes and
+revision, dirty checkout status and retains sanitized bodies, original response sizes/status and elapsed client-call
+time, including local journal I/O. Unknown cost remains unknown. The replay check covers retained A2 journals;
+unretained, deleted or concurrent runs are outside that local guard. It is not an authorization system. There is no
+resume or held-out mode; a continuation needs a new request scope.
+
+Real native actions are a separate local-only acquisition under the
+[feasibility study plan](../../../docs/board/doing/jev_rule_pack/evidence/feasibility-study-plan.md). Its approval does
+not authorize sending them to a provider or adding them to Git. The inventory script implements only metadata selection
+and source-path admission, with no native-content reads:
+
+```bash
+uv run python scripts/experiments/jev/rule-pack-inventory.py --metadata
+uv run python scripts/experiments/jev/rule-pack-inventory.py --inspect-sources /private/tmp/jev-a2-feasibility-<id>
+```
+
+Run it only within an approved acquisition scope. The first command creates a private directory; the second consumes
+that retained metadata selection. Neither command searches for replacements. The
+[checkpoint](../../../docs/board/doing/jev_rule_pack/evidence/feasibility-progress.md) records the first run's
+missing-source shortfall; no action extractor was needed or implemented.
+
+## A1 transport probes
+
 The default prints a fixed synthetic manifest without resolving credentials or making network requests:
 
 ```bash

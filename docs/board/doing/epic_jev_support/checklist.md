@@ -14,9 +14,9 @@ All 17 constructed cases have human adjudications; representative evidence cover
 practical warning usefulness remain unmeasured. That gate precedes further runtime implementation. Activation, dispatch
 and acceptance remain open; constructed labels establish neither quality nor quota savings. A3 remains proposed.
 
-A2's continuation branch is `codex/jev-rule-pack-evidence`, rebased onto `main` at `3573c147` from its original
-`8a2e46d5` base. Its checklist owns the feasibility measurements and separate data/spend decisions; no additional member
-is activated.
+A2's human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485` with all five
+checks passing. Its continuation branch is `codex/jev-rule-pack-feasibility`, starting from that merged `main` head. Its
+checklist owns the feasibility measurements and separate data/spend decisions; no additional member is activated.
 
 ## Activation and sequence
 

@@ -121,20 +121,32 @@ def test_annotations_are_bound_to_evidence_and_do_not_authorize_a_run(probe, raw
         probe.prepare(probe.Corpus.model_validate(raw))
 
 
-def test_prompt_changes_have_separate_identity_without_invalidating_annotations(probe, raw, monkeypatch):
+@pytest.mark.parametrize("name", ["coverage", "compatibility_retention", "independent_boundary"])
+def test_prompt_changes_have_separate_identity_without_invalidating_annotations(probe, raw, monkeypatch, name):
     case = probe.Corpus.model_validate(raw).cases[0]
     original = probe.case_digest(case)
+    raw["cases"][0]["adjudication"] = {
+        "outcome": "warning",
+        "reviewer": "fixture reviewer (not a real adjudication)",
+        "review_reference": "unit-test-only",
+        "case_sha256": original,
+    }
+    corpus = probe.Corpus.model_validate(raw)
+    original_review = probe.review_packet(corpus)
     original_prompt = probe.prompt_digest()
-    original_payload = probe.prepare(probe.Corpus.model_validate(raw))["cases"][0]["payload_sha256"]
+    original_payload = probe.prepare(corpus)["cases"][0]["payload_sha256"]
     changed = probe.questions()
-    question = changed["compatibility_retention"]
-    changed["compatibility_retention"] = question.model_copy(
+    question = changed[name]
+    changed[name] = question.model_copy(
         update={"instructions": question.instructions + " Consider the supplied evidence carefully."}
     )
     monkeypatch.setattr(probe, "questions", lambda: changed)
     assert probe.case_digest(case) == original
     assert probe.prompt_digest() != original_prompt
-    assert probe.prepare(probe.Corpus.model_validate(raw))["cases"][0]["payload_sha256"] != original_payload
+    assert probe.review_packet(corpus) == original_review
+    prepared = probe.prepare(corpus)
+    assert prepared["cases"][0]["label_status"] == "adjudicated"
+    assert prepared["cases"][0]["payload_sha256"] != original_payload
 
 
 def test_true_false_criterion_changes_invalidate_existing_annotations(probe, raw, monkeypatch):

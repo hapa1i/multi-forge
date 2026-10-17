@@ -2,7 +2,7 @@
   "rule_id": "coding_standards.compatibility-wrapper",
   "rule_version": "draft-3",
   "evidence_contract_version": 4,
-  "prompt_sha256": "89578191c0d085e1e4e284fb50145d8fc255fa1bcd55f04e74a327aea488a572",
+  "prompt_sha256": "d86acd463f9febcbadab104ee1006fb4c4040305b511f6af725f3d416eea3efb",
   "mode": "offline_preparation",
   "max_physical_requests": 0,
   "quality_accepted": false,
@@ -28,56 +28,56 @@
       "case_sha256": "16e294ba92fc1192ef6a075fd47af72231032f428c21e34fd1dd2d54b6ae37ec",
       "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "8bdd8ae8b6be78572edd47ab6aa122b9c4ba75cfe91d10c7f9c1047d68d1e0c0",
-      "request_bytes": 4389
+      "payload_sha256": "02f8f24d7c2a86d85af759e8b495a14b8fca33a44f3a105a2acd4049d4f6f8c7",
+      "request_bytes": 5246
     },
     {
       "id": "module-direct-update",
       "case_sha256": "e29152bdbf0665a5aa7839f6ef10afde34009a83b5cee5833ef3e9185982cf17",
       "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "a54f6a1dd61e0760de872215cc2e748726180b92fc7de239a6f79036a9860ca0",
-      "request_bytes": 4335
+      "payload_sha256": "464fc22ce474f0fb2e67fa6050f28ae8761e15f1f5eea43850b1bfd3a841dac5",
+      "request_bytes": 5192
     },
     {
       "id": "module-injection",
       "case_sha256": "5d99db97005d021edad8bad9178e603d3478d5b1b93405cac2b1b69c7a3a4226",
       "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "4f3ed711385733878353cf9535d134ecb416dd59c37ecb57acf74a2606493830",
-      "request_bytes": 4735
+      "payload_sha256": "228215bb34f55971d9ea234f3aa9c0d1ca0ee58fb1674d2c372e360922d4cc84",
+      "request_bytes": 5592
     },
     {
       "id": "method-argument-adapter",
       "case_sha256": "e49cbc1f7d0131c93ed99e4d5c2d08dc0176c172f51eb3a8949558802b496283",
       "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "a13d7768b671bdcd31cbced377e96300d99a5479b1c1ab5194736278fc47df3e",
-      "request_bytes": 4828
+      "payload_sha256": "19817d1e07c3b7589425eeb8ce22cacc68c8b5c12f165baf65f6bb7d48f27b21",
+      "request_bytes": 5685
     },
     {
       "id": "validation-boundary",
       "case_sha256": "c0bbf4ed9e5c11d4ed463d9b0906b5f07c06eda876ff90e184e5641aaeec3b81",
       "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "7648697106127ab654400391be13dc3fdcc1dd72e68af3a6916550e15e1203f0",
-      "request_bytes": 6261
+      "payload_sha256": "53f7afbf66515b6e850bb926077d4040203600f0262280c0d9638bb02c2cbb75",
+      "request_bytes": 7118
     },
     {
       "id": "validation-gratuitous",
       "case_sha256": "2634654ece0db0bdf8379b9c285fe19e9b131167c8972c541e31df25beb75883",
       "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "6da7b393582f5ba57962215dfc189049c152538751b39bb245db0058f20b05f1",
-      "request_bytes": 6334
+      "payload_sha256": "3b4d092cfaecef0c57083cacec9f02e16018cd6cb6046050218c116e6e73028e",
+      "request_bytes": 7191
     },
     {
       "id": "preview-alias",
       "case_sha256": "7e9b1af800c746d845d723a7dfb75a1cfa2e9a3d6c50aa4a8eb2d7f36d21f6a1",
       "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "d7104657091f783ec44b0f6120a7be9fff73d25b12a5f4f32286808f40cd5a22",
-      "request_bytes": 4250
+      "payload_sha256": "de994aeabb3e811eee11f276f9578fad4207a27f697c580c20d0b8dbb9d94fad",
+      "request_bytes": 5107
     },
     {
       "id": "stable-alias",
@@ -108,16 +108,16 @@
       "case_sha256": "ba79983c7a53c03c0c4e184f6fe639c54da0c2a76e7c9859c268f3ffc527d550",
       "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "478cc723c4ec8a393ffb3c586e42349cc23c2be83daf5b28c276e2524d629fd7",
-      "request_bytes": 5930
+      "payload_sha256": "1af04c45f8a731fbd6378b79621375a9b6f25b46ac7920b9944b1c11ca81c41d",
+      "request_bytes": 6787
     },
     {
       "id": "decorator-instrumentation",
       "case_sha256": "609cd48a1a83e6a2d0593005d02d55afbb5a4383d0adf2366f506176fb520ca6",
       "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "5177f79699114d70568092d4426a33b56824d344ec4912675589d66a90f527d4",
-      "request_bytes": 4550
+      "payload_sha256": "56e607b7bcf26055dd5d18c52e9e40024a95f71aa6077a3b9665135472539099",
+      "request_bytes": 5407
     },
     {
       "id": "write-without-history",
@@ -132,32 +132,32 @@
       "case_sha256": "674fc6de1fbdeb72af5a51959b339ce5940fe4d3cace414c344e5c733343bb88",
       "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "7b6d13414747688455ce30d96267d6e2d755fc4dd43eef71ebc7c9ea469fb53d",
-      "request_bytes": 4164
+      "payload_sha256": "16c7f683bee4717ee37ed76b0198397c1aafe5ed550e93b71553117e9f40e459",
+      "request_bytes": 5021
     },
     {
       "id": "return-shape-adapter",
       "case_sha256": "d57fd194f32e397e8e8c19151fce465ee1e4ad40951e43cbbb7e55c458b37ef8",
       "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "c858b0479492031f101a6e203c094996dbb441e79806be54684afdebbdf049ee",
-      "request_bytes": 4569
+      "payload_sha256": "51b0f8ca24ce7684b11d682bfde2d20f6e750f8d2c5f6f8fefe46047563de0b6",
+      "request_bytes": 5426
     },
     {
       "id": "return-shape-direct-update",
       "case_sha256": "82f0c26ca9bcd281c334fa9ec5d62ecf82a4eccb4b697e491529cbeacd0db414",
       "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "e905ad8ded5141a456dc48cc85021f3349b150d6dc4dfbfe95d496ee77d6c3b2",
-      "request_bytes": 4460
+      "payload_sha256": "f5db45e6b8c86e900b6dcae5affbaeb87f760bf7eddb46fc574be26c4131a71b",
+      "request_bytes": 5317
     },
     {
       "id": "multi-file-wrapper",
       "case_sha256": "dc722d956bb8c39f8a54e0166d439a86ae5904ef25310552c7e27d81bb4ddd7f",
       "label_status": "adjudicated",
       "preparation": "model_input",
-      "payload_sha256": "59ee19712ad99191ebb88392c9b836d3ae9763d0a27965fc9207b82de2bb9fcd",
-      "request_bytes": 4388
+      "payload_sha256": "7b2da2b9b990d13c997288ebed0bd109252562d2e7777c682533096874ca4f2e",
+      "request_bytes": 5245
     }
   ]
 }

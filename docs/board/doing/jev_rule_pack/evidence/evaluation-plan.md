@@ -22,8 +22,18 @@ observations. Each question has nine known calibration answers. Held-out has fou
 all four, but `partial-edit` leaves retention and boundary unknown, so those questions have three known answers each.
 That partial Edit remains a model candidate; its unavailable human label is distinct from the host-decided Write. There
 is no human-labeled historical cohort or measured model accuracy. Preparation no longer reports incomplete adjudication;
-its remaining blockers are unset numeric gates, absent predictions/quality evaluation, unimplemented live execution and
-absent historical evidence. `quality_accepted` remains false.
+its retained report lists unset numeric gates, absent predictions/quality evaluation, unimplemented live execution and
+absent historical evidence. The separate [calibration capture harness](calibration-run-plan.md) now prepares a bounded
+live proposal; the evaluator itself remains offline. The
+[first approved calibration capture](calibration-2026-10-16/README.md) is now complete. Its required-boundary scores
+cannot recover the human labels under any allowed bands, so settings remain unset and held-out capture is deferred.
+`quality_accepted` remains false.
+
+The [2026-10-17 boundary instruction revision](boundary-question-proposal.md) preserves coverage, criteria and human
+adjudications. Current preparation reports bind its new prompt/payload hashes. The
+[separately approved follow-up](calibration-boundary-2026-10-17/README.md) is complete and its allowance is consumed. It
+still cannot recover the two required-boundary labels; the clean-break case also cannot clear coverage. All three human
+no-warning cases remain unrecoverable under allowed settings, so the decision remains revise.
 
 The shared `policy.rule_pack.definitions` module owns the draft-3 questions and contract version 4. The
 `policy.rule_pack.outcomes` module owns decision version `draft-2`. These modules are available for offline evaluation;
@@ -206,8 +216,9 @@ Compare two deterministic baselines with Jev: today's marker/regex checks and a 
 each baseline's supported syntax and candidate rules before inspecting held-out outputs. Give all three the same action
 bytes, applicability facts and admission limits; report unsupported/unknown cases explicitly. The AST baseline must not
 use caller inventories unavailable to Jev or become an unbounded implementation of semantic boundary inference. Preserve
-the regex comparison because it measures improvement over today's policy. This update specifies the comparison; it adds
-no AST implementation or measured baseline results.
+the regex comparison because it measures improvement over today's policy. The
+[constructed baseline report](constructed-baselines.json) records raw signals from the bounded offline implementation;
+its structural candidates do not establish semantic warnings or practical usefulness.
 
 ### Capture order and decision gates
 

@@ -1,0 +1,17 @@
+{
+  "source": "https://openrouter.ai/api/v1/endpoints/zdr",
+  "retrieved_date": "2026-10-16",
+  "selection": "Selected fields from the public ZDR row matching typesafe/jev-1.13; not a Decisions capture.",
+  "model_id": "typesafe/jev-1.13",
+  "name": "TypeSafe | typesafe/jev-1.13-20260917",
+  "provider_name": "TypeSafe",
+  "pricing": {
+    "prompt": "0.000000042",
+    "completion": "0",
+    "discount": 0
+  },
+  "context_length": 262144,
+  "max_prompt_tokens": 262144,
+  "planning_note": "Keep A1 admission and a conservative 32000-token allowance per question. Catalog limits do not expand the implemented contract.",
+  "other_version_observed": "typesafe/jev-1.14-20261014; not selected for this evaluation"
+}
