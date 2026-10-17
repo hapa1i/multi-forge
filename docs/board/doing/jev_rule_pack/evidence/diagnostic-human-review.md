@@ -11,8 +11,9 @@ new controls; all source actions are synthetic. No held-out case, native session
 Case names, shared authorship and prior discussion can reveal intended contrasts; this is not blinded independent
 review.
 
-The [retained partial ledger](diagnostic-review-2026-10-17.json) records the human review of the validation pair: 20
-answers are settled and 75 remain unanswered. The overall contract review remains pending. The blank packet and
+The [latest partial ledger](diagnostic-review-2026-10-17-batch-2.json) records the human review of the validation pair,
+callback and method adapter: 36 answers are settled and 59 remain unanswered. It preserves the
+[first ledger](diagnostic-review-2026-10-17.json). The overall contract review remains pending. The blank packet and
 worksheets remain unchanged for further review.
 
 ## Start with the validation pair

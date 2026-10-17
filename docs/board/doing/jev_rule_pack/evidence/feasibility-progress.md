@@ -80,11 +80,13 @@ fragments from absent or ambiguously attributed evidence. The packet and all wor
 identities. At regeneration, all 95 answers and contract review remained pending; agreement on the interpretation was
 not imported as labels. Action evidence, transformations, active rule criteria and existing adjudications are unchanged.
 
-The [first diagnostic ledger](diagnostic-review-2026-10-17.json) records the user's subsequent review of
-`validation-boundary` and `validation-gratuitous`, including their target anchors and transformations. All 20 supplied
-answers match the draft-2 identities and validate. Both cases establish consumer constraints; the replacement satisfies
-them directly only in the gratuitous case. Ten cases and 75 answers remain pending, as does the overall contract review.
-The blank packet, active rule labels and paid-call boundary are unchanged.
+The [cumulative diagnostic ledger](diagnostic-review-2026-10-17-batch-2.json) records the user's review of the
+validation pair, `callback-protocol` and `method-argument-adapter`, including their target anchors and transformations.
+All 36 supplied answers match the draft-2 identities and validate; the first pair's answers and notes are preserved.
+Both validation cases establish consumer constraints; the replacement satisfies them directly only in the gratuitous
+case. The callback replacement fails the supplied protocol, while the method's historical-call probe establishes a
+changed call shape without establishing a current consumer requirement. Eight cases and 59 answers remain pending, as
+does the overall contract review. The blank packet, active rule labels and paid-call boundary are unchanged.
 
 ## Verification
 
