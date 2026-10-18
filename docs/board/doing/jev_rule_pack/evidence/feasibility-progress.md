@@ -182,3 +182,14 @@ $8 planning allowance; it does not guarantee an invoice ceiling or establish a l
 This selects the experiment design without authorizing dispatch, provider spending or revised native acquisition. The 48
 pending case answers, exact payloads, route checks and separate capture approval remain required. No labels, manifest or
 provider calls were added.
+
+## 2026-10-18: validation pair reviewed
+
+The human confirmed the five revised parser questions in each validation case against the current packet and case
+hashes. Both cases establish consumer constraints; the replacement fails the required blank-input exception contract in
+`validation-boundary` and already satisfies it in `validation-gratuitous`. The
+[new ledger](diagnostic-review-2026-10-18-batch-2.json) records those ten answers and verbatim notes. It retains all 32
+inherited answers and source bindings, bringing the total to 57 answers with 38 pending across seven cases. Contract
+review remains `reviewed`; quality remains unaccepted. Earlier ledgers and diagnostic evidence are unchanged.
+
+The callback and method-adapter pair is next. No paid capture, manifest or native acquisition was added.
