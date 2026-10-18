@@ -284,3 +284,21 @@ integration tests passed through `scripts/test-integration.sh`; the missing-Gemi
 fixture-only tests. Full pre-commit passed with the existing broad EOF exclusion for protected skill files; every hook,
 including EOF, passed on changed files. Exact manifest rebuild and `git diff --check` passed. No quality or runtime gate
 is closed by these implementation checks.
+
+## 2026-10-18: bounded capture stopped both model/formulation pairings
+
+The authorized [capture](bounded-diagnostic-2026-10-18/README.md) sent 38 requests: two Jev and all 36 reference slots.
+Jev twice selected `partial` for the complete proposed parser definition in `validation-boundary`, triggering the
+sentinel stop. Its 20 observed answers matched 16 human answers; 265 planned observations remain unobserved.
+
+Opus matched 282/285 answers. All three disagreements were the critical `normalizer.retention` answer for
+`module-forwarding-without-replacement`: `retained` versus the reviewed `not_supplied`. The code visibly forwards to the
+replacement, but the replacement definition or contract is missing. This is disagreement with the reviewed evidence
+completeness contract, not evidence that the model failed to notice forwarding. Retention is not a sentinel, so the
+reference completed its fixed sequence before failing the pass gate. Labels and criteria were not changed.
+
+All attempts passed response/accounting admission, with no technical failure, retry or unknown cost. Reported cost was
+$1.029230756; isolated telemetry joins and operator readers verified all 38 attempts. The report reproduces exactly.
+Only 20 question observations are paired; unused Jev slots supply no reference wins. Neither model/formulation pairing
+passes, the allowance is consumed, and runtime work remains gated. The reference's alias-only response and the
+synthetic, repeated, human-targeted evidence limit interpretation as recorded in the capture README.

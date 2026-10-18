@@ -12,6 +12,10 @@ revised question contract confirmed and no open disputes. Human review is comple
 [capture review packet](bounded-capture-review.md) freezes exact payloads and limits in a locally validated manifest.
 The preparation tool has no live mode; the separate executor must pass offline verification before paid dispatch.
 
+**Executed 2026-10-18:** the [retained capture](bounded-diagnostic-2026-10-18/README.md) records Jev's sentinel stop and
+the reference's critical retention failure. Neither arm passes; this allowance is consumed. The prospective rules below
+remain the unchanged contract used to evaluate that run.
+
 ## Question and fixed comparison
 
 Test whether Jev can reliably answer the reviewed decomposition, and whether one general-purpose reference model can

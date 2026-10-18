@@ -248,18 +248,16 @@ clarification did not resolve the blocker: boundary scores remain 0.15/0.28, and
 0.48/0.47. All three human no-warning cases remain unrecoverable under allowed settings. Both nine-request allowances
 are consumed; keep settings unset and review decomposition or model/rule fit before further paid work.
 
-The [offline diagnostic proposal](evidence/decomposition-diagnostic-proposal.md) tests fact extraction and constrained
-contract comparisons using attributed targets. It needs reviewed questions and separate experiment approval; feasibility
-remains open.
+Diagnostic draft 3 applies the [precedence clarification](evidence/diagnostic-option-precedence.md); its
+[ledger](evidence/diagnostic-review-2026-10-18-batch-6.json) settles all 95 answers and the question contract. The
+[review guide](evidence/diagnostic-human-review.md) preserves inherited and renewed judgments. The user authorized the
+[bounded two-model capture](evidence/bounded-capture-review.md) after implementation and fixture checks on 2026-10-18.
 
-Diagnostic draft 3 applies the [precedence clarification](evidence/diagnostic-option-precedence.md). Its
-[latest ledger](evidence/diagnostic-review-2026-10-18-batch-6.json) has all 95 answers settled. The revised question
-contract is reviewed. The [review guide](evidence/diagnostic-human-review.md) separates inherited from renewed
-judgments. The user selected the [bounded plan's](evidence/bounded-feasibility-plan.md) two-model diagnostic design,
-fixed order and pass/stop rules. The [capture packet](evidence/bounded-capture-review.md) freezes payloads and limits
-for review. On 2026-10-18 the user authorized the bounded capture after runner implementation and fixture verification;
-revised acquisition remains unapproved. Original evidence, active labels and settings remain unchanged. Runtime work
-stays gated.
+The [completed bounded capture](evidence/bounded-diagnostic-2026-10-18/README.md) used 38 requests and reported
+$1.029230756. Jev stopped after two requests on a repeated definition-presence sentinel error. Opus matched 282/285
+answers but failed the critical missing-replacement retention answer in all three repetitions. Neither arm passes the
+frozen screen. The allowance is consumed; 34 unused Jev slots cannot be reused. Active labels and settings remain
+unchanged; revised acquisition, quality acceptance and runtime work remain gated.
 
 ## Slice 3: complete action evidence and bounded dispatch
 

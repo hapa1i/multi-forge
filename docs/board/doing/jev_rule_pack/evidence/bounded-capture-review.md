@@ -6,6 +6,10 @@ review. On 2026-10-18 the user explicitly authorized implementation, fixture ver
 this bounded study. Execution follows the offline checks and remains limited to these bodies, slots and stop rules. The
 preparation tool has no live mode, and the manifest itself cannot grant spending authority.
 
+The [2026-10-18 capture](bounded-diagnostic-2026-10-18/README.md) consumed this allowance: 38 requests, with Jev stopped
+after two and Opus completing 36. Both failed the frozen screen. Reported cost was $1.029230756 with no unknown attempt
+costs. The remaining 34 slots cannot be reused.
+
 ## What would be sent
 
 The [manifest](bounded-capture-manifest.json) contains 24 exact request bodies: one per case and arm. Its 72 ordered
