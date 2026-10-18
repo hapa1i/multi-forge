@@ -497,17 +497,40 @@ async def test_per_call_deadline_cancels_transport_without_retry(study, monkeypa
 
 @pytest.mark.asyncio
 async def test_each_call_inherits_the_earlier_whole_run_deadline(study, monkeypatch):
-    monkeypatch.setattr(study.module, "WHOLE_RUN_SECONDS", 0.3)
+    clock = SimpleNamespace(now=1000.0)
+    timers = []
+    monkeypatch.setattr(study.module, "WHOLE_RUN_SECONDS", 10)
+    monkeypatch.setattr(study.module, "time", SimpleNamespace(monotonic=lambda: clock.now))
+
+    def timeout_at(deadline):
+        # Arm the real cancellation only after fixture dispatch, independently of local I/O speed.
+        timer = asyncio.timeout(None)
+        timers.append((deadline, timer))
+        return timer
+
+    monkeypatch.setattr(
+        study.module,
+        "asyncio",
+        SimpleNamespace(timeout_at=timeout_at, CancelledError=asyncio.CancelledError),
+    )
     cancelled = []
 
+    def catalog_elapsed(source_id, body):
+        clock.now = 1007.0
+
     async def post(request, payload, repetition):
+        deadline, timer = timers[-1]
+        assert deadline == 1010.0
+        assert request.extensions["timeout"]["read"] == 3.0
+        clock.now = deadline
+        timer.reschedule(asyncio.get_running_loop().time())
         try:
-            await asyncio.sleep(2)
+            await asyncio.Event().wait()
         finally:
             cancelled.append(True)
         return httpx.Response(200, json=fixture_response(study, payload))
 
-    fixture = FixtureTransport(study, post)
+    fixture = FixtureTransport(study, post, mutate_catalog=catalog_elapsed)
     journal = await execute(study, fixture)
     assert cancelled == [True]
     assert journal["status"] == "technical_stop"
