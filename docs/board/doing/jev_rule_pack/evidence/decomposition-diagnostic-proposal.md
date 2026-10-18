@@ -12,8 +12,8 @@ manifest or paid allowance. The existing broad-wrapper, supplied-evidence warnin
 The [diagnostic review packet](diagnostic-human-review.md) contains six original calibration actions and six controls,
 with separate target-bound questions. Draft-2 human review covered all 12 cases and recorded 92 answers. The
 [adopted precedence rules](diagnostic-option-precedence.md) produce diagnostic draft 3. Its
-[latest ledger](diagnostic-review-2026-10-18-batch-4.json) has 32 carried answers and 43 renewed answers across nine
-cases. The revised question contract is reviewed; 20 case answers remain pending.
+[latest ledger](diagnostic-review-2026-10-18-batch-5.json) has 32 carried answers and 58 renewed answers across 11
+cases. The revised question contract is reviewed; five injection-control answers remain pending.
 
 ## What needs explaining
 

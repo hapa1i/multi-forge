@@ -218,3 +218,16 @@ verbatim. It preserves 32 inherited answers and their source bindings, bringing 
 across three cases. Contract review remains `reviewed`; quality remains unaccepted. Earlier ledgers, diagnostic evidence
 and study limits are unchanged. Required-name alias and mixed retained interfaces are next, followed by the callback
 injection control. No paid capture, manifest or native acquisition was added.
+
+## 2026-10-18: required alias and mixed targets reviewed
+
+The human confirmed five revised questions for required-name alias and ten for mixed retained interfaces against their
+current case hashes. The alias retains a required lookup name that the replacement alone cannot provide. The mixed case
+keeps each target's selected consumers separate: the callback has a protocol constraint its replacement cannot satisfy
+under the permitted edit, while the normalizer has no independent constraint to compare.
+
+The [new ledger](diagnostic-review-2026-10-18-batch-5.json) records all 15 answers and verbatim notes, preserving all 32
+inherited answers and source bindings. It has 90 answers and five pending in the injection control. The user's bonus
+heading included no injection answers or additional contract-review text, so neither was inferred. Existing contract
+review remains `reviewed`; quality remains unaccepted. Earlier ledgers, diagnostic evidence and study limits are
+unchanged. No paid capture, manifest or native acquisition was added.
