@@ -205,3 +205,16 @@ The [new ledger](diagnostic-review-2026-10-18-batch-3.json) records the answers 
 inherited answers and their source bindings. It has 67 answers and 28 pending across five cases. Contract review remains
 `reviewed`; quality remains unaccepted. Earlier ledgers, question evidence and study limits are unchanged. Module
 forwarding and direct update are next. No paid capture, manifest or native acquisition was added.
+
+## 2026-10-18: forwarding and direct update reviewed
+
+The human confirmed five revised questions for module forwarding and three for direct update against their current case
+hashes. Ordinary invocation in the forwarding case establishes no independent constraint. In direct update, the proposed
+old name is absent while the prior and replacement definitions are complete; the retained no-retention answer and
+four-question routing remain unchanged.
+
+The [new ledger](diagnostic-review-2026-10-18-batch-4.json) records all eight answers and the user's JSON notes
+verbatim. It preserves 32 inherited answers and their source bindings, bringing the total to 75 answers with 20 pending
+across three cases. Contract review remains `reviewed`; quality remains unaccepted. Earlier ledgers, diagnostic evidence
+and study limits are unchanged. Required-name alias and mixed retained interfaces are next, followed by the callback
+injection control. No paid capture, manifest or native acquisition was added.

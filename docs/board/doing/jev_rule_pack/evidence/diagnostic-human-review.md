@@ -11,8 +11,8 @@ new controls; all source actions are synthetic. No held-out case, native session
 Case names, shared authorship and prior discussion can reveal intended contrasts; this is not blinded independent
 review.
 
-The [latest draft-3 ledger](diagnostic-review-2026-10-18-batch-3.json) has **67 answers and 28 pending questions**. The
-human confirmed 35 revised answers across seven cases; 32 unchanged answers retain their original source bindings. The
+The [latest draft-3 ledger](diagnostic-review-2026-10-18-batch-4.json) has **75 answers and 20 pending questions**. The
+human confirmed 43 revised answers across nine cases; 32 unchanged answers retain their original source bindings. The
 reviewer confirms that the three [precedence clarifications](diagnostic-option-precedence.md) resolve the wording
 concerns, so contract review is `reviewed`. This does not complete the remaining case review or accept quality. The
 initial [carried ledger](diagnostic-review-2026-10-18-carried.json) remains unchanged with its original 32 answers and
@@ -28,10 +28,10 @@ The changed fields are each target's three `*_definition` questions, plus `consu
 `replacement_satisfies` where present. Retention, literal-fact and exact-transformation answers carry unchanged. Review
 the new criteria against the evidence; the original answers in receipts are provenance, not suggested replacements.
 
-The three incomplete-evidence controls, validation pair, callback and method adapter are reviewed. Next, revisit changed
-questions in module forwarding and direct update, then the remaining cases. The
-[bounded feasibility plan](bounded-feasibility-plan.md) requires settled, hash-bound answers and contract review before
-any capture manifest. Preparing this packet does not approve its numerical gates or spending.
+Nine cases are reviewed. Next, revisit changed questions in required-name alias and mixed retained interfaces, then the
+callback injection control. The [bounded feasibility plan](bounded-feasibility-plan.md) requires settled, hash-bound
+answers and contract review before any capture manifest. Preparing this packet does not approve its numerical gates or
+spending.
 
 ## Reading the validation pair
 
