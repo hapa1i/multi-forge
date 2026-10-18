@@ -37,6 +37,11 @@ journal and a scored report. Catalog drift refuses dispatch; technical failures 
 sentinel errors stop the affected arm. There are no retries or resume mode, and a consumed proposal cannot be started
 again. The existing calibration capture command does not execute this study.
 
+Both capture replay guards recognize published journals that reference a retained manifest. References must remain
+inside the evidence directory, avoid symlinks and match the manifest digest. A diagnostic publication cannot block an
+unrelated calibration proposal merely because its manifest is referenced, or permit its own replay after a local claim
+is lost. Invalid references refuse the scan.
+
 Compare the same action evidence with marker and AST signals without dispatching requests:
 
 ```bash
@@ -47,6 +52,20 @@ uv run python scripts/experiments/jev/rule-pack-baselines.py \
 These are raw candidate signals, not semantic judgments. The AST detector supports complete Python `Edit` declarations;
 partial edits and patches remain unsupported. Required callback/validation adapters can also be flagged. Neither
 baseline reads the supplied file path or uses human labels to choose a signal.
+
+Compare the fixed 12-case diagnostic review and 17-case constructed corpus locally:
+
+```bash
+uv run python scripts/experiments/jev/rule-pack-offline.py \
+  --review docs/board/doing/jev_rule_pack/evidence/diagnostic-review-2026-10-18-batch-6.json \
+  --corpus docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json
+```
+
+The
+[offline retention/admission review](../../../docs/board/doing/jev_rule_pack/evidence/offline-retention-admission.md)
+explains the prospective dependency table and retained report. Syntax spans and candidate differences are observations,
+not new human labels or quality scores. The cohorts overlap. This command has no live mode or native acquisition, and
+the completed diagnostic capture remains failed under its original contract.
 
 Prepare A2's nine-request constructed calibration manifest without credential access:
 

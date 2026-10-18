@@ -208,6 +208,12 @@ operation is locally unsupported, send none of the action. The preparation layer
 never call a partly covered action clean. Relevant wrapper, replacement and boundary evidence comes from the supplied
 action; the governance declaration cannot substitute a prose claim for that evidence.
 
+The [offline retention/admission proposal](offline-retention-admission.md) distinguishes a structural forwarding
+candidate from admitted `compatibility_retention`. Missing history, replacement evidence or attribution must prevent a
+warning even when a consumer question is independently answerable. Complete removal of the old interface has a separate
+evidence path; an empty AST lookup is not proof of that removal. This clarification does not implement an admission
+resolver or change the active rule and reviewed diagnostic contract.
+
 ## Evidence identity and orchestration boundary
 
 Maintain three separate identities: the full canonical action envelope, the exact evaluated state, and the rendered

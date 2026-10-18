@@ -27,10 +27,13 @@ shipped scope and the next gate without closing A2. Implemented ownership is des
 Human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485`. The
 [PR #274 experimental checkpoint](evidence/pr-274-merge-handoff.md) merged as `09984440` on 2026-10-17. A2 remains
 active at the [pre-runtime feasibility gate](checklist.md#slice-2-feasibility-before-runtime-work). The
-[bounded study plan](evidence/bounded-feasibility-plan.md) proposes a hard stop, stronger-model comparison and revised
-acquisition scope. Diagnostic draft 3 needs [renewed human review](evidence/diagnostic-human-review.md); neither the
-plan nor provider calls are approved. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) remains
-unimplemented; constructed-only evidence cannot establish runtime quality or activate the policy.
+[completed bounded study](evidence/bounded-diagnostic-2026-10-18/README.md) followed review of all 95 diagnostic answers
+and separate capture approval. Jev triggered its repeated-sentinel stop; Opus failed the critical missing-replacement
+retention answer. Neither arm passed, and the allowance is consumed. The
+[bounded offline review](evidence/offline-retention-admission.md) separates structural candidates from evidence
+admission and semantic retention, preserving the failed study and its labels. Native coverage and usefulness remain
+unmeasured. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) remains unimplemented;
+constructed-only evidence cannot establish runtime quality or activate the policy.
 
 ## Problem and outcome
 

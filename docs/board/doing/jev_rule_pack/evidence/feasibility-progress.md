@@ -4,6 +4,13 @@
 unchanged. This checkpoint records preparation, an acquisition shortfall and two synthetic captures; it does not
 establish runtime feasibility.
 
+Current follow-up: the [bounded offline review](offline-retention-admission.md) compares the existing AST baseline with
+the 12 diagnostic and 17 constructed cases, separating structural candidates, evidence admission and semantic retention.
+It preserves the [completed study's failed result](bounded-diagnostic-2026-10-18/README.md) and frozen labels. No new
+judgment call or native collection ran. The offline review records the size-checker's unintended document-count request.
+The historical checkpoints below describe their own revisions; the offline review owns the current proposed
+responsibility split and next evidence gate.
+
 ## Approved local inventory
 
 The user approved the [local study scope](feasibility-study-plan.md) before collection. The corrected metadata inventory

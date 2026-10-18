@@ -39,6 +39,11 @@ into quality evidence.
 patterns with bounded Python AST retention signals. A candidate is a structural observation, not a warning or evidence
 that no independent boundary exists. Unsupported shapes remain explicit, and no repository reads supplement an action.
 
+`scripts/experiments/jev/rule-pack-offline.py` compares that unchanged baseline on the fixed diagnostic review and
+constructed corpus. It records host applicability, raw candidates, syntax spans and differences from human-selected
+targets with input/source identities. It does not implement evidence admission, infer semantic completeness from syntax,
+score candidate quality or change reviewed labels. The active coverage requirement remains authoritative.
+
 `scripts/experiments/jev/rule-pack-capture.py` prepares the fixed constructed-calibration manifest. Its separately
 authorized live mode uses A1's credential/client owner with mandatory ZDR, one attempt per case, exact wire-payload
 checks and a physical request cap. It isolates Forge telemetry, records interrupted attempts before dispatch and exports
@@ -72,6 +77,8 @@ question's full meaning. This tool has no credentials, network or live mode; a m
 
 `diagnostic_capture.py` executes a separately authorized manifest through injected or live HTTP transports.
 `capture_io.py` owns private output, durable slot reservations, proposal claims and public catalog refresh.
+`capture_evidence.py` reads embedded manifests or bounded, hash-verified local publication references for both capture
+replay guards. Published diagnostic receipts remain consumption evidence when the machine-local claim is absent.
 `diagnostic_results.py` admits bounded responses, retains reported accounting and scores the fixed observations.
 Requests use the exact frozen bodies, with no retries, resumption or replacement slots. Technical failures stop both
 arms; two wrong observations on the same sentinel stop that arm. A proposal claim survives interruption and source-only
