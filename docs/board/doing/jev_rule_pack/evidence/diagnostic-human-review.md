@@ -29,8 +29,9 @@ The changed fields are each target's three `*_definition` questions, plus `consu
 the new criteria against the evidence; the original answers in receipts are provenance, not suggested replacements.
 
 The human-review prerequisite in the [bounded feasibility plan](bounded-feasibility-plan.md) is now satisfied. The
-[capture review packet](bounded-capture-review.md) contains the exact proposed requests and limits. Provider spending
-still requires separate approval after executor verification.
+[capture review packet](bounded-capture-review.md) contains the exact requests and limits. The user authorized that
+finite study on 2026-10-18, conditional on executor fixture verification; human review alone grants no spending
+authority.
 
 ## Reading the validation pair
 

@@ -29,8 +29,13 @@ carried answers and 63 renewed answers; all 95 questions and the revised contrac
 [bounded study plan](../../../docs/board/doing/jev_rule_pack/evidence/bounded-feasibility-plan.md) proposes hard stops
 and a stronger-model reference arm. The
 [capture review packet](../../../docs/board/doing/jev_rule_pack/evidence/bounded-capture-review.md) links the exact
-manifest and reproduction commands for `diagnostic_manifest.py`. Preparation and validation are offline; no live mode or
-paid approval is included. The existing calibration capture command does not execute this two-arm study.
+manifest and reproduction commands for `diagnostic_manifest.py`. Preparation and validation are offline; a manifest does
+not grant paid approval. After explicit approval,
+`diagnostic_capture.py --live --manifest <manifest.json> --review <completed-review.json> --catalog <catalog.json> --output <new-absolute-directory>`
+executes the fixed two-arm study. The output must be new and private. It includes an isolated Forge home, a durable
+journal and a scored report. Catalog drift refuses dispatch; technical failures stop the whole study and repeated
+sentinel errors stop the affected arm. There are no retries or resume mode, and a consumed proposal cannot be started
+again. The existing calibration capture command does not execute this study.
 
 Compare the same action evidence with marker and AST signals without dispatching requests:
 

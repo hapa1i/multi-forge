@@ -365,7 +365,7 @@ def test_spend_bounds_count_physical_slots_and_every_jev_question(plan):
     assert plan["arms"]["J"]["deadline_seconds"] == 30
     assert plan["arms"]["R"]["deadline_seconds"] == 45
     assert plan["execution_authorized"] is False
-    assert plan["live_runner_available"] is False
+    assert plan["live_runner_available"] is True
     assert plan["quality_accepted"] is False
 
 
@@ -531,7 +531,7 @@ def test_cli_prepares_and_validates_a_saved_proposal_without_changing_inputs(
         "physical_request_slots": 72,
         "human_answers": 95,
         "execution_authorized": False,
-        "live_runner_available": False,
+        "live_runner_available": True,
         "quality_accepted": False,
     }
     assert [review_path.read_bytes(), catalog_path.read_bytes()] == original_inputs

@@ -7,8 +7,9 @@ runtime: legal thresholds cannot recover the three human `no_warning` outcomes i
 establish that Jev cannot answer simpler questions or support a different rule.
 
 This offline proposal changes no active questions, criteria, versions, labels or settings. The
-[capture review packet](bounded-capture-review.md) freezes the diagnostic requests, with execution and paid approval
-still pending. The existing broad-wrapper, supplied-evidence warning standard remains the target.
+[capture review packet](bounded-capture-review.md) freezes the diagnostic requests. The user authorized that finite
+study on 2026-10-18 after executor fixture verification. The existing broad-wrapper, supplied-evidence warning standard
+remains the target.
 
 The [diagnostic review packet](diagnostic-human-review.md) contains six original calibration actions and six controls,
 with separate target-bound questions. Draft-2 human review covered all 12 cases and recorded 92 answers. The

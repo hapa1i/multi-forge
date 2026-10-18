@@ -308,14 +308,18 @@ def reference_answer_max_bytes(questions: dict[str, Any]) -> int:
 
 
 def implementation_hashes() -> dict[str, str]:
-    """Bind the formatter, diagnostic construction, review admission and production wire/question validators."""
+    """Bind preparation, execution, scoring, review admission and production wire/question validators."""
     paths = [
         Path(__file__).resolve(),
+        Path(__file__).with_name("diagnostic_capture.py"),
+        Path(__file__).with_name("capture_io.py"),
+        Path(__file__).with_name("diagnostic_results.py"),
         Path(__file__).with_name("rule-pack-diagnostic.py"),
         Path(__file__).with_name("diagnostic_review.py"),
         Path(__file__).with_name("rule-pack-eval.py"),
         ROOT / "src/forge/core/judgments/openrouter.py",
         ROOT / "src/forge/core/judgments/types.py",
+        ROOT / "src/forge/core/judgments/usage.py",
         *sorted((ROOT / "src/forge/policy/rule_pack").glob("*.py")),
     ]
     return {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}
@@ -418,7 +422,7 @@ def build_manifest(review: dict[str, Any], catalog: dict[str, Any]) -> dict[str,
         "schema_version": 1,
         "proposal_kind": "bounded_diagnostic_comparison",
         "execution_authorized": False,
-        "live_runner_available": False,
+        "live_runner_available": True,
         "quality_accepted": False,
         "diagnostic_version": review["diagnostic_version"],
         "packet_sha256": review["packet_sha256"],
@@ -496,7 +500,7 @@ def build_manifest(review: dict[str, Any], catalog: dict[str, Any]) -> dict[str,
             "invoice_cap_guaranteed": False,
         },
         "execution_requirements": {
-            "enforcement_implemented": False,
+            "enforcement_implemented": True,
             "approval": "Separate explicit approval of this exact manifest before any paid dispatch",
             "isolation": (
                 "New absolute output directory with a fresh isolated FORGE_HOME beneath it; clear ambient "
@@ -590,7 +594,7 @@ def validate_manifest(manifest: dict[str, Any], review: dict[str, Any], catalog:
         "physical_request_slots": len(expected["slots"]),
         "human_answers": 95,
         "execution_authorized": False,
-        "live_runner_available": False,
+        "live_runner_available": True,
         "quality_accepted": False,
     }
 

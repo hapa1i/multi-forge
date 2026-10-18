@@ -264,3 +264,23 @@ joins still need fixture verification before a paid-run approval request. No pai
 Repository-wide pre-commit passed with the sandbox-protected EOF hook omitted; every changed-file hook, including EOF,
 passed separately. The saved manifest regenerates byte-for-byte and validates against current source, catalog and human
 review identities. Whitespace, link and file-size checks pass.
+
+## 2026-10-18: bounded executor verified
+
+The user authorized implementing the runner and executing the frozen two-arm study after fixture verification.
+`diagnostic_capture.py` now enforces the fixed slots, exact provider bytes, public catalog admission, durable proposal
+claim, deadlines and stop rules. Response admission and categorical scoring remain separate from the active classifier.
+Each arm writes to its own run identity in an isolated Forge home through the existing judgment telemetry owner.
+Synchronous evidence finalization avoids writes after ambient state is restored; a finalization overrun stops further
+dispatch and remains distinct from the admitted response's status.
+
+The regenerated [manifest](bounded-capture-manifest.json) adds executor source identities and availability flags. Its
+provider bodies, slots, arm settings, scoring, limits, local estimates and review/catalog identities match commit
+`17c0b0de` exactly. Its semantic digest is `2e5940f910d71eab4b9eaddd1bc183f349d1b04d21f5a0ed335cd77fd18a51c4`. The
+public catalog preflight also matched the selected routes, prices, parameter sets and token bounds before execution.
+
+Validation: 632 focused tests passed, including 70 runner and 73 response/report tests. Five judgment observability
+integration tests passed through `scripts/test-integration.sh`; the missing-Gemini-key warning did not affect these
+fixture-only tests. Full pre-commit passed with the existing broad EOF exclusion for protected skill files; every hook,
+including EOF, passed on changed files. Exact manifest rebuild and `git diff --check` passed. No quality or runtime gate
+is closed by these implementation checks.

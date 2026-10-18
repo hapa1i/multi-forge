@@ -1,16 +1,16 @@
 # Bounded A2 diagnostic feasibility study
 
 Two-arm design selected by the user on 2026-10-18 after the [PR #274 handoff](pr-274-merge-handoff.md): 12 cases, three
-repetitions per model, the fixed stage order and the pass/stop rules below. This is a design decision only; exact
-payloads and provider spending remain unapproved. It authorizes no provider request, native collection or runtime work.
-Both previous nine-request allowances are consumed. The active rule, its 17 human labels and historical captures remain
-unchanged.
+repetitions per model, the fixed stage order and the pass/stop rules below. The user subsequently authorized the frozen
+[capture manifest](bounded-capture-manifest.json), after runner implementation and fixture checks, on 2026-10-18. That
+finite approval covers this study only. Both previous nine-request allowances are consumed. The active rule, its 17
+human labels and historical captures remain unchanged; native collection and runtime work are outside this study.
 
 Diagnostic draft 3 resolves the [option-precedence concerns](diagnostic-option-precedence.md). Its
 [completed review](diagnostic-review-2026-10-18-batch-6.json) has all 95 answers settled across 12 cases, with the
 revised question contract confirmed and no open disputes. Human review is complete. The
 [capture review packet](bounded-capture-review.md) freezes exact payloads and limits in a locally validated manifest.
-The preparation tool has no live mode; executor verification and paid approval remain separate gates.
+The preparation tool has no live mode; the separate executor must pass offline verification before paid dispatch.
 
 ## Question and fixed comparison
 

@@ -2,19 +2,23 @@
   "schema_version": 1,
   "proposal_kind": "bounded_diagnostic_comparison",
   "execution_authorized": false,
-  "live_runner_available": false,
+  "live_runner_available": true,
   "quality_accepted": false,
   "diagnostic_version": "draft-3",
   "packet_sha256": "05281aaa9120e749f576180af62e9ba17096df1a079dae8bd3b8a84fbe331033",
   "review_sha256": "1db07431ef401146d741271ada562aa5c753a245715c127f629523d1dc607db8",
   "catalog_sha256": "3abdff85329d49119e067eacfdbe027ad476b85560e47e6c42c7bbf967c23668",
   "implementation_sha256": {
-    "scripts/experiments/jev/diagnostic_manifest.py": "d83dc6e43de92b5a49922b17af3e85d568e38ce95295f86d8a08df797679e8a7",
+    "scripts/experiments/jev/diagnostic_manifest.py": "78137879a9fb9357104e3683704321c4dab0bb0e0983286962036989e7c2a352",
+    "scripts/experiments/jev/diagnostic_capture.py": "ccc4b79afdb0ef4fe6698e981b2ee162d4fd5c658a3aecc1e8313aadb56be673",
+    "scripts/experiments/jev/capture_io.py": "0b89020f1ca9dc9315ee7b2c66915f9b2eca9d85085c23cdfac94cad6472a6ea",
+    "scripts/experiments/jev/diagnostic_results.py": "1f78e22e0c67f301d6eb8a7b7268b71c29874e0c091d3bfa7945080cd59a87b4",
     "scripts/experiments/jev/rule-pack-diagnostic.py": "0df9e8c0c967cb332c32d704ba922d4a9f6bd2ccba1bab2d19923012af4aae99",
     "scripts/experiments/jev/diagnostic_review.py": "84d251bc0b49dd2f4ffcd84bd4ec9d1ad5e2cb8765f0f84bf3974171d22465f3",
     "scripts/experiments/jev/rule-pack-eval.py": "b7904bc377c93812c07b7a48c1830532e31f870b32047e456353013f7d03b43b",
     "src/forge/core/judgments/openrouter.py": "d03140ab9e67f4e5ff436aaf6823328dc3653e6e3d3131b90c167d190bd95604",
     "src/forge/core/judgments/types.py": "a7ffc22043778716a5c306ddbe7d9b9a878b85abecd1ff12e4df88cf0934a345",
+    "src/forge/core/judgments/usage.py": "8e0973971164bc26910b238bba78297d8729f20251b6a915f49ce4c7a540d23f",
     "src/forge/policy/rule_pack/__init__.py": "017a3e2842a7264e211cdb65d0be9665088d35221782b18383461df77c9606d2",
     "src/forge/policy/rule_pack/consent.py": "8493cb2b23de653b997d98f32bbd06bf71993946468b00bae3529ee80cca323b",
     "src/forge/policy/rule_pack/definitions.py": "08a5b5c2cf41e8db7690c32133bff1b3177de884248dadf24062fc188a6af1f2",
@@ -102,7 +106,7 @@
     "invoice_cap_guaranteed": false
   },
   "execution_requirements": {
-    "enforcement_implemented": false,
+    "enforcement_implemented": true,
     "approval": "Separate explicit approval of this exact manifest before any paid dispatch",
     "isolation": "New absolute output directory with a fresh isolated FORGE_HOME beneath it; clear ambient Forge session/grouping state",
     "wire_integrity": "Credentials and local telemetry identities must not augment payloads. Verify exact frozen wire bytes before paid HTTP; no added user/session metadata",
@@ -5779,5 +5783,5 @@
       "payload_sha256": "7a486120acdb88fc2a2b7d08e6c899b758cb8f72f0963c3433ab3394a6af0e2d"
     }
   ],
-  "manifest_sha256": "98972d20cf32b19ac173753ce0c76e9ea81927096d62d0229cf5e6ab5659085b"
+  "manifest_sha256": "2e5940f910d71eab4b9eaddd1bc183f349d1b04d21f5a0ed335cd77fd18a51c4"
 }

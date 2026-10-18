@@ -257,8 +257,9 @@ Diagnostic draft 3 applies the [precedence clarification](evidence/diagnostic-op
 contract is reviewed. The [review guide](evidence/diagnostic-human-review.md) separates inherited from renewed
 judgments. The user selected the [bounded plan's](evidence/bounded-feasibility-plan.md) two-model diagnostic design,
 fixed order and pass/stop rules. The [capture packet](evidence/bounded-capture-review.md) freezes payloads and limits
-for review; executor verification, spending and revised acquisition remain unapproved. Original evidence, active labels
-and settings remain unchanged. Runtime work stays gated.
+for review. On 2026-10-18 the user authorized the bounded capture after runner implementation and fixture verification;
+revised acquisition remains unapproved. Original evidence, active labels and settings remain unchanged. Runtime work
+stays gated.
 
 ## Slice 3: complete action evidence and bounded dispatch
 

@@ -68,8 +68,16 @@ reasoning would not establish runtime evidence acquisition.
 completed review and a frozen public catalog. It owns provider-envelope formatting, exact wire identities, the fixed
 request sequence and expanded scoring/stop keys. Human answers remain local scoring data. The reference envelope places
 the unchanged shared instruction guard once in its system message; reconstruction checks preserve each reviewed
-question's full meaning. This tool has no credentials, network or live mode. Its declared execution limits require a
-separately verified capture executor and paid approval; manifest validation does not enforce a live study.
+question's full meaning. This tool has no credentials, network or live mode; a manifest cannot grant paid approval.
+
+`diagnostic_capture.py` executes a separately authorized manifest through injected or live HTTP transports.
+`capture_io.py` owns private output, durable slot reservations, proposal claims and public catalog refresh.
+`diagnostic_results.py` admits bounded responses, retains reported accounting and scores the fixed observations.
+Requests use the exact frozen bodies, with no retries, resumption or replacement slots. Technical failures stop both
+arms; two wrong observations on the same sentinel stop that arm. A proposal claim survives interruption and source-only
+changes. Each arm has its own run identity in an isolated Forge home; existing judgment telemetry owns the v2 attempt
+records. Exact decimal costs remain in the capture alongside rounded ledger amounts. Diagnostic reports never admit
+model quality or runtime activation.
 
 Diagnostic definition presence distinguishes absent attribution from competing evidence; target hints cannot supply
 attribution. Consumer questions examine the proposed target and selected consumers independently of missing history.

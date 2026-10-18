@@ -2,8 +2,9 @@
 
 Prepared on 2026-10-18 from the [completed human review](diagnostic-review-2026-10-18-batch-6.json) and the
 user-selected [two-arm plan](bounded-feasibility-plan.md). This packet freezes the proposed requests and limits for
-review. It does not approve paid execution. The preparation tool has no live mode; a capture executor still needs
-fixture verification before a paid-run approval request.
+review. On 2026-10-18 the user explicitly authorized implementation, fixture verification and the paid calls needed for
+this bounded study. Execution follows the offline checks and remains limited to these bodies, slots and stop rules. The
+preparation tool has no live mode, and the manifest itself cannot grant spending authority.
 
 ## What would be sent
 
@@ -75,11 +76,16 @@ deadline and cost bound. The plan's semantic stop remains two non-correct observ
 Technical failures stop the entire study. Undispatched slots remain missing; stopped-arm slots cannot be transferred.
 
 The offline validator checks the frozen proposal by rebuilding it from the reviewed ledger, catalog and current
-formatter source. It does not dispatch, reserve slots, persist attempts, validate real provider responses or enforce a
-live deadline. Before requesting paid execution approval, the executor must demonstrate durable pre-dispatch
-reservation, no retries/resume, both stop paths, bounded persistence, isolated `FORGE_HOME`, telemetry joins and exact
-wire equality with fixture transports. Any implementation change affecting frozen bytes or limits requires a regenerated
-manifest and renewed review. The study's quality and runtime gates stay open.
+formatter source. The separate `diagnostic_capture.py` runner enforces durable pre-dispatch reservation, no retries or
+resume, both stop paths, bounded persistence, isolated `FORGE_HOME`, telemetry joins and exact wire equality. Its source
+and helpers are bound in the regenerated manifest. Implementation metadata changes must preserve the approved provider
+bodies, slots, scoring and limits; changes to those study inputs require renewed review. The study's quality and runtime
+gates stay open.
+
+The 50-minute deadline cancels an in-flight HTTP call and prohibits further dispatch. Small synchronous evidence writes
+may finish afterward; their duration is recorded separately. Keeping those writes synchronous prevents a late telemetry
+worker from writing into the restored ambient Forge home. A finalization overrun stops the study without relabeling an
+already admitted response or silently changing its emitted accounting.
 
 Reproduce and validate locally, with no credentials or network calls:
 
