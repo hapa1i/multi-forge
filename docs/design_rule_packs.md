@@ -55,8 +55,15 @@ renewed review; this experiment does not implement runtime admission or authoriz
 
 `scripts/experiments/jev/rule-pack-inventory.py` owns the bounded development-only metadata inventory. It reads the
 approved default stores directly without invoking session repair, retains only allowlisted metadata privately and checks
-selected source paths without replacement scans. It does not extract native actions or establish governance, semantic
+selected source paths without replacement scans. Its separate availability-first mode checks at most the same 24 recency
+candidates' confirmed paths before allocating three slots per runtime; the original mode allocates slots first. Both
+retain selection and exclusions privately without extracting native actions or establishing governance, semantic
 coverage or usefulness. Runtime evidence acquisition remains separate.
+
+`scripts/experiments/jev/rule-pack-source-audit.py` audits the frozen availability selection under a separate content
+scope. It checks active state and stable bounded sources, then counts allowlisted Claude identity, timestamp, record,
+stop-reason and tool-name fields. Raw identities and source hashes stay private; no message text or tool arguments are
+retained. This is a schema audit, not a completed-turn validator or action extractor, and it admits no native actions.
 
 `scripts/experiments/jev/rule-pack-diagnostic.py` prepares a separate versioned human-review packet and renders exact
 synthetic evidence, reviewable target hints and proposed transformations. Its development-only `diagnostic_review.py`

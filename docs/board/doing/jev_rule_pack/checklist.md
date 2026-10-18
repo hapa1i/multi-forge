@@ -25,9 +25,11 @@ supplied-evidence semantics. The [boundary-instruction follow-up](evidence/calib
 completed, but boundary and coverage scores cannot recover the three human no-warning labels under any allowed bands.
 The [bounded diagnostic capture](evidence/bounded-diagnostic-2026-10-18/README.md) also failed its frozen screen for
 both arms. The [offline review](evidence/offline-retention-admission.md) now separates structural observations, evidence
-admission and semantic judgment. Its AST comparison does not establish representative coverage or usefulness. Settings
-remain unset and runtime work remains gated. No bundle is enabled. The [card](card.md) owns scope; the
-[epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed.
+admission and semantic judgment. The [bounded continuation](evidence/feasibility-continuation-2026-10-19.md) recommends
+stopping the current implementation path: no viable model/runtime pairing or useful native warnings have been
+established, and the bounded native audit remains inconclusive. No additional paid calls ran. Owner review of that
+recommendation is pending; settings remain unset and runtime work remains gated. No bundle is enabled. The
+[card](card.md) owns scope; the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed.
 
 Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
 never introduce a Jev denial or `needs_review`. An independently configured policy or supervisor retains its existing
@@ -268,9 +270,13 @@ unchanged; revised acquisition, quality acceptance and runtime work remain gated
   prerequisites cannot be replaced by semantic answers; clean-break evidence remains distinct from a missing proposed
   definition. The prospective table is not implemented runtime admission or an accepted quality gate.
 
-Before another model capture, review an availability-checked native acquisition scope and numerical gates, then measure
-whether real actions supply enough evidence and offer useful semantic discrimination beyond the baseline. This offline
-pass authorizes neither collection nor a new prompt-tuning cycle. The broader feasibility checklist items remain open.
+The owner authorized the [bounded continuation](evidence/feasibility-continuation-2026-10-19.md) on 2026-10-19,
+including paid calls if needed. The availability-first cohort and private source-schema audit are complete. Only one
+selected source has named mutations in the recognized assistant-record shape, limiting that subset to 20 selected
+actions. Unknown shapes and completion remain unresolved; no replacement selection, action extraction or additional
+provider call ran. The investigation recommends stopping the current A2 implementation path, preserving failed captures
+and leaving native coverage/usefulness unmeasured. The owner disposition and broader feasibility acceptance items remain
+open; do not start Slices 3–5 from this result.
 
 ## Slice 3: complete action evidence and bounded dispatch
 

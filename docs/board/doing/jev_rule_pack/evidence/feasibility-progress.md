@@ -4,12 +4,20 @@
 unchanged. This checkpoint records preparation, an acquisition shortfall and two synthetic captures; it does not
 establish runtime feasibility.
 
-Current follow-up: the [bounded offline review](offline-retention-admission.md) compares the existing AST baseline with
-the 12 diagnostic and 17 constructed cases, separating structural candidates, evidence admission and semantic retention.
-It preserves the [completed study's failed result](bounded-diagnostic-2026-10-18/README.md) and frozen labels. No new
+Current decision: the
+[bounded continuation](feasibility-continuation-2026-10-19.md#decision-stop-the-current-implementation-path) recommends
+stopping the current A2 implementation path. The recognized assistant-record subset can yield at most 20 selected named
+mutations from one session; unknown shapes and completion remain unresolved. No actions were extracted, and native
+quality remains unmeasured. The tested Jev formulations failed, and the captured Opus configuration does not meet the
+proposed hook-stage limit. No additional provider calls ran. Runtime remains disabled; owner review of A2's board
+disposition is pending.
+
+The preceding [bounded offline review](offline-retention-admission.md) compares the existing AST baseline with the 12
+diagnostic and 17 constructed cases, separating structural candidates, evidence admission and semantic retention. It
+preserves the [completed study's failed result](bounded-diagnostic-2026-10-18/README.md) and frozen labels. No new
 judgment call or native collection ran. The offline review records the size-checker's unintended document-count request.
-The historical checkpoints below describe their own revisions; the offline review owns the current proposed
-responsibility split and next evidence gate.
+The historical checkpoints below describe their own revisions; the offline review owns the proposed responsibility split
+and next evidence gate.
 
 ## Approved local inventory
 

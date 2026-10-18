@@ -355,3 +355,275 @@ def test_source_admission_refuses_duplicate_and_excess_selected_rows(inventory, 
     ledger["selected"] *= 4
     with pytest.raises(inventory.Refusal, match="metadata_selection_limit"):
         inventory.inspect_sources(ledger)
+
+
+def confirm_source(home, repo, manifest, *, exists=True):
+    data = json.loads(manifest.read_text())
+    if data["intent"]["launch"]["runtime"] == "claude_code":
+        native_id = data["confirmed"]["claude_session_id"]
+        source = (
+            home
+            / ".claude/projects"
+            / str(repo).replace("/", "-").replace(".", "-").replace("_", "-")
+            / f"{native_id}.jsonl"
+        )
+        data["confirmed"]["transcript_path"] = str(source)
+    else:
+        native_id = data["confirmed"]["codex"]["thread_id"]
+        source = home / ".codex/sessions/2026/10/15" / f"rollout-2026-10-15T10-00-00-{native_id}.jsonl"
+        data["confirmed"]["codex"]["rollout_path"] = str(source)
+    data["confirmed"]["auth"] = "PRIVATE_AUTH"
+    data["intent"]["user_task"] = "PRIVATE_TASK"
+    manifest.write_text(json.dumps(data))
+    if exists:
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(b"PRIVATE_NATIVE_CONTENT")
+    return source
+
+
+def test_availability_allocates_after_missing_paths_without_changing_old_mode(inventory, setup, monkeypatch):
+    home, repo, _, add, save = setup
+    for number in range(10):
+        _, manifest = add(number, runtime="claude_code" if number < 5 else "codex")
+        confirm_source(home, repo, manifest, exists=number not in (4, 9))
+    save()
+    old_summary, old = inventory.inventory_metadata(repo, home, {str(repo)})
+    assert [row["canonical_identity"].split("|")[0] for row in old["selected"]] == [
+        "session-09",
+        "session-08",
+        "session-07",
+        "session-04",
+        "session-03",
+        "session-02",
+    ]
+    assert old_summary["stage"] == "metadata"
+    assert "source" not in old["selected"][0]
+    assert "candidates" not in old
+    reads, checked = [], []
+    actual_read, actual_admit = inventory.read_regular, inventory.admit_source
+
+    def read_metadata_only(path, limit):
+        assert path.name in {"index.json", "active.json", "forge.session.json"}
+        reads.append(path.name)
+        return actual_read(path, limit)
+
+    def track_source(row, source_home):
+        checked.append(row["canonical_identity"])
+        return actual_admit(row, source_home)
+
+    monkeypatch.setattr(inventory, "read_regular", read_metadata_only)
+    monkeypatch.setattr(inventory, "admit_source", track_source)
+    summary, ledger = inventory.inventory_availability(repo, home, {str(repo)})
+    assert reads.count("index.json") == reads.count("active.json") == 1
+    assert reads.count("forge.session.json") == 10
+    assert len(checked) == summary["native_paths_checked"] == 10
+    assert summary["selected_by_runtime"] == {"codex": 3, "claude_code": 3}
+    assert summary["available_sources_by_runtime"] == {"codex": 4, "claude_code": 4}
+    assert summary["source_exclusions"] == {"missing_path": 2}
+    assert summary["available_sources_beyond_runtime_cap"] == 2
+    assert summary["runtime_shortfalls"] == {"claude_code": 0, "codex": 0}
+    assert [row["canonical_identity"].split("|")[0] for row in ledger["selected"]] == [
+        "session-08",
+        "session-07",
+        "session-06",
+        "session-03",
+        "session-02",
+        "session-01",
+    ]
+    assert len(ledger["candidates"]) == 10
+    assert sum(row["status"] == "selected" for row in ledger["candidates"]) == 6
+    assert "PRIVATE_" not in json.dumps(ledger)
+
+
+def test_availability_has_one_fixed_cohort_and_never_searches_outside_it(inventory, setup, monkeypatch):
+    home, repo, rows, add, save = setup
+    for number in range(30):
+        _, manifest = add(number)
+        confirm_source(home, repo, manifest)
+    rows["unrelated"] = {
+        "project_root": "/another/repository",
+        "last_accessed_at": "2026-10-18T00:00:00Z",
+        "secret": "PRIVATE_OTHER",
+    }
+    save()
+    read_paths, checked = [], []
+    actual_read, actual_admit = inventory.read_regular, inventory.admit_source
+
+    def read_metadata_only(path, limit):
+        assert path.name in {"index.json", "active.json", "forge.session.json"}
+        read_paths.append(path)
+        return actual_read(path, limit)
+
+    def track_source(row, source_home):
+        checked.append(row["canonical_identity"])
+        return actual_admit(row, source_home)
+
+    def no_discovery(*args, **kwargs):
+        raise AssertionError("Inventory must not discover native files")
+
+    monkeypatch.setattr(inventory, "read_regular", read_metadata_only)
+    monkeypatch.setattr(inventory, "admit_source", track_source)
+    monkeypatch.setattr(Path, "glob", no_discovery)
+    monkeypatch.setattr(Path, "rglob", no_discovery)
+    monkeypatch.setattr(inventory.os, "walk", no_discovery)
+    summary, ledger = inventory.inventory_availability(repo, home, {str(repo)})
+    assert summary["matching_index_rows"] == 30
+    assert summary["metadata_candidates_within_cap"] == 24
+    assert summary["metadata_candidates_beyond_cap"] == 6
+    assert summary["native_paths_checked"] == len(checked) == len(ledger["candidates"]) == 24
+    assert sum(path.name == "forge.session.json" for path in read_paths) == 24
+    assert [key.split("|")[0] for key in checked] == [f"session-{number:02d}" for number in range(29, 5, -1)]
+    assert summary["selected_sessions"] == 3
+    assert summary["available_sources_beyond_runtime_cap"] == 21
+    assert summary["runtime_shortfalls"] == {"claude_code": 0, "codex": 3}
+    assert all("PRIVATE_" not in json.dumps(value) for value in (summary, ledger))
+    assert str(home) not in json.dumps(summary) and str(repo) not in json.dumps(summary)
+
+
+def test_availability_retains_metadata_refusals_and_checks_only_eligible_paths(inventory, setup, monkeypatch):
+    home, repo, rows, add, save = setup
+    active_key, _ = add(0)
+    add(1, intent={"launch": {"mode": "sidecar", "runtime": "claude_code"}})
+    bad_key, _ = add(2)
+    rows[bad_key]["worktree_path"] = "/unverified"
+    add(3, schema_version=99)
+    add(4)
+    _, manifest = add(5)
+    confirm_source(home, repo, manifest)
+    save({active_key: {"forge_root": str(repo), "worktree_path": str(repo), "started_at": "2026-10-15T10:00:00Z"}})
+    summary, ledger = inventory.inventory_availability(repo, home, {str(repo)})
+    assert summary["metadata_exclusions"] == {
+        "active_registry_entry": 1,
+        "sidecar_or_unknown_launch": 1,
+        "unverified_worktree_membership": 1,
+        "unsupported_manifest_schema": 1,
+    }
+    assert summary["source_exclusions"] == {"custom_or_unconfirmed_native_store": 1}
+    assert summary["native_paths_checked"] == 2
+    assert summary["selected_sessions"] == 1
+    assert len(ledger["candidates"]) == 6
+    assert all(row["status"] in {"selected", "excluded"} for row in ledger["candidates"])
+    assert all(row["reason"] is not None for row in ledger["candidates"] if row["status"] == "excluded")
+
+
+@pytest.mark.parametrize("unsafe", ["symlink", "oversized", "directory", "missing"])
+def test_availability_rejects_unsafe_native_metadata_without_reading_contents(inventory, setup, unsafe, monkeypatch):
+    home, repo, _, add, save = setup
+    _, manifest = add(1)
+    source = confirm_source(home, repo, manifest)
+    if unsafe == "symlink":
+        target = source.with_name("unapproved")
+        source.rename(target)
+        source.symlink_to(target)
+    elif unsafe == "oversized":
+        monkeypatch.setattr(inventory, "MAX_NATIVE_BYTES", 1)
+    elif unsafe == "directory":
+        source.unlink()
+        source.mkdir()
+    else:
+        source.unlink()
+    save()
+    original_open = inventory.os.open
+
+    def no_native_open(path, *args, **kwargs):
+        assert str(path) not in {str(source), source.name}
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(inventory.os, "open", no_native_open)
+    summary, ledger = inventory.inventory_availability(repo, home, {str(repo)})
+    reason = {
+        "symlink": "symlink_component",
+        "oversized": "native_file_size_limit",
+        "directory": "non_regular_file",
+        "missing": "missing_path",
+    }[unsafe]
+    assert summary["source_exclusions"] == {reason: 1}
+    assert summary["native_files_read"] == summary["native_bytes_read"] == summary["selected_sessions"] == 0
+    assert ledger["selected"] == []
+
+
+def test_availability_records_fixed_action_window_without_filtering_session_recency(inventory, setup):
+    home, repo, rows, add, save = setup
+    first, first_manifest = add(1)
+    last, last_manifest = add(2, runtime="codex")
+    confirm_source(home, repo, first_manifest)
+    confirm_source(home, repo, last_manifest)
+    rows[first]["last_accessed_at"] = "2026-09-30T23:59:59Z"
+    rows[last]["last_accessed_at"] = "2026-10-19T00:00:00Z"
+    save()
+    summary, ledger = inventory.inventory_availability(repo, home, {str(repo)})
+    assert summary["prospective_action_window"] == {
+        "start_inclusive": "2026-10-01T00:00:00Z",
+        "end_exclusive": "2026-10-18T00:00:00Z",
+    }
+    assert summary["selected_sessions"] == 2
+    assert summary["action_window_verified"] is False
+    assert summary["native_header_identity_verified"] is False
+    assert summary["completed_turns_verified"] is False
+    assert summary["native_actions_admitted"] is False
+    assert summary["named_actions_selected"] == 0
+    assert summary["quality_accepted"] is False and summary["runtime_admitted"] is False
+    assert "retained local sources" in ledger["selection_bias"]
+    for row in ledger["selected"]:
+        info = Path(row["source"]["path"]).stat()
+        assert row["source"] == {
+            "path": row["native_path"],
+            "size": info.st_size,
+            "device": info.st_dev,
+            "inode": info.st_ino,
+        }
+
+
+def test_availability_duplicate_native_identity_is_excluded_before_path_checks(inventory, setup, monkeypatch):
+    home, repo, rows, add, save = setup
+    first, first_manifest = add(1)
+    second, second_manifest = add(2)
+    source = confirm_source(home, repo, first_manifest)
+    data = json.loads(second_manifest.read_text())
+    data["confirmed"]["claude_session_id"] = rows[first]["claude_session_id"]
+    data["confirmed"]["transcript_path"] = str(source)
+    rows[second]["claude_session_id"] = rows[first]["claude_session_id"]
+    second_manifest.write_text(json.dumps(data))
+    save()
+
+    def no_source(*args):
+        raise AssertionError("Duplicate native identity must not be inspected")
+
+    monkeypatch.setattr(inventory, "admit_source", no_source)
+    summary, ledger = inventory.inventory_availability(repo, home, {str(repo)})
+    assert summary["metadata_exclusions"] == {"duplicate_native_identity": 2}
+    assert summary["native_paths_checked"] == 0
+    assert ledger["selected"] == []
+    assert all(row["reason"] == "duplicate_native_identity" for row in ledger["candidates"])
+
+
+def test_availability_cli_uses_only_fixture_stores_and_exclusive_private_outputs(inventory, setup, monkeypatch, capsys):
+    home, repo, _, add, save = setup
+    _, manifest = add(1)
+    confirm_source(home, repo, manifest)
+    save()
+    monkeypatch.setattr(inventory, "REPOSITORY", repo)
+    monkeypatch.setattr(Path, "home", lambda: home)
+    monkeypatch.setattr(inventory, "verified_worktrees", lambda repository: {str(repo)})
+    monkeypatch.setattr(sys, "argv", ["rule-pack-inventory.py", "--availability-first"])
+    assert inventory.main() == 0
+    emitted = capsys.readouterr()
+    summary = json.loads(emitted.out)
+    directory = Path(summary.pop("private_directory"))
+    try:
+        assert emitted.err == ""
+        assert directory.name.startswith("jev-a2-availability-")
+        assert directory.stat().st_mode & 0o777 == 0o700
+        assert {path.name for path in directory.iterdir()} == {"availability-private.json", "availability-summary.json"}
+        private = directory / "availability-private.json"
+        assert private.stat().st_mode & 0o777 == 0o600
+        ledger = json.loads(private.read_text())
+        assert ledger["summary"] == summary
+        assert "PRIVATE_" not in emitted.out and str(home) not in emitted.out and str(repo) not in emitted.out
+        with pytest.raises(FileExistsError):
+            inventory.private_write(private, {})
+        assert json.loads(private.read_text()) == ledger
+    finally:
+        for path in directory.iterdir():
+            path.unlink()
+        directory.rmdir()

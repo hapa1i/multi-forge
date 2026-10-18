@@ -33,7 +33,11 @@ retention answer. Neither arm passed, and the allowance is consumed. The
 [bounded offline review](evidence/offline-retention-admission.md) separates structural candidates from evidence
 admission and semantic retention, preserving the failed study and its labels. Native coverage and usefulness remain
 unmeasured. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) remains unimplemented;
-constructed-only evidence cannot establish runtime quality or activate the policy.
+constructed-only evidence cannot establish runtime quality or activate the policy. The
+[2026-10-19 continuation](evidence/feasibility-continuation-2026-10-19.md#decision-stop-the-current-implementation-path)
+recommends stopping this implementation path. The bounded native audit remains inconclusive, and the tested model
+configurations do not establish a viable hook policy. No additional provider calls ran. Owner review of the card's
+disposition is pending; the card remains `doing/` without advancing runtime work.
 
 ## Problem and outcome
 

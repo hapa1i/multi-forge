@@ -104,6 +104,30 @@ that retained metadata selection. Neither command searches for replacements. The
 [checkpoint](../../../docs/board/doing/jev_rule_pack/evidence/feasibility-progress.md) records the first run's
 missing-source shortfall; no action extractor was needed or implemented.
 
+The [bounded continuation](../../../docs/board/doing/jev_rule_pack/evidence/feasibility-continuation-2026-10-19.md) uses
+a separate metadata-only mode:
+
+```bash
+uv run python scripts/experiments/jev/rule-pack-inventory.py --availability-first
+```
+
+It checks confirmed paths within one fixed 24-candidate recency cohort before allocating up to three available sources
+per runtime. It writes a new private selection ledger and aggregate summary, without reading native content or searching
+for replacements. The recorded action window is prospective; path existence does not verify native identity, completion
+or action admission. The original modes retain their original selection behavior.
+
+For a separately authorized content scope, audit only that frozen selection:
+
+```bash
+uv run python scripts/experiments/jev/rule-pack-source-audit.py \
+  --audit /private/tmp/jev-a2-availability-<id>/availability-private.json
+```
+
+This Claude-only schema audit rechecks active state and source identities, bounds JSONL reads, and emits controlled
+metadata counters. It retains private source receipts without message text or tool arguments. It does not verify turn
+completion, extract actions or dispatch requests. Existing audit outputs refuse a repeat before any source read. The
+continuation records the completed study's shortfall and recommendation to stop the current A2 implementation path.
+
 ## A1 transport probes
 
 The default prints a fixed synthetic manifest without resolving credentials or making network requests:
