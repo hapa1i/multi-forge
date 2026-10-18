@@ -28,8 +28,9 @@ The changed fields are each target's three `*_definition` questions, plus `consu
 `replacement_satisfies` where present. Retention, literal-fact and exact-transformation answers carry unchanged. Review
 the new criteria against the evidence; the original answers in receipts are provenance, not suggested replacements.
 
-The human-review prerequisite in the [bounded feasibility plan](bounded-feasibility-plan.md) is now satisfied. Preparing
-the exact capture manifest is next; provider spending still requires separate approval.
+The human-review prerequisite in the [bounded feasibility plan](bounded-feasibility-plan.md) is now satisfied. The
+[capture review packet](bounded-capture-review.md) contains the exact proposed requests and limits. Provider spending
+still requires separate approval after executor verification.
 
 ## Reading the validation pair
 

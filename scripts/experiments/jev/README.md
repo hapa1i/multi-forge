@@ -27,7 +27,10 @@ new partial ledger, retaining only unchanged question contexts and their source 
 contract decisions reopen. The review guide describes source bindings and new human review. Diagnostic draft 3 has 32
 carried answers and 63 renewed answers; all 95 questions and the revised contract are reviewed. The
 [bounded study plan](../../../docs/board/doing/jev_rule_pack/evidence/bounded-feasibility-plan.md) proposes hard stops
-and a stronger-model reference arm; it is not an executable or approved capture manifest. There is no live mode.
+and a stronger-model reference arm. The
+[capture review packet](../../../docs/board/doing/jev_rule_pack/evidence/bounded-capture-review.md) links the exact
+manifest and reproduction commands for `diagnostic_manifest.py`. Preparation and validation are offline; no live mode or
+paid approval is included. The existing calibration capture command does not execute this two-arm study.
 
 Compare the same action evidence with marker and AST signals without dispatching requests:
 

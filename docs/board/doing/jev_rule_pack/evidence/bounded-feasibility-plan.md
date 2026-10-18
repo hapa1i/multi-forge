@@ -8,8 +8,9 @@ unchanged.
 
 Diagnostic draft 3 resolves the [option-precedence concerns](diagnostic-option-precedence.md). Its
 [completed review](diagnostic-review-2026-10-18-batch-6.json) has all 95 answers settled across 12 cases, with the
-revised question contract confirmed and no open disputes. Human review is complete. No runnable diagnostic manifest
-exists yet. Agreement with this study design is separate from approval of exact payloads and spend.
+revised question contract confirmed and no open disputes. Human review is complete. The
+[capture review packet](bounded-capture-review.md) freezes exact payloads and limits in a locally validated manifest.
+The preparation tool has no live mode; executor verification and paid approval remain separate gates.
 
 ## Question and fixed comparison
 

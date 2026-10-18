@@ -64,6 +64,13 @@ rewriting their human evidence. Diagnostic answers remain distinct from policy o
 dispatch or quality-scoring mode. Target selection and new predicates require human review, and successful diagnostic
 reasoning would not establish runtime evidence acquisition.
 
+`scripts/experiments/jev/diagnostic_manifest.py` prepares and validates a bounded two-model diagnostic proposal from a
+completed review and a frozen public catalog. It owns provider-envelope formatting, exact wire identities, the fixed
+request sequence and expanded scoring/stop keys. Human answers remain local scoring data. The reference envelope places
+the unchanged shared instruction guard once in its system message; reconstruction checks preserve each reviewed
+question's full meaning. This tool has no credentials, network or live mode. Its declared execution limits require a
+separately verified capture executor and paid approval; manifest validation does not enforce a live study.
+
 Diagnostic definition presence distinguishes absent attribution from competing evidence; target hints cannot supply
 attribution. Consumer questions examine the proposed target and selected consumers independently of missing history.
 Replacement sufficiency checks behavior only after an independent consumer constraint is established. Separate

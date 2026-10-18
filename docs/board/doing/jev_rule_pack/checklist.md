@@ -256,8 +256,9 @@ Diagnostic draft 3 applies the [precedence clarification](evidence/diagnostic-op
 [latest ledger](evidence/diagnostic-review-2026-10-18-batch-6.json) has all 95 answers settled. The revised question
 contract is reviewed. The [review guide](evidence/diagnostic-human-review.md) separates inherited from renewed
 judgments. The user selected the [bounded plan's](evidence/bounded-feasibility-plan.md) two-model diagnostic design,
-fixed order and pass/stop rules. Payloads, spending and revised acquisition remain unapproved. Original evidence, active
-labels and settings remain unchanged. Runtime work stays gated.
+fixed order and pass/stop rules. The [capture packet](evidence/bounded-capture-review.md) freezes payloads and limits
+for review; executor verification, spending and revised acquisition remain unapproved. Original evidence, active labels
+and settings remain unchanged. Runtime work stays gated.
 
 ## Slice 3: complete action evidence and bounded dispatch
 

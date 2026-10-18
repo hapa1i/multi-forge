@@ -244,3 +244,23 @@ It has 95 settled answers across 12 reviewed cases: 63 renewed answers and 32 in
 bindings preserved. Earlier ledgers, diagnostic evidence and study limits are unchanged. Local validation confirms no
 pending answers or disputed cases; model quality remains unaccepted. Exact capture preparation is next. No paid capture,
 manifest or native acquisition was added.
+
+## 2026-10-18: bounded capture manifest prepared
+
+The [capture review packet](bounded-capture-review.md) freezes 24 provider bodies and 72 ordered slots against all 95
+reviewed answers. Its catalog projection records public route, price and ZDR evidence without a provider inference
+request. The reference serializer places the unchanged guard once in the system message; reconstruction checks retain
+all reviewed instructions, criteria, actions and annotations. The largest J/R bodies are 28,840/28,458 bytes.
+
+Offline preparation expands 46 sentinel and 42 critical case/question keys, preserves the two-arm stage order and
+records local scoring answers outside provider bodies. The full-envelope planning maximum remains $7.940160 within the
+proposed $8 allowance; the byte-based payload estimate is $5.667168858. Neither is an invoice guarantee.
+
+Validation passed 489 focused tests, including 60 new manifest tests. These cover payload privacy and parity, fixed
+slots, routing and schema fields, review/hash mutations and endpoint prompt limits. Earlier reviews and captures remain
+unchanged. The new tool only prepares and validates proposals; durable dispatch, live stop enforcement and telemetry
+joins still need fixture verification before a paid-run approval request. No paid calls or native acquisition ran.
+
+Repository-wide pre-commit passed with the sandbox-protected EOF hook omitted; every changed-file hook, including EOF,
+passed separately. The saved manifest regenerates byte-for-byte and validates against current source, catalog and human
+review identities. Whitespace, link and file-size checks pass.
