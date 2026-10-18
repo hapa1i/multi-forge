@@ -32,6 +32,10 @@ from forge.core.llm.errors import NoApiKeyError
 from forge.core.reactive.env import new_root_run_identity
 from forge.runtime_config import reset_runtime_config
 
+# Keep standalone experiment helpers importable when tests load this script by path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import capture_evidence  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[3]
 CORPUS = ROOT / "docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json"
 CAPTURE_EVIDENCE = CORPUS.parent
@@ -80,6 +84,7 @@ def implementation_hashes() -> dict[str, str]:
     """Bind the capture to its transport, preparation and rule implementation."""
     paths = [
         Path(__file__).resolve(),
+        Path(capture_evidence.__file__),
         Path(__file__).with_name("rule-pack-eval.py"),
         *sorted((ROOT / "src/forge/core/judgments").glob("*.py")),
         *sorted((ROOT / "src/forge/policy/rule_pack").glob("*.py")),
@@ -106,9 +111,8 @@ def refuse_consumed_proposal(plan: dict[str, Any]) -> None:
     for path in sorted(CAPTURE_EVIDENCE.glob("*/capture.json")):
         try:
             journal = read_json(path, MAX_JOURNAL_BYTES)
-            if not isinstance(journal, dict) or not isinstance(journal.get("manifest"), dict):
-                raise ValueError("Expected a capture journal with a manifest")
-            if proposal_identity(journal["manifest"]) != identifier:
+            prior = capture_evidence.retained_manifest(journal, path, CAPTURE_EVIDENCE)
+            if proposal_identity(prior) != identifier:
                 continue
             count = journal.get("physical_requests")
             attempts = journal.get("attempts")

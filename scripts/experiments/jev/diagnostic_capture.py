@@ -26,6 +26,7 @@ from forge.runtime_config import reset_runtime_config
 
 # These standalone experiment modules are intentionally outside the installed package.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import capture_evidence  # noqa: E402
 import capture_io  # noqa: E402
 import diagnostic_manifest as manifest  # noqa: E402
 import diagnostic_results as results  # noqa: E402
@@ -81,6 +82,7 @@ def implementation_hashes() -> dict[str, str]:
     """Capture executor provenance separately from the immutable provider request proposal."""
     paths = [
         Path(__file__).resolve(),
+        Path(capture_evidence.__file__),
         Path(capture_io.__file__),
         Path(results.__file__),
     ]
@@ -147,7 +149,7 @@ def _refuse_consumed(plan: dict[str, Any], evidence_root: Path) -> None:
         if retained_bytes > MAX_JOURNAL_BYTES:
             raise ValueError("Retained evidence exceeds the bounded replay check")
         retained = manifest.read_json(path, MAX_JOURNAL_BYTES)
-        prior = retained.get("manifest", {})
+        prior = capture_evidence.retained_manifest(retained, path, evidence_root)
         if prior.get("proposal_kind") != "bounded_diagnostic_comparison":
             continue
         if proposal_identity(prior) == identifier:
