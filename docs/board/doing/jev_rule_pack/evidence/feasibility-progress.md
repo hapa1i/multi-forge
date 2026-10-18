@@ -170,3 +170,15 @@ unaccepted. The original draft-2 and initial draft-3 carried ledgers remain unch
 
 The validation pair is next for renewed case review. The study design and provider spending remain separate decisions;
 no manifest, paid inference or native acquisition was added.
+
+## 2026-10-18: two-arm study design selected
+
+The user retained the [bounded plan](bounded-feasibility-plan.md): Jev and Opus answer the diagnostic questions only,
+with 12 cases and three repetitions per model, up to 72 requests. The fixed stage order, per-arm repeated-sentinel stop,
+whole-study technical stop and two-of-three/all-three agreement rules remain as written. The conservative arithmetic is
+$0.383040 for Jev plus $7.557120 for the reference, totaling $7.940160 under the stated assumptions. This preserves the
+$8 planning allowance; it does not guarantee an invoice ceiling or establish a lower expected-spend estimate.
+
+This selects the experiment design without authorizing dispatch, provider spending or revised native acquisition. The 48
+pending case answers, exact payloads, route checks and separate capture approval remain required. No labels, manifest or
+provider calls were added.

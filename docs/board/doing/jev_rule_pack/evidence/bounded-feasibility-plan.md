@@ -1,8 +1,10 @@
 # Bounded A2 diagnostic feasibility study
 
-Draft, 2026-10-18. This proposes one finite comparison after the [PR #274 handoff](pr-274-merge-handoff.md). It
-authorizes no provider request, native collection or runtime work. Both previous nine-request allowances are consumed.
-The active rule, its 17 human labels and historical captures remain unchanged.
+Two-arm design selected by the user on 2026-10-18 after the [PR #274 handoff](pr-274-merge-handoff.md): 12 cases, three
+repetitions per model, the fixed stage order and the pass/stop rules below. This is a design decision only; exact
+payloads and provider spending remain unapproved. It authorizes no provider request, native collection or runtime work.
+Both previous nine-request allowances are consumed. The active rule, its 17 human labels and historical captures remain
+unchanged.
 
 Diagnostic draft 3 resolves the [option-precedence concerns](diagnostic-option-precedence.md). Its
 [latest review](diagnostic-review-2026-10-18-batch-1.json) has 47 answers and 48 pending questions, with the revised

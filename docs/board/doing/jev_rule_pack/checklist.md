@@ -255,9 +255,9 @@ remains open.
 Diagnostic draft 3 applies the [precedence clarification](evidence/diagnostic-option-precedence.md). Its
 [latest ledger](evidence/diagnostic-review-2026-10-18-batch-1.json) has 47 answers; 48 remain pending. The revised
 question contract is reviewed. The [review guide](evidence/diagnostic-human-review.md) separates inherited from renewed
-judgments. The [bounded feasibility plan](evidence/bounded-feasibility-plan.md) proposes hard stops, a stronger-model
-comparison and revised acquisition; its gates and spending need separate approval. Original evidence, active labels and
-settings remain unchanged. Runtime work stays gated.
+judgments. The user selected the [bounded plan's](evidence/bounded-feasibility-plan.md) two-model diagnostic design,
+fixed order and pass/stop rules. Payloads, spending and revised acquisition remain unapproved. Original evidence, active
+labels and settings remain unchanged. Runtime work stays gated.
 
 ## Slice 3: complete action evidence and bounded dispatch
 
