@@ -73,8 +73,9 @@ not mean the packet is complete, quality is accepted or an experiment is approve
 
 Draft 3 regenerates identities and reopens review of changed questions and the overall contract. The explicit carry
 command retains 32 retention, fact and transformation answers with unchanged complete question context and original
-attribution. It reopens 60 recorded answers; together with the three original nulls, 63 questions need human review in
-the [carried ledger](diagnostic-review-2026-10-18-carried.json). No new human answer is inferred from this change. The
-original draft-2 ledger and its compact batch history remain intact. The active three-question contract and its prior
-captures remain unchanged. The [bounded plan](bounded-feasibility-plan.md) owns the next experiment proposal; reviewing
-wording does not approve that plan or provider spending.
+attribution. At regeneration it reopened 60 recorded answers; together with the three original nulls, 63 questions were
+pending in the [carried ledger](diagnostic-review-2026-10-18-carried.json). The
+[review guide](diagnostic-human-review.md) tracks subsequent human confirmations. No human answer is inferred from the
+wording change. The original draft-2 ledger and its compact batch history remain intact. The active three-question
+contract and its prior captures remain unchanged. The [bounded plan](bounded-feasibility-plan.md) owns the next
+experiment proposal; reviewing wording does not approve that plan or provider spending.

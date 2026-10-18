@@ -158,3 +158,15 @@ review and authorization. No capture manifest, provider request or new native co
 The combined rule-pack, probe, evaluation/review, capture, baseline, inventory and regression selection passed 454
 tests, including the changed question groups and exact review carry boundary. The active rule, its 17 labels, settings
 and historical captures remain unchanged. Runtime feasibility is still open.
+
+## 2026-10-18: incomplete-evidence controls reviewed
+
+The human confirmed all five revised questions in each of `module-forwarding-without-history`,
+`module-forwarding-without-replacement` and `module-forwarding-partial-definition`, against the current packet and case
+hashes. The [new ledger](diagnostic-review-2026-10-18-batch-1.json) records those 15 answers and verbatim case notes,
+retains 32 inherited answers with their source bindings, and leaves 48 questions pending. The reviewer confirms that
+draft 3 resolves all three precedence concerns; question-contract review is `reviewed`, while quality remains
+unaccepted. The original draft-2 and initial draft-3 carried ledgers remain unchanged.
+
+The validation pair is next for renewed case review. The study design and provider spending remain separate decisions;
+no manifest, paid inference or native acquisition was added.

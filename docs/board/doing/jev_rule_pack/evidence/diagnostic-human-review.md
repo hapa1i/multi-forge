@@ -11,31 +11,31 @@ new controls; all source actions are synthetic. No held-out case, native session
 Case names, shared authorship and prior discussion can reveal intended contrasts; this is not blinded independent
 review.
 
-The [draft-3 carried ledger](diagnostic-review-2026-10-18-carried.json) retains **32 unchanged human answers** and
-leaves **63 questions pending**: 60 reopened answers plus the three previously unsettled answers. The overall contract
-review is pending. Presence, consumer-constraint and replacement-sufficiency wording changed under the
-[adopted precedence rules](diagnostic-option-precedence.md). Actions, scope facts, target annotations, transformations,
-the instruction guard and retention/fact questions are unchanged. No new human judgments have been recorded.
+The [latest draft-3 ledger](diagnostic-review-2026-10-18-batch-1.json) has **47 answers and 48 pending questions**. The
+human confirmed 15 revised answers across the missing-history, missing-replacement and fragment controls; 32 unchanged
+answers retain their original source bindings. The reviewer confirms that the three
+[precedence clarifications](diagnostic-option-precedence.md) resolve the wording concerns, so contract review is
+`reviewed`. This does not complete the remaining case review or accept quality. The initial
+[carried ledger](diagnostic-review-2026-10-18-carried.json) remains unchanged with its original 32 answers and 63 nulls.
 
 The unchanged [draft-2 source ledger](diagnostic-review-2026-10-17-batch-6.json) preserves all 92 original answers,
 three nulls, notes and caveats. Its [compact history](diagnostic-review-history.json) reconstructs all six original
 batches. It is historical evidence, not a valid completed review of draft 3. Carry receipts retain its attribution and
-notes; do not edit that source file. Blank worksheets show pending placeholders for every question; use the carried
-ledger to distinguish the 63 renewed judgments from the 32 unchanged answers.
+notes; do not edit that source file. Blank worksheets show pending placeholders for every question; use the latest
+ledger to distinguish pending judgments from recorded or inherited answers.
 
 The changed fields are each target's three `*_definition` questions, plus `consumer_constraint` and
 `replacement_satisfies` where present. Retention, literal-fact and exact-transformation answers carry unchanged. Review
 the new criteria against the evidence; the original answers in receipts are provenance, not suggested replacements.
 
-Start the renewed wording review with the missing-history, missing-replacement and fragment controls, then revisit
-changed questions in the validation pair and remaining cases. The
-[bounded feasibility plan](bounded-feasibility-plan.md) requires settled, hash-bound answers and contract review before
-any capture manifest. Preparing this packet does not approve its numerical gates or spending.
+The three incomplete-evidence controls are reviewed. Next, revisit changed questions in the validation pair and
+remaining cases. The [bounded feasibility plan](bounded-feasibility-plan.md) requires settled, hash-bound answers and
+contract review before any capture manifest. Preparing this packet does not approve its numerical gates or spending.
 
 ## Reading the validation pair
 
 Read [validation-boundary](diagnostic-review/validation-boundary.md) and
-[validation-gratuitous](diagnostic-review/validation-gratuitous.md) first. Review the criteria and target annotations
+[validation-gratuitous](diagnostic-review/validation-gratuitous.md) next. Review the criteria and target annotations
 before selecting answers. The requirement question asks whether a consumer imposes a constraint; it does not ask whether
 that constraint already justifies keeping the wrapper. The replacement question then asks whether the replacement
 satisfies that same constraint. Transformations ask about exact supplied code changes, not an unrestricted redesign.

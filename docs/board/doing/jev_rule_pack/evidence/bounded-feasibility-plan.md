@@ -4,10 +4,10 @@ Draft, 2026-10-18. This proposes one finite comparison after the [PR #274 handof
 authorizes no provider request, native collection or runtime work. Both previous nine-request allowances are consumed.
 The active rule, its 17 human labels and historical captures remain unchanged.
 
-Diagnostic draft 3 resolves the [option-precedence concerns](diagnostic-option-precedence.md). Its regenerated review
-carries 32 unchanged answers and leaves 63 pending, with overall contract review reopened. Complete that human review
-before preparing a capture. No runnable diagnostic manifest exists yet. Agreement with this study design is separate
-from approval of exact payloads and spend.
+Diagnostic draft 3 resolves the [option-precedence concerns](diagnostic-option-precedence.md). Its
+[latest review](diagnostic-review-2026-10-18-batch-1.json) has 47 answers and 48 pending questions, with the revised
+question contract reviewed. Complete the remaining case review before preparing a capture. No runnable diagnostic
+manifest exists yet. Agreement with this study design is separate from approval of exact payloads and spend.
 
 ## Question and fixed comparison
 
