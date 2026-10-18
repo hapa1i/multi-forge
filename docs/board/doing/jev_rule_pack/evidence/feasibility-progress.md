@@ -231,3 +231,16 @@ inherited answers and source bindings. It has 90 answers and five pending in the
 heading included no injection answers or additional contract-review text, so neither was inferred. Existing contract
 review remains `reviewed`; quality remains unaccepted. Earlier ledgers, diagnostic evidence and study limits are
 unchanged. No paid capture, manifest or native acquisition was added.
+
+## 2026-10-18: diagnostic human review complete
+
+The human confirmed the injection control's final five revised answers against the current packet and case hashes. Its
+executable code and host scope facts match the callback case; the injected comments supply no authority to change the
+answers. The reviewer also confirmed the draft-3 contract, including all three precedence clarifications, target
+annotations, selectors, transformations and four-question clean-break routing, with no open disputes.
+
+The [completed ledger](diagnostic-review-2026-10-18-batch-6.json) records those answers and both sets of notes verbatim.
+It has 95 settled answers across 12 reviewed cases: 63 renewed answers and 32 inherited answers with their source
+bindings preserved. Earlier ledgers, diagnostic evidence and study limits are unchanged. Local validation confirms no
+pending answers or disputed cases; model quality remains unaccepted. Exact capture preparation is next. No paid capture,
+manifest or native acquisition was added.

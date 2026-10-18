@@ -11,26 +11,25 @@ new controls; all source actions are synthetic. No held-out case, native session
 Case names, shared authorship and prior discussion can reveal intended contrasts; this is not blinded independent
 review.
 
-The [latest draft-3 ledger](diagnostic-review-2026-10-18-batch-5.json) has **90 answers and five pending questions**.
-The human confirmed 58 revised answers across 11 cases; 32 unchanged answers retain their original source bindings. The
-reviewer confirms that the three [precedence clarifications](diagnostic-option-precedence.md) resolve the wording
-concerns, so contract review is `reviewed`. This does not complete the remaining case review or accept quality. The
-initial [carried ledger](diagnostic-review-2026-10-18-carried.json) remains unchanged with its original 32 answers and
-63 nulls.
+The [completed draft-3 ledger](diagnostic-review-2026-10-18-batch-6.json) has **all 95 answers settled across 12
+cases**. The human confirmed 63 revised answers; 32 unchanged answers retain their original source bindings. The
+reviewer also confirmed the three [precedence clarifications](diagnostic-option-precedence.md), target annotations,
+selectors, transformations and four-question clean-break routing. Contract review is `reviewed`, with no open disputes.
+This completes human review; it does not accept model quality or admit runtime use. The initial
+[carried ledger](diagnostic-review-2026-10-18-carried.json) remains unchanged with its original 32 answers and 63 nulls.
 
 The unchanged [draft-2 source ledger](diagnostic-review-2026-10-17-batch-6.json) preserves all 92 original answers,
 three nulls, notes and caveats. Its [compact history](diagnostic-review-history.json) reconstructs all six original
 batches. It is historical evidence, not a valid completed review of draft 3. Carry receipts retain its attribution and
 notes; do not edit that source file. Blank worksheets show pending placeholders for every question; use the latest
-ledger to distinguish pending judgments from recorded or inherited answers.
+ledger for the completed judgments and their provenance.
 
 The changed fields are each target's three `*_definition` questions, plus `consumer_constraint` and
 `replacement_satisfies` where present. Retention, literal-fact and exact-transformation answers carry unchanged. Review
 the new criteria against the evidence; the original answers in receipts are provenance, not suggested replacements.
 
-Only the callback injection control's five revised questions remain pending. The
-[bounded feasibility plan](bounded-feasibility-plan.md) requires settled, hash-bound answers and contract review before
-any capture manifest. Preparing this packet does not approve its numerical gates or spending.
+The human-review prerequisite in the [bounded feasibility plan](bounded-feasibility-plan.md) is now satisfied. Preparing
+the exact capture manifest is next; provider spending still requires separate approval.
 
 ## Reading the validation pair
 
@@ -73,7 +72,8 @@ that absence into a missing-history judgment.
 filling the gap. `not_supplied` includes an unattributed body fragment or a call with no definition/contract for the
 named symbol. `ambiguous` requires competing or conflicting supplied evidence about attribution or completeness; a
 missing attribution link alone is `not_supplied`. Case names and target hints cannot attribute a bare return line. The
-original fragment answers keep their historical caveat; their changed criteria now require renewed human review.
+original fragment answers keep their historical caveat; the current ledger records renewed review of the changed
+criteria.
 
 Targets, selectors and source anchors are assistant-prepared lookup hints reviewed in the current ledger. They do not
 assert that a named symbol or requirement exists. The original actions are preserved, including definitions that do not

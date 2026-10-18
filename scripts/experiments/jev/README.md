@@ -20,12 +20,12 @@ uv run python scripts/experiments/jev/rule-pack-diagnostic.py --validate-review 
 ```
 
 The [diagnostic review guide](../../../docs/board/doing/jev_rule_pack/evidence/diagnostic-human-review.md) links the
-pending worksheets. This packet has separate criteria and identities; old human labels do not answer its new questions.
-Validation checks a retained partial ledger without importing labels into the active corpus. Active-rule provenance is
-separate from diagnostic answer identity. `--carry-review <ledger.json>` explicitly prepares a new partial ledger,
-retaining only unchanged question contexts and their source attribution; changed answers and contract decisions reopen.
-The review guide describes source bindings and new human review. Diagnostic draft 3 has 32 carried answers and 58
-renewed answers; five questions remain pending. The revised question contract is reviewed. The
+blank worksheets and completed ledger. This packet has separate criteria and identities; old human labels do not answer
+its new questions. Validation checks a retained partial ledger without importing labels into the active corpus.
+Active-rule provenance is separate from diagnostic answer identity. `--carry-review <ledger.json>` explicitly prepares a
+new partial ledger, retaining only unchanged question contexts and their source attribution; changed answers and
+contract decisions reopen. The review guide describes source bindings and new human review. Diagnostic draft 3 has 32
+carried answers and 63 renewed answers; all 95 questions and the revised contract are reviewed. The
 [bounded study plan](../../../docs/board/doing/jev_rule_pack/evidence/bounded-feasibility-plan.md) proposes hard stops
 and a stronger-model reference arm; it is not an executable or approved capture manifest. There is no live mode.
 
