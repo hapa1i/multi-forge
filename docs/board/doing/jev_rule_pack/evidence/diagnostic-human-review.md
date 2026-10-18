@@ -11,12 +11,12 @@ new controls; all source actions are synthetic. No held-out case, native session
 Case names, shared authorship and prior discussion can reveal intended contrasts; this is not blinded independent
 review.
 
-The [latest draft-3 ledger](diagnostic-review-2026-10-18-batch-2.json) has **57 answers and 38 pending questions**. The
-human confirmed 25 revised answers across the three incomplete-evidence controls and validation pair; 32 unchanged
-answers retain their original source bindings. The reviewer confirms that the three
-[precedence clarifications](diagnostic-option-precedence.md) resolve the wording concerns, so contract review is
-`reviewed`. This does not complete the remaining case review or accept quality. The initial
-[carried ledger](diagnostic-review-2026-10-18-carried.json) remains unchanged with its original 32 answers and 63 nulls.
+The [latest draft-3 ledger](diagnostic-review-2026-10-18-batch-3.json) has **67 answers and 28 pending questions**. The
+human confirmed 35 revised answers across seven cases; 32 unchanged answers retain their original source bindings. The
+reviewer confirms that the three [precedence clarifications](diagnostic-option-precedence.md) resolve the wording
+concerns, so contract review is `reviewed`. This does not complete the remaining case review or accept quality. The
+initial [carried ledger](diagnostic-review-2026-10-18-carried.json) remains unchanged with its original 32 answers and
+63 nulls.
 
 The unchanged [draft-2 source ledger](diagnostic-review-2026-10-17-batch-6.json) preserves all 92 original answers,
 three nulls, notes and caveats. Its [compact history](diagnostic-review-history.json) reconstructs all six original
@@ -28,10 +28,10 @@ The changed fields are each target's three `*_definition` questions, plus `consu
 `replacement_satisfies` where present. Retention, literal-fact and exact-transformation answers carry unchanged. Review
 the new criteria against the evidence; the original answers in receipts are provenance, not suggested replacements.
 
-The three incomplete-evidence controls and validation pair are reviewed. Next, revisit changed questions in the callback
-and method-adapter pair, then the remaining cases. The [bounded feasibility plan](bounded-feasibility-plan.md) requires
-settled, hash-bound answers and contract review before any capture manifest. Preparing this packet does not approve its
-numerical gates or spending.
+The three incomplete-evidence controls, validation pair, callback and method adapter are reviewed. Next, revisit changed
+questions in module forwarding and direct update, then the remaining cases. The
+[bounded feasibility plan](bounded-feasibility-plan.md) requires settled, hash-bound answers and contract review before
+any capture manifest. Preparing this packet does not approve its numerical gates or spending.
 
 ## Reading the validation pair
 

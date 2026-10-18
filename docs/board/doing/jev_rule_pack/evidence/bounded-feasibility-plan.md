@@ -7,7 +7,7 @@ Both previous nine-request allowances are consumed. The active rule, its 17 huma
 unchanged.
 
 Diagnostic draft 3 resolves the [option-precedence concerns](diagnostic-option-precedence.md). Its
-[latest review](diagnostic-review-2026-10-18-batch-2.json) has 57 answers and 38 pending questions, with the revised
+[latest review](diagnostic-review-2026-10-18-batch-3.json) has 67 answers and 28 pending questions, with the revised
 question contract reviewed. Complete the remaining case review before preparing a capture. No runnable diagnostic
 manifest exists yet. Agreement with this study design is separate from approval of exact payloads and spend.
 

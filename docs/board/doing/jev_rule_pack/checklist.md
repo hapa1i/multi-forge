@@ -253,7 +253,7 @@ contract comparisons using attributed targets. It needs reviewed questions and s
 remains open.
 
 Diagnostic draft 3 applies the [precedence clarification](evidence/diagnostic-option-precedence.md). Its
-[latest ledger](evidence/diagnostic-review-2026-10-18-batch-2.json) has 57 answers; 38 remain pending. The revised
+[latest ledger](evidence/diagnostic-review-2026-10-18-batch-3.json) has 67 answers; 28 remain pending. The revised
 question contract is reviewed. The [review guide](evidence/diagnostic-human-review.md) separates inherited from renewed
 judgments. The user selected the [bounded plan's](evidence/bounded-feasibility-plan.md) two-model diagnostic design,
 fixed order and pass/stop rules. Payloads, spending and revised acquisition remain unapproved. Original evidence, active

@@ -193,3 +193,15 @@ inherited answers and source bindings, bringing the total to 57 answers with 38 
 review remains `reviewed`; quality remains unaccepted. Earlier ledgers and diagnostic evidence are unchanged.
 
 The callback and method-adapter pair is next. No paid capture, manifest or native acquisition was added.
+
+## 2026-10-18: callback and method adapter reviewed
+
+The human confirmed all ten revised questions in the callback and method-adapter pair against the current case hashes.
+The callback's selected consumers establish a Record protocol that the replacement cannot satisfy under the permitted
+wiring edit. The method's selected consumer has already migrated to the replacement, leaving no independent constraint
+to compare; its historical-call probe supplies no current consumer requirement.
+
+The [new ledger](diagnostic-review-2026-10-18-batch-3.json) records the answers and verbatim notes, preserving all 32
+inherited answers and their source bindings. It has 67 answers and 28 pending across five cases. Contract review remains
+`reviewed`; quality remains unaccepted. Earlier ledgers, question evidence and study limits are unchanged. Module
+forwarding and direct update are next. No paid capture, manifest or native acquisition was added.
