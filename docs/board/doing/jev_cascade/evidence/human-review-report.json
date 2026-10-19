@@ -1,7 +1,7 @@
 {
   "contract_version": "draft-1",
   "corpus_sha256": "249b0cce2a89a520988479c2a4f2716c7ab6e667db251d021111648c5107a133",
-  "reviews_sha256": "edb7772e6bb1609ad5649ed222939f582d42ead00649d8dc2fff4e4948424f0b",
+  "reviews_sha256": "77e77b8a1d93b6e0309c903c66a00edb9a2bba84aac10888dcd2f19432f72d0c",
   "source_sha256": "25921d97f5bcaff7e1bb3b7af9b176291582a7ed0ee7d2d8845908ddb2a8f7e2",
   "quality_accepted": false,
   "max_physical_requests": 0,
@@ -77,7 +77,7 @@
       "reasons": [
         "plan_authority_stale"
       ],
-      "human_status": "pending",
+      "human_status": "reviewed",
       "human_evidence_ready": false,
       "always_escalate_control": "escalate"
     },
@@ -88,8 +88,8 @@
       "case_sha256": "6fcba448e5a279bc247a9f89bae575f7b2f53f5a02622b71bb6025f0e5e47287",
       "declared_admission": "candidate_pending_review",
       "reasons": [],
-      "human_status": "pending",
-      "human_evidence_ready": false,
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
       "always_escalate_control": "escalate"
     },
     {
