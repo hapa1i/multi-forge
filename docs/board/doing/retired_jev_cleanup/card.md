@@ -2,6 +2,8 @@
 
 **Status**: Active cleanup on `codex/remove-retired-jev-experiments`, based on `39ba8cbb`.
 
+**PR**: [#277](https://github.com/hapa1i/multi-forge/pull/277), verified locally and awaiting review.
+
 The [Jev epic](../../retired/epic_jev_support/card.md), [A2](../../retired/jev_rule_pack/card.md) and
 [A3](../../retired/jev_cascade/card.md) are retired. Their experiment runners, rule definitions and unused consent
 integration still add package and maintenance cost. Remove that implementation with its tests while retaining the

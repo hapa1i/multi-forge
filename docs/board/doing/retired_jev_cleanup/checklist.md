@@ -1,6 +1,6 @@
 # Retired Jev cleanup checklist
 
-**Current focus**: Implementation and aggregate verification are complete; prepare the cleanup PR for review.
+**Current focus**: [PR #277](https://github.com/hapa1i/multi-forge/pull/277) is open for review; closeout follows merge.
 
 ## Implementation
 
@@ -25,7 +25,7 @@
 
 ## Closeout
 
-- [ ] Commit reviewable cleanup and open a PR with validation results.
+- [x] Commit reviewable cleanup and open a PR with validation results.
 - [ ] After merge, update the change log and move this card to done.
 
 ## Recorded verification
