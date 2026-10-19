@@ -474,7 +474,8 @@ def test_preparation_preserves_pending_review_and_cannot_claim_quality(cascade, 
     assert all(answer is None for row in reviews.values() for answer in row.answers.values())
     assert report["quality_accepted"] is False
     assert report["max_physical_requests"] == 0
-    assert report["semantic_deterministic_baseline"] == "not_implemented"
+    assert report["semantic_deterministic_baseline"] == "plan_bound_structural_certificates"
+    assert report["calibration_preflight"]["status"] == "stop"
     assert report["cases"][0]["declared_admission"] == "candidate_pending_review"
     assert report["cases"][0]["always_escalate_control"] == "escalate"
     assert report["cases"][0]["human_evidence_ready"] is False

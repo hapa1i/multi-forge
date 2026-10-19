@@ -43,9 +43,9 @@ escalate. Case 05 satisfies all three clauses but has ambiguous plan authority a
 
 The [review report](human-review-report.json) validates all 24 user reviews, with no pending or disputed records. The
 three incomplete or unsupported implementations retain null semantic answers. These are human labels, not observed model
-outcomes, calibrated thresholds or runtime permission decisions. The human-review step is complete; next compare the
-admitted cases with the deterministic control and fix the finite calibration procedure in the
-[study plan](feasibility-plan.md) before proposing a paid capture.
+outcomes, calibrated thresholds or runtime permission decisions. The human-review step is complete. The subsequent
+[deterministic comparison](calibration-procedure.md) accounts for every human-positive case, so the
+[study plan](feasibility-plan.md) records an offline stop before paid capture.
 
 ## Review procedure
 
@@ -117,9 +117,9 @@ identity.
 
 The [preparation report](preparation-report.json) separates declared host exclusions from candidates pending human
 review. It always records `quality_accepted=false` and zero dispatchable requests. The always-escalate control tests
-safety only; the semantic deterministic baseline is still unimplemented. Some small pure-function examples may be
-settled by simple contract checks, so these candidates do not yet show benefit from Jev. Resolve that comparison and the
-finite calibration procedure before proposing a paid manifest.
+safety only. The deterministic control recognizes four complete algorithms against their exact plan contracts; it allows
+all six reviewed positives and escalates the other cases. No family retains an incremental positive, so the capture
+preflight stops. The proposed finite calibration procedure remains inactive; no model observations exist.
 
 ## Reproduction
 

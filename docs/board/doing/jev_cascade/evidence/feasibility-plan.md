@@ -1,13 +1,20 @@
 # A3: bounded feasibility before runtime work
 
-Status: proposed study design. Offline preparation is active; this document grants no paid-call or native-data approval.
-A3 depends on A1 and B1. A2's failed wrapper study neither validates nor rules out plan/action checking.
+Status: this synthetic packet stopped at the offline benefit gate. The deterministic control covers every reviewed
+positive, leaving no incremental model opportunity. This document grants no paid-call or native-data approval. A3
+depends on A1 and B1. A2's failed wrapper study neither validates nor rules out plan/action checking.
 
 ## Decision to make
 
 Can reviewed atomic plan questions identify useful, completely covered actions that warrant a later review-skipping
 study? The first screen tests judgment under human-reviewed plan coverage. It does not validate automatic decomposition,
 runtime evidence acquisition, representative false-allow rates or subscription savings.
+
+The [comparison and calibration procedure](calibration-procedure.md) defines the four deterministic certificates, finite
+threshold grid, selection rule and scoring denominators. The [retained report](human-review-report.json) records six
+deterministic correct allows, 18 escalations and no residual positive in any family. This result limits the current
+synthetic packet; it does not establish that A3 is generally infeasible. A different cohort or scope needs a new bounded
+proposal and owner disposition, not automatic replacement cases. No model capture should be prepared for this packet.
 
 Start with offline evidence admission and human review. Stop if that cannot establish a useful supported subset. Only
 then prepare a separately approved Jev capture. Generative-checker and frontier comparison calls wait until the

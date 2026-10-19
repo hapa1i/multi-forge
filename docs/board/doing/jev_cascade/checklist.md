@@ -2,9 +2,10 @@
 
 ## Current focus
 
-A3 starts with an offline feasibility gate after the A2 pause and PR #275 merge. The [card](card.md) owns the intended
-review-skipping outcome; the [study plan](evidence/feasibility-plan.md) owns the bounded experiment. Runtime integration
-waits for an explicit proceed decision. A1 and B1 are shipped prerequisites; A2 is not a dependency.
+A3 reached an offline stop on its first synthetic packet after the A2 pause and PR #275 merge. The [card](card.md) owns
+the intended review-skipping outcome; the [study plan](evidence/feasibility-plan.md) owns the bounded experiment. The
+deterministic comparison leaves no incremental positive case in any family. Runtime integration waits for an explicit
+proceed decision. A1 and B1 are shipped prerequisites; A2 is not a dependency.
 
 Execution branch: `codex/jev-cascade-feasibility`, based on `main` at `8dea95f5` after PR #275 merged as `fe2d09a1`. No
 A3 paid calls, native data collection or production review skipping have run. New numerical limits in the study plan are
@@ -30,23 +31,26 @@ proposals to review before a capture manifest can be approved.
   sufficiency, per-question answers and expected routing. Retain pending/disputed labels and provenance.
 - [x] Fix whole-family calibration/held-out membership and record any exposure. Separate human-reviewed decomposition
   feasibility from automatic runtime decomposition; no implementation of the latter is part of this slice.
-- [ ] Implement only the offline admission/composition and reporting needed for this experiment. Compare always-escalate
+- [x] Implement only the offline admission/composition and reporting needed for this experiment. Compare always-escalate
   and bounded deterministic controls using identical evidence. Stop if no useful supported semantic subset remains.
 - [ ] Review the finite calibration procedure, proposed false-allow/usefulness gates, exact model screen and hard stops
   before any capture. Human labels, host coverage and model confidence remain separate inputs.
 
-Offline preparation: the [review guide](evidence/human-review.md) links four compact worksheets and a blank,
-identity-bound template. The [retained ledger](evidence/human-review-ledger.json) records all 24 user reviews across the
-12 calibration and 12 held-out cases, preserving null answers where the evidence cannot support a semantic judgment. The
-preparation report distinguishes 12 declared exclusions from 12 review candidates. Fixture composition requires reviewed
-evidence, exact current identity and explicit probabilities/bands; it preserves existing denials and unrelated review.
-It has no dispatch or quality-scoring mode. The semantic deterministic baseline and usefulness comparison remain open;
-always-escalate alone cannot establish incremental model benefit. No paid manifest is prepared.
+Offline comparison: the [retained ledger](evidence/human-review-ledger.json) records all 24 user reviews, preserving
+unknown semantic answers for unsupported evidence. The [report](evidence/human-review-report.json) separates 12 host
+exclusions from 12 model candidates. Four plan-bound structural certificates account for all six human-expected allows;
+the other 18 cases escalate, with no false allow against the reviewed labels. The always-escalate control misses those
+six allows. No family has a positive case left beyond the deterministic control, so this packet stops before capture.
+The certificates were authored with every case visible; this is a bounded comparison, not generalization evidence.
 
-Offline validation: `tests/src/scripts/test_jev_cascade_offline.py` passes 107 fixture tests, including missing-clause
-confidence, denial precedence, malformed inputs, copied/stale human reviews and absence of provider/native access. The
-blank packet and preparation report reproduce from the corpus, and the human-review report reproduces from the retained
-ledger; these checks establish tool behavior, not model quality.
+The [calibration procedure](evidence/calibration-procedure.md) defines the proposed shared threshold grid, three
+repetitions, calibration-only selection and held-out hard stops. It remains inactive: no threshold is selected, scorer
+or runner implemented, or paid manifest prepared. The owner-review item above remains open. A new cohort or scope needs
+a new bounded proposal; do not silently replace cases to make this packet pass.
+
+Offline validation: focused fixtures cover admission, identity-bound human reviews, structural certificates, semantic
+mutations, label-independent predictions, comparison denominators and the no-benefit stop. The blank packet and both
+reports reproduce from their bound inputs. These checks establish tool behavior, not model quality.
 
 | Fixture                                         | Required observation                                           |
 | ----------------------------------------------- | -------------------------------------------------------------- |
