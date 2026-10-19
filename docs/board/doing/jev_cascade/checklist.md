@@ -36,7 +36,7 @@ proposals to review before a capture manifest can be approved.
   before any capture. Human labels, host coverage and model confidence remain separate inputs.
 
 Offline preparation: the [review guide](evidence/human-review.md) links four compact worksheets and a blank,
-identity-bound template. The [retained ledger](evidence/human-review-ledger.json) records six user reviews; 18 remain
+identity-bound template. The [retained ledger](evidence/human-review-ledger.json) records eight user reviews; 16 remain
 pending. The preparation report distinguishes 12 declared exclusions from 12 review candidates. Fixture composition
 requires reviewed evidence, exact current identity and explicit probabilities/bands; it preserves existing denials and
 unrelated review. It has no dispatch or quality-scoring mode. The semantic deterministic baseline and usefulness
