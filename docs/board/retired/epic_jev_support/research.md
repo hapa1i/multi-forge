@@ -1,5 +1,9 @@
 # Jev research for Multi-Forge
 
+Historical research for the epic retired as cancelled on 2026-10-19. A1 remains done; A2/A3 are retired. The
+[retirement closeout](checklist.md#retirement-closeout) records the outcome. Proposed avenues below are not active work
+or current provider verification; Jev Router remains separately proposed.
+
 Research date: 2026-10-06. Forge checkout: `c2638510`. This note records external findings, current Forge integration
 points, and design avenues. The [epic](card.md) has a draft scope and three member cards. No inference benchmarks were
 run or repository content sent to Jev.
@@ -378,10 +382,11 @@ own design. [Effort resolution](../../../../src/forge/proxy/reasoning.py),
 ## Selected cards and remaining design avenues
 
 The draft scope is [A1: client and probes](../../done/jev_client_probes/card.md),
-[A2: warning-only rule packs](../../paused/jev_rule_pack/card.md), and [A3: cascade](../../doing/jev_cascade/card.md).
-A2 needs [B3](../../done/codex_policy_warnings/card.md) for Codex-visible warnings; A3 needs
-[B1](../../done/plan_file_supervision/card.md) for fresh plan-file Claude supervision. Those cards belong to the
-separate Codex supervisor epic. The broader avenues below remain research context, not additional committed members.
+[A2: warning-only rule packs](../../retired/jev_rule_pack/card.md), and
+[A3: cascade](../../retired/jev_cascade/card.md). A2 needs [B3](../../done/codex_policy_warnings/card.md) for
+Codex-visible warnings; A3 needs [B1](../../done/plan_file_supervision/card.md) for fresh plan-file Claude supervision.
+Those cards belong to the separate Codex supervisor epic. The broader avenues below remain research context, not
+additional committed members.
 
 | Avenue                           | Main purpose                                   | First useful evidence                          |
 | -------------------------------- | ---------------------------------------------- | ---------------------------------------------- |

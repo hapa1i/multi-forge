@@ -2,10 +2,9 @@
 
 ## Current focus
 
-**Paused by owner decision, 2026-10-19.** Stop the current Jev-backed compatibility-wrapper hook path and select A3 for
-separate feasibility work. The [pause handoff](evidence/pr-275-pause-handoff.md) records the bounded investigation,
-remaining gates and conditions for reconsideration. PR #275 preserves experimental tools and negative results; it does
-not complete this card or enable a runtime policy.
+**Retired — cancelled by owner decision, 2026-10-19.** No replacement exists. The
+[retirement closeout](#retirement-closeout) supersedes the earlier [pause handoff](evidence/pr-275-pause-handoff.md). PR
+#275 preserves experimental tools and negative results; it does not complete this card or enable a runtime policy.
 
 The [bounded study](evidence/bounded-diagnostic-2026-10-18/README.md) failed its frozen screen for both models. The
 [offline review](evidence/offline-retention-admission.md) separates structural candidates, evidence admission and
@@ -14,9 +13,36 @@ found no viable tested model/runtime pairing; native evidence coverage and warni
 Settings stay unset, `jev_rule_pack` stays reserved, and the
 [runtime evidence proposal](evidence/runtime-evidence-contract.md) remains unimplemented.
 
-The foundations and their prior merge evidence remain below. Unmet acceptance items stay open. Resuming this card
-requires an explicit owner decision and new evidence addressing the pause; another prompt variant alone is insufficient.
-The [card](card.md) owns scope and the [epic checklist](../../doing/epic_jev_support/checklist.md) owns sequencing.
+The foundations and their prior merge evidence remain below. Unchecked items are unmet requirements of the cancelled
+proposal, not executable future work or completed acceptance. Reconsideration requires a new `proposed/` card linked to
+this record, not reactivation. The [card](card.md) preserves scope and the
+[epic checklist](../../retired/epic_jev_support/checklist.md) records the terminal member disposition.
+
+## Retirement closeout
+
+The owner cancelled A2, A3 and the epic on 2026-10-19 after [PR #276](https://github.com/hapa1i/multi-forge/pull/276)
+merged as `ca943b6c`. A2's last shipped investigation remains [PR #275](https://github.com/hapa1i/multi-forge/pull/275),
+merged as `fe2d09a1`; its [handoff](evidence/pr-275-pause-handoff.md) retains the verification evidence. A1 remains
+[done](../../done/jev_client_probes/checklist.md#merged-closeout). No replacement card is selected.
+
+The frozen two-model diagnostic screen failed: Jev hit its repeated definition-presence sentinel stop, while Opus missed
+the critical missing-replacement retention answer. The later offline analysis exposed an evidence-contract ambiguity
+without changing those labels or turning the failed capture into a pass. Native action coverage and warning usefulness
+remain unmeasured. These results stop the tested path; they do not prove every possible rule pack infeasible.
+
+Keep the shipped consent foundations, rule definitions, offline evaluation tools, human adjudications and capture
+evidence. `jev_rule_pack` stays reserved, settings remain unset, and no runtime dispatch, activation or native warning
+delivery is accepted. The quality, representative-evidence, runtime and release gates below remain unfulfilled and are
+cancelled with this card. Historical status and next-step statements in dated merge records describe those earlier
+checkpoints only.
+
+A future proposal must name a concrete use case, supply representative evidence and human-reviewed warning usefulness,
+and explain how a bounded comparison addresses the observed quality and latency failures. It must define its own data
+scope and paid-call approval; another prompt variant alone is insufficient to reopen runtime work.
+
+Retirement validation and the unchanged evidence hashes are recorded in the
+[epic closeout](../epic_jev_support/checklist.md#retirement-closeout). The 1,041-test focused run includes A2 relocation
+and consumed-capture replay regressions.
 
 ## Activation and verified starting points
 
@@ -257,9 +283,9 @@ The owner authorized the [bounded continuation](evidence/feasibility-continuatio
 including paid calls if needed. The availability-first cohort and private source-schema audit are complete. Only one
 selected source has named mutations in the recognized assistant-record shape, limiting that subset to 20 selected
 actions. Unknown shapes and completion remain unresolved; no replacement selection, action extraction or additional
-provider call ran. The investigation recommends stopping the current A2 implementation path, preserving failed captures
-and leaving native coverage/usefulness unmeasured. The owner disposition and broader feasibility acceptance items remain
-open; do not start Slices 3–5 from this result.
+provider call ran. The investigation recommended stopping the current A2 implementation path, preserving failed captures
+and leaving native coverage/usefulness unmeasured. The owner first paused and then cancelled this card; broader
+feasibility acceptance remains unmet, and Slices 3–5 were not authorized from this result.
 
 ## Slice 3: complete action evidence and bounded dispatch
 
@@ -472,6 +498,10 @@ Paths under `tests/src/policy/rule_pack/` and the A2 harness/integration test na
   Record failures/skips as well as passing evidence; paid native checks remain governed by their own run plans.
 
 ## Closeout
+
+These original release-closeout requirements were not fulfilled; retirement cancels their execution while retaining the
+checked evidence of shipped foundations. The terminal disposition is recorded in
+[Retirement closeout](#retirement-closeout).
 
 - [ ] Link the approved rule/evaluation contract, corpus provenance, quality results, native-delivery evidence and
   telemetry verification. Record unsupported contexts and any unsatisfied gate explicitly.

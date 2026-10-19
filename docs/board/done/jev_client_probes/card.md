@@ -1,12 +1,12 @@
 # Jev client and test scripts: OpenRouter Decisions
 
-Epic: [Jev support](../../doing/epic_jev_support/card.md). Member **A1**. No new-card dependencies. Provides the client
-and evidence consumed by A2 and A3.
+Epic: [Jev support](../../retired/epic_jev_support/card.md) (retired). Member **A1**. No new-card dependencies. Provides
+the shipped client and evidence used by the A2 and A3 investigations.
 
 Status: **done**, shipped 2026-10-14 through [PR #268](https://github.com/hapa1i/multi-forge/pull/268), merged as
 `9778007a`. The [merged closeout](checklist.md#merged-closeout) records verification and the
-[results](evidence/2026-10-14/report.md) account for all 29 approved synthetic requests. The Jev epic remains active;
-A2/A3 are separate consumers.
+[results](evidence/2026-10-14/report.md) account for all 29 approved synthetic requests. The epic and A2/A3 were
+cancelled and retired on 2026-10-19 with no replacement; A1 remains done and its client remains available.
 
 ## Problem and outcome
 
@@ -14,7 +14,7 @@ Before A1, Forge had no typed Jev transport or measured latency/multi-question c
 is alpha. This card added a thin client over existing `httpx` and reproducible scripts in `scripts/experiments/jev/` to
 establish the route contract before policy consumers rely on it.
 
-Use the [research](../../doing/epic_jev_support/research.md#access-paths-and-their-implications) as the starting
+Use the [research](../../retired/epic_jev_support/research.md#access-paths-and-their-implications) as the starting
 evidence, not as a substitute for live probes. Vendor speed claims do not establish this deployment's p50/p95 latency.
 
 Start with the minimal credential, URL, ZDR and timeout path, then a separately authorized small synthetic capture.

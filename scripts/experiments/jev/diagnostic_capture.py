@@ -31,7 +31,7 @@ import capture_io  # noqa: E402
 import diagnostic_manifest as manifest  # noqa: E402
 import diagnostic_results as results  # noqa: E402
 
-EVIDENCE_ROOT = manifest.ROOT / "docs/board/paused/jev_rule_pack/evidence"
+EVIDENCE_ROOT = manifest.ROOT / "docs/board/retired/jev_rule_pack/evidence"
 WHOLE_RUN_SECONDS = 3000
 DEADLINE_SECONDS = {"J": 30, "R": 45}
 CATALOG_TIMEOUT_SECONDS = 30

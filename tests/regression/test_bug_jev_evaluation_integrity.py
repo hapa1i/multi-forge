@@ -11,7 +11,7 @@ import pytest
 
 pytestmark = pytest.mark.regression
 ROOT = Path(__file__).resolve().parents[2]
-CORPUS = ROOT / "docs/board/paused/jev_rule_pack/evidence/wrapper-corpus.json"
+CORPUS = ROOT / "docs/board/retired/jev_rule_pack/evidence/wrapper-corpus.json"
 MODEL = "typesafe/jev-1.13-20260917"
 
 

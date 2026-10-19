@@ -1,5 +1,8 @@
 # A3: bounded feasibility before runtime work
 
+Retired study: the owner cancelled A3 on 2026-10-19 after PR #276 merged. This document preserves experimental context;
+it is not an active plan. See the [terminal closeout](../checklist.md#merged-closeout-and-retirement).
+
 Status: this synthetic packet stopped at the offline benefit gate. The deterministic control covers every reviewed
 positive, leaving no incremental model opportunity. This document grants no paid-call or native-data approval. A3
 depends on A1 and B1. A2's failed wrapper study neither validates nor rules out plan/action checking.

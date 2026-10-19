@@ -3,6 +3,11 @@
 Normative ownership for the implemented rule-pack foundations. Policy engine composition remains in
 [workflow design](design_workflows.md); this foundation does not add a runnable policy bundle.
 
+The [Jev epic](board/retired/epic_jev_support/card.md), [A2](board/retired/jev_rule_pack/card.md) and
+[A3](board/retired/jev_cascade/card.md) were cancelled and retired on 2026-10-19 with no replacement. Their tools and
+evidence remain available for offline inspection. A1's client remains shipped; no warning policy or review-skipping
+cascade was activated. Reconsideration requires a new proposed card rather than resuming the retired plans.
+
 ## Evaluation foundations
 
 `policy/rule_pack/definitions.py` owns the provisional compatibility-wrapper rule, applicability table and three atomic
@@ -22,8 +27,9 @@ The development harness `scripts/experiments/jev/rule-pack-eval.py` prepares bou
 offline. Corpus/split, semantic evidence, prompt, prediction, settings and adjudication identities remain distinct.
 Reports compare host decisions with human labels, separate source cohorts and repetitions, preserve abstentions and
 unknown costs, and use only human adjudications for error/calibration metrics. Fixture reports cannot establish rule
-quality; no release verdict is implemented. Calibration, data and acceptance decisions remain pending in the A2 card;
-they are not runtime contracts. Session consent is described in [session design](design_sessions.md).
+quality; no release verdict is implemented. A2 retired without selecting thresholds or admitting runtime use; its
+unfinished calibration, data and acceptance plans are historical references, not runtime contracts. Session consent is
+described in [session design](design_sessions.md).
 
 The same harness exports human-review packets containing rule criteria and exact case evidence while withholding
 proposals, reviewer-only notes and existing labels. Import verifies contract, membership and content identity before
@@ -42,7 +48,8 @@ that no independent boundary exists. Unsupported shapes remain explicit, and no 
 `scripts/experiments/jev/rule-pack-offline.py` compares that unchanged baseline on the fixed diagnostic review and
 constructed corpus. It records host applicability, raw candidates, syntax spans and differences from human-selected
 targets with input/source identities. It does not implement evidence admission, infer semantic completeness from syntax,
-score candidate quality or change reviewed labels. The active coverage requirement remains authoritative.
+score candidate quality or change reviewed labels. The shared rule's coverage requirement remains authoritative for
+offline assessments.
 
 `scripts/experiments/jev/rule-pack-capture.py` prepares the fixed constructed-calibration manifest. Its separately
 authorized live mode uses A1's credential/client owner with mandatory ZDR, one attempt per case, exact wire-payload
@@ -68,8 +75,8 @@ retained. This is a schema audit, not a completed-turn validator or action extra
 `scripts/experiments/jev/rule-pack-diagnostic.py` prepares a separate versioned human-review packet and renders exact
 synthetic evidence, reviewable target hints and proposed transformations. Its development-only `diagnostic_review.py`
 helper owns semantic identities, source receipts, validation and explicit answer carry-forward. It validates partial
-review ledgers against the current packet without importing labels into the active corpus. Diagnostic semantic
-identities exclude active-rule provenance but bind supplied evidence, scope facts, guard, targets, transformations and
+review ledgers against the current packet without importing labels into the wrapper corpus. Diagnostic semantic
+identities exclude shared-rule provenance but bind supplied evidence, scope facts, guard, targets, transformations and
 question text. An explicit carry-forward command reuses unchanged question reviews, retains source attribution and
 reopens changed answers and overall contract review when needed. It validates retained schema-1 ledgers without
 rewriting their human evidence. Diagnostic answers remain distinct from policy outcomes; this tool has no provider
@@ -117,9 +124,10 @@ human-positive candidate beyond the deterministic control.
 This tool has no provider dispatch, native acquisition, action-code execution or runtime wiring. Reports never accept
 model quality or select a threshold. Calibration scoring and automatic plan-clause discovery remain unimplemented.
 Workflow design continues to own the shipped generative checker, resolver and reviewer. The
-[A3 checklist](board/doing/jev_cascade/checklist.md) owns the experiment's offline stop and approval gates; its
-[calibration procedure](board/doing/jev_cascade/evidence/calibration-procedure.md) defines the proposed finite selection
-rule, which remains inactive for the current packet.
+[A3 closeout](board/retired/jev_cascade/checklist.md) records the offline stop: deterministic controls cover all six
+human-positive cases, leaving no incremental benefit to test on this packet. Its
+[calibration procedure](board/retired/jev_cascade/evidence/calibration-procedure.md) retains the unused finite selection
+proposal. Retirement cancels further work under that plan; it does not establish A3's general infeasibility.
 
 ## Consent and runtime boundary
 

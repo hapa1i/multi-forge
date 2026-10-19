@@ -1,17 +1,38 @@
 # Jev support: coordination checklist
 
-## Current focus
+## Final disposition
 
-[A2](../../paused/jev_rule_pack/card.md) is **paused** by owner decision on 2026-10-19. Its
-[pause handoff](../../paused/jev_rule_pack/evidence/pr-275-pause-handoff.md) records the tested runner, failed bounded
-study, inconclusive native audit and unmet runtime gates. PR #275 wraps that investigation without enabling A2.
+**Retired — cancelled by owner decision on 2026-10-19. No replacement.** A1 remains done; A2 and A3 are retired. The
+epic delivered typed transport and experimental tooling, but its consumer quality and quota-saving goals remain unmet.
+No active sequencing or capture work remains. Reconsideration starts with a new proposed card.
 
-Active member: [A3](../jev_cascade/card.md), for its own bounded feasibility study before runtime implementation. Branch
-`codex/jev-cascade-feasibility` starts at `8dea95f5` after PR #275 merged as `fe2d09a1`; its
-[checklist](../jev_cascade/checklist.md) and [study plan](../jev_cascade/evidence/feasibility-plan.md) own the gates. A3
-depends on shipped A1 and B1, not A2; A2's results supply caution and reusable transport/tooling, not A3 quality
-evidence. The epic stays `doing/` as the living coordinator. A1 remains done, and consumer acceptance and quota savings
-remain unproven.
+This checklist retains historical assertions. Unchecked consumer, economics and completion items below were cancelled
+without being satisfied; they are not a backlog or permission to resume this epic.
+
+## Retirement closeout
+
+- [x] Merge [PR #276](https://github.com/hapa1i/multi-forge/pull/276) as `ca943b6c` on 2026-10-19, with all five CI
+  checks passing and the same tree as reviewed head `b989b55f`.
+- [x] Retain A1's [done closeout](../../done/jev_client_probes/checklist.md#merged-closeout) and shipped code.
+- [x] Retire [A2](../jev_rule_pack/checklist.md#retirement-closeout) after its failed bounded studies and
+  [A3](../jev_cascade/checklist.md#merged-closeout-and-retirement) after the offline no-benefit stop.
+- [x] Preserve human labels, corpora, manifests, captures and original source hashes; repoint runnable fixture paths and
+  board links. Retired consumer cards do not count as shipped members.
+- [x] Verify relocated evidence, focused tests, pre-commit, links and diff checks on the retirement change.
+
+The A3 comparison accounts for six human-expected allows with four narrow deterministic certificates; the remaining 18
+actions escalate. All cases were visible during certificate design, so this limits the current packet and does not prove
+general A3 infeasibility. No A3 paid calls or runtime skipping ran. The proposed calibration procedure remains inactive.
+A2's [pause handoff](../jev_rule_pack/evidence/pr-275-pause-handoff.md) remains historical evidence, superseded by its
+terminal closeout.
+
+Retirement validation on merged `main`: 1,041 focused Jev tests passed across experiment scripts, typed judgments,
+rule-pack foundations and regressions. All 46 retained JSON files match their pre-move SHA-256 hashes. A3's blank
+packet, preparation report and completed-review report reproduce byte-for-byte at the retired paths. Full
+`make pre-commit`, the 732-source link audit and `git diff --check` pass. The first pre-commit run only reformatted
+Markdown; its rerun passed. The four A2 script path constants changed, so historical manifests retain their original
+implementation digests; no capture, label or saved report was regenerated to rebind that evidence. No paid calls or
+native collection ran.
 
 ## Activation and sequence
 
@@ -22,11 +43,11 @@ remain unproven.
   [shared contract](card.md#shared-contract); Jev Router remains separate.
 - [x] Verify activation links: the initial 2026-10-14 audit passed for all 672 Markdown sources.
 
-| Member                                     | Lane   | Prerequisites  | Acceptance owner                                                         |
-| ------------------------------------------ | ------ | -------------- | ------------------------------------------------------------------------ |
-| [A1](../../done/jev_client_probes/card.md) | Done   | None           | [A1 closeout](../../done/jev_client_probes/checklist.md#merged-closeout) |
-| [A2](../../paused/jev_rule_pack/card.md)   | Paused | A1; shipped B3 | [A2 checklist](../../paused/jev_rule_pack/checklist.md)                  |
-| [A3](../jev_cascade/card.md)               | Doing  | A1; shipped B1 | [A3 checklist](../jev_cascade/checklist.md)                              |
+| Member                                     | Lane    | Prerequisites  | Acceptance owner                                                         |
+| ------------------------------------------ | ------- | -------------- | ------------------------------------------------------------------------ |
+| [A1](../../done/jev_client_probes/card.md) | Done    | None           | [A1 closeout](../../done/jev_client_probes/checklist.md#merged-closeout) |
+| [A2](../../retired/jev_rule_pack/card.md)  | Retired | A1; shipped B3 | [A2 checklist](../../retired/jev_rule_pack/checklist.md)                 |
+| [A3](../jev_cascade/card.md)               | Retired | A1; shipped B1 | [A3 checklist](../jev_cascade/checklist.md)                              |
 
 A2 is not an A3 dependency. Neither member's quality evidence validates the other. A valid live ZDR-required Decisions
 request gates consumer availability, even when offline transport is ready.
@@ -34,7 +55,7 @@ request gates consumer availability, even when offline transport is ready.
 A2 now includes the independent [feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269),
 merged as `e9c144eb`. Its [closeout](../../done/claude_policy_feedback_permissions/checklist.md#merged-closeout) records
 the user's decision to merge with paid native testing skipped. The fix is outside this epic's membership; A2's native
-warning-delivery evidence remains its own open gate.
+warning-delivery requirement remains unmet at retirement.
 
 ## Gate 1: shared transport handoff
 
@@ -55,6 +76,8 @@ thresholds and any reviewer reserve; A1 supplies no decision-quality or quota-sa
 
 ## Gate 2: consumer activation and drift control
 
+Historical handoffs follow in date order; the retirement closeout above supersedes their active-state descriptions.
+
 - [x] Select the next member explicitly after reviewing its prerequisites. Create its branch/checklist and update both
   sides of the epic link; no implicit parallel activation or shared implementation batch.
 - [ ] Review the selected member against the shared contract and the B1/B3 handoff it consumes. Put its concrete
@@ -69,8 +92,8 @@ thresholds and any reviewer reserve; A1 supplies no decision-quality or quota-sa
   dependencies, update the owning card first, then this sequence; member quality evidence remains independent.
 
 2026-10-14 selection: A2, on `codex/jev-rule-pack` from `f7ce7a9a`. It exercises A1's first policy integration and B3's
-warning delivery before A3's review-skipping decisions. The [A2 checklist](../../paused/jev_rule_pack/checklist.md) owns
-whole-action coverage, bounded dispatch, warning provenance and quality/data gates. A2's calibration and held-out
+warning delivery before A3's review-skipping decisions. The [A2 checklist](../../retired/jev_rule_pack/checklist.md)
+owns whole-action coverage, bounded dispatch, warning provenance and quality/data gates. A2's calibration and held-out
 acceptance criteria still need review before evaluation; its quality evidence cannot validate A3.
 
 Review handoff, 2026-10-14: A2 owns the user's decision to require a new paid/data-sharing acknowledgment in every
@@ -78,26 +101,26 @@ derived session, and runs after existing whole-action checks inside the establis
 accepts `judge(run_identity=...)` with the ambient fallback retained. Five offline telemetry integrations verify
 distinct evaluations, retry identity and run ancestry; A2's dispatch/cache integration remains pending. Gate 2 must
 reconcile that API, run ancestry and audit storage with A3 before merge. The
-[A2 checklist](../../paused/jev_rule_pack/checklist.md) owns the fixtures and numeric limits.
+[A2 checklist](../../retired/jev_rule_pack/checklist.md) owns the fixtures and numeric limits.
 
 Foundation handoff, 2026-10-15: PR #270 merged as `9442c1e5`. The additive `judge(run_identity=...)` contract is
 available to either consumer; omitted identity retains the ambient fallback, and session/grouping attribution still
 comes from the environment. Downstream v2 and usage v1 are unchanged. A3 remains unimplemented and must derive its own
 evaluation runs; A2's unfinished cache/audit and quality gates remain separate. See the
-[foundation handoff](../../paused/jev_rule_pack/checklist.md#foundation-merge-and-continuation).
+[foundation handoff](../../retired/jev_rule_pack/checklist.md#foundation-merge-and-continuation).
 
 Offline evaluation handoff, 2026-10-15: PR #271 merged as `791d9872` with all five CI checks passing and the same tree
 as reviewed head `cd008613`. It changes no A1 API or telemetry schema. Its saved-response identities, human/host audit
 and metric definitions belong to A2; they supply no quality evidence for A3. The
-[A2 handoff](../../paused/jev_rule_pack/checklist.md#offline-evaluation-merge-and-next-gate) records validation and
+[A2 handoff](../../retired/jev_rule_pack/checklist.md#offline-evaluation-merge-and-next-gate) records validation and
 remaining acceptance gates. A2 and the epic remain active; A3 is not activated.
 
 Feasibility handoff, 2026-10-17: PR #274 merged as `09984440`. It changes no A1 API or telemetry schema and establishes
-no consumer quality or runtime admission. The [A2 handoff](../../paused/jev_rule_pack/evidence/pr-274-merge-handoff.md)
+no consumer quality or runtime admission. The [A2 handoff](../../retired/jev_rule_pack/evidence/pr-274-merge-handoff.md)
 preserves review provenance and the next gates. A2 and the epic remain active; A3 remains proposed.
 
 Pause handoff, 2026-10-19: the owner stopped A2's current implementation path and selected A3 feasibility next. The
-[A2 handoff](../../paused/jev_rule_pack/evidence/pr-275-pause-handoff.md) retains the failed frozen judgments and all
+[A2 handoff](../../retired/jev_rule_pack/evidence/pr-275-pause-handoff.md) retains the failed frozen judgments and all
 unmet acceptance items. PR #275 changes no A1 runtime API or telemetry schema and supplies no review-skipping evidence.
 A3 activated on `codex/jev-cascade-feasibility` from `8dea95f5` after the merge. Its
 [study plan](../jev_cascade/evidence/feasibility-plan.md) begins with offline evidence admission and human review;
@@ -115,7 +138,7 @@ Member checklists own behavior-level fixtures and tests. The epic verifies their
 | Consumer acceptance | Separate A2/A3 labeled evaluations               | Own thresholds met; limits recorded                |
 | Economics           | Same-cohort attempts, escalations and audits     | Reconciled spend and actual reviewer calls avoided |
 
-## Member and epic closeout
+## Original member and epic completion requirements (unmet)
 
 - [ ] Record each member's tests, risk-required integrations, non-passing outcomes, reviewed PR/merge evidence and final
   supported scope. Update its lane and links after closeout.

@@ -1,15 +1,32 @@
 # A3: Jev cascade feasibility checklist
 
-## Current focus
+## Final disposition
 
-A3 reached an offline stop on its first synthetic packet after the A2 pause and PR #275 merge. The [card](card.md) owns
-the intended review-skipping outcome; the [study plan](evidence/feasibility-plan.md) owns the bounded experiment. The
-deterministic comparison leaves no incremental positive case in any family. Runtime integration waits for an explicit
-proceed decision. A1 and B1 are shipped prerequisites; A2 is not a dependency.
+**Retired — cancelled by owner decision on 2026-10-19. No replacement.** A3's first synthetic packet stopped at the
+offline benefit gate. The original runtime scope was not delivered. Unchecked items below remain unmet and are closed by
+cancellation, not queued for execution. Reconsideration requires a new proposed card.
 
-Execution branch: `codex/jev-cascade-feasibility`, based on `main` at `8dea95f5` after PR #275 merged as `fe2d09a1`. No
-A3 paid calls, native data collection or production review skipping have run. New numerical limits in the study plan are
-proposals to review before a capture manifest can be approved.
+## Merged closeout and retirement
+
+[PR #276](https://github.com/hapa1i/multi-forge/pull/276) merged as `ca943b6c` on 2026-10-19, with all five CI checks
+passing. Its tree matches reviewed head `b989b55f`. The branch `codex/jev-cascade-feasibility` started from `8dea95f5`.
+
+Shipped scope: 24 synthetic cases and retained human reviews, offline admission/composition, four narrow deterministic
+certificates, comparison reports and an inactive calibration procedure. The six human-expected allows are all covered by
+deterministic checks; the other 18 actions escalate. No family has an incremental positive for a model capture. All
+cases were visible during baseline design, so this result limits the packet rather than establishing general A3
+infeasibility. No paid A3 calls, native collection, selected threshold, capture runner or production review skipping
+ran.
+
+Pre-merge validation: 172 focused tests and full `make pre-commit` passed. The blank packet and both reports reproduced
+exactly; the corpus, human ledger and review worksheets were unchanged. Tests establish offline behavior, not model
+quality or economic benefit.
+
+- [x] Record the owner's decision to stop this initiative and retire the [epic](../epic_jev_support/card.md), A2 and A3.
+- [x] Preserve the evidence and proposed selection procedure without promoting them to runtime acceptance.
+- [x] Verify relocated fixtures, report reproduction and repository checks; the
+  [epic closeout](../epic_jev_support/checklist.md#retirement-closeout) records 1,041 focused tests and all evidence
+  hashes.
 
 ## Activation and code handoff
 
@@ -45,8 +62,8 @@ The certificates were authored with every case visible; this is a bounded compar
 
 The [calibration procedure](evidence/calibration-procedure.md) defines the proposed shared threshold grid, three
 repetitions, calibration-only selection and held-out hard stops. It remains inactive: no threshold is selected, scorer
-or runner implemented, or paid manifest prepared. The owner-review item above remains open. A new cohort or scope needs
-a new bounded proposal; do not silently replace cases to make this packet pass.
+or runner implemented, or paid manifest prepared. The owner-review item above was cancelled without approval. A new
+cohort or scope needs a new proposed card and bounded study; do not replace cases within this retired packet.
 
 Offline validation: focused fixtures cover admission, identity-bound human reviews, structural certificates, semantic
 mutations, label-independent predictions, comparison denominators and the no-benefit stop. The blank packet and both
@@ -73,8 +90,8 @@ reports reproduce from their bound inputs. These checks establish tool behavior,
 - [ ] Report the frozen result, unknown/missing observations, per-family coverage, repeat consistency, latency and
   costs. Stop before held-out dispatch if no calibration setting is admissible; a held-out false allow stops the
   candidate. An all-escalate result or no benefit beyond deterministic checks stops this study.
-- [ ] Record owner-reviewed stop/revise/proceed-to-observation. A synthetic pass does not authorize runtime skipping or
-  establish representative accuracy, quota savings or a production threshold.
+- [x] Record owner-reviewed stop: cancellation at the offline gate, before the model screen. A synthetic pass does not
+  authorize runtime skipping or establish representative accuracy, quota savings or a production threshold.
 
 ## Deferred consumer acceptance
 
@@ -87,4 +104,5 @@ reports reproduce from their bound inputs. These checks establish tool behavior,
 - [ ] Demonstrate actual avoided calls and real escalation under an approved integration/native manifest. Run applicable
   hook/auth/telemetry integrations and sync workflow, telemetry and end-user docs as behavior ships.
 - [ ] Record acceptance, validation and PR evidence before any `done/` move; otherwise preserve open gates in a pause or
-  retirement decision. The [epic](../epic_jev_support/checklist.md) remains the sequencing authority.
+  retirement decision. The [retired epic](../epic_jev_support/checklist.md#retirement-closeout) records the final
+  disposition.

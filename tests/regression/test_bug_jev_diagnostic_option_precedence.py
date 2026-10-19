@@ -10,7 +10,7 @@ import pytest
 
 pytestmark = pytest.mark.regression
 ROOT = Path(__file__).resolve().parents[2]
-LEGACY = ROOT / "docs/board/paused/jev_rule_pack/evidence/diagnostic-review-2026-10-17-batch-6.json"
+LEGACY = ROOT / "docs/board/retired/jev_rule_pack/evidence/diagnostic-review-2026-10-17-batch-6.json"
 CHANGED = {
     "prior_definition",
     "proposed_definition",

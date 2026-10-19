@@ -8,8 +8,8 @@ Completed 2026-10-11 through [PR #262](https://github.com/hapa1i/multi-forge/pul
 The merged tree matches tested head `81c14448`; all five GitHub checks passed. The
 [merged closeout](checklist.md#merged-closeout) records verification and fixture teardown. The
 [live evidence](evidence/README.md) includes the user-selected source-only mode and its limits.
-[B4](../../done/codex_stop_review/card.md) subsequently shipped using this feedback contract; B5 and Jev remain
-proposed.
+[B4](../../done/codex_stop_review/card.md) subsequently shipped using this feedback contract, and
+[B5](../../done/codex_fork_supervisor/card.md) shipped independently. The prospective Jev consumer was retired.
 
 ## Problem and outcome
 
@@ -19,10 +19,10 @@ Codex on an allowed action using the response shape B2 proves reaches model cont
 warnings through tested PreToolUse `systemMessage` behavior; UI/event-stream delivery and model context are separate
 channels.
 
-This enables [Jev rule-pack warnings](../../paused/jev_rule_pack/card.md) in Codex, but is independently useful for
-existing policy warnings and degraded supervisor outcomes. Ordinary warning delivery needs no supervisor or Jev call.
-The optional source-only mode validates supervisor quotations against B1's immutable reviewed plan snapshot before the
-warning conversion loses citation structure.
+This was intended to support [Jev rule-pack warnings](../../retired/jev_rule_pack/card.md), whose card was cancelled and
+retired without runtime activation. It independently supports existing policy warnings and degraded supervisor outcomes.
+Ordinary warning delivery needs no supervisor or Jev call. The optional source-only mode validates supervisor quotations
+against B1's immutable reviewed plan snapshot before the warning conversion loses citation structure.
 
 ## Scope
 

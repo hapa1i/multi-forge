@@ -1,5 +1,8 @@
 # A3 identity and accounting handoff
 
+Retired study: the owner cancelled A3 on 2026-10-19 after PR #276 merged. This document preserves experimental context;
+it is not an active plan. See the [terminal closeout](../checklist.md#merged-closeout-and-retirement).
+
 Code inspection at `2672ecf2`, 2026-10-19. This reconciles the identity task in the [checklist](../checklist.md) for the
 [offline study](feasibility-plan.md). No provider or native-source calls ran. The existing contracts support offline
 preparation; they do not yet provide complete A3 runtime correlation.

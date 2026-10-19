@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts/experiments/jev/cascade-offline.py"
-CORPUS_PATH = ROOT / "docs/board/doing/jev_cascade/evidence/cascade-corpus.json"
+CORPUS_PATH = ROOT / "docs/board/retired/jev_cascade/evidence/cascade-corpus.json"
 
 
 @pytest.fixture

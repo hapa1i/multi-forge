@@ -10,7 +10,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts/experiments/jev/cascade-offline.py"
-EVIDENCE = ROOT / "docs/board/doing/jev_cascade/evidence"
+EVIDENCE = ROOT / "docs/board/retired/jev_cascade/evidence"
 
 
 @pytest.fixture

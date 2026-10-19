@@ -1,14 +1,23 @@
 # Jev as the cascade's first tier
 
-Status: **doing**, activated 2026-10-19 for feasibility only after PR #275 merged. The [checklist](checklist.md) and
-[bounded study plan](evidence/feasibility-plan.md) place evidence admission and human review before model capture or
-runtime integration. Branch `codex/jev-cascade-feasibility` starts at `8dea95f5`.
+Status: **retired**. Outcome: **cancelled** by owner decision on 2026-10-19, after
+[PR #276](https://github.com/hapa1i/multi-forge/pull/276) merged as `ca943b6c`. No replacement is selected. The
+[merged closeout](checklist.md#merged-closeout-and-retirement) records retained tooling, verification and unmet goals.
 
-Epic: [Jev support](../../doing/epic_jev_support/card.md). Member **A3**. Depends on
+Four deterministic certificates cover all six human-positive cases in the synthetic packet; the other 18 cases escalate.
+No incremental positive remains for a Jev capture, so the study stopped offline. No model quality, actual avoided Claude
+calls or quota savings were established. The baseline was designed with all examples visible; broader A3 feasibility
+remains untested. No A3 paid requests or runtime integration ran.
+
+This card is a terminal reference. The original scope below was not delivered. Any reconsideration requires a new
+`proposed/` card linked here, with representative cases and a bounded comparison; the inactive calibration proposal
+supplies no execution approval.
+
+Epic: [Jev support](../../retired/epic_jev_support/card.md). Member **A3**. Depends on
 [A1: Jev client and probes](../../done/jev_client_probes/card.md) and
 [B1: plan-file Claude supervision](../../done/plan_file_supervision/card.md). A2 is not a dependency.
 
-## Problem and outcome
+## Original problem and outcome
 
 On projects where Jev API spend is accepted, settle clearly covered plan/action checks before invoking the Claude
 supervisor. Reserve Claude subscription calls for uncertain, unsupported or divergent cases, while retaining the current
@@ -16,7 +25,7 @@ cascade's conservative allow-or-escalate boundary.
 
 Only an actual avoided Claude invocation preserves reviewer quota. Jev's request price is an additional API charge, and
 sampled audits/retries/escalations consume resources too. Everyday subscription-only supervision keeps this tier
-disabled. See the [economics research](../../doing/epic_jev_support/research.md#economics-protecting-claude-quota).
+disabled. See the [economics research](../../retired/epic_jev_support/research.md#economics-protecting-claude-quota).
 
 ## Scope
 
@@ -38,7 +47,7 @@ disabled. See the [economics research](../../doing/epic_jev_support/research.md#
   reviewer attempts once, and attribute Jev cost separately from Claude usage. Keep audit volume explicitly bounded so
   it does not silently consume the quota being protected.
 - Reconcile A2's optional evaluation `RunIdentity` parameter, `judge(run_identity=...)`, at the
-  [epic handoff](../../doing/epic_jev_support/checklist.md#gate-2-consumer-activation-and-drift-control). Use distinct
+  [epic handoff](../../retired/epic_jev_support/checklist.md#gate-2-consumer-activation-and-drift-control). Use distinct
   evaluation runs with retained parent/root ancestry for Jev, reviewer escalation and audits; do not count an entire
   interactive session as one evaluation. This is a shared API review, not an A2 quality dependency.
 - Require offline evaluation and an opt-in observation phase before enabling Jev to skip reviews. Select thresholds from

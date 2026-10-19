@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
-EVIDENCE = ROOT / "docs/board/doing/jev_cascade/evidence"
+EVIDENCE = ROOT / "docs/board/retired/jev_cascade/evidence"
 SCRIPT = ROOT / "scripts/experiments/jev/cascade-offline.py"
 
 

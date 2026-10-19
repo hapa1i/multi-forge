@@ -103,9 +103,10 @@ and is not a sixth epic member. B5 verified its composition with native Stop rev
 
 ## Boundaries and sequencing
 
-The [Jev epic](../../doing/epic_jev_support/card.md) is separate. Its A2 uses B3 for Codex-visible warnings; A3 uses B1
-for the Claude escalation target. Jev is a paid API route and is not enabled by everyday subscription-only supervision.
-Plan-file Claude supervision is B1, not a third epic. Team supervision remains with
+The [retired Jev epic](../../retired/epic_jev_support/card.md) was separate. Its A2 proposed using B3 for Codex-visible
+warnings, and A3 proposed using B1 for the Claude escalation target. Both consumers were cancelled without runtime
+activation. Jev is a paid API route and is not enabled by everyday subscription-only supervision. Plan-file Claude
+supervision is B1, not a third epic. Team supervision remains with
 [team supervisor plan context](../../proposed/team_supervisor_plan_context/card.md).
 
 B1 shipped using the established `apply_patch` deny path, with current-version end-to-end, isolation and deadline tests

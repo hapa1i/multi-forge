@@ -1,6 +1,11 @@
 # Jev rule pack, warnings only
 
-Epic: [Jev support](../../doing/epic_jev_support/card.md). Member **A2**. Depends on
+Status: **retired — cancelled by owner decision on 2026-10-19**. No replacement exists. This is a terminal reference
+record; the warning policy did not ship. The [retirement closeout](checklist.md#retirement-closeout) records the
+verified stopping point and unmet gates. The shipped foundations, tools and evidence remain available, and
+[A1](../../done/jev_client_probes/card.md) remains done. Any reconsideration starts a new `proposed/` card linked here.
+
+Epic: [Jev support](../../retired/epic_jev_support/card.md). Member **A2**. Depends on
 [A1: Jev client and probes](../../done/jev_client_probes/card.md). Codex-visible delivery also depends on
 [B3: warnings Codex can see](../../done/codex_policy_warnings/card.md), shipped through PR #262 and closed on
 2026-10-11.
@@ -8,15 +13,15 @@ Epic: [Jev support](../../doing/epic_jev_support/card.md). Member **A2**. Depend
 The independent [feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), shipped as
 `e9c144eb` and is included on `main`. Its
 [closeout](../../done/claude_policy_feedback_permissions/checklist.md#merged-closeout) records the user's decision to
-merge with paid native testing skipped. A2 still needs its own native warning-delivery evidence.
+merge with paid native testing skipped. A2's own native warning-delivery gate was never satisfied.
 
-Status: **paused**, by owner decision on 2026-10-19. The foundations shipped through
-[PR #270](https://github.com/hapa1i/multi-forge/pull/270), merged as `9442c1e5` on 2026-10-15. Offline outcomes and
-saved-response evaluation shipped through [PR #271](https://github.com/hapa1i/multi-forge/pull/271) as `791d9872` on the
-same day. The [execution checklist](checklist.md) records the outstanding quality and activation gates. The
+The foundations shipped through [PR #270](https://github.com/hapa1i/multi-forge/pull/270), merged as `9442c1e5` on
+2026-10-15. Offline outcomes and saved-response evaluation shipped through
+[PR #271](https://github.com/hapa1i/multi-forge/pull/271) as `791d9872` on the same day. The
+[execution checklist](checklist.md) records the outstanding quality and activation gates. The
 [wrapper evidence contract](evidence/initial-rule-review.md) follows the user's 2026-10-15 choice to keep broader
 wrappers. All 17 constructed hook-shaped examples now have human adjudications. Representative action coverage, warning
-usefulness and numerical quality gates remain open. The
+usefulness and numerical quality gates remain unmet. The
 [first calibration capture](evidence/calibration-2026-10-16/README.md) and
 [boundary-instruction follow-up](evidence/calibration-boundary-2026-10-17/README.md) are complete. The follow-up still
 cannot recover any of the three human no-warning labels under allowed thresholds. Settings remain unset and the bundle
@@ -37,8 +42,11 @@ constructed-only evidence cannot establish runtime quality or activate the polic
 [2026-10-19 continuation](evidence/feasibility-continuation-2026-10-19.md#decision-stop-the-current-implementation-path)
 records why this implementation path stopped. The bounded native audit remains inconclusive, and the tested model
 configurations do not establish a viable hook policy. The owner accepted the pause on 2026-10-19. The
-[pause handoff](evidence/pr-275-pause-handoff.md) preserves shipped scope, unmet gates and conditions for
-reconsideration. The epic selects A3 for separate feasibility work; this is not an A2 completion or quality endorsement.
+[pause handoff](evidence/pr-275-pause-handoff.md) preserves that earlier disposition. The owner subsequently retired A2,
+A3 and the epic after [PR #276](https://github.com/hapa1i/multi-forge/pull/276) merged. Retirement supersedes the pause
+and A3 handoff; it does not change the failed study or imply that every future rule pack is infeasible.
+
+The scope and acceptance requirements below are the cancelled proposal, preserved for reference rather than execution.
 
 ## Problem and outcome
 
@@ -48,7 +56,7 @@ warnings. It works without a plan or supervisor and provides measurable evidence
 block actions.
 
 [Workflow design §1.1](../../../design_workflows.md#11-deterministic-policy-forge-policy) motivates this use. The
-[research](../../doing/epic_jev_support/research.md#rule-packs-backed-by-jev-fixed-semantic-checks) explains the
+[research](../../retired/epic_jev_support/research.md#rule-packs-backed-by-jev-fixed-semantic-checks) explains the
 boundary between stable rule citations, action evidence and semantic correctness.
 
 ## Scope
@@ -109,7 +117,7 @@ boundary between stable rule citations, action evidence and semantic correctness
 
 Direct blocking and escalation of fixed-rule findings are deferred. The existing plan supervisor cannot adjudicate rule
 findings merely because it is configured; that extension would need an explicit rule/evidence handoff.
-[A3](../../doing/jev_cascade/card.md) is plan-check cascade work, not a shortcut around that requirement.
+[A3](../../retired/jev_cascade/card.md) is plan-check cascade work, not a shortcut around that requirement.
 
 ## B3 formatter handoff (2026-10-10)
 

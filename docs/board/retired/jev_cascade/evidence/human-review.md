@@ -1,5 +1,8 @@
 # A3 offline review
 
+Retired study: the owner cancelled A3 on 2026-10-19 after PR #276 merged. This document preserves experimental context;
+it is not an active plan. See the [terminal closeout](../checklist.md#merged-closeout-and-retirement).
+
 The [study plan](feasibility-plan.md) asks whether atomic plan questions can support a useful later review-skipping
 study. This packet contains 24 synthetic actions across four plan families and no model results. The first review
 concerns the evidence and questions themselves; no paid capture is authorized.
@@ -129,12 +132,12 @@ worksheets apply repository Markdown formatting after rendering; JSON content an
 
 ```bash
 uv run python scripts/experiments/jev/cascade-offline.py \
-  docs/board/doing/jev_cascade/evidence/cascade-corpus.json
+  docs/board/retired/jev_cascade/evidence/cascade-corpus.json
 uv run python scripts/experiments/jev/cascade-offline.py \
-  docs/board/doing/jev_cascade/evidence/cascade-corpus.json --review-packet
+  docs/board/retired/jev_cascade/evidence/cascade-corpus.json --review-packet
 uv run python scripts/experiments/jev/cascade-offline.py \
-  docs/board/doing/jev_cascade/evidence/cascade-corpus.json --render-family input-handling
+  docs/board/retired/jev_cascade/evidence/cascade-corpus.json --render-family input-handling
 uv run python scripts/experiments/jev/cascade-offline.py \
-  docs/board/doing/jev_cascade/evidence/cascade-corpus.json \
-  --review docs/board/doing/jev_cascade/evidence/human-review-ledger.json
+  docs/board/retired/jev_cascade/evidence/cascade-corpus.json \
+  --review docs/board/retired/jev_cascade/evidence/human-review-ledger.json
 ```

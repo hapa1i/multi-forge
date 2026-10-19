@@ -1,5 +1,11 @@
 # PR #275: bounded investigation and A2 pause
 
+**Historical pause handoff, superseded on 2026-10-19.** After [PR #276](https://github.com/hapa1i/multi-forge/pull/276)
+merged as `ca943b6c`, the owner cancelled A2, A3 and the epic with no replacement. The
+[retirement closeout](../checklist.md#retirement-closeout) owns the terminal disposition. The pause, A3 selection and
+verification below describe the earlier PR #275 checkpoint; they are not current authorization to resume either
+consumer. A1 remains done, and the retained tools and evidence do not activate a warning policy.
+
 ## Owner decision, 2026-10-19
 
 Pause A2's current Jev-backed compatibility-wrapper hook path and select A3 for separate feasibility work. Preserve the
@@ -21,15 +27,17 @@ infeasible.
 - The [bounded diagnostic capture](bounded-diagnostic-2026-10-18/README.md) records 38 requests and $1.029230756
   reported spend. Its allowance is consumed. No additional A2 or A3 experiment capture ran during this wrap; standard
   integration verification used its normal setup and is recorded below.
-- Capture journals, manifests, completed reviews and saved reports retain their original JSON bytes through the lane
-  move. Harness defaults and current document links follow `paused/`; historical source receipts still identify the code
-  used then. New executions have new source identities and cannot silently reuse an old capture authorization.
+- Capture journals, manifests, completed reviews and saved reports retained their original JSON bytes through the pause
+  lane move. Harness defaults and current document links followed `paused/` at that checkpoint; retirement later moved
+  them to `retired/`. Historical source receipts still identify the code used then. New executions have new source
+  identities and cannot silently reuse an old capture authorization.
 - Settings remain unset. Runtime evidence acquisition, trusted scope declarations, dispatch, activation, warning
   delivery and quality acceptance remain open. The card's unchecked acceptance items are preserved.
 
-Reconsideration requires an owner decision and a bounded proposal addressing evidence admission, representative
-usefulness and the tested quality/latency failures. A different complete-diff review product would need an explicit
-scope decision. Another prompt variant alone does not reopen runtime implementation.
+At the pause, reconsideration required an owner decision and a bounded proposal addressing evidence admission,
+representative usefulness and the tested quality/latency failures. Retirement now requires a new `proposed/` card linked
+to this record. A different complete-diff review product would need an explicit scope decision. Another prompt variant
+alone does not reopen runtime implementation.
 
 ## Verification and next member
 
@@ -44,10 +52,11 @@ Focused pause validation passed 490 affected script tests, 94 relocation/evaluat
 inventory/source-audit tests; these overlap the aggregate suites. All 40 retained JSON evidence files match their
 pre-move hashes. The inventory now uses private platform temporary storage while retaining historical ledger support.
 Applicable changed-file pre-commit checks passed, including types, formatting, secrets, size limits and the 722-source
-Markdown link audit. The user's unrelated `AGENTS.md` edits were excluded and preserved. Settings remain unset, and A2
-remains paused with its runtime and quality gates open.
+Markdown link audit. The user's unrelated `AGENTS.md` edits were excluded and preserved. Settings remained unset, and A2
+was paused with its runtime and quality gates open at that checkpoint.
 
-[A3](../../../doing/jev_cascade/card.md) depends on A1 and shipped B1, not A2. It activated on
-`codex/jev-cascade-feasibility` from `8dea95f5`, with its own [checklist](../../../doing/jev_cascade/checklist.md) and
-finite feasibility plan. A3 must establish action/plan coverage and a useful false-allow/abstention trade-off before
-skipping any real review. The [epic](../../../doing/epic_jev_support/checklist.md) remains active and owns that handoff.
+[A3](../../../retired/jev_cascade/card.md) depends on A1 and shipped B1, not A2. It activated on
+`codex/jev-cascade-feasibility` from `8dea95f5`, with its own [checklist](../../../retired/jev_cascade/checklist.md) and
+finite feasibility plan. That handoff required A3 to establish action/plan coverage and a useful false-allow/abstention
+trade-off before skipping any real review. The [epic](../../../retired/epic_jev_support/checklist.md) then remained
+active; its retirement closeout records why that subsequent investigation also stopped.

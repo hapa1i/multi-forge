@@ -161,8 +161,8 @@ From the repository root, using already-installed development dependencies:
 
 ```bash
 uv run python scripts/experiments/jev/rule-pack-offline.py \
-  --review docs/board/paused/jev_rule_pack/evidence/diagnostic-review-2026-10-18-batch-6.json \
-  --corpus docs/board/paused/jev_rule_pack/evidence/wrapper-corpus.json
+  --review docs/board/retired/jev_rule_pack/evidence/diagnostic-review-2026-10-18-batch-6.json \
+  --corpus docs/board/retired/jev_rule_pack/evidence/wrapper-corpus.json
 ```
 
 The command emits JSON only and has no provider, credential, native collection or runtime mode. Compare stdout with the

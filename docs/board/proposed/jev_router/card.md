@@ -1,6 +1,7 @@
 # Jev Router support
 
-Status: proposed. Separate from the [Jev judgments epic](../../doing/epic_jev_support/card.md) and its A1–A3 cards.
+Status: proposed. Independent of the retired [Jev judgments epic](../../retired/epic_jev_support/card.md) and its A1–A3
+cards. The epic's cancellation does not activate or retire this proposal; this card is not its replacement.
 
 ## Problem and outcome
 
@@ -51,5 +52,5 @@ model allowlist. Exclusions still apply; an empty resulting pool returns 404.
 ## Boundary
 
 This is dynamic generative-model routing, independent of Jev's typed Decisions client, semantic rule packs and
-plan-check cascade. The [research](../../doing/epic_jev_support/research.md#jev-router-separate-card) records the
+plan-check cascade. The [research](../../retired/epic_jev_support/research.md#jev-router-separate-card) records the
 distinction. No dependency on A1 or the Codex supervisor epic is assumed.

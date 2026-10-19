@@ -1,9 +1,11 @@
 # A3 deterministic comparison and proposed calibration
 
-Status: offline comparison plus a proposed, inactive calibration procedure. No threshold is selected and no paid capture
-is authorized. The [checklist](../checklist.md) owns execution status; the [feasibility plan](feasibility-plan.md) owns
-the study boundary and later proceed decision. The capture runner and calibration scorer remain deferred
-implementations.
+Retired study: the owner cancelled A3 on 2026-10-19 after PR #276 merged. This document preserves experimental context;
+it is not an active plan. See the [terminal closeout](../checklist.md#merged-closeout-and-retirement).
+
+Status: retained offline comparison and unused calibration proposal. No threshold was selected or paid capture
+authorized. The [checklist](../checklist.md) records cancellation; the [feasibility plan](feasibility-plan.md) preserves
+the historical study boundary. The capture runner and calibration scorer were not implemented before cancellation.
 
 ## Offline comparison before capture
 

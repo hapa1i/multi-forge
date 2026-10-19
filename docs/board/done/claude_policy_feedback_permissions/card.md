@@ -5,8 +5,8 @@ user authorized merge with the paid native trial still skipped. The implementati
 receipt and permission handling remain unverified. See the [merged closeout](checklist.md#merged-closeout).
 
 Activated 2026-10-14 on `codex/claude-policy-feedback-permissions`, based on `main` at `f7ce7a9a`. Identified during the
-[A2 rule-pack](../../paused/jev_rule_pack/card.md) review. This independent fix is outside the Jev epic's membership; A2
-must establish its own native warning-delivery evidence before claiming that acceptance.
+[A2 rule-pack](../../retired/jev_rule_pack/card.md) review. This independent fix is outside the Jev epic's membership;
+A2 was cancelled and retired without native warning-delivery acceptance or runtime activation.
 
 ## Problem and outcome
 

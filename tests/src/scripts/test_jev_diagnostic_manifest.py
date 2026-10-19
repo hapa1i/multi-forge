@@ -14,7 +14,7 @@ import pytest
 from forge.core.judgments.types import JudgmentError
 
 ROOT = Path(__file__).resolve().parents[3]
-EVIDENCE = ROOT / "docs/board/paused/jev_rule_pack/evidence"
+EVIDENCE = ROOT / "docs/board/retired/jev_rule_pack/evidence"
 REVIEW_PATH = EVIDENCE / "diagnostic-review-2026-10-18-batch-6.json"
 CASE_ORDER = (
     "validation-boundary",

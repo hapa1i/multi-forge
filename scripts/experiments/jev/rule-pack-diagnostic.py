@@ -13,7 +13,7 @@ from typing import Any
 from forge.core.judgments.types import ChoiceQuestion
 
 ROOT = Path(__file__).resolve().parents[3]
-EVIDENCE = ROOT / "docs/board/paused/jev_rule_pack/evidence"
+EVIDENCE = ROOT / "docs/board/retired/jev_rule_pack/evidence"
 CORPUS = EVIDENCE / "wrapper-corpus.json"
 CONTROLS = EVIDENCE / "diagnostic-controls.json"
 DIAGNOSTIC_VERSION = "draft-3"

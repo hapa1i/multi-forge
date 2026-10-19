@@ -37,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import capture_evidence  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
-CORPUS = ROOT / "docs/board/paused/jev_rule_pack/evidence/wrapper-corpus.json"
+CORPUS = ROOT / "docs/board/retired/jev_rule_pack/evidence/wrapper-corpus.json"
 CAPTURE_EVIDENCE = CORPUS.parent
 MAX_JOURNAL_BYTES = 32_000_000
 ENDPOINT = "https://openrouter.ai/api/alpha/decisions"

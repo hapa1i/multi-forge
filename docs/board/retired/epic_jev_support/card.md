@@ -1,17 +1,19 @@
-# Epic: Jev support
+# Retired epic: Jev support
 
-Status: **doing**, activated 2026-10-14 with A1. The [coordination checklist](checklist.md) tracks member gates and
-handoffs. A1 shipped through [PR #268](https://github.com/hapa1i/multi-forge/pull/268), merged as `9778007a` on
-2026-10-14. A2's foundations shipped through [PR #270](https://github.com/hapa1i/multi-forge/pull/270) as `9442c1e5` on
-2026-10-15. Its offline outcomes and evaluation shipped through
-[PR #271](https://github.com/hapa1i/multi-forge/pull/271) as `791d9872` on the same day. A2 is paused by owner decision
-on 2026-10-19 after the bounded investigation failed to establish a viable hook policy. Its
-[pause handoff](../../paused/jev_rule_pack/evidence/pr-275-pause-handoff.md) preserves the tools, negative results and
-unmet gates. A3 is active for feasibility on `codex/jev-cascade-feasibility` from `8dea95f5`, after PR #275 merged as
-`fe2d09a1`. Its [checklist](../jev_cascade/checklist.md) owns the study. The epic remains active; no consumer quality or
-quota-saving outcome has shipped.
+Status: **retired**. Outcome: **cancelled** by owner decision on 2026-10-19 after
+[PR #276](https://github.com/hapa1i/multi-forge/pull/276) merged as `ca943b6c`. No replacement is selected. A1 remains
+[done](../../done/jev_client_probes/card.md); A2 and A3 are retired with their shipped foundations and experimental
+evidence retained. The [retirement closeout](checklist.md#retirement-closeout) records the final disposition.
 
-## Problem and outcome
+A2's tested wrapper policy did not pass its feasibility gates. A3's first synthetic packet supplied no incremental
+positive beyond deterministic controls, so it stopped before model capture. The epic's useful warnings and avoided
+Claude reviews did not ship. These results do not establish that every future Jev use case is infeasible.
+
+This is a terminal reference, not an executable roadmap. Reconsideration requires a new `proposed/` card with a concrete
+use case, representative evidence and a bounded comparison. The original goals and contracts below preserve context;
+[rule-pack design](../../../design_rule_packs.md) describes shipped tooling.
+
+## Original problem and outcome
 
 Add Jev-backed policy evaluation to Multi-Forge, beginning with OpenRouter Decisions. Fixed semantic rule packs provide
 warnings; a separately validated cascade can settle covered actions and reserve Claude supervisor calls for the cases
@@ -27,28 +29,27 @@ reported cost for the captured shapes; quota savings and decision quality remain
 
 ## Members and dependencies
 
-| ID  | Card                                                               | Independently shippable outcome                                               | Depends on                        |
-| --- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------- | --------------------------------- |
-| A1  | [Jev client and probes](../../done/jev_client_probes/card.md)      | Typed OpenRouter transport and reproducible contract/latency/billing evidence | None                              |
-| A2  | [Jev rule pack, warnings only](../../paused/jev_rule_pack/card.md) | Opt-in semantic policy type over fixed atomic rules                           | A1; B3 for Codex-visible warnings |
-| A3  | [Jev as the cascade's first tier](../../doing/jev_cascade/card.md) | Validated covered allows avoid a Claude review; other cases escalate          | A1, B1                            |
+| ID  | Card                                                      | Final lane | Retained outcome                              |
+| --- | --------------------------------------------------------- | ---------- | --------------------------------------------- |
+| A1  | [Client and probes](../../done/jev_client_probes/card.md) | Done       | Typed transport and measured route/accounting |
+| A2  | [Warning rule pack](../jev_rule_pack/card.md)             | Retired    | Foundations and failed feasibility evidence   |
+| A3  | [Cascade first tier](../jev_cascade/card.md)              | Retired    | Human reviews and offline comparison          |
 
-[B1](../../done/plan_file_supervision/card.md) and [B3](../../done/codex_policy_warnings/card.md) belong to the separate
-[Codex supervisor epic](../../done/epic_codex_supervisor/card.md). A2 and A3 can proceed independently after their
-prerequisites; A2's fixed-rule quality evidence does not validate A3's plan-alignment questions. Cards use separate
-execution branches when activated.
-
-Active member: [A3](../jev_cascade/card.md), for feasibility before runtime work on its separate execution branch. A2
-remains paused; neither its failures nor its shipped tooling settle A3's independent plan/action coverage and
-false-allow questions. A3 must justify review-skipping against full supervision and deterministic baselines before
-implementation. No further A2 capture is planned.
+No member remains active. A1's shipped outcome remains independently verified; retiring A2/A3 does not satisfy the
+epic's original consumer acceptance or economic goals. B1 and B3 remain shipped members of the separate
+[Codex supervisor epic](../../done/epic_codex_supervisor/card.md). [Jev Router](../../proposed/jev_router/card.md)
+remains independently proposed and is not a replacement for this epic.
 
 The independent [Claude feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), shipped as
 `e9c144eb` and is included on `main`. Its
 [closeout](../../done/claude_policy_feedback_permissions/checklist.md#merged-closeout) records the decision to merge
-with native testing skipped. It remains outside this epic's membership, and A2's native delivery gate stays open.
+with native testing skipped. It remains outside this epic's membership, and A2's native delivery gate was never
+satisfied.
 
 ## Shared contract
+
+Historical member contract; unfinished consumer work was cancelled. A1 and the shipped foundations remain governed by
+the design documents and code.
 
 - OpenRouter first: `POST /api/alpha/decisions`, with `provider.zdr: true` on every attempt. Fail rather than retry
   without that requirement. The alpha route needs empirical checks before real policy payloads depend on it.
@@ -73,13 +74,13 @@ with native testing skipped. It remains outside this epic's membership, and A2's
 
 ## Deferred scope
 
-Direct TypeSafe remains an intended later access path. Its distinct System One transport and limits are documented in
-the research, but implementation is outside these three cards; the epic does not claim both routes at closeout.
-Standalone Jev blocking, team classification, search and memory selection remain research avenues.
+Direct TypeSafe was an intended later access path. Its distinct System One transport and limits are documented in the
+research, but implementation is outside these three cards; the epic does not claim both routes at closeout. Standalone
+Jev blocking, team classification, search and memory selection remain research avenues.
 [Jev Router](../../proposed/jev_router/card.md) stays a separate card because it chooses a generative model and
 reasoning effort, with different routing and identity contracts. Codex runtime supervision is owned by its own epic.
 
-## Completion evidence
+## Original completion requirements (unmet)
 
 A1 begins with a small authorized synthetic capture after the minimal transport, then establishes the usable route
 contract and measures latency, request size and multi-question accounting. A2 must show useful, visible warnings with a

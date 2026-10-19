@@ -10,6 +10,23 @@ Older entries are retained verbatim in [2026-08-20](archive/change_log_2026-08-2
 
 ## 2026-10-19
 
+### Preserve the A3 comparison and retire the Jev initiative
+
+**Outcome**: [PR #276](https://github.com/hapa1i/multi-forge/pull/276) merged as `ca943b6c`, preserving 24
+human-reviewed synthetic cases, offline admission/composition and four deterministic controls. Those controls cover all
+six expected allows; the remaining 18 actions escalate. This packet stopped before paid capture and establishes no
+general A3 quality or quota-saving claim.
+
+The owner cancelled and retired the [epic](retired/epic_jev_support/checklist.md#retirement-closeout),
+[A2](retired/jev_rule_pack/checklist.md#retirement-closeout) and
+[A3](retired/jev_cascade/checklist.md#merged-closeout-and-retirement), with no replacement selected. A1 remains done.
+Retained foundations and evidence remain available; unfinished warnings and review skipping do not receive completion
+credit. Future reconsideration requires a new proposed card.
+
+**Verification**: PR #276's merged tree matches reviewed head `b989b55f`, with all five CI checks passing. Pre-merge
+validation passed 172 focused tests and full pre-commit. Retirement checks and preserved evidence identities are
+recorded in the epic closeout. No paid model call or native collection ran during retirement.
+
 ### Preserve bounded Jev evidence and pause A2
 
 **Goal**: Close the bounded A2 investigation with retained evidence and an explicit pause before further runtime work.
@@ -22,7 +39,7 @@ selects independent A3 feasibility next; no runtime policy or review skipping is
 **Verification**: [PR #275](https://github.com/hapa1i/multi-forge/pull/275) merged as `fe2d09a1`, identical to reviewed
 head `06074f0c`, with all five GitHub checks passing. Local `make test` passed 11,597 unit and 528 integration tests;
 `make test-regression` passed 2,015. Applicable pre-commit checks and the 722-source Markdown link audit passed. The
-[pause handoff](paused/jev_rule_pack/evidence/pr-275-pause-handoff.md) records the earlier offline-cache setup failure,
+[pause handoff](retired/jev_rule_pack/evidence/pr-275-pause-handoff.md) records the earlier offline-cache setup failure,
 successful normal rerun, standard test-selection limits and remaining A2 gates. No additional A2 or A3 experiment
 capture ran during this wrap.
 
@@ -38,7 +55,7 @@ known consumed proposals before credential access. A2 remains active; no runtime
 
 **Verification**: [PR #274](https://github.com/hapa1i/multi-forge/pull/274) merged as `09984440` after all five CI
 checks passed on reviewed head `f51bcde8`; 453 focused tests passed locally. The
-[handoff](paused/jev_rule_pack/evidence/pr-274-merge-handoff.md) preserves 92 diagnostic answers, three nulls,
+[handoff](retired/jev_rule_pack/evidence/pr-274-merge-handoff.md) preserves 92 diagnostic answers, three nulls,
 unresolved wording and remaining feasibility gates. No further paid capture or native trial is authorized.
 
 ## 2026-10-16
@@ -55,7 +72,7 @@ output check.
 **Verification**: [PR #272](https://github.com/hapa1i/multi-forge/pull/272) merged as `64317485` with all five CI checks
 passing. Local validation passed 239 focused tests, full pre-commit across the sandboxed run and separate local EOF
 rerun, and the 691-source Markdown link audit. All eight ledgers replay and retain report identity after relocation. The
-[handoff](paused/jev_rule_pack/checklist.md#human-review-merge-and-feasibility-continuation) preserves remaining data,
+[handoff](retired/jev_rule_pack/checklist.md#human-review-merge-and-feasibility-continuation) preserves remaining data,
 quality and runtime gates. A2 remains active; no paid A2 evaluation or native trial ran.
 
 ### Restore prompt-cache reuse on translated routes
@@ -98,7 +115,7 @@ separate from proposals; A2's quality, activation and native-delivery gates stay
 head `cd008613`, with all five CI checks passing. Local checks passed 148 focused tests, 11,076 unit tests (117
 deselected), 1,924 regressions and full pre-commit. An initial watchdog timeout-test failure passed isolated and full
 reruns without changes. See the
-[merge handoff](paused/jev_rule_pack/checklist.md#offline-evaluation-merge-and-next-gate) for CLI fixture and
+[merge handoff](retired/jev_rule_pack/checklist.md#offline-evaluation-merge-and-next-gate) for CLI fixture and
 preparation evidence. No paid A2 evaluation or native trial ran.
 
 ### Ship Jev consent and offline evaluation foundations
@@ -112,7 +129,7 @@ notes from model evidence. A2 remains active; activation, quality and native del
 **Verification**: [PR #270](https://github.com/hapa1i/multi-forge/pull/270) merged as `9442c1e5`, identical to reviewed
 head `55ce6e24`, with all CI checks passing. Implementation checks passed 11,001 unit tests, 1,889 regressions and 46
 distinct targeted integrations; final review passed 215 focused tests and seven policy CLI integrations. See the
-[foundation handoff](paused/jev_rule_pack/checklist.md#foundation-merge-and-continuation). No paid/native trial ran.
+[foundation handoff](retired/jev_rule_pack/checklist.md#foundation-merge-and-continuation). No paid/native trial ran.
 
 ### Preserve Claude permissions in policy feedback
 

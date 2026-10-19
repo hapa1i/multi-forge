@@ -4,12 +4,13 @@
 
 A1 is **done** after [PR #268](https://github.com/hapa1i/multi-forge/pull/268) merged as `9778007a` on 2026-10-14.
 Execution used `codex/jev-client-probes`, based on `main` at `1ae9667d` (`v1.1.0`). The
-[Jev epic checklist](../../doing/epic_jev_support/checklist.md) owns downstream sequencing.
+[Jev epic closeout](../../retired/epic_jev_support/checklist.md) records the subsequent cancellation and retirement of
+the epic and A2/A3 on 2026-10-19. A1 remains done.
 
 The user approved four early synthetic requests and then 25 measurement requests; all 29 physical requests are accounted
 for in the [evidence report](evidence/2026-10-14/report.md). ZDR-required Choice/Noul/Score routing succeeded. Live
 captures corrected score-rounding tolerance and the provider's HTTP 400 size-error wrapper. A2/A3, Direct TypeSafe, its
-SDK and Jev Router remain outside A1. Consumer selection belongs to the active epic.
+SDK and Jev Router remain outside A1. No consumer work remains active under the retired epic.
 
 ## Verified starting points
 
@@ -230,8 +231,8 @@ that existing loader is hard-coded to Codex scripts, so it is not directly reusa
   is not a pass. Preserve any consumer dependency blocker even if offline transport work is useful independently.
 - [x] Record reviewed PR, tested head and merge evidence; add the completed-work change-log entry. Promote durable
   lessons to implementation notes only after human review.
-- [x] Move A1 to `done/` only when shipped and verified. Repoint links and record the epic handoff; keep the epic active
-  and select A2 or A3 separately.
+- [x] Move A1 to `done/` when shipped and verified. Repoint links and record the epic handoff. The epic remained active
+  at A1's closeout to select A2 or A3 separately; its later retirement is recorded above.
 
 ## Planning verification
 
@@ -281,8 +282,8 @@ producer; existing Claude paths already support reported direct cost. The `core_
 unchanged.
 
 Retry/deadline policy remains conservative. Three-sample latency measurements do not establish a minimum safe retry
-window, and arbitrary deadline ceilings would constrain callers without a supported limit. Consumer admission at Gate 1
-still owns its monotonic deadline and reviewer reserve. The epic remains active after A1's merge.
+window, and arbitrary deadline ceilings would constrain callers without a supported limit. The consumer contract at Gate
+1 assigned the monotonic deadline and reviewer reserve to each caller. The epic remained active after A1's merge.
 
 ## Merged closeout
 
@@ -304,5 +305,6 @@ is recorded in the [change log](../../change_log.md#2026-10-14).
 Handoff: OpenRouter Decisions supports the three typed question shapes with ZDR required, default requested model
 `typesafe/jev-1.13` and captured resolved model `typesafe/jev-1.13-20260917`. Preserve the 30,000-byte screen, unknown
 cost on both HTTP 400 controls, measured answer variance and caller-owned deadline. Captures prove transport readiness,
-not decision quality, guaranteed latency or quota savings. A2/A3 require separate activation and data/spend decisions;
-the epic remains `doing`.
+not decision quality, guaranteed latency or quota savings. A2/A3 required separate activation and data/spend decisions;
+neither consumer reached runtime activation before its cancellation and retirement on 2026-10-19. The client and its
+evidence remain shipped independently of that decision.
