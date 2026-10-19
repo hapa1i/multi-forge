@@ -1,7 +1,7 @@
 {
   "contract_version": "draft-1",
   "corpus_sha256": "249b0cce2a89a520988479c2a4f2716c7ab6e667db251d021111648c5107a133",
-  "reviews_sha256": "e30050a6d19aae68d8e9a71a20ab15d25924fe840a8107cfc6b1c1c64a5d2ba1",
+  "reviews_sha256": "38ae304581de3ed97552d3785910c3d61c10882fef752ac834f254e0ec359a7d",
   "source_sha256": "25921d97f5bcaff7e1bb3b7af9b176291582a7ed0ee7d2d8845908ddb2a8f7e2",
   "quality_accepted": false,
   "max_physical_requests": 0,
@@ -271,7 +271,7 @@
       "reasons": [
         "unmapped_plan_clause"
       ],
-      "human_status": "pending",
+      "human_status": "reviewed",
       "human_evidence_ready": false,
       "always_escalate_control": "escalate"
     },
@@ -286,7 +286,7 @@
         "unsupported_plan_clause",
         "no_semantic_questions"
       ],
-      "human_status": "pending",
+      "human_status": "reviewed",
       "human_evidence_ready": false,
       "always_escalate_control": "escalate"
     },
@@ -299,7 +299,7 @@
       "reasons": [
         "plan_authority_ambiguous"
       ],
-      "human_status": "pending",
+      "human_status": "reviewed",
       "human_evidence_ready": false,
       "always_escalate_control": "escalate"
     },
@@ -310,8 +310,8 @@
       "case_sha256": "f13e5eb19d7f02a3088a1941c80e5350103ae19d0254892ce6ad03c73996fe49",
       "declared_admission": "candidate_pending_review",
       "reasons": [],
-      "human_status": "pending",
-      "human_evidence_ready": false,
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
       "always_escalate_control": "escalate"
     }
   ]

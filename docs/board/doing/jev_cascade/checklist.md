@@ -26,7 +26,7 @@ proposals to review before a capture manifest can be approved.
 - [x] Prepare four synthetic plan families and 24 action records with fixed identities, authored clause inventories and
   explicit supported/unsupported evidence. The [corpus](evidence/cascade-corpus.json) includes multi-file, deletion,
   truncation and stale-plan controls; human review must verify the completeness claims.
-- [ ] Export a compact review packet; obtain human review of authority, relevant clauses, decomposition, evidence
+- [x] Export a compact review packet; obtain human review of authority, relevant clauses, decomposition, evidence
   sufficiency, per-question answers and expected routing. Retain pending/disputed labels and provenance.
 - [x] Fix whole-family calibration/held-out membership and record any exposure. Separate human-reviewed decomposition
   feasibility from automatic runtime decomposition; no implementation of the latter is part of this slice.
@@ -36,16 +36,17 @@ proposals to review before a capture manifest can be approved.
   before any capture. Human labels, host coverage and model confidence remain separate inputs.
 
 Offline preparation: the [review guide](evidence/human-review.md) links four compact worksheets and a blank,
-identity-bound template. The [retained ledger](evidence/human-review-ledger.json) records all 12 calibration-family
-reviews, all six file-operation reviews and the first two bounded-processing reviews; four human reviews remain pending.
-The preparation report distinguishes 12 declared exclusions from 12 review candidates. Fixture composition requires
-reviewed evidence, exact current identity and explicit probabilities/bands; it preserves existing denials and unrelated
-review. It has no dispatch or quality-scoring mode. The semantic deterministic baseline and usefulness comparison remain
-open; always-escalate alone cannot establish incremental model benefit. No paid manifest is prepared.
+identity-bound template. The [retained ledger](evidence/human-review-ledger.json) records all 24 user reviews across the
+12 calibration and 12 held-out cases, preserving null answers where the evidence cannot support a semantic judgment. The
+preparation report distinguishes 12 declared exclusions from 12 review candidates. Fixture composition requires reviewed
+evidence, exact current identity and explicit probabilities/bands; it preserves existing denials and unrelated review.
+It has no dispatch or quality-scoring mode. The semantic deterministic baseline and usefulness comparison remain open;
+always-escalate alone cannot establish incremental model benefit. No paid manifest is prepared.
 
 Offline validation: `tests/src/scripts/test_jev_cascade_offline.py` passes 107 fixture tests, including missing-clause
 confidence, denial precedence, malformed inputs, copied/stale human reviews and absence of provider/native access. The
-generated report and pending ledger reproduce from the corpus; these checks establish tool behavior, not model quality.
+blank packet and preparation report reproduce from the corpus, and the human-review report reproduces from the retained
+ledger; these checks establish tool behavior, not model quality.
 
 | Fixture                                         | Required observation                                           |
 | ----------------------------------------------- | -------------------------------------------------------------- |
