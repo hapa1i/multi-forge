@@ -29,9 +29,10 @@ semantic boundary evidence, not an approved governance exception.
 
 The current [shared activation builder](../../../../../src/forge/core/ops/policy.py) validates the supported bundle
 vocabulary before its callers write policy intent. `PolicyIntent.bundle_config` is already a per-bundle mapping. The
-[consent helper](../../../../../src/forge/policy/rule_pack/consent.py) binds validated settings to the session name,
-creation time, Forge root and worktree. Its raw-override guards reject Jev configuration writes, and derived sessions
-discard Jev selection and configuration. These are foundations; the builder does not yet admit `jev_rule_pack`.
+[consent helper](https://github.com/hapa1i/multi-forge/blob/39ba8cbb49d2ca3906f196edae2b139705a51bf1/src/forge/policy/rule_pack/consent.py)
+binds validated settings to the session name, creation time, Forge root and worktree. Its raw-override guards reject Jev
+configuration writes, and derived sessions discard Jev selection and configuration. These are foundations; the builder
+does not yet admit `jev_rule_pack`.
 
 Extend that shared activation owner to validate the selected declaration and build the immutable reference before
 publishing any enabled intent. Put declaration validation and action preparation under `policy/rule_pack/`; do not make

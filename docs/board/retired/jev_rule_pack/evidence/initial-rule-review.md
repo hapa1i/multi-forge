@@ -126,8 +126,8 @@ hash. If the whole eligible action exceeds the single-request budget, send nothi
 
 ## Draft atomic questions
 
-[`policy.rule_pack.definitions`](../../../../../src/forge/policy/rule_pack/definitions.py) owns three Noul questions
-with explicit true/false criteria, shared by offline preparation and evaluation:
+[`policy.rule_pack.definitions`](https://github.com/hapa1i/multi-forge/blob/39ba8cbb49d2ca3906f196edae2b139705a51bf1/src/forge/policy/rule_pack/definitions.py)
+owns three Noul questions with explicit true/false criteria, shared by offline preparation and evaluation:
 
 1. **Coverage:** Do complete relevant before/after definitions and attributed scope facts establish whether an earlier
    interface is retained? A retained wrapper requires its complete definition and a replacement definition or adequate
@@ -163,8 +163,9 @@ exception. Actual stable surfaces and approved preview exceptions remain host ap
 The [corpus manifest](wrapper-corpus.json) contains constructed hook actions with proposed outcomes and rationales kept
 separate from the model state. It covers module functions, methods with argument adaptation, preview aliases, stable
 public deprecation, validation, callbacks, decorators, missing context, injection and a multi-file patch. The
-[offline harness](../../../../../scripts/experiments/jev/rule-pack-eval.py) validates action shapes and source-family
-splits, builds size-checked A1 payloads without dispatch, and reports label/quality gaps. It has no live mode.
+[offline harness](https://github.com/hapa1i/multi-forge/blob/39ba8cbb49d2ca3906f196edae2b139705a51bf1/scripts/experiments/jev/rule-pack-eval.py)
+validates action shapes and source-family splits, builds size-checked A1 payloads without dispatch, and reports
+label/quality gaps. It has no live mode.
 
 Every example is constructed. All 12 calibration and five held-out cases have confirmed human outcomes. The partial Edit
 has coverage false and unknown retention/boundary answers; host-decided cases have no question answers. The proposed

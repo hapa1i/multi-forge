@@ -1,17 +1,20 @@
 # Retired epic: Jev support
 
+The subsequent code cleanup removed A2/A3 implementation and dedicated tests. The [source archive](source-archive.md)
+identifies the revision for historical commands and verification below; A1 and retained evidence remain.
+
 Status: **retired**. Outcome: **cancelled** by owner decision on 2026-10-19 after
 [PR #276](https://github.com/hapa1i/multi-forge/pull/276) merged as `ca943b6c`. No replacement is selected. A1 remains
-[done](../../done/jev_client_probes/card.md); A2 and A3 are retired with their shipped foundations and experimental
-evidence retained. The [retirement closeout](checklist.md#retirement-closeout) records the final disposition.
+[done](../../done/jev_client_probes/card.md); A2 and A3 are retired with their experimental evidence retained. The
+[retirement closeout](checklist.md#retirement-closeout) records the final disposition.
 
 A2's tested wrapper policy did not pass its feasibility gates. A3's first synthetic packet supplied no incremental
 positive beyond deterministic controls, so it stopped before model capture. The epic's useful warnings and avoided
 Claude reviews did not ship. These results do not establish that every future Jev use case is infeasible.
 
 This is a terminal reference, not an executable roadmap. Reconsideration requires a new `proposed/` card with a concrete
-use case, representative evidence and a bounded comparison. The original goals and contracts below preserve context;
-[rule-pack design](../../../design_rule_packs.md) describes shipped tooling.
+use case, representative evidence and a bounded comparison. The original goals and contracts below preserve context; the
+[source archive](source-archive.md) preserves the removed tooling and design at a fixed revision.
 
 ## Original problem and outcome
 
@@ -32,7 +35,7 @@ reported cost for the captured shapes; quota savings and decision quality remain
 | ID  | Card                                                      | Final lane | Retained outcome                              |
 | --- | --------------------------------------------------------- | ---------- | --------------------------------------------- |
 | A1  | [Client and probes](../../done/jev_client_probes/card.md) | Done       | Typed transport and measured route/accounting |
-| A2  | [Warning rule pack](../jev_rule_pack/card.md)             | Retired    | Foundations and failed feasibility evidence   |
+| A2  | [Warning rule pack](../jev_rule_pack/card.md)             | Retired    | Failed feasibility evidence and archived code |
 | A3  | [Cascade first tier](../jev_cascade/card.md)              | Retired    | Human reviews and offline comparison          |
 
 No member remains active. A1's shipped outcome remains independently verified; retiring A2/A3 does not satisfy the
@@ -48,8 +51,8 @@ satisfied.
 
 ## Shared contract
 
-Historical member contract; unfinished consumer work was cancelled. A1 and the shipped foundations remain governed by
-the design documents and code.
+Historical member contract; unfinished consumer work was cancelled and its implementation removed. A1 remains governed
+by the current design documents and code.
 
 - OpenRouter first: `POST /api/alpha/decisions`, with `provider.zdr: true` on every attempt. Fail rather than retry
   without that requirement. The alpha route needs empirical checks before real policy payloads depend on it.

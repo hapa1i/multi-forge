@@ -59,7 +59,8 @@ model recognizes their completeness.
 ## Adopted boundary instruction
 
 The shared data/instruction guard and the true/false criteria stay unchanged. Only the appended
-[`independent_boundary.instructions`](../../../../../src/forge/policy/rule_pack/definitions.py) text changes to:
+[`independent_boundary.instructions`](https://github.com/hapa1i/multi-forge/blob/39ba8cbb49d2ca3906f196edae2b139705a51bf1/src/forge/policy/rule_pack/definitions.py)
+text changes to:
 
 > Does the supplied evidence justify a boundary role for the retained interface, distinct from its replacement? Identify
 > the retained interface, its replacement, and any supplied consumer, registration, contract or test evidence requiring

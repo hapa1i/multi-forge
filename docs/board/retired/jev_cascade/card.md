@@ -1,5 +1,9 @@
 # Jev as the cascade's first tier
 
+The subsequent code cleanup removed A2/A3 implementation and dedicated tests. The
+[source archive](../epic_jev_support/source-archive.md) identifies the revision for historical commands and verification
+below; A1 and retained evidence remain.
+
 Status: **retired**. Outcome: **cancelled** by owner decision on 2026-10-19, after
 [PR #276](https://github.com/hapa1i/multi-forge/pull/276) merged as `ca943b6c`. No replacement is selected. The
 [merged closeout](checklist.md#merged-closeout-and-retirement) records retained tooling, verification and unmet goals.

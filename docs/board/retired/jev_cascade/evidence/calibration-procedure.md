@@ -83,8 +83,9 @@ Use one `minimum_true` for every question and family, chosen only from this fixe
 These are candidate decision bands, not calibrated probabilities or a production error guarantee. For an admitted
 observation, the candidate allows only if every selected question has a valid finite probability greater than or equal
 to `minimum_true`. Otherwise it escalates. Preserve the existing denial and unrelated-review precedence in
-[`compose`](../../../../../scripts/experiments/jev/cascade-offline.py); semantic confidence cannot override those
-conditions. Human answer values and expected routes are used for scoring, never as model inputs or decision shortcuts.
+[`compose`](https://github.com/hapa1i/multi-forge/blob/39ba8cbb49d2ca3906f196edae2b139705a51bf1/scripts/experiments/jev/cascade-offline.py);
+semantic confidence cannot override those conditions. Human answer values and expected routes are used for scoring,
+never as model inputs or decision shortcuts.
 
 Selection requires all 18 planned calibration observations to be present, attributable and valid. Evaluate each grid
 value against these same observations. A candidate qualifies only when:

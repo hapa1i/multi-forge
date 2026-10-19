@@ -9,15 +9,9 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
-from forge.policy.rule_pack.consent import (
-    ACKNOWLEDGMENT_KEY,
-    BUNDLE_NAME,
-    build_acknowledgment,
-    has_acknowledgment,
-)
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.authority import read_authority_events
-from forge.session.models import PolicyIntent, VerificationConfig
+from forge.session.models import VerificationConfig
 from tests.fixtures.session_state import publish_session
 from tests.src.cli.session_command_support import (
     successful_claude_launch,
@@ -38,49 +32,6 @@ def _seed_cross_project_session(*, caller_root: Path, target_root: Path, name: s
         relative_path=".",
     )
     return store
-
-
-def _seed_jev_session(root: Path, *, enabled: bool, disabled_override: bool = False) -> SessionStore:
-    state = create_session_state("jev-test", worktree_path=str(root))
-    state.forge_root = str(root)
-    config = {"pack_version": "candidate-1", "model": "typesafe/jev-1.13"}
-    grant = build_acknowledgment(state, config, acknowledge_paid_data_sharing=True)
-    state.intent.policy = PolicyIntent(
-        enabled=enabled,
-        bundles=["tdd", BUNDLE_NAME],
-        bundle_config={BUNDLE_NAME: {**config, ACKNOWLEDGMENT_KEY: grant}},
-    )
-    if disabled_override:
-        state.overrides = {"policy": {"enabled": False}}
-    publish_session(IndexStore(), state, root, forge_root=root, checkout_root=root, relative_path=".")
-    return SessionStore(str(root), state.name)
-
-
-@pytest.mark.parametrize("operation", ["set", "reset-key", "reset-all"])
-def test_raw_effective_enable_cannot_restore_a_paid_grant(runner, temp_env, operation):
-    store = _seed_jev_session(temp_env, enabled=operation != "set", disabled_override=operation != "set")
-    before = store.read()
-    args = {
-        "set": ["set", "policy.enabled", "true"],
-        "reset-key": ["reset", "policy.enabled"],
-        "reset-all": ["reset"],
-    }[operation]
-    result = runner.invoke(main, ["session", *args, "--session", "jev-test"])
-    assert result.exit_code == 1, result.output
-    assert "Jev activation is not available" in result.output
-    assert store.read() == before
-
-
-def test_raw_disable_revokes_grant_before_reset_can_expose_intent(runner, temp_env):
-    store = _seed_jev_session(temp_env, enabled=True)
-    result = runner.invoke(main, ["session", "set", "policy.enabled", "false", "--session", "jev-test"])
-    assert result.exit_code == 0, result.output
-    state = store.read()
-    assert state.intent.policy.bundles == ["tdd", BUNDLE_NAME]
-    assert not has_acknowledgment(state, state.intent.policy.bundle_config[BUNDLE_NAME])
-    result = runner.invoke(main, ["session", "reset", "policy.enabled", "--session", "jev-test"])
-    assert result.exit_code == 1, result.output
-    assert store.read() == state
 
 
 class TestSessionSetOverride:

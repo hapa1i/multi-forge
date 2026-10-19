@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
-
 import pytest
 
 from forge.session.exceptions import InvalidOverrideKeyError
@@ -18,28 +16,7 @@ from forge.session.overrides import (
 )
 
 
-@pytest.mark.parametrize(
-    "key,value",
-    [
-        ("policy", {"bundles": ["tdd", "jev_rule_pack"]}),
-        ("policy", {"bundle_config": {"jev_rule_pack": {"acknowledgment": {}}}}),
-        ("policy.bundles", ["tdd", "jev_rule_pack"]),
-        ("policy.bundle_config", {"jev_rule_pack": {}}),
-        ("policy.bundle_config.jev_rule_pack", {}),
-        ("policy.bundle_config.jev_rule_pack.acknowledgment", {}),
-        ("policy.*", ["jev_rule_pack"]),
-        ("policy.*", {"jev_rule_pack": {"acknowledgment": {}}}),
-    ],
-)
-def test_raw_jev_writes_refuse_before_any_mutation(key, value):
-    overrides = {"policy": {"enabled": False}, "memory": {"auto_recall": True}}
-    before = deepcopy(overrides)
-    with pytest.raises(InvalidOverrideKeyError, match="Jev activation is not available"):
-        set_override(overrides, key, value)
-    assert overrides == before
-
-
-def test_unrelated_policy_overrides_remain_supported():
+def test_policy_bundle_overrides_are_supported():
     overrides = {}
     set_override(overrides, "policy.bundles", ["tdd", "coding_standards"])
     set_override(overrides, "policy.bundle_config", {"tdd": {"strict": False}})

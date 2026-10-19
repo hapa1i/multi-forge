@@ -1,9 +1,14 @@
 # Jev rule pack, warnings only
 
+The subsequent code cleanup removed A2/A3 implementation and dedicated tests. The
+[source archive](../epic_jev_support/source-archive.md) identifies the revision for historical commands and verification
+below; A1 and retained evidence remain.
+
 Status: **retired — cancelled by owner decision on 2026-10-19**. No replacement exists. This is a terminal reference
 record; the warning policy did not ship. The [retirement closeout](checklist.md#retirement-closeout) records the
-verified stopping point and unmet gates. The shipped foundations, tools and evidence remain available, and
-[A1](../../done/jev_client_probes/card.md) remains done. Any reconsideration starts a new `proposed/` card linked here.
+verified stopping point and unmet gates. Evidence remains available; the removed foundations and tools are in the
+[source archive](../epic_jev_support/source-archive.md). [A1](../../done/jev_client_probes/card.md) remains done. Any
+reconsideration starts a new `proposed/` card linked here.
 
 Epic: [Jev support](../../retired/epic_jev_support/card.md). Member **A2**. Depends on
 [A1: Jev client and probes](../../done/jev_client_probes/card.md). Codex-visible delivery also depends on
@@ -27,7 +32,7 @@ usefulness and numerical quality gates remain unmet. The
 cannot recover any of the three human no-warning labels under allowed thresholds. Settings remain unset and the bundle
 is not registered for activation. The [merge handoff](checklist.md#offline-evaluation-merge-and-next-gate) records
 shipped scope and the next gate without closing A2. Implemented ownership is described in
-[rule-pack design](../../../design_rule_packs.md).
+[rule-pack design](https://github.com/hapa1i/multi-forge/blob/39ba8cbb49d2ca3906f196edae2b139705a51bf1/docs/design_rule_packs.md).
 
 Human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485`. The
 [PR #274 experimental checkpoint](evidence/pr-274-merge-handoff.md) merged as `09984440` on 2026-10-17. A2 stopped at

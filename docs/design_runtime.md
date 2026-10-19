@@ -184,8 +184,8 @@ local rejections have no attempts; attempted I/O without an HTTP status remains 
 not proof of zero billing.
 
 The [repository probe harness](../scripts/experiments/jev/README.md) defaults to a synthetic dry-run manifest. Live
-captures require an explicit bounded approval and an isolated Forge home. A1 supplies transport and evidence only; Jev
-policy and cascade consumers are separate work.
+captures require an explicit bounded approval and an isolated Forge home. A1 supplies transport and evidence only; the
+Jev policy and cascade experiments are [retired](design_history.md#g-removed-jev-rule-pack-and-cascade-experiments).
 
 ## 7. Isolation and Proxy Modes
 

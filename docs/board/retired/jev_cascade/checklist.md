@@ -1,5 +1,9 @@
 # A3: Jev cascade feasibility checklist
 
+The subsequent code cleanup removed A2/A3 implementation and dedicated tests. The
+[source archive](../epic_jev_support/source-archive.md) identifies the revision for historical commands and verification
+below; A1 and retained evidence remain.
+
 ## Final disposition
 
 **Retired — cancelled by owner decision on 2026-10-19. No replacement.** A3's first synthetic packet stopped at the

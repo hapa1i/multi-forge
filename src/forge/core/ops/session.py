@@ -424,25 +424,11 @@ def set_session_override(
         # Apply + validate + persist atomically under lock.
         # The mutate callback receives the fresh state from disk, avoiding TOCTOU.
         def _mutate(m: SessionState) -> None:
-            from forge.policy.rule_pack.consent import (
-                check_raw_transition,
-                raw_override_disables_policy,
-                revoke_acknowledgment,
-                snapshot_activation,
-            )
             from forge.policy.semantic.identity import snapshot_supervisor_options
 
             old = snapshot_supervisor_options(m)
-            old_jev = snapshot_activation(m)
             set_override(m.overrides, key, parsed_value)
             effective = compute_effective_intent(m, strict=True, override_key=key)
-            try:
-                if check_raw_transition(
-                    old_jev, snapshot_activation(m), session_name=m.name
-                ) or raw_override_disables_policy(key, parsed_value):
-                    revoke_acknowledgment(m)
-            except ValueError as exc:
-                raise InvalidOverrideValueError(key, str(exc), value_str) from exc
             if key.split(".", 1)[0] in {"policy", "launch", "*"}:
                 from forge.policy.semantic.identity import (
                     validate_supervisor_transition,
@@ -512,21 +498,10 @@ def reset_session_overrides(
             result_holder: dict[str, Any] = {}
 
             def _mutate_delete(m: SessionState) -> None:
-                from forge.policy.rule_pack.consent import (
-                    check_raw_transition,
-                    revoke_acknowledgment,
-                    snapshot_activation,
-                )
                 from forge.policy.semantic.identity import snapshot_supervisor_options
 
                 old = snapshot_supervisor_options(m)
-                old_jev = snapshot_activation(m)
                 result_holder["deleted"] = delete_override(m.overrides, key)
-                try:
-                    if check_raw_transition(old_jev, snapshot_activation(m), session_name=m.name):
-                        revoke_acknowledgment(m)
-                except ValueError as exc:
-                    raise ForgeOpError(str(exc)) from exc
                 if key.split(".", 1)[0] in {"policy", "launch", "*"} and old:
                     from forge.policy.semantic.identity import (
                         validate_supervisor_transition,
@@ -549,24 +524,13 @@ def reset_session_overrides(
             if had_overrides:
 
                 def clear_checked(m: SessionState) -> None:
-                    from forge.policy.rule_pack.consent import (
-                        check_raw_transition,
-                        revoke_acknowledgment,
-                        snapshot_activation,
-                    )
                     from forge.policy.semantic.identity import (
                         snapshot_supervisor_options,
                         validate_supervisor_transition,
                     )
 
                     old = snapshot_supervisor_options(m)
-                    old_jev = snapshot_activation(m)
                     clear_overrides(m.overrides)
-                    try:
-                        if check_raw_transition(old_jev, snapshot_activation(m), session_name=m.name):
-                            revoke_acknowledgment(m)
-                    except ValueError as exc:
-                        raise ForgeOpError(str(exc)) from exc
                     if old:
                         try:
                             validate_supervisor_transition(m, old, compute_effective_intent(m))

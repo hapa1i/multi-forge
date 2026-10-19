@@ -399,7 +399,6 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
 @click.option("--session", "-s", "session_name", help="Target session (default: auto-detect)")
 def disable(session_name: str | None) -> None:
     """Disable policy enforcement for the current session."""
-    from forge.policy.rule_pack.consent import revoke_acknowledgment
     from forge.session.overrides import delete_override
 
     activation = policy_ops.build_policy_activation(enabled=False)
@@ -416,7 +415,6 @@ def disable(session_name: str | None) -> None:
         else:
             m.intent.policy = PolicyIntent(enabled=activation.enabled)
         delete_override(m.overrides, "policy.enabled")
-        revoke_acknowledgment(m)
 
     try:
         store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)

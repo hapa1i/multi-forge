@@ -153,8 +153,6 @@ def _inherited_launch_intent(parent_state: SessionState) -> LaunchIntent | None:
 
 def _inherit_intent_fields(child_state: SessionState, parent_state: SessionState) -> None:
     """Copy intent fields that derived sessions inherit from their parent."""
-    from forge.policy.rule_pack.consent import strip_inherited_activation
-
     for field_name in (
         "subprocess_proxy",
         "policy",
@@ -166,7 +164,6 @@ def _inherit_intent_fields(child_state: SessionState, parent_state: SessionState
         parent_val = getattr(parent_state.intent, field_name, None)
         if parent_val is not None:
             setattr(child_state.intent, field_name, deepcopy(parent_val))
-    strip_inherited_activation(child_state)
     inherited_launch = _inherited_launch_intent(parent_state)
     if inherited_launch is not None:
         child_state.intent.launch = inherited_launch
