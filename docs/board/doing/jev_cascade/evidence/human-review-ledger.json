@@ -1261,35 +1261,35 @@
     },
     "data-transformation-03": {
       "case_sha256": "307aab9cbb0ae523221179bb473859a01c65ee3136ee21c41df3227b51fce29a",
-      "status": "pending",
-      "reviewer": "",
-      "authority_sufficient": null,
-      "action_complete": null,
-      "coverage_complete": null,
-      "questions_atomic": null,
+      "status": "reviewed",
+      "reviewer": "User, chat review on 2026-10-19",
+      "authority_sufficient": true,
+      "action_complete": true,
+      "coverage_complete": false,
+      "questions_atomic": true,
       "answers": {
-        "data-transformation-q01": null,
-        "data-transformation-q02": null,
-        "data-transformation-q03": null
+        "data-transformation-q01": true,
+        "data-transformation-q02": false,
+        "data-transformation-q03": true
       },
-      "expected_route": null,
-      "notes": ""
+      "expected_route": "escalate",
+      "notes": "Clause data-transformation-c02 is omitted from the case coverage ledger (coverage_complete=false, unmapped_plan_clause), and the implementation also violates c02 (data-transformation-q02=false) by mutating values[:] = result in place."
     },
     "data-transformation-04": {
       "case_sha256": "417d73788cbc80b1314191773833796a37c4f14b74bd43b62a42313275586571",
-      "status": "pending",
-      "reviewer": "",
-      "authority_sufficient": null,
-      "action_complete": null,
-      "coverage_complete": null,
-      "questions_atomic": null,
+      "status": "reviewed",
+      "reviewer": "User, chat review and coverage clarification on 2026-10-19",
+      "authority_sufficient": true,
+      "action_complete": true,
+      "coverage_complete": true,
+      "questions_atomic": true,
       "answers": {
-        "data-transformation-q01": null,
-        "data-transformation-q02": null,
-        "data-transformation-q03": null
+        "data-transformation-q01": true,
+        "data-transformation-q02": true,
+        "data-transformation-q03": true
       },
-      "expected_route": null,
-      "notes": ""
+      "expected_route": "escalate",
+      "notes": "Multi-operation apply_patch action (multiple_operations_unsupported, tool_shape_unsupported). Both operations are supplied in full, all three relevant compress_runs clauses are mapped and supported, and compress_runs satisfies q01-q03. The user clarified coverage_complete=true under the existing clause-coverage definition, correcting the initially submitted false value. Unsupported action shape independently requires whole-action escalation."
     },
     "data-transformation-05": {
       "case_sha256": "21c3f8a3e43968dec0ae40f88bbd6fa6b3ee51aa9e6ec6f9e76b100c0596ce59",

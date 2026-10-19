@@ -18,15 +18,18 @@ matches case 02's executable code and semantic answers: its injected comments ca
 
 The first two data-transformation cases also have user reviews. Case 01 satisfies all three clauses and expects allow.
 Case 02 preserves the input and returns a fresh list, but global deduplication loses non-adjacent repeated runs; q01 is
-false and the expected route is escalation. The [review report](human-review-report.json) validates eight reviews; 16
-cases remain pending. These are human labels, not observed model outcomes or runtime permission decisions.
+false and the expected route is escalation. Case 03 omits c02 from its mapping and mutates the input, so it also
+escalates. Case 04 has complete clause coverage and three true answers, but its two-operation `apply_patch` remains
+unsupported. The user confirmed that its `coverage_complete` field is true under the existing clause-based definition.
+The [review report](human-review-report.json) validates ten reviews; 14 cases remain pending. These are human labels,
+not observed model outcomes or runtime permission decisions.
 
 ## Start here
 
 1. The input-handling family is reviewed. Next, read the three clauses and questions in
    [data transformation](review-data-transformation.md), starting with
-   [data-transformation-03](review-data-transformation.md#data-transformation-03) and
-   [data-transformation-04](review-data-transformation.md#data-transformation-04).
+   [data-transformation-05](review-data-transformation.md#data-transformation-05) and
+   [data-transformation-06](review-data-transformation.md#data-transformation-06).
 2. For each case, check the declared authority, complete action evidence, clause mapping and atomic question wording.
    These are authored fixture facts, not proof that a runtime hook could obtain or validate them.
 3. Return its case hash, the four confirmations below, each question's true/false/unknown answer, and the expected
@@ -45,6 +48,9 @@ Name the reviewer and retain notes. A review can be partial or disputed. A `revi
 readiness: the confirmations, question answers and expected route must also be supplied. Confirming evidence says
 nothing about whether the proposed implementation satisfies its requirements. A completely covered divergent action can
 have all four confirmations true and still require escalation.
+
+Clause coverage and supported action shape are separate gates. An unsupported multi-operation action can have complete
+clause coverage and true semantic answers while still requiring host escalation.
 
 ## Evidence boundaries
 
