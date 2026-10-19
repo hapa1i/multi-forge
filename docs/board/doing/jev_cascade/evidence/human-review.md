@@ -1,8 +1,16 @@
 # A3 offline review
 
 The [study plan](feasibility-plan.md) asks whether atomic plan questions can support a useful later review-skipping
-study. This packet contains 24 synthetic actions across four plan families. It has no model results or human labels. The
-first review concerns the evidence and questions themselves; no paid capture is authorized.
+study. This packet contains 24 synthetic actions across four plan families and no model results. The first review
+concerns the evidence and questions themselves; no paid capture is authorized.
+
+## Recorded reviews
+
+The [retained ledger](human-review-ledger.json) records the user's chat review of `input-handling-01` and
+`input-handling-02` on 2026-10-19, with exact case hashes and notes. Both confirm sufficient evidence and atomic
+questions. The first labels all three clauses true and expects allow; the second labels q03 false and expects escalation
+because values above 100 are clamped rather than rejected. The [review report](human-review-report.json) validates both
+reviews; 22 cases remain pending. These are human labels, not observed model outcomes or runtime permission decisions.
 
 ## Start here
 
@@ -82,5 +90,6 @@ uv run python scripts/experiments/jev/cascade-offline.py \
 uv run python scripts/experiments/jev/cascade-offline.py \
   docs/board/doing/jev_cascade/evidence/cascade-corpus.json --render-family input-handling
 uv run python scripts/experiments/jev/cascade-offline.py \
-  docs/board/doing/jev_cascade/evidence/cascade-corpus.json --review /path/to/completed-review.json
+  docs/board/doing/jev_cascade/evidence/cascade-corpus.json \
+  --review docs/board/doing/jev_cascade/evidence/human-review-ledger.json
 ```
