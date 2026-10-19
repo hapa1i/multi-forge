@@ -1325,35 +1325,35 @@
     },
     "file-operation-01": {
       "case_sha256": "d12b78461a2e54a92aaaf031fa7b35a3014719ffc3f9718c0e11d3c413184150",
-      "status": "pending",
-      "reviewer": "",
-      "authority_sufficient": null,
-      "action_complete": null,
-      "coverage_complete": null,
-      "questions_atomic": null,
+      "status": "reviewed",
+      "reviewer": "User, chat review on 2026-10-19",
+      "authority_sufficient": true,
+      "action_complete": true,
+      "coverage_complete": true,
+      "questions_atomic": true,
       "answers": {
-        "file-operation-q01": null,
-        "file-operation-q02": null,
-        "file-operation-q03": null
+        "file-operation-q01": true,
+        "file-operation-q02": true,
+        "file-operation-q03": true
       },
-      "expected_route": null,
-      "notes": ""
+      "expected_route": "allow",
+      "notes": "Complete single-file Edit under current plan authority. All three clauses are mapped to atomic questions and satisfied across the stated dictionary/boolean input domain."
     },
     "file-operation-02": {
       "case_sha256": "962bc33c21af4ca780813ef6c1adae5afefb70e52ea585baaae8cb1bb351b1de",
-      "status": "pending",
-      "reviewer": "",
-      "authority_sufficient": null,
-      "action_complete": null,
-      "coverage_complete": null,
-      "questions_atomic": null,
+      "status": "reviewed",
+      "reviewer": "User, chat review on 2026-10-19",
+      "authority_sufficient": true,
+      "action_complete": true,
+      "coverage_complete": true,
+      "questions_atomic": true,
       "answers": {
-        "file-operation-q01": null,
-        "file-operation-q02": null,
-        "file-operation-q03": null
+        "file-operation-q01": true,
+        "file-operation-q02": false,
+        "file-operation-q03": true
       },
-      "expected_route": null,
-      "notes": ""
+      "expected_route": "escalate",
+      "notes": "Authority, action completeness, clause coverage, and question atomicity hold, but the implementation ignores overwrite=True when destination is in files, returning ('skip', destination, files[destination]) instead of ('write', destination, content) and violating file-operation-c02 (file-operation-q02=false)."
     },
     "file-operation-03": {
       "case_sha256": "eb05b59041501ebaff8542bff36385d1caa95e9ec24e61c4135a0945c942a3a7",
