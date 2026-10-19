@@ -1,6 +1,6 @@
 # Jev rule pack, warnings only
 
-Epic: [Jev support](../epic_jev_support/card.md). Member **A2**. Depends on
+Epic: [Jev support](../../doing/epic_jev_support/card.md). Member **A2**. Depends on
 [A1: Jev client and probes](../../done/jev_client_probes/card.md). Codex-visible delivery also depends on
 [B3: warnings Codex can see](../../done/codex_policy_warnings/card.md), shipped through PR #262 and closed on
 2026-10-11.
@@ -10,10 +10,10 @@ The independent [feedback-permissions fix, PR #269](https://github.com/hapa1i/mu
 [closeout](../../done/claude_policy_feedback_permissions/checklist.md#merged-closeout) records the user's decision to
 merge with paid native testing skipped. A2 still needs its own native warning-delivery evidence.
 
-Status: **doing**. The foundations shipped through [PR #270](https://github.com/hapa1i/multi-forge/pull/270), merged as
-`9442c1e5` on 2026-10-15. Offline outcomes and saved-response evaluation shipped through
-[PR #271](https://github.com/hapa1i/multi-forge/pull/271) as `791d9872` on the same day. The
-[execution checklist](checklist.md) records the outstanding quality and activation gates. The
+Status: **paused**, by owner decision on 2026-10-19. The foundations shipped through
+[PR #270](https://github.com/hapa1i/multi-forge/pull/270), merged as `9442c1e5` on 2026-10-15. Offline outcomes and
+saved-response evaluation shipped through [PR #271](https://github.com/hapa1i/multi-forge/pull/271) as `791d9872` on the
+same day. The [execution checklist](checklist.md) records the outstanding quality and activation gates. The
 [wrapper evidence contract](evidence/initial-rule-review.md) follows the user's 2026-10-15 choice to keep broader
 wrappers. All 17 constructed hook-shaped examples now have human adjudications. Representative action coverage, warning
 usefulness and numerical quality gates remain open. The
@@ -25,8 +25,8 @@ shipped scope and the next gate without closing A2. Implemented ownership is des
 [rule-pack design](../../../design_rule_packs.md).
 
 Human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485`. The
-[PR #274 experimental checkpoint](evidence/pr-274-merge-handoff.md) merged as `09984440` on 2026-10-17. A2 remains
-active at the [pre-runtime feasibility gate](checklist.md#slice-2-feasibility-before-runtime-work). The
+[PR #274 experimental checkpoint](evidence/pr-274-merge-handoff.md) merged as `09984440` on 2026-10-17. A2 stopped at
+the [pre-runtime feasibility gate](checklist.md#slice-2-feasibility-before-runtime-work). The
 [completed bounded study](evidence/bounded-diagnostic-2026-10-18/README.md) followed review of all 95 diagnostic answers
 and separate capture approval. Jev triggered its repeated-sentinel stop; Opus failed the critical missing-replacement
 retention answer. Neither arm passed, and the allowance is consumed. The
@@ -35,9 +35,10 @@ admission and semantic retention, preserving the failed study and its labels. Na
 unmeasured. The [runtime evidence proposal](evidence/runtime-evidence-contract.md) remains unimplemented;
 constructed-only evidence cannot establish runtime quality or activate the policy. The
 [2026-10-19 continuation](evidence/feasibility-continuation-2026-10-19.md#decision-stop-the-current-implementation-path)
-recommends stopping this implementation path. The bounded native audit remains inconclusive, and the tested model
-configurations do not establish a viable hook policy. No additional provider calls ran. Owner review of the card's
-disposition is pending; the card remains `doing/` without advancing runtime work.
+records why this implementation path stopped. The bounded native audit remains inconclusive, and the tested model
+configurations do not establish a viable hook policy. The owner accepted the pause on 2026-10-19. The
+[pause handoff](evidence/pr-275-pause-handoff.md) preserves shipped scope, unmet gates and conditions for
+reconsideration. The epic selects A3 for separate feasibility work; this is not an A2 completion or quality endorsement.
 
 ## Problem and outcome
 
@@ -47,8 +48,8 @@ warnings. It works without a plan or supervisor and provides measurable evidence
 block actions.
 
 [Workflow design §1.1](../../../design_workflows.md#11-deterministic-policy-forge-policy) motivates this use. The
-[research](../epic_jev_support/research.md#rule-packs-backed-by-jev-fixed-semantic-checks) explains the boundary between
-stable rule citations, action evidence and semantic correctness.
+[research](../../doing/epic_jev_support/research.md#rule-packs-backed-by-jev-fixed-semantic-checks) explains the
+boundary between stable rule citations, action evidence and semantic correctness.
 
 ## Scope
 

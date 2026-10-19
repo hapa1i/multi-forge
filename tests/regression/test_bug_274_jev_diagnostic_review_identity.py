@@ -10,7 +10,7 @@ import pytest
 
 pytestmark = pytest.mark.regression
 ROOT = Path(__file__).resolve().parents[2]
-EVIDENCE = ROOT / "docs/board/doing/jev_rule_pack/evidence"
+EVIDENCE = ROOT / "docs/board/paused/jev_rule_pack/evidence"
 
 
 @pytest.fixture

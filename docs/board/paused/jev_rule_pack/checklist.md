@@ -2,38 +2,21 @@
 
 ## Current focus
 
-The offline outcome/evaluation slice shipped through [PR #271](https://github.com/hapa1i/multi-forge/pull/271), merged
-as `791d9872` on 2026-10-15. The [merge handoff](#offline-evaluation-merge-and-next-gate) records its verified scope. It
-builds on [PR #270](https://github.com/hapa1i/multi-forge/pull/270)'s explicit evaluation identity, session consent and
-override guards. Human review shipped through [PR #272](https://github.com/hapa1i/multi-forge/pull/272) as `64317485`.
-The [PR #274 handoff](evidence/pr-274-merge-handoff.md) records the merged experimental checkpoint and remaining gates.
-A2 remains active.
+**Paused by owner decision, 2026-10-19.** Stop the current Jev-backed compatibility-wrapper hook path and select A3 for
+separate feasibility work. The [pause handoff](evidence/pr-275-pause-handoff.md) records the bounded investigation,
+remaining gates and conditions for reconsideration. PR #275 preserves experimental tools and negative results; it does
+not complete this card or enable a runtime policy.
 
-All 17 constructed cases now have [human adjudications](evidence/human-review.md): 12 calibration and five held-out. The
-[feasibility checkpoint](evidence/corpus-feasibility.md) records seven families, empty historical strata and only one
-held-out positive family. Its scenarios and proposals were visible during draft-3 development; held-out model outputs
-can support only a limited check, not unseen-scenario generalization. Select question bands on calibration responses
-only.
+The [bounded study](evidence/bounded-diagnostic-2026-10-18/README.md) failed its frozen screen for both models. The
+[offline review](evidence/offline-retention-admission.md) separates structural candidates, evidence admission and
+semantic judgment without rescoring those results. The [continuation](evidence/feasibility-continuation-2026-10-19.md)
+found no viable tested model/runtime pairing; native evidence coverage and warning usefulness remain unmeasured.
+Settings stay unset, `jev_rule_pack` stays reserved, and the
+[runtime evidence proposal](evidence/runtime-evidence-contract.md) remains unimplemented.
 
-The next [feasibility gate](#slice-2-feasibility-before-runtime-work) precedes declaration, dispatch, activation and
-feedback implementation. It measures real-action evidence coverage, exception mapping and warning usefulness against the
-[evaluation plan](evidence/evaluation-plan.md). The [current checkpoint](evidence/feasibility-progress.md) records the
-approved inventory's missing-source shortfall and constructed baseline signals. The
-[runtime evidence proposal](evidence/runtime-evidence-contract.md) remains unimplemented and selects no production
-authority. The [wrapper evidence contract](evidence/initial-rule-review.md) retains broader wrappers and advisory
-supplied-evidence semantics. The [boundary-instruction follow-up](evidence/calibration-boundary-2026-10-17/README.md)
-completed, but boundary and coverage scores cannot recover the three human no-warning labels under any allowed bands.
-The [bounded diagnostic capture](evidence/bounded-diagnostic-2026-10-18/README.md) also failed its frozen screen for
-both arms. The [offline review](evidence/offline-retention-admission.md) now separates structural observations, evidence
-admission and semantic judgment. The [bounded continuation](evidence/feasibility-continuation-2026-10-19.md) recommends
-stopping the current implementation path: no viable model/runtime pairing or useful native warnings have been
-established, and the bounded native audit remains inconclusive. No additional paid calls ran. Owner review of that
-recommendation is pending; settings remain unset and runtime work remains gated. No bundle is enabled. The
-[card](card.md) owns scope; the [epic checklist](../epic_jev_support/checklist.md) owns sequencing. A3 remains proposed.
-
-Build an explicitly enabled, warnings-only policy over a small reviewed rule pack. A finding or unavailable check must
-never introduce a Jev denial or `needs_review`. An independently configured policy or supervisor retains its existing
-behavior. This card does not adjudicate plan alignment, change Stop review, or claim avoided supervisor calls.
+The foundations and their prior merge evidence remain below. Unmet acceptance items stay open. Resuming this card
+requires an explicit owner decision and new evidence addressing the pause; another prompt variant alone is insufficient.
+The [card](card.md) owns scope and the [epic checklist](../../doing/epic_jev_support/checklist.md) owns sequencing.
 
 ## Activation and verified starting points
 

@@ -201,7 +201,7 @@ To reproduce offline preparation from the repository root:
 
 ```bash
 uv run python scripts/experiments/jev/rule-pack-eval.py \
-  docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json
+  docs/board/paused/jev_rule_pack/evidence/wrapper-corpus.json
 ```
 
 Use `--include-payloads` to inspect the exact model-shaped inputs for cases requiring semantic assessment. They exclude

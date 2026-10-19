@@ -139,7 +139,7 @@ tracked worksheet, format it with the configured hook before comparing bytes:
 
 ```bash
 uv run pre-commit run mdformat --files \
-  docs/board/doing/jev_rule_pack/evidence/diagnostic-review/validation-boundary.md
+  docs/board/paused/jev_rule_pack/evidence/diagnostic-review/validation-boundary.md
 ```
 
 Validate a retained partial ledger:
@@ -158,7 +158,7 @@ When diagnostic wording or evidence changes, explicitly prepare a new partial le
 
 ```bash
 uv run python scripts/experiments/jev/rule-pack-diagnostic.py \
-  --carry-review docs/board/doing/jev_rule_pack/evidence/diagnostic-review-2026-10-17-batch-6.json \
+  --carry-review docs/board/paused/jev_rule_pack/evidence/diagnostic-review-2026-10-17-batch-6.json \
   > /tmp/jev-diagnostic-carried.json
 ```
 

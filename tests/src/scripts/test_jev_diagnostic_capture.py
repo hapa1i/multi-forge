@@ -19,7 +19,7 @@ import pytest
 from click.testing import CliRunner
 
 ROOT = Path(__file__).resolve().parents[3]
-EVIDENCE = ROOT / "docs/board/doing/jev_rule_pack/evidence"
+EVIDENCE = ROOT / "docs/board/paused/jev_rule_pack/evidence"
 SECRET = "synthetic-capture-secret"
 CREDENTIALS = {"base_url": "https://openrouter.ai/api/v1", "api_key": SECRET}
 

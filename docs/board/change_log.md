@@ -20,8 +20,8 @@ known consumed proposals before credential access. A2 remains active; no runtime
 
 **Verification**: [PR #274](https://github.com/hapa1i/multi-forge/pull/274) merged as `09984440` after all five CI
 checks passed on reviewed head `f51bcde8`; 453 focused tests passed locally. The
-[handoff](doing/jev_rule_pack/evidence/pr-274-merge-handoff.md) preserves 92 diagnostic answers, three nulls, unresolved
-wording and remaining feasibility gates. No further paid capture or native trial is authorized.
+[handoff](paused/jev_rule_pack/evidence/pr-274-merge-handoff.md) preserves 92 diagnostic answers, three nulls,
+unresolved wording and remaining feasibility gates. No further paid capture or native trial is authorized.
 
 ## 2026-10-16
 
@@ -37,7 +37,7 @@ output check.
 **Verification**: [PR #272](https://github.com/hapa1i/multi-forge/pull/272) merged as `64317485` with all five CI checks
 passing. Local validation passed 239 focused tests, full pre-commit across the sandboxed run and separate local EOF
 rerun, and the 691-source Markdown link audit. All eight ledgers replay and retain report identity after relocation. The
-[handoff](doing/jev_rule_pack/checklist.md#human-review-merge-and-feasibility-continuation) preserves remaining data,
+[handoff](paused/jev_rule_pack/checklist.md#human-review-merge-and-feasibility-continuation) preserves remaining data,
 quality and runtime gates. A2 remains active; no paid A2 evaluation or native trial ran.
 
 ### Restore prompt-cache reuse on translated routes
@@ -79,8 +79,9 @@ separate from proposals; A2's quality, activation and native-delivery gates stay
 **Verification**: [PR #271](https://github.com/hapa1i/multi-forge/pull/271) merged as `791d9872`, identical to reviewed
 head `cd008613`, with all five CI checks passing. Local checks passed 148 focused tests, 11,076 unit tests (117
 deselected), 1,924 regressions and full pre-commit. An initial watchdog timeout-test failure passed isolated and full
-reruns without changes. See the [merge handoff](doing/jev_rule_pack/checklist.md#offline-evaluation-merge-and-next-gate)
-for CLI fixture and preparation evidence. No paid A2 evaluation or native trial ran.
+reruns without changes. See the
+[merge handoff](paused/jev_rule_pack/checklist.md#offline-evaluation-merge-and-next-gate) for CLI fixture and
+preparation evidence. No paid A2 evaluation or native trial ran.
 
 ### Ship Jev consent and offline evaluation foundations
 
@@ -93,7 +94,7 @@ notes from model evidence. A2 remains active; activation, quality and native del
 **Verification**: [PR #270](https://github.com/hapa1i/multi-forge/pull/270) merged as `9442c1e5`, identical to reviewed
 head `55ce6e24`, with all CI checks passing. Implementation checks passed 11,001 unit tests, 1,889 regressions and 46
 distinct targeted integrations; final review passed 215 focused tests and seven policy CLI integrations. See the
-[foundation handoff](doing/jev_rule_pack/checklist.md#foundation-merge-and-continuation). No paid/native trial ran.
+[foundation handoff](paused/jev_rule_pack/checklist.md#foundation-merge-and-continuation). No paid/native trial ran.
 
 ### Preserve Claude permissions in policy feedback
 

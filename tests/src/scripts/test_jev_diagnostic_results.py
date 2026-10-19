@@ -27,7 +27,7 @@ def results():
 
 @pytest.fixture
 def plan():
-    return json.loads((ROOT / "docs/board/doing/jev_rule_pack/evidence/bounded-capture-manifest.json").read_text())
+    return json.loads((ROOT / "docs/board/paused/jev_rule_pack/evidence/bounded-capture-manifest.json").read_text())
 
 
 def provider_body(plan, arm, case_id="validation-boundary"):

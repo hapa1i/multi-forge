@@ -105,7 +105,7 @@ Export with current definitions and exact input identities:
 
 ```bash
 uv run python scripts/experiments/jev/rule-pack-eval.py \
-  docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json \
+  docs/board/paused/jev_rule_pack/evidence/wrapper-corpus.json \
   --review-packet > /tmp/jev-human-review.json
 ```
 
@@ -113,7 +113,7 @@ After a human edits that packet, validate it and emit a new corpus:
 
 ```bash
 uv run python scripts/experiments/jev/rule-pack-eval.py \
-  docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json \
+  docs/board/paused/jev_rule_pack/evidence/wrapper-corpus.json \
   --import-review /tmp/jev-human-review.json > /tmp/jev-reviewed-corpus.json
 uv run python scripts/experiments/jev/rule-pack-eval.py /tmp/jev-reviewed-corpus.json
 ```

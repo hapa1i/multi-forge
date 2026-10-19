@@ -50,7 +50,7 @@ After separate approval of the unchanged manifest, the completed run used:
 
 ```bash
 PYTHON_DOTENV_DISABLED=1 uv run python scripts/experiments/jev/rule-pack-capture.py \
-  --live --manifest docs/board/doing/jev_rule_pack/evidence/calibration-boundary-manifest.json \
+  --live --manifest docs/board/paused/jev_rule_pack/evidence/calibration-boundary-manifest.json \
   --output /private/tmp/jev-a2-calibration-boundary-2026-10-17
 ```
 

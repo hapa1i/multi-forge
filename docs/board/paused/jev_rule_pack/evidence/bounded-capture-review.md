@@ -95,11 +95,11 @@ Reproduce and validate locally, with no credentials or network calls:
 
 ```bash
 uv run python scripts/experiments/jev/diagnostic_manifest.py \
-  --review docs/board/doing/jev_rule_pack/evidence/diagnostic-review-2026-10-18-batch-6.json \
-  --catalog docs/board/doing/jev_rule_pack/evidence/bounded-catalog-2026-10-18.json \
+  --review docs/board/paused/jev_rule_pack/evidence/diagnostic-review-2026-10-18-batch-6.json \
+  --catalog docs/board/paused/jev_rule_pack/evidence/bounded-catalog-2026-10-18.json \
   > /tmp/jev-bounded-manifest.json
 uv run python scripts/experiments/jev/diagnostic_manifest.py \
-  --review docs/board/doing/jev_rule_pack/evidence/diagnostic-review-2026-10-18-batch-6.json \
-  --catalog docs/board/doing/jev_rule_pack/evidence/bounded-catalog-2026-10-18.json \
-  --validate docs/board/doing/jev_rule_pack/evidence/bounded-capture-manifest.json
+  --review docs/board/paused/jev_rule_pack/evidence/diagnostic-review-2026-10-18-batch-6.json \
+  --catalog docs/board/paused/jev_rule_pack/evidence/bounded-catalog-2026-10-18.json \
+  --validate docs/board/paused/jev_rule_pack/evidence/bounded-capture-manifest.json
 ```

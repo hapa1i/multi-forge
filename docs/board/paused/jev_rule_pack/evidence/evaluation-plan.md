@@ -88,9 +88,9 @@ Prepare payloads as before, or generate an empty fixture manifest for one split:
 
 ```bash
 uv run python scripts/experiments/jev/rule-pack-eval.py \
-  docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json --include-payloads
+  docs/board/paused/jev_rule_pack/evidence/wrapper-corpus.json --include-payloads
 uv run python scripts/experiments/jev/rule-pack-eval.py \
-  docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json \
+  docs/board/paused/jev_rule_pack/evidence/wrapper-corpus.json \
   --prediction-template --split calibration --expected-model fixture-model > /tmp/jev-predictions.json
 ```
 
@@ -140,7 +140,7 @@ Save explicitly selected settings to `/tmp/jev-settings.json`, then evaluate wit
 
 ```bash
 uv run python scripts/experiments/jev/rule-pack-eval.py \
-  docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json \
+  docs/board/paused/jev_rule_pack/evidence/wrapper-corpus.json \
   --predictions /tmp/jev-predictions.json --settings /tmp/jev-settings.json
 ```
 

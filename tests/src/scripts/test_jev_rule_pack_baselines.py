@@ -13,7 +13,7 @@ from forge.core.judgments.types import JudgmentError
 from forge.policy.deterministic import coding_standards
 
 ROOT = Path(__file__).resolve().parents[3]
-CORPUS = ROOT / "docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json"
+CORPUS = ROOT / "docs/board/paused/jev_rule_pack/evidence/wrapper-corpus.json"
 
 
 @pytest.fixture

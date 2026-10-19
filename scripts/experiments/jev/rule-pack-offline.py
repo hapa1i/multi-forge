@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
-EVIDENCE = ROOT / "docs/board/doing/jev_rule_pack/evidence"
+EVIDENCE = ROOT / "docs/board/paused/jev_rule_pack/evidence"
 REVIEW = EVIDENCE / "diagnostic-review-2026-10-18-batch-6.json"
 CORPUS = EVIDENCE / "wrapper-corpus.json"
 MAX_REVIEW_BYTES = 2_000_000
