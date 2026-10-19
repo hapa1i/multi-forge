@@ -1,0 +1,851 @@
+{
+  "report_schema_version": 2,
+  "contract_version": "draft-1",
+  "corpus_sha256": "249b0cce2a89a520988479c2a4f2716c7ab6e667db251d021111648c5107a133",
+  "reviews_sha256": "38ae304581de3ed97552d3785910c3d61c10882fef752ac834f254e0ec359a7d",
+  "source_sha256": "dcf13e16fdcc76cad86b693476ec51b086c956fccbedb97ecc2886039d3acf70",
+  "quality_accepted": false,
+  "max_physical_requests": 0,
+  "semantic_deterministic_baseline": "plan_bound_structural_certificates",
+  "deterministic_version": "draft-1",
+  "limits": [
+    "Fixture metadata and authored clause inventory require human review; syntax does not prove completeness.",
+    "No model observations, model quality scoring, runtime admission or native acquisition are implemented.",
+    "Certificates were authored with every case visible; this is not unseen-scenario generalization.",
+    "Comments-only controls duplicate algorithms; certificate counts are not independent sample counts."
+  ],
+  "admission_counts": {
+    "candidate_pending_review": 12,
+    "escalate": 12
+  },
+  "comparison": {
+    "overall": {
+      "cases": 24,
+      "labelled_cases": 24,
+      "unlabelled_cases": 0,
+      "host_exclusions": 12,
+      "model_candidates": 12,
+      "human_expected_allows": 6,
+      "eligible_divergent_cases": 6,
+      "controls": {
+        "always_escalate_control": {
+          "correct_allow": 0,
+          "false_allow": 0,
+          "missed_allow": 6,
+          "correct_escalation": 18
+        },
+        "deterministic_control": {
+          "correct_allow": 6,
+          "false_allow": 0,
+          "missed_allow": 0,
+          "correct_escalation": 18
+        }
+      },
+      "incremental_positive_cases": [],
+      "distinct_allow_certificates": [
+        "adjacent_run_accumulation",
+        "bounded_decimal_accumulation",
+        "bounded_index_prefix",
+        "overwrite_aware_planner"
+      ]
+    },
+    "by_split": {
+      "calibration": {
+        "cases": 12,
+        "labelled_cases": 12,
+        "unlabelled_cases": 0,
+        "host_exclusions": 6,
+        "model_candidates": 6,
+        "human_expected_allows": 3,
+        "eligible_divergent_cases": 3,
+        "controls": {
+          "always_escalate_control": {
+            "correct_allow": 0,
+            "false_allow": 0,
+            "missed_allow": 3,
+            "correct_escalation": 9
+          },
+          "deterministic_control": {
+            "correct_allow": 3,
+            "false_allow": 0,
+            "missed_allow": 0,
+            "correct_escalation": 9
+          }
+        },
+        "incremental_positive_cases": [],
+        "distinct_allow_certificates": [
+          "adjacent_run_accumulation",
+          "bounded_decimal_accumulation"
+        ]
+      },
+      "held_out": {
+        "cases": 12,
+        "labelled_cases": 12,
+        "unlabelled_cases": 0,
+        "host_exclusions": 6,
+        "model_candidates": 6,
+        "human_expected_allows": 3,
+        "eligible_divergent_cases": 3,
+        "controls": {
+          "always_escalate_control": {
+            "correct_allow": 0,
+            "false_allow": 0,
+            "missed_allow": 3,
+            "correct_escalation": 9
+          },
+          "deterministic_control": {
+            "correct_allow": 3,
+            "false_allow": 0,
+            "missed_allow": 0,
+            "correct_escalation": 9
+          }
+        },
+        "incremental_positive_cases": [],
+        "distinct_allow_certificates": [
+          "bounded_index_prefix",
+          "overwrite_aware_planner"
+        ]
+      }
+    },
+    "by_family": {
+      "input-handling": {
+        "cases": 6,
+        "labelled_cases": 6,
+        "unlabelled_cases": 0,
+        "host_exclusions": 3,
+        "model_candidates": 3,
+        "human_expected_allows": 1,
+        "eligible_divergent_cases": 2,
+        "controls": {
+          "always_escalate_control": {
+            "correct_allow": 0,
+            "false_allow": 0,
+            "missed_allow": 1,
+            "correct_escalation": 5
+          },
+          "deterministic_control": {
+            "correct_allow": 1,
+            "false_allow": 0,
+            "missed_allow": 0,
+            "correct_escalation": 5
+          }
+        },
+        "incremental_positive_cases": [],
+        "distinct_allow_certificates": [
+          "bounded_decimal_accumulation"
+        ]
+      },
+      "data-transformation": {
+        "cases": 6,
+        "labelled_cases": 6,
+        "unlabelled_cases": 0,
+        "host_exclusions": 3,
+        "model_candidates": 3,
+        "human_expected_allows": 2,
+        "eligible_divergent_cases": 1,
+        "controls": {
+          "always_escalate_control": {
+            "correct_allow": 0,
+            "false_allow": 0,
+            "missed_allow": 2,
+            "correct_escalation": 4
+          },
+          "deterministic_control": {
+            "correct_allow": 2,
+            "false_allow": 0,
+            "missed_allow": 0,
+            "correct_escalation": 4
+          }
+        },
+        "incremental_positive_cases": [],
+        "distinct_allow_certificates": [
+          "adjacent_run_accumulation"
+        ]
+      },
+      "file-operation": {
+        "cases": 6,
+        "labelled_cases": 6,
+        "unlabelled_cases": 0,
+        "host_exclusions": 3,
+        "model_candidates": 3,
+        "human_expected_allows": 1,
+        "eligible_divergent_cases": 2,
+        "controls": {
+          "always_escalate_control": {
+            "correct_allow": 0,
+            "false_allow": 0,
+            "missed_allow": 1,
+            "correct_escalation": 5
+          },
+          "deterministic_control": {
+            "correct_allow": 1,
+            "false_allow": 0,
+            "missed_allow": 0,
+            "correct_escalation": 5
+          }
+        },
+        "incremental_positive_cases": [],
+        "distinct_allow_certificates": [
+          "overwrite_aware_planner"
+        ]
+      },
+      "bounded-processing": {
+        "cases": 6,
+        "labelled_cases": 6,
+        "unlabelled_cases": 0,
+        "host_exclusions": 3,
+        "model_candidates": 3,
+        "human_expected_allows": 2,
+        "eligible_divergent_cases": 1,
+        "controls": {
+          "always_escalate_control": {
+            "correct_allow": 0,
+            "false_allow": 0,
+            "missed_allow": 2,
+            "correct_escalation": 4
+          },
+          "deterministic_control": {
+            "correct_allow": 2,
+            "false_allow": 0,
+            "missed_allow": 0,
+            "correct_escalation": 4
+          }
+        },
+        "incremental_positive_cases": [],
+        "distinct_allow_certificates": [
+          "bounded_index_prefix"
+        ]
+      }
+    }
+  },
+  "calibration_preflight": {
+    "procedure_version": "draft-1",
+    "status": "stop",
+    "blockers": [
+      "no_incremental_positive:input-handling",
+      "no_incremental_positive:data-transformation",
+      "no_incremental_positive:file-operation",
+      "no_incremental_positive:bounded-processing"
+    ],
+    "incremental_positive_cases_by_family": {
+      "input-handling": [],
+      "data-transformation": [],
+      "file-operation": [],
+      "bounded-processing": []
+    },
+    "candidate_minimum_true": [
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      0.95,
+      0.99,
+      1.0
+    ],
+    "repetitions": 3,
+    "conditional_slots_by_split": {
+      "calibration": 18,
+      "held_out": 18
+    },
+    "selected_minimum_true": null,
+    "selection_implemented": false,
+    "paid_capture_authorized": false
+  },
+  "cases": [
+    {
+      "id": "input-handling-01",
+      "family": "input-handling",
+      "split": "calibration",
+      "case_sha256": "d744c856c4439d9255cb4cbd21332f80ef2308a4e4de15f232517bc8537fef45",
+      "declared_admission": "candidate_pending_review",
+      "reasons": [],
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "allow",
+      "human_route_answer_conflict": false,
+      "model_candidate": true,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "allow",
+        "reasons": [],
+        "certificate": "bounded_decimal_accumulation"
+      }
+    },
+    {
+      "id": "input-handling-02",
+      "family": "input-handling",
+      "split": "calibration",
+      "case_sha256": "b9e1de1381f292aade727141b0cfd752964d7c1e98b7deb36d45526ef7e4b710",
+      "declared_admission": "candidate_pending_review",
+      "reasons": [],
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": true,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "unrecognized_complete_algorithm"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "input-handling-03",
+      "family": "input-handling",
+      "split": "calibration",
+      "case_sha256": "498e86cf9de80e62e37296a56130de62237426623b4f8f3d491769f42b83602b",
+      "declared_admission": "escalate",
+      "reasons": [
+        "unmapped_plan_clause"
+      ],
+      "human_status": "reviewed",
+      "human_evidence_ready": false,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": false,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "unmapped_plan_clause",
+          "human_evidence_review_incomplete"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "input-handling-04",
+      "family": "input-handling",
+      "split": "calibration",
+      "case_sha256": "34f8bdff236a4f9813e31b0e429c2d23349680e9c70fceb4db97b99d19899fdb",
+      "declared_admission": "escalate",
+      "reasons": [
+        "incomplete_action",
+        "external_context_required",
+        "missing_edit_evidence",
+        "unsupported_plan_clause",
+        "no_semantic_questions"
+      ],
+      "human_status": "reviewed",
+      "human_evidence_ready": false,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": false,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "incomplete_action",
+          "external_context_required",
+          "missing_edit_evidence",
+          "unsupported_plan_clause",
+          "no_semantic_questions",
+          "human_evidence_review_incomplete"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "input-handling-05",
+      "family": "input-handling",
+      "split": "calibration",
+      "case_sha256": "afd6be09b2067c072342175437009dda40b2657c4a6c55e81e0e97410e9e0770",
+      "declared_admission": "escalate",
+      "reasons": [
+        "plan_authority_stale"
+      ],
+      "human_status": "reviewed",
+      "human_evidence_ready": false,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": false,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "plan_authority_stale",
+          "human_evidence_review_incomplete"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "input-handling-06",
+      "family": "input-handling",
+      "split": "calibration",
+      "case_sha256": "6fcba448e5a279bc247a9f89bae575f7b2f53f5a02622b71bb6025f0e5e47287",
+      "declared_admission": "candidate_pending_review",
+      "reasons": [],
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": true,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "unrecognized_complete_algorithm"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "data-transformation-01",
+      "family": "data-transformation",
+      "split": "calibration",
+      "case_sha256": "5590879aa273f49556007da1df30bf10d5cb6a858a33dde7f5c029d9ad13cc28",
+      "declared_admission": "candidate_pending_review",
+      "reasons": [],
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "allow",
+      "human_route_answer_conflict": false,
+      "model_candidate": true,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "allow",
+        "reasons": [],
+        "certificate": "adjacent_run_accumulation"
+      }
+    },
+    {
+      "id": "data-transformation-02",
+      "family": "data-transformation",
+      "split": "calibration",
+      "case_sha256": "8ab2a255ab40dd3976d9fddaba1fe712efd022c648edcdc8b8b958335ff44bc0",
+      "declared_admission": "candidate_pending_review",
+      "reasons": [],
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": true,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "unrecognized_complete_algorithm"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "data-transformation-03",
+      "family": "data-transformation",
+      "split": "calibration",
+      "case_sha256": "307aab9cbb0ae523221179bb473859a01c65ee3136ee21c41df3227b51fce29a",
+      "declared_admission": "escalate",
+      "reasons": [
+        "unmapped_plan_clause"
+      ],
+      "human_status": "reviewed",
+      "human_evidence_ready": false,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": false,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "unmapped_plan_clause",
+          "human_evidence_review_incomplete"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "data-transformation-04",
+      "family": "data-transformation",
+      "split": "calibration",
+      "case_sha256": "417d73788cbc80b1314191773833796a37c4f14b74bd43b62a42313275586571",
+      "declared_admission": "escalate",
+      "reasons": [
+        "multiple_operations_unsupported",
+        "tool_shape_unsupported"
+      ],
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": false,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "multiple_operations_unsupported",
+          "tool_shape_unsupported"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "data-transformation-05",
+      "family": "data-transformation",
+      "split": "calibration",
+      "case_sha256": "21c3f8a3e43968dec0ae40f88bbd6fa6b3ee51aa9e6ec6f9e76b100c0596ce59",
+      "declared_admission": "escalate",
+      "reasons": [
+        "plan_authority_ambiguous"
+      ],
+      "human_status": "reviewed",
+      "human_evidence_ready": false,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": false,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "plan_authority_ambiguous",
+          "human_evidence_review_incomplete"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "data-transformation-06",
+      "family": "data-transformation",
+      "split": "calibration",
+      "case_sha256": "262d5fba982aa11c9a2454660fbd7376067bfc49d43588ec6e237b4b92559730",
+      "declared_admission": "candidate_pending_review",
+      "reasons": [],
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "allow",
+      "human_route_answer_conflict": false,
+      "model_candidate": true,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "allow",
+        "reasons": [],
+        "certificate": "adjacent_run_accumulation"
+      }
+    },
+    {
+      "id": "file-operation-01",
+      "family": "file-operation",
+      "split": "held_out",
+      "case_sha256": "d12b78461a2e54a92aaaf031fa7b35a3014719ffc3f9718c0e11d3c413184150",
+      "declared_admission": "candidate_pending_review",
+      "reasons": [],
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "allow",
+      "human_route_answer_conflict": false,
+      "model_candidate": true,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "allow",
+        "reasons": [],
+        "certificate": "overwrite_aware_planner"
+      }
+    },
+    {
+      "id": "file-operation-02",
+      "family": "file-operation",
+      "split": "held_out",
+      "case_sha256": "962bc33c21af4ca780813ef6c1adae5afefb70e52ea585baaae8cb1bb351b1de",
+      "declared_admission": "candidate_pending_review",
+      "reasons": [],
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": true,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "unrecognized_complete_algorithm"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "file-operation-03",
+      "family": "file-operation",
+      "split": "held_out",
+      "case_sha256": "eb05b59041501ebaff8542bff36385d1caa95e9ec24e61c4135a0945c942a3a7",
+      "declared_admission": "escalate",
+      "reasons": [
+        "unmapped_plan_clause"
+      ],
+      "human_status": "reviewed",
+      "human_evidence_ready": false,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": false,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "unmapped_plan_clause",
+          "human_evidence_review_incomplete"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "file-operation-04",
+      "family": "file-operation",
+      "split": "held_out",
+      "case_sha256": "4fa24756a263f70e51fc4300740a3e340099da0938983e27fe6b0900c25fa696",
+      "declared_admission": "escalate",
+      "reasons": [
+        "deletion_unsupported",
+        "tool_shape_unsupported",
+        "unsupported_plan_clause",
+        "no_semantic_questions"
+      ],
+      "human_status": "reviewed",
+      "human_evidence_ready": false,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": false,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "deletion_unsupported",
+          "tool_shape_unsupported",
+          "unsupported_plan_clause",
+          "no_semantic_questions",
+          "human_evidence_review_incomplete"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "file-operation-05",
+      "family": "file-operation",
+      "split": "held_out",
+      "case_sha256": "683bdadcb0869df8f5f630bfb1ad341c1aad2f00171232ca8462301f76a98612",
+      "declared_admission": "escalate",
+      "reasons": [
+        "plan_authority_missing"
+      ],
+      "human_status": "reviewed",
+      "human_evidence_ready": false,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": false,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "plan_authority_missing",
+          "human_evidence_review_incomplete"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "file-operation-06",
+      "family": "file-operation",
+      "split": "held_out",
+      "case_sha256": "85b3b539a4b8aee12e3a53ea1ecfcde61079b41577a7a4ad8e861032a875f9ea",
+      "declared_admission": "candidate_pending_review",
+      "reasons": [],
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": true,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "unrecognized_complete_algorithm"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "bounded-processing-01",
+      "family": "bounded-processing",
+      "split": "held_out",
+      "case_sha256": "55aa59c59b72863eeff2d147d76e79626362b6062ef5cf3c402862319d31862a",
+      "declared_admission": "candidate_pending_review",
+      "reasons": [],
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "allow",
+      "human_route_answer_conflict": false,
+      "model_candidate": true,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "allow",
+        "reasons": [],
+        "certificate": "bounded_index_prefix"
+      }
+    },
+    {
+      "id": "bounded-processing-02",
+      "family": "bounded-processing",
+      "split": "held_out",
+      "case_sha256": "d94d1cdb16105d625a440ddba3b629f1748082dfd8e691c312fb4d9f01d13a1c",
+      "declared_admission": "candidate_pending_review",
+      "reasons": [],
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": true,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "unrecognized_complete_algorithm"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "bounded-processing-03",
+      "family": "bounded-processing",
+      "split": "held_out",
+      "case_sha256": "e69c0f52cfd3aa1400d4e1009a6772918fff28c690349297fa09e56349635b4e",
+      "declared_admission": "escalate",
+      "reasons": [
+        "unmapped_plan_clause"
+      ],
+      "human_status": "reviewed",
+      "human_evidence_ready": false,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": false,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "unmapped_plan_clause",
+          "human_evidence_review_incomplete"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "bounded-processing-04",
+      "family": "bounded-processing",
+      "split": "held_out",
+      "case_sha256": "e96a99ed0728bbe88680b0bf86ef379337d269c8019798c7d6f0e3f0eb041922",
+      "declared_admission": "escalate",
+      "reasons": [
+        "incomplete_action",
+        "unsupported_plan_clause",
+        "no_semantic_questions"
+      ],
+      "human_status": "reviewed",
+      "human_evidence_ready": false,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": false,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "incomplete_action",
+          "unsupported_plan_clause",
+          "no_semantic_questions",
+          "human_evidence_review_incomplete"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "bounded-processing-05",
+      "family": "bounded-processing",
+      "split": "held_out",
+      "case_sha256": "01d4f6873d8a71ab97defddaa8ebe82f96b7f3de8152a779d970d8866e5a7a5f",
+      "declared_admission": "escalate",
+      "reasons": [
+        "plan_authority_ambiguous"
+      ],
+      "human_status": "reviewed",
+      "human_evidence_ready": false,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "escalate",
+      "human_route_answer_conflict": false,
+      "model_candidate": false,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "escalate",
+        "reasons": [
+          "plan_authority_ambiguous",
+          "human_evidence_review_incomplete"
+        ],
+        "certificate": null
+      }
+    },
+    {
+      "id": "bounded-processing-06",
+      "family": "bounded-processing",
+      "split": "held_out",
+      "case_sha256": "f13e5eb19d7f02a3088a1941c80e5350103ae19d0254892ce6ad03c73996fe49",
+      "declared_admission": "candidate_pending_review",
+      "reasons": [],
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
+      "human_review_complete": true,
+      "human_route_label_available": true,
+      "human_expected_route": "allow",
+      "human_route_answer_conflict": false,
+      "model_candidate": true,
+      "always_escalate_control": "escalate",
+      "deterministic_control": {
+        "route": "allow",
+        "reasons": [],
+        "certificate": "bounded_index_prefix"
+      }
+    }
+  ]
+}

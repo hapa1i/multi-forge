@@ -47,7 +47,7 @@ Applicable changed-file pre-commit checks passed, including types, formatting, s
 Markdown link audit. The user's unrelated `AGENTS.md` edits were excluded and preserved. Settings remain unset, and A2
 remains paused with its runtime and quality gates open.
 
-[A3](../../../proposed/jev_cascade/card.md) depends on A1 and shipped B1, not A2. It starts on a separate branch after
-this PR merges, with its own checklist and finite feasibility plan. A3 must establish action/plan coverage and a useful
-false-allow/abstention trade-off before skipping any real review. The
-[epic](../../../doing/epic_jev_support/checklist.md) remains active and owns that handoff.
+[A3](../../../doing/jev_cascade/card.md) depends on A1 and shipped B1, not A2. It activated on
+`codex/jev-cascade-feasibility` from `8dea95f5`, with its own [checklist](../../../doing/jev_cascade/checklist.md) and
+finite feasibility plan. A3 must establish action/plan coverage and a useful false-allow/abstention trade-off before
+skipping any real review. The [epic](../../../doing/epic_jev_support/checklist.md) remains active and owns that handoff.

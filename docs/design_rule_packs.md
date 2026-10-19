@@ -99,6 +99,28 @@ Replacement sufficiency checks behavior only after an independent consumer const
 structural and retention questions still record missing evidence, so an inapplicable comparison does not establish
 coverage.
 
+## Cascade feasibility tools
+
+`scripts/experiments/jev/cascade-offline.py` owns A3's synthetic corpus validation, human-review packet and declared
+evidence-admission report. It binds complete plan/question/action context to case identities and separates authored
+metadata from human confirmation. Missing mappings, unsupported actions and non-current authority escalate; confidence
+cannot fill an evidence gap. Its prospective fixture combiner requires an explicit threshold and reviewed evidence,
+preserves existing denials and unrelated review, and never uses human answer values to choose the candidate outcome.
+
+The same script owns the bounded deterministic comparison. Four complete algorithm certificates bind the exact normative
+plan and question contract. AST comparison ignores comments and local variable names; it preserves public signatures and
+executable structure. Unsupported contracts or structures escalate. Parsing alone establishes no semantic coverage, and
+human answer values do not choose the prediction. Reports separate host exclusions, evidence readiness, control outcomes
+and human labels, with per-family and per-split counts. A capture preflight stops when a required family has no
+human-positive candidate beyond the deterministic control.
+
+This tool has no provider dispatch, native acquisition, action-code execution or runtime wiring. Reports never accept
+model quality or select a threshold. Calibration scoring and automatic plan-clause discovery remain unimplemented.
+Workflow design continues to own the shipped generative checker, resolver and reviewer. The
+[A3 checklist](board/doing/jev_cascade/checklist.md) owns the experiment's offline stop and approval gates; its
+[calibration procedure](board/doing/jev_cascade/evidence/calibration-procedure.md) defines the proposed finite selection
+rule, which remains inactive for the current packet.
+
 ## Consent and runtime boundary
 
 `policy/rule_pack/consent.py` binds the paid repository-data acknowledgment to the session instance and pack settings.

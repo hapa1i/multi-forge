@@ -6,10 +6,12 @@
 [pause handoff](../../paused/jev_rule_pack/evidence/pr-275-pause-handoff.md) records the tested runner, failed bounded
 study, inconclusive native audit and unmet runtime gates. PR #275 wraps that investigation without enabling A2.
 
-Next selected member: [A3](../../proposed/jev_cascade/card.md), for its own bounded feasibility study before runtime
-implementation. Its branch/checklist activation follows the PR #275 merge. A3 depends on shipped A1 and B1, not A2; A2's
-results supply caution and reusable transport/tooling, not A3 quality evidence. The epic stays `doing/` as the living
-coordinator. A1 remains done, and consumer acceptance and quota savings remain unproven.
+Active member: [A3](../jev_cascade/card.md), for its own bounded feasibility study before runtime implementation. Branch
+`codex/jev-cascade-feasibility` starts at `8dea95f5` after PR #275 merged as `fe2d09a1`; its
+[checklist](../jev_cascade/checklist.md) and [study plan](../jev_cascade/evidence/feasibility-plan.md) own the gates. A3
+depends on shipped A1 and B1, not A2; A2's results supply caution and reusable transport/tooling, not A3 quality
+evidence. The epic stays `doing/` as the living coordinator. A1 remains done, and consumer acceptance and quota savings
+remain unproven.
 
 ## Activation and sequence
 
@@ -20,11 +22,11 @@ coordinator. A1 remains done, and consumer acceptance and quota savings remain u
   [shared contract](card.md#shared-contract); Jev Router remains separate.
 - [x] Verify activation links: the initial 2026-10-14 audit passed for all 672 Markdown sources.
 
-| Member                                     | Lane     | Prerequisites  | Acceptance owner                                                         |
-| ------------------------------------------ | -------- | -------------- | ------------------------------------------------------------------------ |
-| [A1](../../done/jev_client_probes/card.md) | Done     | None           | [A1 closeout](../../done/jev_client_probes/checklist.md#merged-closeout) |
-| [A2](../../paused/jev_rule_pack/card.md)   | Paused   | A1; shipped B3 | [A2 checklist](../../paused/jev_rule_pack/checklist.md)                  |
-| [A3](../../proposed/jev_cascade/card.md)   | Proposed | A1; shipped B1 | [A3 card](../../proposed/jev_cascade/card.md#acceptance-and-validation)  |
+| Member                                     | Lane   | Prerequisites  | Acceptance owner                                                         |
+| ------------------------------------------ | ------ | -------------- | ------------------------------------------------------------------------ |
+| [A1](../../done/jev_client_probes/card.md) | Done   | None           | [A1 closeout](../../done/jev_client_probes/checklist.md#merged-closeout) |
+| [A2](../../paused/jev_rule_pack/card.md)   | Paused | A1; shipped B3 | [A2 checklist](../../paused/jev_rule_pack/checklist.md)                  |
+| [A3](../jev_cascade/card.md)               | Doing  | A1; shipped B1 | [A3 checklist](../jev_cascade/checklist.md)                              |
 
 A2 is not an A3 dependency. Neither member's quality evidence validates the other. A valid live ZDR-required Decisions
 request gates consumer availability, even when offline transport is ready.
@@ -97,8 +99,10 @@ preserves review provenance and the next gates. A2 and the epic remain active; A
 Pause handoff, 2026-10-19: the owner stopped A2's current implementation path and selected A3 feasibility next. The
 [A2 handoff](../../paused/jev_rule_pack/evidence/pr-275-pause-handoff.md) retains the failed frozen judgments and all
 unmet acceptance items. PR #275 changes no A1 runtime API or telemetry schema and supplies no review-skipping evidence.
-A3 activation must record its own branch base, finite experiment, human evidence and stop decision before any runtime
-work or newly authorized capture.
+A3 activated on `codex/jev-cascade-feasibility` from `8dea95f5` after the merge. Its
+[study plan](../jev_cascade/evidence/feasibility-plan.md) begins with offline evidence admission and human review;
+proposed numeric gates and a future exact capture require review before execution. No A3 capture or runtime behavior has
+shipped.
 
 ## Coordination acceptance
 
