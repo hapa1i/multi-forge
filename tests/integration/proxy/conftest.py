@@ -371,6 +371,46 @@ def proxy_server_local_anthropic(
 
 
 @pytest.fixture(scope="module")
+def proxy_server_local_anthropic_offline(
+    fake_litellm_openai: FakeOpenAIUpstream, module_forge_home: Path, tmp_path_factory
+) -> Generator[str, None, None]:
+    """Exercise local Anthropic translation without starting a live provider backend."""
+    port = allocate_ephemeral_port()
+    proxy_id = f"litellm-anthropic-offline-{port}"
+    _register_proxy_for_test(
+        proxy_id=proxy_id,
+        template="litellm-anthropic-local",
+        port=port,
+        forge_home=module_forge_home,
+        upstream_base_url=fake_litellm_openai.base_url,
+    )
+    env = os.environ.copy()
+    for credential_name in (
+        "ANTHROPIC_API_KEY",
+        "AZURE_OPENAI_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+        "OPENAI_API_KEY",
+        "OPENROUTER_API_KEY",
+    ):
+        env.pop(credential_name, None)
+    env["FORGE_HOME"] = str(module_forge_home)
+    env["LITELLM_LOCAL_BASE_URL"] = fake_litellm_openai.base_url
+    proc = _start_proxy_subprocess(
+        template="litellm-anthropic-local",
+        port=port,
+        forge_home=module_forge_home,
+        env=env,
+        cwd=tmp_path_factory.mktemp("forge_proxy_cwd_anthropic_offline_"),
+        proxy_id=proxy_id,
+    )
+    try:
+        yield f"http://localhost:{port}"
+    finally:
+        kill_process(proc.pid)
+
+
+@pytest.fixture(scope="module")
 def fake_litellm_openai() -> Generator[FakeOpenAIUpstream, None, None]:
     """Serve a hermetic Responses API endpoint and capture its request bodies."""
     port = allocate_ephemeral_port()
@@ -808,7 +848,9 @@ def proxy_server_remote_gemini(module_forge_home: Path, tmp_path_factory) -> Gen
 
 
 @pytest.fixture(scope="module")
-def proxy_server_openrouter_offline(module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
+def proxy_server_openrouter_offline(
+    fake_litellm_openai: FakeOpenAIUpstream, module_forge_home: Path, tmp_path_factory
+) -> Generator[str, None, None]:
     """Start the OpenRouter template for runtime-truth checks without calling upstream."""
     yield from _openrouter_family_proxy(
         "openrouter-anthropic",
@@ -817,6 +859,7 @@ def proxy_server_openrouter_offline(module_forge_home: Path, tmp_path_factory) -
         "OpenRouter proxy unreachable",
         preflight=False,
         require_key=False,
+        upstream_base_url=fake_litellm_openai.base_url,
     )
 
 
@@ -871,6 +914,7 @@ def _openrouter_family_proxy(
     *,
     preflight: bool = True,
     require_key: bool = True,
+    upstream_base_url: str | None = None,
 ) -> Generator[str, None, None]:
     """Start an OpenRouter family proxy, optionally with a cheap haiku-tier preflight.
 
@@ -886,6 +930,8 @@ def _openrouter_family_proxy(
     env["FORGE_HOME"] = str(module_forge_home)
     if not require_key:
         env["OPENROUTER_API_KEY"] = "test-openrouter-key"
+    if upstream_base_url is not None:
+        env["OPENROUTER_BASE_URL"] = upstream_base_url
 
     cwd = tmp_path_factory.mktemp("forge_proxy_cwd_")
     proc = _start_proxy_subprocess(
