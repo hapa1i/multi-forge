@@ -1,7 +1,7 @@
 {
   "contract_version": "draft-1",
   "corpus_sha256": "249b0cce2a89a520988479c2a4f2716c7ab6e667db251d021111648c5107a133",
-  "reviews_sha256": "5fa408efed4b32c64cc03961e29a8c952a289774c41d6e351eedefe401a69a84",
+  "reviews_sha256": "e30050a6d19aae68d8e9a71a20ab15d25924fe840a8107cfc6b1c1c64a5d2ba1",
   "source_sha256": "25921d97f5bcaff7e1bb3b7af9b176291582a7ed0ee7d2d8845908ddb2a8f7e2",
   "quality_accepted": false,
   "max_physical_requests": 0,
@@ -247,8 +247,8 @@
       "case_sha256": "55aa59c59b72863eeff2d147d76e79626362b6062ef5cf3c402862319d31862a",
       "declared_admission": "candidate_pending_review",
       "reasons": [],
-      "human_status": "pending",
-      "human_evidence_ready": false,
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
       "always_escalate_control": "escalate"
     },
     {
@@ -258,8 +258,8 @@
       "case_sha256": "d94d1cdb16105d625a440ddba3b629f1748082dfd8e691c312fb4d9f01d13a1c",
       "declared_admission": "candidate_pending_review",
       "reasons": [],
-      "human_status": "pending",
-      "human_evidence_ready": false,
+      "human_status": "reviewed",
+      "human_evidence_ready": true,
       "always_escalate_control": "escalate"
     },
     {
