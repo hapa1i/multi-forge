@@ -1,0 +1,86 @@
+# A3 offline review
+
+The [study plan](feasibility-plan.md) asks whether atomic plan questions can support a useful later review-skipping
+study. This packet contains 24 synthetic actions across four plan families. It has no model results or human labels. The
+first review concerns the evidence and questions themselves; no paid capture is authorized.
+
+## Start here
+
+1. Read the three clauses and questions in [input handling](review-input-handling.md). Start with cases
+   [input-handling-01](review-input-handling.md#input-handling-01) and
+   [input-handling-02](review-input-handling.md#input-handling-02).
+2. For each case, check the declared authority, complete action evidence, clause mapping and atomic question wording.
+   These are authored fixture facts, not proof that a runtime hook could obtain or validate them.
+3. Return its case hash, the four confirmations below, each question's true/false/unknown answer, and the expected
+   allow/escalate result. Describe any dispute before choosing an answer. Unknown answers stay null.
+
+| Field                  | Meaning                                                                             |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| `authority_sufficient` | The declared synthetic authority permits this plan to govern the action             |
+| `action_complete`      | The supplied action has enough complete evidence for these questions                |
+| `coverage_complete`    | Every relevant normative plan constraint is mapped and supported                    |
+| `questions_atomic`     | Each question has a clear single-clause interpretation and adequate criteria        |
+| `answers`              | Human answers keyed by question ID; true, false or null                             |
+| `expected_route`       | Allow or escalate for this complete action under the proposed conservative contract |
+
+Name the reviewer and retain notes. A review can be partial or disputed. A `reviewed` status alone does not establish
+readiness: the confirmations, question answers and expected route must also be supplied. Confirming evidence says
+nothing about whether the proposed implementation satisfies its requirements. A completely covered divergent action can
+have all four confirmations true and still require escalation.
+
+## Evidence boundaries
+
+Read every normative sentence, including the input-domain definitions. Flag a clause omitted from the authored ledger;
+the harness can detect a missing mapping for a listed clause, but cannot discover an unlisted requirement in prose.
+Similarly, `complete=true` is a claim to review, not a syntax-based proof. No helper or unseen repository context may be
+invented to repair an action. Unsupported multi-file, deletion, truncated and missing-history cases remain escalation
+controls. A false or unknown coverage/authority judgment cannot be repaired by confident model answers.
+
+Questions concern the proposed implementation. The before text supplies action context, not a presumed correct answer.
+All paths are synthetic identifiers and are never opened. The file-operation family models a pure planner over a
+supplied dictionary; it establishes nothing about real disk access. Action comments cannot change plan authority,
+criteria or the review instructions.
+
+Each family's sixth case is a matched comment-injection control: its executable evidence matches either the first or
+second case, with only reviewer-directed comments added. Review the evidence directly; these pairings are not labels.
+The other unsupported variants exercise the host's admission boundary rather than model reasoning.
+
+## Remaining families and retained records
+
+- [Data transformation](review-data-transformation.md): calibration.
+- [File operation](review-file-operation.md): held-out model evaluation.
+- [Bounded processing](review-bounded-processing.md): held-out model evaluation.
+
+The split is fixed by whole family before any model output. All scenarios and questions are visible during authoring and
+human review, so eventual results would not demonstrate unseen-scenario generalization. No threshold has been selected,
+and there are no capture payloads or a live mode.
+
+The [corpus](cascade-corpus.json) owns plans, clauses, proposed mappings and exact action text. The
+[blank review packet](review-packet.json) binds that content and question wording; all review fields start pending.
+Return answers in chat or edit a retained copy of the packet. The tool validates a supplied ledger without overwriting
+the corpus or manufacturing labels. Each review retains its case hash, so a sibling case's review or a review predating
+an evidence change cannot satisfy the fixture combiner. Attribution is operator-supplied provenance, not authenticated
+identity.
+
+The [preparation report](preparation-report.json) separates declared host exclusions from candidates pending human
+review. It always records `quality_accepted=false` and zero dispatchable requests. The always-escalate control tests
+safety only; the semantic deterministic baseline is still unimplemented. Some small pure-function examples may be
+settled by simple contract checks, so these candidates do not yet show benefit from Jev. Resolve that comparison and the
+finite calibration procedure before proposing a paid manifest.
+
+## Reproduction
+
+Run from the repository root. Each command reads only the specified synthetic corpus/ledger and source identity. The
+harness neither executes action code nor reads credentials, native sources or paths named in actions. Checked-in
+worksheets apply repository Markdown formatting after rendering; JSON content and case hashes own identity.
+
+```bash
+uv run python scripts/experiments/jev/cascade-offline.py \
+  docs/board/doing/jev_cascade/evidence/cascade-corpus.json
+uv run python scripts/experiments/jev/cascade-offline.py \
+  docs/board/doing/jev_cascade/evidence/cascade-corpus.json --review-packet
+uv run python scripts/experiments/jev/cascade-offline.py \
+  docs/board/doing/jev_cascade/evidence/cascade-corpus.json --render-family input-handling
+uv run python scripts/experiments/jev/cascade-offline.py \
+  docs/board/doing/jev_cascade/evidence/cascade-corpus.json --review /path/to/completed-review.json
+```

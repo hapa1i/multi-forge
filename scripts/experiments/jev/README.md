@@ -1,5 +1,17 @@
 # Jev Decisions probes
 
+A3's `cascade-offline.py` prepares the separate synthetic plan/action study without dispatch or executing action code:
+
+```bash
+uv run python scripts/experiments/jev/cascade-offline.py \
+  docs/board/doing/jev_cascade/evidence/cascade-corpus.json
+```
+
+Use `--review-packet` for the blank ledger, `--render-family <id>` for a worksheet and `--review <ledger.json>` to
+validate retained human review. The [A3 review guide](../../../docs/board/doing/jev_cascade/evidence/human-review.md)
+owns the instructions and evidence limits. Authored completeness and clause inventories require review; the current
+report establishes neither model quality nor benefit beyond deterministic checks. No paid capture is authorized.
+
 The A2 `rule-pack-eval.py` harness prepares the wrapper corpus and evaluates saved responses without a live mode. See
 its [evaluation plan](../../../docs/board/paused/jev_rule_pack/evidence/evaluation-plan.md) for manifests, explicit
 threshold settings, label provenance and metric limitations. The paid transport probe below remains separate.

@@ -99,6 +99,19 @@ Replacement sufficiency checks behavior only after an independent consumer const
 structural and retention questions still record missing evidence, so an inapplicable comparison does not establish
 coverage.
 
+## Cascade feasibility tools
+
+`scripts/experiments/jev/cascade-offline.py` owns A3's synthetic corpus validation, human-review packet and declared
+evidence-admission report. It binds complete plan/question/action context to case identities and separates authored
+metadata from human confirmation. Missing mappings, unsupported actions and non-current authority escalate; confidence
+cannot fill an evidence gap. Its prospective fixture combiner requires an explicit threshold and reviewed evidence,
+preserves existing denials and unrelated review, and never uses human answer values to choose the candidate outcome.
+
+This tool has no provider dispatch, native acquisition, action-code execution or runtime wiring. Reports never accept
+quality; semantic deterministic comparisons and automatic plan-clause discovery remain unimplemented. Workflow design
+continues to own the shipped generative checker, resolver and reviewer. The
+[A3 checklist](board/doing/jev_cascade/checklist.md) owns the unfinished experiment and its approval gates.
+
 ## Consent and runtime boundary
 
 `policy/rule_pack/consent.py` binds the paid repository-data acknowledgment to the session instance and pack settings.

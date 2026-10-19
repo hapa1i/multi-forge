@@ -17,22 +17,34 @@ proposals to review before a capture manifest can be approved.
   plan records per-file evidence limits and the subscription-only/cascade incompatibility.
 - [x] Run the existing offline baseline suites: plan check, cascade hook composition, engine, retry deadline and shadow
   evidence. All 110 tests passed on reviewed PR #275 head `06074f0c`; this establishes fixture behavior, not A3 quality.
-- [ ] Reconcile A1's optional `judge(run_identity=...)`, parent/root ancestry and attempt accounting with the proposed
-  checker, frontier and audit identities. No telemetry schema or A1 API change is planned for offline preparation.
+- [x] Reconcile A1's optional `judge(run_identity=...)`, parent/root ancestry and attempt accounting with the proposed
+  checker, frontier and audit identities. The [handoff](evidence/identity-handoff.md) records current gaps and future
+  ownership; no telemetry schema or A1 API change is needed for offline preparation.
 
 ## First gate: evidence and labels
 
-- [ ] Prepare at most four synthetic plan families and 24 complete action records with fixed identities, complete clause
-  inventories and explicit supported/unsupported evidence. Include multi-file, deletion, truncation and stale-plan
-  cases.
+- [x] Prepare four synthetic plan families and 24 action records with fixed identities, authored clause inventories and
+  explicit supported/unsupported evidence. The [corpus](evidence/cascade-corpus.json) includes multi-file, deletion,
+  truncation and stale-plan controls; human review must verify the completeness claims.
 - [ ] Export a compact review packet; obtain human review of authority, relevant clauses, decomposition, evidence
   sufficiency, per-question answers and expected routing. Retain pending/disputed labels and provenance.
-- [ ] Fix whole-family calibration/held-out membership and record any exposure. Separate human-reviewed decomposition
+- [x] Fix whole-family calibration/held-out membership and record any exposure. Separate human-reviewed decomposition
   feasibility from automatic runtime decomposition; no implementation of the latter is part of this slice.
 - [ ] Implement only the offline admission/composition and reporting needed for this experiment. Compare always-escalate
   and bounded deterministic controls using identical evidence. Stop if no useful supported semantic subset remains.
 - [ ] Review the finite calibration procedure, proposed false-allow/usefulness gates, exact model screen and hard stops
   before any capture. Human labels, host coverage and model confidence remain separate inputs.
+
+Offline preparation: the [review guide](evidence/human-review.md) links four compact worksheets and a blank,
+identity-bound ledger. All 24 human judgments remain pending. The report distinguishes 12 declared exclusions from 12
+candidates pending review. Fixture composition requires reviewed evidence, exact current identity and explicit
+probabilities/bands; it preserves existing denials and unrelated review. It has no dispatch or quality-scoring mode. The
+semantic deterministic baseline and usefulness comparison remain open; always-escalate alone cannot establish
+incremental model benefit. No paid manifest is prepared.
+
+Offline validation: `tests/src/scripts/test_jev_cascade_offline.py` passes 107 fixture tests, including missing-clause
+confidence, denial precedence, malformed inputs, copied/stale human reviews and absence of provider/native access. The
+generated report and pending ledger reproduce from the corpus; these checks establish tool behavior, not model quality.
 
 | Fixture                                         | Required observation                                           |
 | ----------------------------------------------- | -------------------------------------------------------------- |
