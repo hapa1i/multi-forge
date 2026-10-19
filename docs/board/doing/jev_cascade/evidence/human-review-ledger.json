@@ -1357,35 +1357,35 @@
     },
     "file-operation-03": {
       "case_sha256": "eb05b59041501ebaff8542bff36385d1caa95e9ec24e61c4135a0945c942a3a7",
-      "status": "pending",
-      "reviewer": "",
-      "authority_sufficient": null,
-      "action_complete": null,
-      "coverage_complete": null,
-      "questions_atomic": null,
+      "status": "reviewed",
+      "reviewer": "User, chat review on 2026-10-19",
+      "authority_sufficient": true,
+      "action_complete": true,
+      "coverage_complete": false,
+      "questions_atomic": true,
       "answers": {
-        "file-operation-q01": null,
-        "file-operation-q02": null,
-        "file-operation-q03": null
+        "file-operation-q01": true,
+        "file-operation-q02": true,
+        "file-operation-q03": false
       },
-      "expected_route": null,
-      "notes": ""
+      "expected_route": "escalate",
+      "notes": "Clause file-operation-c03 is omitted from the case coverage ledger (coverage_complete=false, unmapped_plan_clause), and the implementation also violates c03 (file-operation-q03=false) by mutating files[destination] = content on the write path."
     },
     "file-operation-04": {
       "case_sha256": "4fa24756a263f70e51fc4300740a3e340099da0938983e27fe6b0900c25fa696",
-      "status": "pending",
-      "reviewer": "",
-      "authority_sufficient": null,
-      "action_complete": null,
-      "coverage_complete": null,
-      "questions_atomic": null,
+      "status": "reviewed",
+      "reviewer": "User, chat review on 2026-10-19",
+      "authority_sufficient": true,
+      "action_complete": true,
+      "coverage_complete": false,
+      "questions_atomic": true,
       "answers": {
         "file-operation-q01": null,
         "file-operation-q02": null,
         "file-operation-q03": null
       },
-      "expected_route": null,
-      "notes": ""
+      "expected_route": "escalate",
+      "notes": "The supplied apply_patch deletion action is complete and untruncated (action_complete=true), but removing write_planner.py supplies no proposed plan_write function body, leaving all three clauses unsupported (coverage_complete=false, deletion_unsupported, tool_shape_unsupported). Semantic answers are null and the case must escalate."
     },
     "file-operation-05": {
       "case_sha256": "683bdadcb0869df8f5f630bfb1ad341c1aad2f00171232ca8462301f76a98612",

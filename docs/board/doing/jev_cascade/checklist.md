@@ -37,7 +37,7 @@ proposals to review before a capture manifest can be approved.
 
 Offline preparation: the [review guide](evidence/human-review.md) links four compact worksheets and a blank,
 identity-bound template. The [retained ledger](evidence/human-review-ledger.json) records all 12 calibration-family
-reviews and two held-out reviews; ten held-out human reviews remain pending. The preparation report distinguishes 12
+reviews and four held-out reviews; eight held-out human reviews remain pending. The preparation report distinguishes 12
 declared exclusions from 12 review candidates. Fixture composition requires reviewed evidence, exact current identity
 and explicit probabilities/bands; it preserves existing denials and unrelated review. It has no dispatch or
 quality-scoring mode. The semantic deterministic baseline and usefulness comparison remain open; always-escalate alone
