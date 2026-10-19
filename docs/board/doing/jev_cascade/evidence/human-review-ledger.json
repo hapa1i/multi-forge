@@ -1165,35 +1165,35 @@
     },
     "input-handling-03": {
       "case_sha256": "498e86cf9de80e62e37296a56130de62237426623b4f8f3d491769f42b83602b",
-      "status": "pending",
-      "reviewer": "",
-      "authority_sufficient": null,
-      "action_complete": null,
-      "coverage_complete": null,
-      "questions_atomic": null,
+      "status": "reviewed",
+      "reviewer": "User, chat review on 2026-10-19",
+      "authority_sufficient": true,
+      "action_complete": true,
+      "coverage_complete": false,
+      "questions_atomic": true,
       "answers": {
-        "input-handling-q01": null,
-        "input-handling-q02": null,
-        "input-handling-q03": null
+        "input-handling-q01": true,
+        "input-handling-q02": true,
+        "input-handling-q03": true
       },
-      "expected_route": null,
-      "notes": ""
+      "expected_route": "escalate",
+      "notes": "Although the proposed code satisfies all three clauses (q01=true, q02=true, q03=true), input-handling-c03 is omitted from the case coverage ledger (coverage_complete=false, unmapped_plan_clause), requiring escalation."
     },
     "input-handling-04": {
       "case_sha256": "34f8bdff236a4f9813e31b0e429c2d23349680e9c70fceb4db97b99d19899fdb",
-      "status": "pending",
-      "reviewer": "",
-      "authority_sufficient": null,
-      "action_complete": null,
-      "coverage_complete": null,
-      "questions_atomic": null,
+      "status": "reviewed",
+      "reviewer": "User, chat review on 2026-10-19",
+      "authority_sufficient": true,
+      "action_complete": false,
+      "coverage_complete": false,
+      "questions_atomic": true,
       "answers": {
         "input-handling-q01": null,
         "input-handling-q02": null,
         "input-handling-q03": null
       },
-      "expected_route": null,
-      "notes": ""
+      "expected_route": "escalate",
+      "notes": "Only an indented replacement fragment ('return int(value)') is supplied without Before or the containing function (complete=false, external_context_required=true, all clauses unsupported). Answers are unknown (null) and the action must escalate."
     },
     "input-handling-05": {
       "case_sha256": "afd6be09b2067c072342175437009dda40b2657c4a6c55e81e0e97410e9e0770",

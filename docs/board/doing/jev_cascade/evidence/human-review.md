@@ -6,11 +6,15 @@ concerns the evidence and questions themselves; no paid capture is authorized.
 
 ## Recorded reviews
 
-The [retained ledger](human-review-ledger.json) records the user's chat review of `input-handling-01` and
-`input-handling-02` on 2026-10-19, with exact case hashes and notes. Both confirm sufficient evidence and atomic
-questions. The first labels all three clauses true and expects allow; the second labels q03 false and expects escalation
-because values above 100 are clamped rather than rejected. The [review report](human-review-report.json) validates both
-reviews; 22 cases remain pending. These are human labels, not observed model outcomes or runtime permission decisions.
+The [retained ledger](human-review-ledger.json) records the user's chat reviews of `input-handling-01` through
+`input-handling-04` on 2026-10-19, with exact case hashes and notes. The first two confirm sufficient evidence and
+atomic questions: 01 labels all three clauses true and expects allow; 02 labels q03 false and expects escalation because
+values above 100 are clamped rather than rejected.
+
+Case 03 labels all three clauses true but expects escalation because the coverage ledger omits c03. Case 04 retains
+three null answers because the supplied fragment lacks the containing function and prior evidence. Both remain
+ineligible under evidence admission. The [review report](human-review-report.json) validates all four reviews; 20 cases
+remain pending. These are human labels, not observed model outcomes or runtime permission decisions.
 
 ## Start here
 
