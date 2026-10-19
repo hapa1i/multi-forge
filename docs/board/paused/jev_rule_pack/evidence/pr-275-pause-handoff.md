@@ -19,7 +19,8 @@ infeasible.
 - A1's typed client, explicit evaluation identity and telemetry remain shipped. A2's consent foundations, offline
   outcomes, human review and evaluation tools remain available; `jev_rule_pack` remains reserved.
 - The [bounded diagnostic capture](bounded-diagnostic-2026-10-18/README.md) records 38 requests and $1.029230756
-  reported spend. Its allowance is consumed. No further provider calls ran in the continuation or pause work.
+  reported spend. Its allowance is consumed. No additional A2 or A3 experiment capture ran during this wrap; standard
+  integration verification used its normal setup and is recorded below.
 - Capture journals, manifests, completed reviews and saved reports retain their original JSON bytes through the lane
   move. Harness defaults and current document links follow `paused/`; historical source receipts still identify the code
   used then. New executions have new source identities and cannot silently reuse an old capture authorization.
@@ -32,12 +33,19 @@ scope decision. Another prompt variant alone does not reopen runtime implementat
 
 ## Verification and next member
 
-Pause validation passed 490 affected script tests, 94 relocation/evaluation/replay regressions and 70
-inventory/source-audit tests. All 40 retained JSON evidence files match their pre-move hashes. The Linux CI failure was
-the inventory's macOS-only temporary path; the fix uses private platform temporary storage and retains historical ledger
-support. Changed-file pre-commit covers type checks, formatting, secrets, size limits and the repository link audit
-while excluding the user's unrelated `AGENTS.md` edits. Merge evidence follows final GitHub checks; none of these
-software checks changes the failed semantic result.
+[PR #275](https://github.com/hapa1i/multi-forge/pull/275) merged as `fe2d09a1` on 2026-10-19 with the same tree as
+reviewed head `06074f0c`; all five GitHub checks passed. Local `make test` passed 11,597 unit tests and 528 integration
+tests, and `make test-regression` passed 2,015 tests. These standard selections had no failures, skips or retries; slow
+integrations were not selected. An earlier run with an added offline-cache restriction failed to resolve `hatchling` for
+wheel building. Removing that restriction allowed the complete normal run to pass, including both wheel-isolation tests.
+These software checks do not change the failed semantic result or establish A3 quality.
+
+Focused pause validation passed 490 affected script tests, 94 relocation/evaluation/replay regressions and 70
+inventory/source-audit tests; these overlap the aggregate suites. All 40 retained JSON evidence files match their
+pre-move hashes. The inventory now uses private platform temporary storage while retaining historical ledger support.
+Applicable changed-file pre-commit checks passed, including types, formatting, secrets, size limits and the 722-source
+Markdown link audit. The user's unrelated `AGENTS.md` edits were excluded and preserved. Settings remain unset, and A2
+remains paused with its runtime and quality gates open.
 
 [A3](../../../proposed/jev_cascade/card.md) depends on A1 and shipped B1, not A2. It starts on a separate branch after
 this PR merges, with its own checklist and finite feasibility plan. A3 must establish action/plan coverage and a useful
