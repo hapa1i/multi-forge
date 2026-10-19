@@ -36,11 +36,12 @@ proposals to review before a capture manifest can be approved.
   before any capture. Human labels, host coverage and model confidence remain separate inputs.
 
 Offline preparation: the [review guide](evidence/human-review.md) links four compact worksheets and a blank,
-identity-bound template. The [retained ledger](evidence/human-review-ledger.json) records ten user reviews; 14 remain
-pending. The preparation report distinguishes 12 declared exclusions from 12 review candidates. Fixture composition
-requires reviewed evidence, exact current identity and explicit probabilities/bands; it preserves existing denials and
-unrelated review. It has no dispatch or quality-scoring mode. The semantic deterministic baseline and usefulness
-comparison remain open; always-escalate alone cannot establish incremental model benefit. No paid manifest is prepared.
+identity-bound template. The [retained ledger](evidence/human-review-ledger.json) records all 12 calibration-family
+reviews; the 12 held-out human reviews remain pending. The preparation report distinguishes 12 declared exclusions from
+12 review candidates. Fixture composition requires reviewed evidence, exact current identity and explicit
+probabilities/bands; it preserves existing denials and unrelated review. It has no dispatch or quality-scoring mode. The
+semantic deterministic baseline and usefulness comparison remain open; always-escalate alone cannot establish
+incremental model benefit. No paid manifest is prepared.
 
 Offline validation: `tests/src/scripts/test_jev_cascade_offline.py` passes 107 fixture tests, including missing-clause
 confidence, denial precedence, malformed inputs, copied/stale human reviews and absence of provider/native access. The
