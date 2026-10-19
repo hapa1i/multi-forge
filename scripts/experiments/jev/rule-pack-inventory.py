@@ -9,11 +9,12 @@ import os
 import re
 import stat
 import subprocess
+import tempfile
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import dacite
 
@@ -512,10 +513,10 @@ def main() -> int:
     group.add_argument("--recheck-metadata", type=Path, help="Re-evaluate only an unchanged prior index snapshot")
     args = parser.parse_args()
     try:
+        temporary_root = Path(tempfile.gettempdir()).resolve()
         if args.metadata or args.availability_first:
             prefix = "jev-a2-availability-" if args.availability_first else "jev-a2-feasibility-"
-            directory = Path("/private/tmp") / (prefix + uuid4().hex[:12])
-            directory.mkdir(mode=0o700)
+            directory = Path(tempfile.mkdtemp(prefix=prefix, dir=temporary_root))
             collect = inventory_availability if args.availability_first else inventory_metadata
             summary, ledger = collect(REPOSITORY, Path.home(), verified_worktrees(REPOSITORY))
             stem = "availability" if args.availability_first else "metadata"
@@ -523,7 +524,10 @@ def main() -> int:
             private_write(directory / f"{stem}-summary.json", summary)
         else:
             directory = args.inspect_sources or args.recheck_metadata
-            if directory.parent != Path("/private/tmp") or not directory.name.startswith("jev-a2-feasibility-"):
+            # Retain access to ledgers created before the platform temporary root was used.
+            if directory.parent not in {temporary_root, Path("/private/tmp")} or not directory.name.startswith(
+                "jev-a2-feasibility-"
+            ):
                 raise Refusal("unapproved_output_directory")
             no_symlinks(directory)
             if directory.stat().st_mode & 0o777 != 0o700:

@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import sys
+import tempfile
 from pathlib import Path
 from uuid import UUID
 
@@ -597,26 +598,56 @@ def test_availability_duplicate_native_identity_is_excluded_before_path_checks(i
     assert all(row["reason"] == "duplicate_native_identity" for row in ledger["candidates"])
 
 
-def test_availability_cli_uses_only_fixture_stores_and_exclusive_private_outputs(inventory, setup, monkeypatch, capsys):
+@pytest.mark.parametrize(
+    ("mode", "stem", "prefix"),
+    [
+        ("--availability-first", "availability", "jev-a2-availability-"),
+        ("--metadata", "metadata", "jev-a2-feasibility-"),
+    ],
+)
+@pytest.mark.parametrize("temporary_root_alias", [False, True])
+def test_availability_cli_uses_only_fixture_stores_and_exclusive_private_outputs(
+    inventory,
+    setup,
+    tmp_path,
+    monkeypatch,
+    capsys,
+    mode,
+    stem,
+    prefix,
+    temporary_root_alias,
+):
     home, repo, _, add, save = setup
     _, manifest = add(1)
     confirm_source(home, repo, manifest)
     save()
+    temporary_root = tmp_path / "temporary"
+    temporary_root.mkdir()
+    configured_root = temporary_root
+    if temporary_root_alias:
+        configured_root = tmp_path / "temporary-alias"
+        configured_root.symlink_to(temporary_root, target_is_directory=True)
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(configured_root))
     monkeypatch.setattr(inventory, "REPOSITORY", repo)
     monkeypatch.setattr(Path, "home", lambda: home)
     monkeypatch.setattr(inventory, "verified_worktrees", lambda repository: {str(repo)})
-    monkeypatch.setattr(sys, "argv", ["rule-pack-inventory.py", "--availability-first"])
+    monkeypatch.setattr(sys, "argv", ["rule-pack-inventory.py", mode])
     assert inventory.main() == 0
     emitted = capsys.readouterr()
     summary = json.loads(emitted.out)
     directory = Path(summary.pop("private_directory"))
     try:
         assert emitted.err == ""
-        assert directory.name.startswith("jev-a2-availability-")
+        assert directory.parent == temporary_root.resolve()
+        assert directory.name.startswith(prefix)
         assert directory.stat().st_mode & 0o777 == 0o700
-        assert {path.name for path in directory.iterdir()} == {"availability-private.json", "availability-summary.json"}
-        private = directory / "availability-private.json"
+        assert {path.name for path in directory.iterdir()} == {
+            f"{stem}-private.json",
+            f"{stem}-summary.json",
+        }
+        private = directory / f"{stem}-private.json"
         assert private.stat().st_mode & 0o777 == 0o600
+        assert (directory / f"{stem}-summary.json").stat().st_mode & 0o777 == 0o600
         ledger = json.loads(private.read_text())
         assert ledger["summary"] == summary
         assert "PRIVATE_" not in emitted.out and str(home) not in emitted.out and str(repo) not in emitted.out
@@ -627,3 +658,34 @@ def test_availability_cli_uses_only_fixture_stores_and_exclusive_private_outputs
         for path in directory.iterdir():
             path.unlink()
         directory.rmdir()
+
+
+@pytest.mark.parametrize(
+    ("mode", "stem"),
+    [("--recheck-metadata", "metadata-corrected"), ("--inspect-sources", "sources")],
+)
+def test_metadata_cli_followup_accepts_its_platform_temporary_directory(
+    inventory, setup, tmp_path, monkeypatch, capsys, mode, stem
+):
+    home, repo, _, add, save = setup
+    _, manifest = add(1)
+    confirm_source(home, repo, manifest)
+    save()
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(inventory, "REPOSITORY", repo)
+    monkeypatch.setattr(Path, "home", lambda: home)
+    monkeypatch.setattr(inventory, "verified_worktrees", lambda repository: {str(repo)})
+    monkeypatch.setattr(sys, "argv", ["rule-pack-inventory.py", "--metadata"])
+    assert inventory.main() == 0
+    directory = Path(json.loads(capsys.readouterr().out)["private_directory"])
+    assert directory.parent == tmp_path.resolve()
+
+    monkeypatch.setattr(sys, "argv", ["rule-pack-inventory.py", mode, str(directory)])
+    assert inventory.main() == 0
+    emitted = capsys.readouterr()
+    summary = json.loads(emitted.out)
+    assert emitted.err == ""
+    assert summary.pop("private_directory") == str(directory)
+    assert summary["native_files_read"] == 0
+    assert json.loads((directory / f"{stem}-summary.json").read_text()) == summary
+    assert (directory / f"{stem}-private.json").stat().st_mode & 0o777 == 0o600
