@@ -121,7 +121,7 @@ def test_required_alias_and_other_targets_cannot_borrow_callback_wiring(diagnost
 @pytest.mark.parametrize("stale_contract", ["draft-1", "overlapping-presence-criteria"])
 def test_old_wording_identity_is_rejected_even_with_consistent_hashes(diagnostic, stale_contract):
     packet = diagnostic.build_packet()
-    assert packet["diagnostic_version"] == "draft-2"
+    assert packet["diagnostic_version"] == "draft-3"
     stale = copy.deepcopy(packet)
     if stale_contract == "draft-1":
         stale["diagnostic_version"] = "draft-1"

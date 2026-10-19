@@ -9,11 +9,12 @@ import os
 import re
 import stat
 import subprocess
+import tempfile
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import dacite
 
@@ -30,6 +31,10 @@ MAX_MANIFESTS = 24
 MAX_PER_RUNTIME = 3
 MAX_NATIVE_BYTES = 20 * 1024 * 1024
 SCHEMA_VERSION = 1
+AVAILABILITY_ACTION_WINDOW = {
+    "start_inclusive": "2026-10-01T00:00:00Z",
+    "end_exclusive": "2026-10-18T00:00:00Z",
+}
 
 
 class Refusal(ValueError):
@@ -226,7 +231,6 @@ def _metadata(key: str, row: dict[str, Any], worktrees: set[str], active: dict[s
         if row.get("codex_thread_id") != native_id or row.get("claude_session_id"):
             raise Refusal("index_native_identity_mismatch")
         expected = None
-    # Missing or unprovable native sources consume a selected slot. No discovery or replacement scan occurs.
     return {
         "canonical_identity": key,
         "repository": row["project_root"],
@@ -252,6 +256,22 @@ def inventory_metadata(
     expected_hashes: tuple[str, str] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Select metadata before reading any native source; cap matching manifest candidates at 24."""
+    return _inventory_metadata(repository, home, worktrees, expected_hashes=expected_hashes)
+
+
+def inventory_availability(repository: Path, home: Path, worktrees: set[str]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Check availability within the same 24-candidate cohort before allocating runtime slots; read no native content."""
+    return _inventory_metadata(repository, home, worktrees, availability_first=True)
+
+
+def _inventory_metadata(
+    repository: Path,
+    home: Path,
+    worktrees: set[str],
+    *,
+    expected_hashes: tuple[str, str] | None = None,
+    availability_first: bool = False,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     index, index_sha = _index(home / ".forge/sessions/index.json")
     active, active_sha = _index(home / ".forge/sessions/active.json")
     if expected_hashes is not None and (index_sha, active_sha) != expected_hashes:
@@ -283,25 +303,51 @@ def inventory_metadata(
             refusals[str(exc)] += 1
     valid.sort(key=lambda value: (-value[0], value[1]))
     metadata = []
-    for _, key, row in valid[:MAX_MANIFESTS]:
+    dispositions: dict[str, dict[str, Any]] = {}
+    for rank, (_, key, row) in enumerate(valid[:MAX_MANIFESTS], 1):
+        if availability_first:
+            dispositions[key] = {"candidate_id": f"candidate-{rank:02d}", "index_identity_sha256": digest(key.encode())}
         try:
             metadata.append(_metadata(key, row, worktrees, active, home))
         except (Refusal, OSError, TypeError):
             # Type errors are corrupt metadata, not permission to infer a replacement identity.
             reason = sys_exception_reason()
             refusals[reason] += 1
+            if availability_first:
+                dispositions[key].update(status="excluded", stage="metadata", reason=reason)
     duplicate_ids = {
         row["native_id"] for row in metadata if sum(other["native_id"] == row["native_id"] for other in metadata) > 1
     }
     selected: list[dict[str, Any]] = []
     runtime_counts: Counter[str] = Counter()
+    available_counts: Counter[str] = Counter()
+    source_refusals: Counter[str] = Counter()
+    path_checks = 0
     for row in metadata:
+        disposition = dispositions.get(row["canonical_identity"], {})
         if row["native_id"] in duplicate_ids:
             refusals["duplicate_native_identity"] += 1
+            disposition.update(status="excluded", stage="metadata", reason="duplicate_native_identity")
             continue
+        if availability_first:
+            path_checks += 1
+            disposition.update(runtime=row["runtime"], manifest_sha256=row["manifest_sha256"])
+            try:
+                row = {**row, "source": admit_source(row, home)}
+            except (Refusal, OSError):
+                reason = sys_exception_reason()
+                source_refusals[reason] += 1
+                disposition.update(status="excluded", stage="availability", reason=reason)
+                continue
+            available_counts[row["runtime"]] += 1
         if runtime_counts[row["runtime"]] < MAX_PER_RUNTIME:
             runtime_counts[row["runtime"]] += 1
             selected.append({"session_id": f"session-{len(selected) + 1:02d}", "family_id": "family-unknown", **row})
+            disposition.update(
+                status="selected", stage="allocation", session_id=selected[-1]["session_id"], reason=None
+            )
+        else:
+            disposition.update(status="excluded", stage="allocation", reason="runtime_selection_limit")
     summary = {
         "stage": "metadata",
         "schema_version": SCHEMA_VERSION,
@@ -317,6 +363,26 @@ def inventory_metadata(
         "named_actions_selected": 0,
         "quality_accepted": False,
     }
+    if availability_first:
+        summary.update(
+            stage="availability_metadata",
+            selection="availability_first_within_fixed_recency_cohort",
+            prospective_action_window=dict(AVAILABILITY_ACTION_WINDOW),
+            action_window_verified=False,
+            native_paths_checked=path_checks,
+            available_sources_by_runtime=dict(available_counts),
+            available_sources=sum(available_counts.values()),
+            source_exclusions=dict(sorted(source_refusals.items())),
+            available_sources_beyond_runtime_cap=sum(available_counts.values()) - len(selected),
+            selected_source_bytes_by_metadata=sum(row["source"]["size"] for row in selected),
+            runtime_shortfalls={
+                runtime: MAX_PER_RUNTIME - runtime_counts[runtime] for runtime in ("claude_code", "codex")
+            },
+            native_header_identity_verified=False,
+            completed_turns_verified=False,
+            native_actions_admitted=False,
+            runtime_admitted=False,
+        )
     ledger = {
         "schema_version": SCHEMA_VERSION,
         "captured_at": datetime.now(timezone.utc).isoformat(),
@@ -328,6 +394,11 @@ def inventory_metadata(
         "selected": selected,
         "summary": summary,
     }
+    if availability_first:
+        ledger["candidates"] = list(dispositions.values())
+        ledger["selection_bias"] = (
+            "Availability filtering favors retained local sources; missing sources imply no action count."
+        )
     return summary, ledger
 
 
@@ -435,19 +506,28 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--metadata", action="store_true")
+    group.add_argument(
+        "--availability-first", action="store_true", help="Check only confirmed path metadata before allocation"
+    )
     group.add_argument("--inspect-sources", type=Path)
     group.add_argument("--recheck-metadata", type=Path, help="Re-evaluate only an unchanged prior index snapshot")
     args = parser.parse_args()
     try:
-        if args.metadata:
-            directory = Path("/private/tmp") / ("jev-a2-feasibility-" + uuid4().hex[:12])
-            directory.mkdir(mode=0o700)
-            summary, ledger = inventory_metadata(REPOSITORY, Path.home(), verified_worktrees(REPOSITORY))
-            private_write(directory / "metadata-private.json", ledger)
-            private_write(directory / "metadata-summary.json", summary)
+        temporary_root = Path(tempfile.gettempdir()).resolve()
+        if args.metadata or args.availability_first:
+            prefix = "jev-a2-availability-" if args.availability_first else "jev-a2-feasibility-"
+            directory = Path(tempfile.mkdtemp(prefix=prefix, dir=temporary_root))
+            collect = inventory_availability if args.availability_first else inventory_metadata
+            summary, ledger = collect(REPOSITORY, Path.home(), verified_worktrees(REPOSITORY))
+            stem = "availability" if args.availability_first else "metadata"
+            private_write(directory / f"{stem}-private.json", ledger)
+            private_write(directory / f"{stem}-summary.json", summary)
         else:
             directory = args.inspect_sources or args.recheck_metadata
-            if directory.parent != Path("/private/tmp") or not directory.name.startswith("jev-a2-feasibility-"):
+            # Retain access to ledgers created before the platform temporary root was used.
+            if directory.parent not in {temporary_root, Path("/private/tmp")} or not directory.name.startswith(
+                "jev-a2-feasibility-"
+            ):
                 raise Refusal("unapproved_output_directory")
             no_symlinks(directory)
             if directory.stat().st_mode & 0o777 != 0o700:

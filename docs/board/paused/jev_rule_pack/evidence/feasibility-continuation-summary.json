@@ -1,0 +1,268 @@
+{
+  "schema_version": 1,
+  "scope": "feasibility-continuation-2026-10-19.md",
+  "implementation_sha256": {
+    "rule-pack-source-audit.py": "b81110e57a08479cc830406e8ef798c5e66007054342b594e12cd07daa013975",
+    "rule-pack-inventory.py": "8c482dd781ced4a6bf55015574638e70ae39558435c5148270493899277c2813"
+  },
+  "availability": {
+    "stage": "availability_metadata",
+    "schema_version": 1,
+    "matching_index_rows": 88,
+    "metadata_candidates_within_cap": 24,
+    "metadata_candidates_beyond_cap": 64,
+    "eligible_metadata_rows": 23,
+    "selected_sessions": 3,
+    "selected_by_runtime": {
+      "claude_code": 3
+    },
+    "metadata_exclusions": {
+      "active_registry_entry": 1
+    },
+    "native_files_read": 0,
+    "native_bytes_read": 0,
+    "named_actions_selected": 0,
+    "quality_accepted": false,
+    "selection": "availability_first_within_fixed_recency_cohort",
+    "prospective_action_window": {
+      "start_inclusive": "2026-10-01T00:00:00Z",
+      "end_exclusive": "2026-10-18T00:00:00Z"
+    },
+    "action_window_verified": false,
+    "native_paths_checked": 23,
+    "available_sources_by_runtime": {
+      "claude_code": 8
+    },
+    "available_sources": 8,
+    "source_exclusions": {
+      "missing_path": 15
+    },
+    "available_sources_beyond_runtime_cap": 5,
+    "selected_source_bytes_by_metadata": 17745038,
+    "runtime_shortfalls": {
+      "claude_code": 0,
+      "codex": 3
+    },
+    "native_header_identity_verified": false,
+    "completed_turns_verified": false,
+    "native_actions_admitted": false,
+    "runtime_admitted": false
+  },
+  "source_schema_audit": {
+    "schema_version": 1,
+    "stage": "native_source_metadata_audit",
+    "selected_sources": 3,
+    "native_read_attempts": 3,
+    "native_read_failures": 0,
+    "native_files_read": 3,
+    "native_bytes_read": 17745038,
+    "known_native_bytes_read": 17745038,
+    "audited_sources": 3,
+    "sources": [
+      {
+        "session_id": "session-01",
+        "runtime": "claude_code",
+        "status": "audited",
+        "reason": null,
+        "counters": {
+          "records": 948,
+          "record_types": {
+            "user": 109,
+            "assistant": 210,
+            "system": 11,
+            "progress": 0,
+            "queue-operation": 0,
+            "file-history-snapshot": 5,
+            "summary": 0,
+            "other": 613
+          },
+          "identity": {
+            "match": 943,
+            "missing": 5,
+            "conflict": 0
+          },
+          "cwd": {
+            "match": 577,
+            "missing": 371,
+            "conflict": 0
+          },
+          "sidechain": {
+            "true": 0,
+            "false": 577,
+            "missing": 371,
+            "other": 0
+          },
+          "assistant_stop_reasons": {
+            "end_turn": 6,
+            "max_tokens": 0,
+            "stop_sequence": 0,
+            "tool_use": 204,
+            "null": 0,
+            "other": 0
+          },
+          "system_subtypes": {
+            "turn_duration": 3,
+            "stop_hook_summary": 3,
+            "compact_boundary": 1,
+            "other": 4
+          },
+          "tool_uses": {
+            "Edit": 0,
+            "Write": 0,
+            "other": 98
+          },
+          "timestamps": {
+            "in_window": 577,
+            "before_window": 0,
+            "after_window": 0,
+            "missing": 371,
+            "invalid": 0
+          },
+          "completion_boundary_verified": false,
+          "actions_admitted": 0
+        }
+      },
+      {
+        "session_id": "session-02",
+        "runtime": "claude_code",
+        "status": "audited",
+        "reason": null,
+        "counters": {
+          "records": 4289,
+          "record_types": {
+            "user": 443,
+            "assistant": 874,
+            "system": 18,
+            "progress": 0,
+            "queue-operation": 0,
+            "file-history-snapshot": 6,
+            "summary": 0,
+            "other": 2948
+          },
+          "identity": {
+            "match": 4251,
+            "missing": 38,
+            "conflict": 0
+          },
+          "cwd": {
+            "match": 3046,
+            "missing": 1243,
+            "conflict": 0
+          },
+          "sidechain": {
+            "true": 0,
+            "false": 3046,
+            "missing": 1243,
+            "other": 0
+          },
+          "assistant_stop_reasons": {
+            "end_turn": 12,
+            "max_tokens": 0,
+            "stop_sequence": 0,
+            "tool_use": 862,
+            "null": 0,
+            "other": 0
+          },
+          "system_subtypes": {
+            "turn_duration": 6,
+            "stop_hook_summary": 6,
+            "compact_boundary": 2,
+            "other": 4
+          },
+          "tool_uses": {
+            "Edit": 71,
+            "Write": 6,
+            "other": 357
+          },
+          "timestamps": {
+            "in_window": 3104,
+            "before_window": 0,
+            "after_window": 0,
+            "missing": 1185,
+            "invalid": 0
+          },
+          "completion_boundary_verified": false,
+          "actions_admitted": 0
+        }
+      },
+      {
+        "session_id": "session-03",
+        "runtime": "claude_code",
+        "status": "audited",
+        "reason": null,
+        "counters": {
+          "records": 450,
+          "record_types": {
+            "user": 41,
+            "assistant": 78,
+            "system": 6,
+            "progress": 0,
+            "queue-operation": 0,
+            "file-history-snapshot": 2,
+            "summary": 0,
+            "other": 323
+          },
+          "identity": {
+            "match": 448,
+            "missing": 2,
+            "conflict": 0
+          },
+          "cwd": {
+            "match": 308,
+            "missing": 142,
+            "conflict": 0
+          },
+          "sidechain": {
+            "true": 0,
+            "false": 308,
+            "missing": 142,
+            "other": 0
+          },
+          "assistant_stop_reasons": {
+            "end_turn": 4,
+            "max_tokens": 0,
+            "stop_sequence": 0,
+            "tool_use": 74,
+            "null": 0,
+            "other": 0
+          },
+          "system_subtypes": {
+            "turn_duration": 2,
+            "stop_hook_summary": 2,
+            "compact_boundary": 1,
+            "other": 1
+          },
+          "tool_uses": {
+            "Edit": 0,
+            "Write": 0,
+            "other": 37
+          },
+          "timestamps": {
+            "in_window": 308,
+            "before_window": 0,
+            "after_window": 0,
+            "missing": 142,
+            "invalid": 0
+          },
+          "completion_boundary_verified": false,
+          "actions_admitted": 0
+        }
+      }
+    ],
+    "source_refusals": {},
+    "actions_admitted": 0,
+    "quality_accepted": false,
+    "runtime_admitted": false
+  },
+  "decision_limits": {
+    "actions_extracted": 0,
+    "completion_boundaries_verified": false,
+    "native_coverage_measured": false,
+    "new_provider_requests": 0,
+    "sources_with_recognized_named_mutation_blocks": 1,
+    "recognized_named_mutation_blocks_observed": 77,
+    "maximum_selected_actions_from_recognized_shape": 20,
+    "unrecognized_record_shape_actions_measured": false,
+    "source_wide_action_upper_bound": null
+  }
+}

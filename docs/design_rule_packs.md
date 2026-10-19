@@ -39,6 +39,11 @@ into quality evidence.
 patterns with bounded Python AST retention signals. A candidate is a structural observation, not a warning or evidence
 that no independent boundary exists. Unsupported shapes remain explicit, and no repository reads supplement an action.
 
+`scripts/experiments/jev/rule-pack-offline.py` compares that unchanged baseline on the fixed diagnostic review and
+constructed corpus. It records host applicability, raw candidates, syntax spans and differences from human-selected
+targets with input/source identities. It does not implement evidence admission, infer semantic completeness from syntax,
+score candidate quality or change reviewed labels. The active coverage requirement remains authoritative.
+
 `scripts/experiments/jev/rule-pack-capture.py` prepares the fixed constructed-calibration manifest. Its separately
 authorized live mode uses A1's credential/client owner with mandatory ZDR, one attempt per case, exact wire-payload
 checks and a physical request cap. It isolates Forge telemetry, records interrupted attempts before dispatch and exports
@@ -50,8 +55,15 @@ renewed review; this experiment does not implement runtime admission or authoriz
 
 `scripts/experiments/jev/rule-pack-inventory.py` owns the bounded development-only metadata inventory. It reads the
 approved default stores directly without invoking session repair, retains only allowlisted metadata privately and checks
-selected source paths without replacement scans. It does not extract native actions or establish governance, semantic
+selected source paths without replacement scans. Its separate availability-first mode checks at most the same 24 recency
+candidates' confirmed paths before allocating three slots per runtime; the original mode allocates slots first. Both
+retain selection and exclusions privately without extracting native actions or establishing governance, semantic
 coverage or usefulness. Runtime evidence acquisition remains separate.
+
+`scripts/experiments/jev/rule-pack-source-audit.py` audits the frozen availability selection under a separate content
+scope. It checks active state and stable bounded sources, then counts allowlisted Claude identity, timestamp, record,
+stop-reason and tool-name fields. Raw identities and source hashes stay private; no message text or tool arguments are
+retained. This is a schema audit, not a completed-turn validator or action extractor, and it admits no native actions.
 
 `scripts/experiments/jev/rule-pack-diagnostic.py` prepares a separate versioned human-review packet and renders exact
 synthetic evidence, reviewable target hints and proposed transformations. Its development-only `diagnostic_review.py`
@@ -63,6 +75,29 @@ reopens changed answers and overall contract review when needed. It validates re
 rewriting their human evidence. Diagnostic answers remain distinct from policy outcomes; this tool has no provider
 dispatch or quality-scoring mode. Target selection and new predicates require human review, and successful diagnostic
 reasoning would not establish runtime evidence acquisition.
+
+`scripts/experiments/jev/diagnostic_manifest.py` prepares and validates a bounded two-model diagnostic proposal from a
+completed review and a frozen public catalog. It owns provider-envelope formatting, exact wire identities, the fixed
+request sequence and expanded scoring/stop keys. Human answers remain local scoring data. The reference envelope places
+the unchanged shared instruction guard once in its system message; reconstruction checks preserve each reviewed
+question's full meaning. This tool has no credentials, network or live mode; a manifest cannot grant paid approval.
+
+`diagnostic_capture.py` executes a separately authorized manifest through injected or live HTTP transports.
+`capture_io.py` owns private output, durable slot reservations, proposal claims and public catalog refresh.
+`capture_evidence.py` reads embedded manifests or bounded, hash-verified local publication references for both capture
+replay guards. Published diagnostic receipts remain consumption evidence when the machine-local claim is absent.
+`diagnostic_results.py` admits bounded responses, retains reported accounting and scores the fixed observations.
+Requests use the exact frozen bodies, with no retries, resumption or replacement slots. Technical failures stop both
+arms; two wrong observations on the same sentinel stop that arm. A proposal claim survives interruption and source-only
+changes. Each arm has its own run identity in an isolated Forge home; existing judgment telemetry owns the v2 attempt
+records. Exact decimal costs remain in the capture alongside rounded ledger amounts. Diagnostic reports never admit
+model quality or runtime activation.
+
+Diagnostic definition presence distinguishes absent attribution from competing evidence; target hints cannot supply
+attribution. Consumer questions examine the proposed target and selected consumers independently of missing history.
+Replacement sufficiency checks behavior only after an independent consumer constraint is established. Separate
+structural and retention questions still record missing evidence, so an inapplicable comparison does not establish
+coverage.
 
 ## Consent and runtime boundary
 

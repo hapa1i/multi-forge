@@ -1,12 +1,12 @@
 # Jev Decisions probes
 
 The A2 `rule-pack-eval.py` harness prepares the wrapper corpus and evaluates saved responses without a live mode. See
-its [evaluation plan](../../../docs/board/doing/jev_rule_pack/evidence/evaluation-plan.md) for manifests, explicit
+its [evaluation plan](../../../docs/board/paused/jev_rule_pack/evidence/evaluation-plan.md) for manifests, explicit
 threshold settings, label provenance and metric limitations. The paid transport probe below remains separate.
 
 Use `--review-packet` to export case evidence with authored labels/rationales withheld, and `--import-review <path>` to
 validate a human-completed packet and emit a new corpus on stdout. See the
-[human review instructions](../../../docs/board/doing/jev_rule_pack/evidence/human-review.md) for partial reviews,
+[human review instructions](../../../docs/board/paused/jev_rule_pack/evidence/human-review.md) for partial reviews,
 explicit replacement and disagreement/exclusion handling. These commands do not call a provider.
 
 Shared module ownership is in [rule-pack design](../../../docs/design_rule_packs.md).
@@ -19,23 +19,53 @@ uv run python scripts/experiments/jev/rule-pack-diagnostic.py --case validation-
 uv run python scripts/experiments/jev/rule-pack-diagnostic.py --validate-review /tmp/jev-diagnostic-review.json
 ```
 
-The [diagnostic review guide](../../../docs/board/doing/jev_rule_pack/evidence/diagnostic-human-review.md) links the
-pending worksheets. This packet has separate criteria and identities; old human labels do not answer its new questions.
-Validation checks a retained partial ledger without importing labels into the active corpus. Active-rule provenance is
-separate from diagnostic answer identity. `--carry-review <ledger.json>` explicitly prepares a new partial ledger,
-retaining only unchanged question contexts and their source attribution; changed answers and contract decisions reopen.
-The review guide describes source bindings and new human review. There is no live mode.
+The [diagnostic review guide](../../../docs/board/paused/jev_rule_pack/evidence/diagnostic-human-review.md) links the
+blank worksheets and completed ledger. This packet has separate criteria and identities; old human labels do not answer
+its new questions. Validation checks a retained partial ledger without importing labels into the active corpus.
+Active-rule provenance is separate from diagnostic answer identity. `--carry-review <ledger.json>` explicitly prepares a
+new partial ledger, retaining only unchanged question contexts and their source attribution; changed answers and
+contract decisions reopen. The review guide describes source bindings and new human review. Diagnostic draft 3 has 32
+carried answers and 63 renewed answers; all 95 questions and the revised contract are reviewed. The
+[bounded study plan](../../../docs/board/paused/jev_rule_pack/evidence/bounded-feasibility-plan.md) proposes hard stops
+and a stronger-model reference arm. The
+[capture review packet](../../../docs/board/paused/jev_rule_pack/evidence/bounded-capture-review.md) links the exact
+manifest and reproduction commands for `diagnostic_manifest.py`. Preparation and validation are offline; a manifest does
+not grant paid approval. After explicit approval,
+`diagnostic_capture.py --live --manifest <manifest.json> --review <completed-review.json> --catalog <catalog.json> --output <new-absolute-directory>`
+executes the fixed two-arm study. The output must be new and private. It includes an isolated Forge home, a durable
+journal and a scored report. Catalog drift refuses dispatch; technical failures stop the whole study and repeated
+sentinel errors stop the affected arm. There are no retries or resume mode, and a consumed proposal cannot be started
+again. The existing calibration capture command does not execute this study.
+
+Both capture replay guards recognize published journals that reference a retained manifest. References must remain
+inside the evidence directory, avoid symlinks and match the manifest digest. A diagnostic publication cannot block an
+unrelated calibration proposal merely because its manifest is referenced, or permit its own replay after a local claim
+is lost. Invalid references refuse the scan.
 
 Compare the same action evidence with marker and AST signals without dispatching requests:
 
 ```bash
 uv run python scripts/experiments/jev/rule-pack-baselines.py \
-  docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json > /tmp/jev-baselines.json
+  docs/board/paused/jev_rule_pack/evidence/wrapper-corpus.json > /tmp/jev-baselines.json
 ```
 
 These are raw candidate signals, not semantic judgments. The AST detector supports complete Python `Edit` declarations;
 partial edits and patches remain unsupported. Required callback/validation adapters can also be flagged. Neither
 baseline reads the supplied file path or uses human labels to choose a signal.
+
+Compare the fixed 12-case diagnostic review and 17-case constructed corpus locally:
+
+```bash
+uv run python scripts/experiments/jev/rule-pack-offline.py \
+  --review docs/board/paused/jev_rule_pack/evidence/diagnostic-review-2026-10-18-batch-6.json \
+  --corpus docs/board/paused/jev_rule_pack/evidence/wrapper-corpus.json
+```
+
+The
+[offline retention/admission review](../../../docs/board/paused/jev_rule_pack/evidence/offline-retention-admission.md)
+explains the prospective dependency table and retained report. Syntax spans and candidate differences are observations,
+not new human labels or quality scores. The cohorts overlap. This command has no live mode or native acquisition, and
+the completed diagnostic capture remains failed under its original contract.
 
 Prepare A2's nine-request constructed calibration manifest without credential access:
 
@@ -44,7 +74,7 @@ PYTHON_DOTENV_DISABLED=1 uv run python scripts/experiments/jev/rule-pack-capture
 ```
 
 Both retained calibration approvals are consumed. The
-[completed calibration plan](../../../docs/board/doing/jev_rule_pack/evidence/calibration-boundary-run-plan.md) records
+[completed calibration plan](../../../docs/board/paused/jev_rule_pack/evidence/calibration-boundary-run-plan.md) records
 historical scope, dated price and allowance; it does not authorize a repeat. The runner refuses proposal identities
 already dispatched in retained A2 journals before accessing credentials. A separately reviewed repeat needs a new
 proposal identity, supplied during generation with `--proposal-id <new-id>`. Creating that identity does not approve
@@ -60,7 +90,7 @@ unretained, deleted or concurrent runs are outside that local guard. It is not a
 resume or held-out mode; a continuation needs a new request scope.
 
 Real native actions are a separate local-only acquisition under the
-[feasibility study plan](../../../docs/board/doing/jev_rule_pack/evidence/feasibility-study-plan.md). Its approval does
+[feasibility study plan](../../../docs/board/paused/jev_rule_pack/evidence/feasibility-study-plan.md). Its approval does
 not authorize sending them to a provider or adding them to Git. The inventory script implements only metadata selection
 and source-path admission, with no native-content reads:
 
@@ -71,8 +101,32 @@ uv run python scripts/experiments/jev/rule-pack-inventory.py --inspect-sources /
 
 Run it only within an approved acquisition scope. The first command creates a private directory; the second consumes
 that retained metadata selection. Neither command searches for replacements. The
-[checkpoint](../../../docs/board/doing/jev_rule_pack/evidence/feasibility-progress.md) records the first run's
+[checkpoint](../../../docs/board/paused/jev_rule_pack/evidence/feasibility-progress.md) records the first run's
 missing-source shortfall; no action extractor was needed or implemented.
+
+The [bounded continuation](../../../docs/board/paused/jev_rule_pack/evidence/feasibility-continuation-2026-10-19.md)
+uses a separate metadata-only mode:
+
+```bash
+uv run python scripts/experiments/jev/rule-pack-inventory.py --availability-first
+```
+
+It checks confirmed paths within one fixed 24-candidate recency cohort before allocating up to three available sources
+per runtime. It writes a new private selection ledger and aggregate summary, without reading native content or searching
+for replacements. The recorded action window is prospective; path existence does not verify native identity, completion
+or action admission. The original modes retain their original selection behavior.
+
+For a separately authorized content scope, audit only that frozen selection:
+
+```bash
+uv run python scripts/experiments/jev/rule-pack-source-audit.py \
+  --audit /private/tmp/jev-a2-availability-<id>/availability-private.json
+```
+
+This Claude-only schema audit rechecks active state and source identities, bounds JSONL reads, and emits controlled
+metadata counters. It retains private source receipts without message text or tool arguments. It does not verify turn
+completion, extract actions or dispatch requests. Existing audit outputs refuse a repeat before any source read. The
+continuation records the completed study's shortfall and recommendation to stop the current A2 implementation path.
 
 ## A1 transport probes
 

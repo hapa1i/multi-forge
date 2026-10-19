@@ -10,7 +10,7 @@ import pytest
 
 pytestmark = pytest.mark.regression
 ROOT = Path(__file__).resolve().parents[2]
-EVIDENCE = ROOT / "docs/board/doing/jev_rule_pack/evidence"
+EVIDENCE = ROOT / "docs/board/paused/jev_rule_pack/evidence"
 
 
 @pytest.fixture
@@ -27,12 +27,44 @@ def diagnostic(monkeypatch):
 
 
 @pytest.fixture
-def source():
-    # This immutable legacy human ledger exercises migration without reauthoring human choices.
-    return json.loads((EVIDENCE / "diagnostic-review-2026-10-17-batch-6.json").read_text())
+def source(diagnostic):
+    # Synthetic schema-1 review matches current semantics; these choices are validation fixtures, not human labels.
+    packet = diagnostic.build_packet()
+    packet["schema_version"] = 1
+    packet.pop("review_sources")
+    packet.pop("contract_review_source")
+    packet["reviewer"] = "Synthetic identity-test reviewer"
+    packet["review_reference"] = "synthetic-identity-review.json"
+    packet["contract_review"] = {"status": "reviewed", "notes": "Synthetic contract review for identity tests."}
+    nulls = {
+        ("module-forwarding-without-history", "normalizer.consumer_constraint"),
+        ("module-forwarding-without-history", "normalizer.replacement_satisfies"),
+        ("module-forwarding-without-replacement", "normalizer.replacement_satisfies"),
+    }
+    for case in packet["cases"]:
+        for key in diagnostic.reviews.CASE_V2:
+            case.pop(key)
+        case["review"] = {
+            "status": "reviewed",
+            "answers": {
+                key: None if (case["id"], key) in nulls else next(iter(row["question"]["criteria"]))
+                for key, row in case["questions"].items()
+            },
+            "notes": "Synthetic choices exercise identity validation, not semantic accuracy.",
+        }
+        case["case_sha256"] = diagnostic.digest(
+            {key: value for key, value in case.items() if key not in {"case_sha256", "review"}}
+        )
+    immutable = copy.deepcopy(packet)
+    for key in ("reviewer", "review_reference", "packet_sha256", "contract_review"):
+        immutable.pop(key)
+    for case in immutable["cases"]:
+        case.pop("review")
+    packet["packet_sha256"] = diagnostic.digest(immutable)
+    return packet
 
 
-def test_original_legacy_ledger_can_be_validated_without_rewriting_it(diagnostic, source):
+def test_unchanged_legacy_ledger_can_be_validated_without_rewriting_it(diagnostic, source):
     before = copy.deepcopy(source)
     result = diagnostic.validate_review(source)
     assert result["answered_questions"] == 92

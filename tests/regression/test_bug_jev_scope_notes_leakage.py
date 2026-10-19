@@ -20,7 +20,7 @@ def test_scope_notes_do_not_leak_into_payload_or_change_evaluation_identity(
     module = importlib.util.module_from_spec(spec)
     monkeypatch.setitem(sys.modules, spec.name, module)
     spec.loader.exec_module(module)
-    raw = json.loads((ROOT / "docs/board/doing/jev_rule_pack/evidence/wrapper-corpus.json").read_text())
+    raw = json.loads((ROOT / "docs/board/paused/jev_rule_pack/evidence/wrapper-corpus.json").read_text())
     raw["cases"] = [next(case for case in raw["cases"] if case["id"] == "module-forwarding")]
     original = module.prepare(module.Corpus.model_validate(raw), include_payloads=True)["cases"][0]
     raw["cases"][0]["scope_facts"][

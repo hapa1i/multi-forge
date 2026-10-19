@@ -1,0 +1,275 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-18T18:33:14.071040+00:00",
+  "sources": [
+    {
+      "id": "jev-endpoints",
+      "url": "https://openrouter.ai/api/v1/models/typesafe/jev-1.13/endpoints",
+      "response_sha256": "dbfc5c2adb571a5af0bc7ba627683a4d6060683bf568a2e5784e36e332fcfaa5",
+      "response_bytes": 1237,
+      "retrieved_at": "2026-10-18T18:33:13.176241+00:00",
+      "retention": "exact selected endpoint objects; unrelated rows omitted"
+    },
+    {
+      "id": "reference-endpoints",
+      "url": "https://openrouter.ai/api/v1/models/anthropic/claude-opus-5.5/endpoints",
+      "response_sha256": "d6aa307393d37709e5d4e62d2c74913f6612081dd5f48e8b72e32cfd7f021041",
+      "response_bytes": 13246,
+      "retrieved_at": "2026-10-18T18:33:13.477136+00:00",
+      "retention": "exact selected endpoint objects; unrelated rows omitted"
+    },
+    {
+      "id": "zdr-endpoints",
+      "url": "https://openrouter.ai/api/v1/endpoints/zdr",
+      "response_sha256": "12303a52b9ddb3d4a1d0f3615127509787bd6f0e41f528f0217d13aab8a1bef3",
+      "response_bytes": 1053738,
+      "retrieved_at": "2026-10-18T18:33:14.071040+00:00",
+      "retention": "exact selected endpoint objects; unrelated rows omitted"
+    }
+  ],
+  "arms": {
+    "J": {
+      "requested_model": "typesafe/jev-1.13",
+      "response_models": [
+        "typesafe/jev-1.13-20260917"
+      ],
+      "provider_slug": "typesafe",
+      "provider_name": "TypeSafe",
+      "input_usd_per_token": "0.000000042",
+      "output_usd_per_token": "0",
+      "supported_parameters": [],
+      "zdr": true,
+      "endpoint_source": "jev-endpoints",
+      "zdr_source": "zdr-endpoints",
+      "endpoint": {
+        "name": "TypeSafe | typesafe/jev-1.13-20260917",
+        "model_id": "typesafe/jev-1.13",
+        "model_name": "TypeSafe: Jev 1.13",
+        "context_length": 262144,
+        "pricing": {
+          "prompt": "0.000000042",
+          "completion": "0",
+          "discount": 0
+        },
+        "provider_name": "TypeSafe",
+        "tag": "typesafe",
+        "service_tier": null,
+        "quantization": "unknown",
+        "max_completion_tokens": 235929,
+        "max_prompt_tokens": 262144,
+        "supported_parameters": [],
+        "supports_tool_choice": {
+          "none": true,
+          "auto": true,
+          "required": true,
+          "function": true
+        },
+        "status": 0,
+        "uptime_last_30m": 100,
+        "uptime_last_5m": 100,
+        "uptime_last_1d": 100,
+        "supports_implicit_caching": false,
+        "native_tools": {},
+        "supports_voice_cloning": false,
+        "supports_multiple_audio_references": false,
+        "supports_image_reference": false,
+        "supports_diarization": false,
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      "zdr_endpoint": {
+        "name": "TypeSafe | typesafe/jev-1.13-20260917",
+        "model_id": "typesafe/jev-1.13",
+        "model_name": "TypeSafe: Jev 1.13",
+        "context_length": 262144,
+        "pricing": {
+          "prompt": "0.000000042",
+          "completion": "0",
+          "discount": 0
+        },
+        "provider_name": "TypeSafe",
+        "tag": "typesafe",
+        "service_tier": null,
+        "quantization": "unknown",
+        "max_completion_tokens": 235929,
+        "max_prompt_tokens": 262144,
+        "supported_parameters": [],
+        "supports_tool_choice": {
+          "none": true,
+          "auto": true,
+          "required": true,
+          "function": true
+        },
+        "status": 0,
+        "uptime_last_30m": 100,
+        "uptime_last_5m": 100,
+        "uptime_last_1d": 100,
+        "supports_implicit_caching": false,
+        "native_tools": {},
+        "supports_voice_cloning": false,
+        "supports_multiple_audio_references": false,
+        "supports_image_reference": false,
+        "supports_diarization": false,
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    },
+    "R": {
+      "requested_model": "anthropic/claude-opus-5.5",
+      "response_models": [
+        "anthropic/claude-opus-5.5",
+        "anthropic/claude-opus-5.5-20260921"
+      ],
+      "provider_slug": "google-vertex/global",
+      "provider_name": "Google",
+      "input_usd_per_token": "0.000004",
+      "output_usd_per_token": "0.00002",
+      "supported_parameters": [
+        "reasoning",
+        "include_reasoning",
+        "max_tokens",
+        "response_format",
+        "tool_choice",
+        "tools",
+        "verbosity",
+        "structured_outputs",
+        "stop",
+        "reasoning_effort"
+      ],
+      "zdr": true,
+      "endpoint_source": "reference-endpoints",
+      "zdr_source": "zdr-endpoints",
+      "endpoint": {
+        "name": "Google | anthropic/claude-opus-5.5-20260921",
+        "model_id": "anthropic/claude-opus-5.5",
+        "model_name": "Anthropic: Claude Opus 5.5",
+        "context_length": 1000000,
+        "pricing": {
+          "prompt": "0.000004",
+          "completion": "0.00002",
+          "web_search": "0.01",
+          "input_cache_read": "0.0000002",
+          "input_cache_write": "0.000005",
+          "input_cache_write_1h": "0.000008",
+          "discount": 0
+        },
+        "provider_name": "Google",
+        "tag": "google-vertex/global",
+        "service_tier": null,
+        "quantization": "unknown",
+        "max_completion_tokens": 128000,
+        "max_prompt_tokens": null,
+        "supported_parameters": [
+          "reasoning",
+          "include_reasoning",
+          "max_tokens",
+          "response_format",
+          "tool_choice",
+          "tools",
+          "verbosity",
+          "structured_outputs",
+          "stop",
+          "reasoning_effort"
+        ],
+        "supports_tool_choice": {
+          "none": true,
+          "auto": true,
+          "required": false,
+          "function": false
+        },
+        "status": 0,
+        "uptime_last_30m": 100,
+        "uptime_last_5m": 100,
+        "uptime_last_1d": 100,
+        "supports_implicit_caching": false,
+        "native_tools": {
+          "openrouter:bash": {
+            "type": "bash_20250124"
+          }
+        },
+        "supports_voice_cloning": false,
+        "supports_multiple_audio_references": false,
+        "supports_image_reference": false,
+        "supports_diarization": false,
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      "zdr_endpoint": {
+        "name": "Google | anthropic/claude-opus-5.5-20260921",
+        "model_id": "anthropic/claude-opus-5.5",
+        "model_name": "Anthropic: Claude Opus 5.5",
+        "context_length": 1000000,
+        "pricing": {
+          "prompt": "0.000004",
+          "completion": "0.00002",
+          "web_search": "0.01",
+          "input_cache_read": "0.0000002",
+          "input_cache_write": "0.000005",
+          "input_cache_write_1h": "0.000008",
+          "discount": 0
+        },
+        "provider_name": "Google",
+        "tag": "google-vertex/global",
+        "service_tier": null,
+        "quantization": "unknown",
+        "max_completion_tokens": 128000,
+        "max_prompt_tokens": null,
+        "supported_parameters": [
+          "reasoning",
+          "include_reasoning",
+          "max_tokens",
+          "response_format",
+          "tool_choice",
+          "tools",
+          "verbosity",
+          "structured_outputs",
+          "stop",
+          "reasoning_effort"
+        ],
+        "supports_tool_choice": {
+          "none": true,
+          "auto": true,
+          "required": false,
+          "function": false
+        },
+        "status": 0,
+        "uptime_last_30m": 100,
+        "uptime_last_5m": 100,
+        "uptime_last_1d": 100,
+        "supports_implicit_caching": false,
+        "native_tools": {
+          "openrouter:bash": {
+            "type": "bash_20250124"
+          }
+        },
+        "supports_voice_cloning": false,
+        "supports_multiple_audio_references": false,
+        "supports_image_reference": false,
+        "supports_diarization": false,
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    }
+  },
+  "identity_limitations": {
+    "J": "Require the dated response identity observed in prior captures. The requested alias is not an immutable weight pin.",
+    "R": "Accept only the requested alias or dated catalog identity. Record alias-only responses as unresolved snapshot identity and stop on an observed identity change; neither identity proves immutable server weights."
+  },
+  "documentation": [
+    {
+      "url": "https://openrouter.ai/docs/guides/best-practices/reasoning-tokens",
+      "checked_date": "2026-10-18",
+      "finding": "Anthropic reasoning is billed as output within max_tokens. The medium effort setting and 4096 combined limit do not guarantee enough visible output; length finish is a technical stop."
+    },
+    {
+      "url": "https://openrouter.ai/docs/guides/features/structured-outputs",
+      "checked_date": "2026-10-18",
+      "finding": "Use response_format json_schema with strict true, exact required properties and additionalProperties false. Endpoint support does not guarantee every live response conforms; validate locally."
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-steering-and-cost",
+      "checked_date": "2026-10-18",
+      "finding": "For adaptive thinking, max_tokens limits thinking and visible output together; output_tokens remains the inclusive billed total. This documents the requested cap, not empirical verification of this OpenRouter route."
+    }
+  ]
+}

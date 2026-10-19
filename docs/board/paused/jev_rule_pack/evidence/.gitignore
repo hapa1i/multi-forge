@@ -1,0 +1,2 @@
+# Private exclusive claims retain interrupted local runs; published captures also prevent replay.
+.diagnostic-proposal-claims/
