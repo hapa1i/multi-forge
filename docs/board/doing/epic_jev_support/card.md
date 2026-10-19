@@ -7,8 +7,9 @@ handoffs. A1 shipped through [PR #268](https://github.com/hapa1i/multi-forge/pul
 [PR #271](https://github.com/hapa1i/multi-forge/pull/271) as `791d9872` on the same day. A2 is paused by owner decision
 on 2026-10-19 after the bounded investigation failed to establish a viable hook policy. Its
 [pause handoff](../../paused/jev_rule_pack/evidence/pr-275-pause-handoff.md) preserves the tools, negative results and
-unmet gates. A3 is selected next for a separate feasibility branch and checklist. The epic remains active; no consumer
-quality or quota-saving outcome has shipped.
+unmet gates. A3 is active for feasibility on `codex/jev-cascade-feasibility` from `8dea95f5`, after PR #275 merged as
+`fe2d09a1`. Its [checklist](../jev_cascade/checklist.md) owns the study. The epic remains active; no consumer quality or
+quota-saving outcome has shipped.
 
 ## Problem and outcome
 
@@ -26,21 +27,21 @@ reported cost for the captured shapes; quota savings and decision quality remain
 
 ## Members and dependencies
 
-| ID  | Card                                                                  | Independently shippable outcome                                               | Depends on                        |
-| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------- |
-| A1  | [Jev client and probes](../../done/jev_client_probes/card.md)         | Typed OpenRouter transport and reproducible contract/latency/billing evidence | None                              |
-| A2  | [Jev rule pack, warnings only](../../paused/jev_rule_pack/card.md)    | Opt-in semantic policy type over fixed atomic rules                           | A1; B3 for Codex-visible warnings |
-| A3  | [Jev as the cascade's first tier](../../proposed/jev_cascade/card.md) | Validated covered allows avoid a Claude review; other cases escalate          | A1, B1                            |
+| ID  | Card                                                               | Independently shippable outcome                                               | Depends on                        |
+| --- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------- | --------------------------------- |
+| A1  | [Jev client and probes](../../done/jev_client_probes/card.md)      | Typed OpenRouter transport and reproducible contract/latency/billing evidence | None                              |
+| A2  | [Jev rule pack, warnings only](../../paused/jev_rule_pack/card.md) | Opt-in semantic policy type over fixed atomic rules                           | A1; B3 for Codex-visible warnings |
+| A3  | [Jev as the cascade's first tier](../../doing/jev_cascade/card.md) | Validated covered allows avoid a Claude review; other cases escalate          | A1, B1                            |
 
 [B1](../../done/plan_file_supervision/card.md) and [B3](../../done/codex_policy_warnings/card.md) belong to the separate
 [Codex supervisor epic](../../done/epic_codex_supervisor/card.md). A2 and A3 can proceed independently after their
 prerequisites; A2's fixed-rule quality evidence does not validate A3's plan-alignment questions. Cards use separate
 execution branches when activated.
 
-Next selected member: [A3](../../proposed/jev_cascade/card.md), for feasibility before runtime work. Activate it on its
-own branch after PR #275 merges. A2 remains paused; neither its failures nor its shipped tooling settle A3's independent
-plan/action coverage and false-allow questions. A3 must justify review-skipping against full supervision and
-deterministic baselines before implementation. No further A2 capture is planned.
+Active member: [A3](../jev_cascade/card.md), for feasibility before runtime work on its separate execution branch. A2
+remains paused; neither its failures nor its shipped tooling settle A3's independent plan/action coverage and
+false-allow questions. A3 must justify review-skipping against full supervision and deterministic baselines before
+implementation. No further A2 capture is planned.
 
 The independent [Claude feedback-permissions fix, PR #269](https://github.com/hapa1i/multi-forge/pull/269), shipped as
 `e9c144eb` and is included on `main`. Its

@@ -109,7 +109,7 @@ boundary between stable rule citations, action evidence and semantic correctness
 
 Direct blocking and escalation of fixed-rule findings are deferred. The existing plan supervisor cannot adjudicate rule
 findings merely because it is configured; that extension would need an explicit rule/evidence handoff.
-[A3](../../proposed/jev_cascade/card.md) is plan-check cascade work, not a shortcut around that requirement.
+[A3](../../doing/jev_cascade/card.md) is plan-check cascade work, not a shortcut around that requirement.
 
 ## B3 formatter handoff (2026-10-10)
 

@@ -1,5 +1,9 @@
 # Jev as the cascade's first tier
 
+Status: **doing**, activated 2026-10-19 for feasibility only after PR #275 merged. The [checklist](checklist.md) and
+[bounded study plan](evidence/feasibility-plan.md) place evidence admission and human review before model capture or
+runtime integration. Branch `codex/jev-cascade-feasibility` starts at `8dea95f5`.
+
 Epic: [Jev support](../../doing/epic_jev_support/card.md). Member **A3**. Depends on
 [A1: Jev client and probes](../../done/jev_client_probes/card.md) and
 [B1: plan-file Claude supervision](../../done/plan_file_supervision/card.md). A2 is not a dependency.
