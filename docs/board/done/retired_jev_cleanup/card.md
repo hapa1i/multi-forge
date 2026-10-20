@@ -1,8 +1,11 @@
 # Remove retired Jev consumer experiments
 
-**Status**: Active cleanup on `codex/remove-retired-jev-experiments`, based on `39ba8cbb`.
+**Status**: Done on 2026-10-20. [PR #277](https://github.com/hapa1i/multi-forge/pull/277) merged as `51c2d92c`.
 
-**PR**: [#277](https://github.com/hapa1i/multi-forge/pull/277), verified locally and awaiting review.
+**Closeout**: [Merged verification](checklist.md#merged-closeout). A1 remains shipped; the epic, A2 and A3 remain
+retired.
+
+## Original scope
 
 The [Jev epic](../../retired/epic_jev_support/card.md), [A2](../../retired/jev_rule_pack/card.md) and
 [A3](../../retired/jev_cascade/card.md) are retired. Their experiment runners, rule definitions and unused consent

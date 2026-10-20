@@ -8,6 +8,25 @@ Older entries are retained verbatim in [2026-08-20](archive/change_log_2026-08-2
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-20
+
+### Remove retired Jev consumer experiments
+
+**Goal**: Remove A2/A3 implementation and maintenance cost while retaining the shipped A1 client and historical
+evidence.
+
+**Key changes**:
+
+- Removed retired experiment runners, private rule/consent modules and their tests; ordinary policy validation remains.
+- Preserved A1 and all 45 historical JSON artifacts; current documentation links the archived experimental source.
+- Made fast forced-tool rejection tests use local upstream fixtures and assert that no request is forwarded.
+
+**Verification**: [PR #277](https://github.com/hapa1i/multi-forge/pull/277) merged as `51c2d92c`, with the same tree as
+reviewed head `e760648f` and all five GitHub checks passing. Local `make test` passed 10,962 unit and 519 integration
+tests; 1,891 regressions, full pre-commit, build and clean-wheel checks passed. Slow live-provider tests were excluded.
+The [cleanup closeout](done/retired_jev_cleanup/checklist.md#merged-closeout) preserves verification details. A1 remains
+done; the epic, A2 and A3 remain retired.
+
 ## 2026-10-19
 
 ### Preserve the A3 comparison and retire the Jev initiative

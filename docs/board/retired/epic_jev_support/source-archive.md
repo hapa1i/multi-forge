@@ -4,6 +4,9 @@ The A2 rule-pack and A3 cascade experiments were removed after the initiative wa
 unused packaged rule/consent foundations were removed with them. A1's client, telemetry and transport probe remain
 supported; see [the probe guide](../../../../scripts/experiments/jev/README.md).
 
+The [cleanup closeout](../../done/retired_jev_cleanup/checklist.md#merged-closeout) records removal in PR #277 and its
+verification. The cleanup shipped independently; the epic and both consumers remain retired.
+
 Historical commands and verification counts in these retired cards describe the code at their recorded revisions. They
 are not commands supported by the current checkout. The final complete source before removal is
 [`39ba8cbb49d2ca3906f196edae2b139705a51bf1`](https://github.com/hapa1i/multi-forge/tree/39ba8cbb49d2ca3906f196edae2b139705a51bf1):

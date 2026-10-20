@@ -1,6 +1,6 @@
 # Retired Jev cleanup checklist
 
-**Current focus**: [PR #277](https://github.com/hapa1i/multi-forge/pull/277) is open for review; closeout follows merge.
+**Current focus**: Complete. [PR #277](https://github.com/hapa1i/multi-forge/pull/277) merged on 2026-10-20.
 
 ## Implementation
 
@@ -26,7 +26,16 @@
 ## Closeout
 
 - [x] Commit reviewable cleanup and open a PR with validation results.
-- [ ] After merge, update the change log and move this card to done.
+- [x] After merge, update the change log and move this card to done.
+
+## Merged closeout
+
+PR #277 merged as `51c2d92c` on 2026-10-20. The merged tree is identical to reviewed head `e760648f`; all five GitHub
+checks passed. The local verification below remains applicable to that shipped tree.
+
+The cleanup card is done. A1 remains done, and the epic, A2 and A3 remain retired. Their historical JSON evidence is
+unchanged, and the [source archive](../../retired/epic_jev_support/source-archive.md) retains the pre-removal revision.
+The design map, architecture history, session ownership and end-user policy guidance were synchronized in the merged PR.
 
 ## Recorded verification
 
