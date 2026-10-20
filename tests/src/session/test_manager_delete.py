@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -12,8 +13,6 @@ import forge.session.worktree as worktree_pkg
 import forge.session.worktree.cleanup as worktree_cleanup_mod
 from forge.session import ForgeSessionError, IndexStore, SessionManager, SessionStore
 from forge.session.exceptions import ManifestCorruptedError
-from forge.session.manager import _tracked_derivation_transcript_session_ids
-from forge.session.models import Derivation
 
 
 def _init_project(path: Path) -> None:
@@ -24,29 +23,24 @@ def _init_project(path: Path) -> None:
     (path / ".claude").mkdir()
 
 
-def test_tracked_derivation_transcript_ids_include_rewind_relocated_id() -> None:
-    """Shared-transcript scans must see rewind's fresh relocated UUID."""
-    derivation = Derivation(
-        parent_session="parent",
-        rewind_relocated_session_id="296385c3-9753-452b-af3d-e9170233c613",
-    )
-
-    assert _tracked_derivation_transcript_session_ids(derivation) == ["296385c3-9753-452b-af3d-e9170233c613"]
-    assert _tracked_derivation_transcript_session_ids(
-        {"rewind_relocated_session_id": "296385c3-9753-452b-af3d-e9170233c613"}
-    ) == ["296385c3-9753-452b-af3d-e9170233c613"]
-
-
 def test_delete_preserves_session_when_worktree_cleanup_reports_errors(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, git_repo: Path
 ) -> None:
-    """Cleanup errors should abort deletion before transcripts/index/manifest are removed."""
+    """Worktree errors keep the record and retry inventory; delete never reaches native files."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
 
-    project = tmp_path / "project"
-    _init_project(project)
+    project = git_repo
+    (project / ".forge").mkdir()
+    (project / ".claude").mkdir()
+    checkout = tmp_path / "cleanup-worktree"
+    subprocess.run(
+        ["git", "worktree", "add", "-b", "cleanup-fail-branch", str(checkout)],
+        cwd=project,
+        capture_output=True,
+        check=True,
+    )
     monkeypatch.chdir(project)
 
     manager = SessionManager(index_store=IndexStore())
@@ -55,6 +49,7 @@ def test_delete_preserves_session_when_worktree_cleanup_reports_errors(
 
     def _mark_worktree(manifest) -> None:
         assert manifest.worktree is not None
+        manifest.worktree.path = str(checkout)
         manifest.worktree.is_worktree = True
         manifest.worktree.branch = "cleanup-fail-branch"
         manifest.confirmed.claude_session_id = "cleanup-fail-uuid"
@@ -67,18 +62,13 @@ def test_delete_preserves_session_when_worktree_cleanup_reports_errors(
         captured["cleanup_called"] = True
         return cleanup_mod.CleanupResult()
 
-    def fake_cleanup_worktree(**kwargs):
+    def fake_cleanup_worktree(*args, **kwargs):
         captured["worktree_cleanup_called"] = True
         return worktree_pkg.CleanupResult(errors=["branch still in use"])
 
     monkeypatch.setattr(cleanup_mod, "cleanup_session", fake_cleanup_session)
     monkeypatch.setattr(worktree_pkg, "cleanup_worktree", fake_cleanup_worktree)
     monkeypatch.setattr(worktree_cleanup_mod, "cleanup_worktree", fake_cleanup_worktree)
-    monkeypatch.setattr(
-        SessionManager,
-        "_find_co_resident_sessions",
-        lambda self, worktree_path, exclude: [],
-    )
 
     with pytest.raises(ForgeSessionError, match="branch still in use"):
         manager.delete_session("cleanup-fail-test", delete_branch=True, force=True)

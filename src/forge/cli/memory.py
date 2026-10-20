@@ -1044,24 +1044,30 @@ def _review_curate(
     dispatched_lane = read_bound_lane(state, SHADOW_CURATION_CONSUMER)
     backend_id = read_bound_backend_id(state, SHADOW_CURATION_CONSUMER)
 
-    result = run_shadow_curation(
-        session_name=resolved.store.session_name,
-        forge_root=forge_root,
-        official_path=for_doc,
-        official_content=official_content,
-        shadow_entries=shadow_entries,
-        base_url=base_url,
-        direct=direct,
-        scope=scope,
-        reasoning_effort=effective_effort,
-        backend_id=backend_id,
-        # Pass the raw bound lane. `run_shadow_curation` validates it and
-        # selects the claude/codex arm, failing loud on an invalid/drifted explicit binding.
-        lane_record=dispatched_lane,
-        # Freeze only on the actual dispatch (on_dispatch); threaded lane + equality guard
-        # keep confirmed consistent with the billed backend.
-        on_dispatch=lambda: persist_lane_freeze(resolved.store, SHADOW_CURATION_CONSUMER, dispatched_lane),
-    )
+    from forge.session.workers import capture_session_instance, session_worker_lease
+
+    token = capture_session_instance(forge_root, resolved.store.session_name)
+    with session_worker_lease(
+        forge_root, resolved.store.session_name, expected_instance_id=token, label="shadow curation"
+    ):
+        result = run_shadow_curation(
+            session_name=resolved.store.session_name,
+            forge_root=forge_root,
+            official_path=for_doc,
+            official_content=official_content,
+            shadow_entries=shadow_entries,
+            base_url=base_url,
+            direct=direct,
+            scope=scope,
+            reasoning_effort=effective_effort,
+            backend_id=backend_id,
+            # Pass the raw bound lane. `run_shadow_curation` validates it and
+            # selects the claude/codex arm, failing loud on an invalid/drifted explicit binding.
+            lane_record=dispatched_lane,
+            # Freeze only on the actual dispatch (on_dispatch); threaded lane + equality guard
+            # keep confirmed consistent with the billed backend.
+            on_dispatch=lambda: persist_lane_freeze(resolved.store, SHADOW_CURATION_CONSUMER, dispatched_lane),
+        )
 
     if as_json:
         click.echo(

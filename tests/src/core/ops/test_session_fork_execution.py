@@ -108,7 +108,10 @@ def test_supervisor_mutation_failure_rolls_back_child(
     plan = plan_session_fork(_request(repo, supervise_target=True, no_launch=True), manager=manager)
 
     with (
-        patch("forge.core.ops.session_fork_execution.apply_supervisor_wiring", side_effect=OSError("wiring denied")),
+        patch(
+            "forge.core.ops.session_fork_execution.apply_supervisor_wiring",
+            side_effect=OSError("wiring denied"),
+        ),
         pytest.raises(ForkExecutionError, match="wiring denied"),
     ):
         execute_session_fork(
@@ -134,7 +137,10 @@ def test_native_relocation_failure_rolls_back_child_worktree_and_branch(
     )
 
     with (
-        patch("forge.session.claude.relocate_transcript", side_effect=PermissionError("denied")),
+        patch(
+            "forge.session.claude.relocate_transcript",
+            side_effect=PermissionError("denied"),
+        ),
         pytest.raises(ForkExecutionError, match="Could not relocate"),
     ):
         execute_session_fork(
@@ -215,7 +221,10 @@ def test_realized_routing_builds_launch_plan_without_inherited_reresolution(
             "forge.core.ops.session_fork_execution.get_effective_proxy_for_resume",
             side_effect=AssertionError("explicit routing must not re-resolve"),
         ),
-        patch("forge.core.ops.session_fork_execution._resolve_context_limit", return_value=123_456),
+        patch(
+            "forge.core.ops.session_fork_execution._resolve_context_limit",
+            return_value=123_456,
+        ),
     ):
         result = execute_session_fork(
             plan,
@@ -232,6 +241,7 @@ def test_realized_routing_builds_launch_plan_without_inherited_reresolution(
     assert result.launch_plan.proxy_id == "runtime-proxy"
     assert result.launch_plan.resume_id == "parent-uuid"
     assert result.launch_plan.fork_session is True
+    assert result.launch_plan.instance_id == SessionStore(str(repo), "child").review_identity()
 
 
 def test_rollback_failure_surfaces_explicit_recovery(
@@ -244,7 +254,11 @@ def test_rollback_failure_surfaces_explicit_recovery(
     def _fail_transfer(**_kwargs: object) -> tuple[Path | None, list[str]]:
         raise OSError("context denied")
 
-    monkeypatch.setattr(manager, "delete_session", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("busy")))
+    monkeypatch.setattr(
+        manager,
+        "delete_session",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("busy")),
+    )
     with pytest.raises(ForkExecutionError, match="Cleanup also failed") as raised:
         execute_session_fork(
             plan,
@@ -256,5 +270,6 @@ def test_rollback_failure_surfaces_explicit_recovery(
         )
 
     assert raised.value.tip is not None
-    assert "forge session delete child --yes --force --keep-transcripts" in raised.value.tip
+    assert "forge session delete child --yes --force --delete-branch" in raised.value.tip
+    assert f"--forge-root {repo}" in raised.value.tip
     assert SessionStore(str(repo), "child").exists()

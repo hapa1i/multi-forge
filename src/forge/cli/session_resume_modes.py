@@ -15,6 +15,7 @@ from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.context_limit import _resolve_context_limit
 from forge.session.launch import _combine_prompt_files, resolve_manifest_prompt_file
 from forge.session.models import AuthorityIntent
+from forge.session.workers import session_worker_lease
 
 from .session_rewind import _prepare_rewind_launch_artifacts
 
@@ -53,6 +54,7 @@ def _resume_fresh_rewind(
         else _resolve_context_limit(effective_proxy_ref)
     )
 
+    published_instances: list[str] = []
     try:
         child_manifest, transfer_result = manager.resume_session(
             parent,
@@ -62,20 +64,35 @@ def _resume_fresh_rewind(
             memory_flag=memory_flag,
             authority=authority,
             authority_explicit=authority_explicit,
+            instance_sink=published_instances.append,
         )
     except ForgeSessionError as e:
         handle_session_error(e)
         return
 
+    instance_id = published_instances[0] if published_instances else None
+    if instance_id is None:
+        handle_session_error(
+            ForgeSessionError("Created child has no captured instance identity; retained for inspection")
+        )
+        return
+
     parent_uuid = parent_state.confirmed.claude_session_id
     assert parent_uuid is not None  # caller validated
-    rewind_artifacts = _prepare_rewind_launch_artifacts(
-        manifest=child_manifest,
-        parent_name=parent,
-        parent_state=parent_state,
-        parent_uuid=parent_uuid,
-        drop_last=drop_last,
-    )
+    with session_worker_lease(
+        child_manifest.forge_root or str(Path.cwd()),
+        child_manifest.name,
+        expected_instance_id=instance_id,
+        label="prepare-rewind",
+        index_store=manager.index_store,
+    ):
+        rewind_artifacts = _prepare_rewind_launch_artifacts(
+            manifest=child_manifest,
+            parent_name=parent,
+            parent_state=parent_state,
+            parent_uuid=parent_uuid,
+            drop_last=drop_last,
+        )
 
     if transfer_result.warnings:
         for warning in transfer_result.warnings:
@@ -92,6 +109,7 @@ def _resume_fresh_rewind(
             error="Rewind fallback could not prepare a resumable transcript.",
             tip="Retry after fixing Claude transcript store access, or use a non-rewind fresh strategy.",
             log_context="rewind resume fallback",
+            expected_instance_id=instance_id,
         )
         print_error_with_tip(error, tip)
         sys.exit(1)
@@ -105,46 +123,54 @@ def _resume_fresh_rewind(
         console.print(f"  Context:  {display_path(rewind_artifacts.context_path)}")
     console.print()
 
-    prompt_files: list[Path] = []
-    child_worktree_path = Path(child_manifest.worktree.path) if child_manifest.worktree else Path.cwd()
-    configured_prompt = resolve_manifest_prompt_file(child_manifest)
-    if configured_prompt is not None:
-        prompt_files.append(configured_prompt)
-    if rewind_artifacts.context_path is not None:
-        prompt_files.append(rewind_artifacts.context_path)
-    prompt_file = _combine_prompt_files(
-        worktree_path=child_worktree_path,
-        session_name=child_manifest.name,
-        prompt_files=prompt_files,
-    )
-
-    use_sidecar, mounts, image = _get_resume_launch_preferences(child_manifest, direct=direct)
-    if use_sidecar:
-        print_error_with_tip(
-            "--strategy rewind is not supported with sidecar mode.",
-            "Rewind writes to the host ~/.claude store; run in host mode (e.g. --no-proxy) or use transfer mode.",
+    with session_worker_lease(
+        child_manifest.forge_root or str(Path.cwd()),
+        child_manifest.name,
+        expected_instance_id=instance_id,
+        label="prepare-rewind-launch",
+        index_store=manager.index_store,
+    ):
+        prompt_files: list[Path] = []
+        child_worktree_path = Path(child_manifest.worktree.path) if child_manifest.worktree else Path.cwd()
+        configured_prompt = resolve_manifest_prompt_file(child_manifest)
+        if configured_prompt is not None:
+            prompt_files.append(configured_prompt)
+        if rewind_artifacts.context_path is not None:
+            prompt_files.append(rewind_artifacts.context_path)
+        prompt_file = _combine_prompt_files(
+            worktree_path=child_worktree_path,
+            session_name=child_manifest.name,
+            prompt_files=prompt_files,
         )
-        sys.exit(1)
-    _execute_resume_launch_plan(
-        manager=manager,
-        plan=ResumeLaunchPlan(
-            manifest=child_manifest,
-            routing=_resume_routing_for_op(routing),
-            direct=direct,
-            resume_id=rewind_artifacts.resume_id,
-            session_id=None,
-            fork_session=True,
-            prompt_file=Path(prompt_file) if prompt_file else None,
-            action=ClaudeResumeAction.FRESH_DERIVED,
-            context_limit=context_limit,
-            launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
-            direct_model_override=direct_model_override,
-            model_route_selection=model_route_selection,
-            render_model_route=render_model_route,
-            launch_args=launch_args or RuntimeLaunchArgs(),
-            parent_name=parent,
-        ),
-    )
+
+        use_sidecar, mounts, image = _get_resume_launch_preferences(child_manifest, direct=direct)
+        if use_sidecar:
+            print_error_with_tip(
+                "--strategy rewind is not supported with sidecar mode.",
+                "Rewind writes to the host ~/.claude store; run in host mode (e.g. --no-proxy) or use transfer mode.",
+            )
+            sys.exit(1)
+        _execute_resume_launch_plan(
+            manager=manager,
+            plan=ResumeLaunchPlan(
+                manifest=child_manifest,
+                instance_id=instance_id,
+                routing=_resume_routing_for_op(routing),
+                direct=direct,
+                resume_id=rewind_artifacts.resume_id,
+                session_id=None,
+                fork_session=True,
+                prompt_file=Path(prompt_file) if prompt_file else None,
+                action=ClaudeResumeAction.FRESH_DERIVED,
+                context_limit=context_limit,
+                launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
+                direct_model_override=direct_model_override,
+                model_route_selection=model_route_selection,
+                render_model_route=render_model_route,
+                launch_args=launch_args or RuntimeLaunchArgs(),
+                parent_name=parent,
+            ),
+        )
 
 
 def _resume_fresh_native(
@@ -179,6 +205,7 @@ def _resume_fresh_native(
         else _resolve_context_limit(effective_proxy_ref)
     )
 
+    published_instances: list[str] = []
     try:
         child_manifest, transfer_result = manager.resume_session(
             parent,
@@ -188,9 +215,17 @@ def _resume_fresh_native(
             memory_flag=memory_flag,
             authority=authority,
             authority_explicit=authority_explicit,
+            instance_sink=published_instances.append,
         )
     except ForgeSessionError as e:
         handle_session_error(e)
+        return
+
+    instance_id = published_instances[0] if published_instances else None
+    if instance_id is None:
+        handle_session_error(
+            ForgeSessionError("Created child has no captured instance identity; retained for inspection")
+        )
         return
 
     if transfer_result.warnings:
@@ -205,23 +240,31 @@ def _resume_fresh_native(
     console.print()
 
     use_sidecar, mounts, image = _get_resume_launch_preferences(child_manifest, direct=direct)
-    _execute_resume_launch_plan(
-        manager=manager,
-        plan=ResumeLaunchPlan(
-            manifest=child_manifest,
-            routing=_resume_routing_for_op(routing),
-            direct=direct,
-            resume_id=parent_uuid,
-            session_id=None,
-            fork_session=True,
-            prompt_file=None,
-            action=ClaudeResumeAction.FRESH_DERIVED,
-            context_limit=context_limit,
-            launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
-            direct_model_override=direct_model_override,
-            model_route_selection=model_route_selection,
-            render_model_route=render_model_route,
-            launch_args=launch_args or RuntimeLaunchArgs(),
-            parent_name=parent,
-        ),
-    )
+    with session_worker_lease(
+        child_manifest.forge_root or str(Path.cwd()),
+        child_manifest.name,
+        expected_instance_id=instance_id,
+        label="prepare-native-resume",
+        index_store=manager.index_store,
+    ):
+        _execute_resume_launch_plan(
+            manager=manager,
+            plan=ResumeLaunchPlan(
+                manifest=child_manifest,
+                instance_id=instance_id,
+                routing=_resume_routing_for_op(routing),
+                direct=direct,
+                resume_id=parent_uuid,
+                session_id=None,
+                fork_session=True,
+                prompt_file=None,
+                action=ClaudeResumeAction.FRESH_DERIVED,
+                context_limit=context_limit,
+                launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
+                direct_model_override=direct_model_override,
+                model_route_selection=model_route_selection,
+                render_model_route=render_model_route,
+                launch_args=launch_args or RuntimeLaunchArgs(),
+                parent_name=parent,
+            ),
+        )

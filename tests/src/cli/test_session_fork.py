@@ -196,11 +196,11 @@ class TestCrossProjectResolution:
 
         result = runner.invoke(main, ["session", "delete", "--all", "--yes"])
 
-        assert result.exit_code == 1
-        assert "requires being inside a Forge project" in result.output
+        assert result.exit_code != 0
+        assert "inside a Forge project" in result.output
 
     def test_delete_cross_project_corrupt_manifest(self, runner: CliRunner, temp_env: Path) -> None:
-        """Force-delete should work on cross-project sessions with corrupt manifests."""
+        """Force authorizes dirty worktrees, never unverifiable session ownership."""
         other_root = _seed_cross_project_session(temp_env)
 
         # Corrupt the manifest
@@ -209,8 +209,9 @@ class TestCrossProjectResolution:
 
         result = runner.invoke(main, ["session", "delete", "cross-sess", "--yes", "--force"])
 
-        # Should succeed (force-delete cleans up despite corrupt manifest)
-        assert result.exit_code == 0
+        assert result.exit_code == 1
+        assert "invalid JSON" in result.output
+        assert manifest_path.read_text() == "{invalid json"
 
     def test_show_ambiguous_shows_locations(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
@@ -1179,7 +1180,7 @@ class TestSessionFork:
         # Rollback must NOT delete transcripts: the conflicting dest file is the user's, and the
         # cleanup branch would otherwise unlink the exact file the conflict protected.
         mock_manager.delete_session.assert_called_once()
-        assert mock_manager.delete_session.call_args.kwargs["delete_transcripts"] is False
+        assert mock_manager.delete_session.call_args.kwargs["expected_instance_id"] is not None
 
     def test_native_relocate_rolls_back_on_io_error(self, runner: CliRunner, temp_env: Path) -> None:
         """A non-custom IO failure (e.g. PermissionError) rolls back the fork without a traceback."""
@@ -1215,10 +1216,10 @@ class TestSessionFork:
         assert isinstance(result.exception, SystemExit)
         assert "Could not relocate" in result.output
         assert "Cleanup also failed for created session 'fork-child': cleanup denied." in result.output
-        assert "forge session delete fork-child --yes --force --keep-transcripts" in result.output
+        assert "forge session delete fork-child --yes --force" in result.output
         assert "--keep-worktree" not in result.output
         mock_manager.delete_session.assert_called_once()
-        assert mock_manager.delete_session.call_args.kwargs["delete_transcripts"] is False
+        assert mock_manager.delete_session.call_args.kwargs["expected_instance_id"] is not None
 
     def test_sidecar_worktree_fork_injects_addendum_once(self, runner: CliRunner, temp_env: Path) -> None:
         """Sidecar worktree forks should combine context with one copy of the addendum."""
@@ -1247,7 +1248,7 @@ class TestSessionFork:
         assert fork_state.worktree is not None
         fork_state.worktree.is_worktree = True
         fork_state.forge_root = str(fork_worktree)
-        SessionStore(str(fork_worktree), "fork-child").write(fork_state)
+        publish_session(IndexStore(), fork_state, fork_worktree)
 
         context_file = fork_worktree / ".forge" / "prev_sessions" / "fork-parent" / "children" / "fork-child.md"
         context_file.parent.mkdir(parents=True)

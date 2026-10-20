@@ -10,8 +10,9 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
-from forge.session import SessionStore, create_session_state
+from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
+from tests.fixtures.session_state import publish_session
 from tests.src.cli.session_command_support import _configure_mock_fork_manager
 
 
@@ -139,7 +140,7 @@ def test_worktree_rewind_launches_truncated_uuid_with_context(runner: CliRunner,
         + "\n",
         encoding="utf-8",
     )
-    SessionStore(str(fork_worktree), "fork-child").write(fork_state)
+    publish_session(IndexStore(), fork_state, fork_worktree)
 
     with (
         patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
@@ -202,7 +203,7 @@ def test_worktree_rewind_proxy_addendum_injected_once(runner: CliRunner, temp_en
         + "\n",
         encoding="utf-8",
     )
-    SessionStore(str(fork_worktree), "fork-child").write(fork_state)
+    publish_session(IndexStore(), fork_state, fork_worktree)
 
     with (
         patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
@@ -251,7 +252,7 @@ def test_worktree_rewind_fallback_copy_failure_aborts_before_launch(
     fork_worktree = Path(fork_state.worktree.path)
     parent_transcript = get_transcript_path(str(temp_env), "parent-uuid")
     _write_code_edit_transcript(parent_transcript)
-    SessionStore(str(fork_worktree), "fork-child").write(fork_state)
+    publish_session(IndexStore(), fork_state, fork_worktree)
 
     with (
         patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
@@ -284,16 +285,16 @@ def test_worktree_rewind_fallback_copy_failure_aborts_before_launch(
     assert "Plain native-relocate fallback could not copy the full parent transcript (disk full)" in result.output
     assert "Rewind fallback could not prepare a resumable transcript in the fork worktree." in result.output
     assert "Cleanup also failed for created session 'fork-child': cleanup denied." in result.output
-    assert "forge session delete fork-child --yes --force --keep-transcripts" in result.output
+    assert "forge session delete fork-child --yes --force" in result.output
     assert "--keep-worktree" not in result.output
     mock_invoke.assert_not_called()
     mock_manager.delete_session.assert_called_once_with(
         "fork-child",
         delete_worktree=True,
         delete_branch=True,
-        delete_transcripts=False,
         force=True,
         forge_root=fork_state.forge_root,
+        expected_instance_id=SessionStore(fork_state.forge_root, "fork-child").review_identity(),
     )
 
 
@@ -382,9 +383,9 @@ def test_rewind_fork_rejects_sidecar_child_at_launch_seam(runner: CliRunner, tem
         "fork-child",
         delete_worktree=True,
         delete_branch=True,
-        delete_transcripts=False,
         force=True,
         forge_root=fork_state.forge_root,
+        expected_instance_id=SessionStore(fork_state.forge_root, "fork-child").review_identity(),
     )
     mock_prepare.assert_not_called()
     mock_invoke.assert_not_called()

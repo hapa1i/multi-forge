@@ -22,8 +22,9 @@ from click.testing import CliRunner
 from forge.cli.hooks.commands import hooks
 from forge.policy.semantic.plan_check import PlanCheckVerdict
 from forge.policy.types import PolicyDecision, Violation
-from forge.session import SessionStore, create_session_state
+from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.models import PolicyIntent, SupervisorConfig
+from tests.fixtures.session_state import publish_session
 
 
 def _make_session(
@@ -49,7 +50,7 @@ def _make_session(
         bundles=bundles or [],
         supervisor=supervisor,
     )
-    store.write(manifest)
+    publish_session(IndexStore(), manifest, tmp_path)
     return store
 
 

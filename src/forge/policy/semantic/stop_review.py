@@ -308,7 +308,16 @@ def record_action(context: TurnContext, action: dict[str, Any]) -> None:
 
 
 def review_stop(context: TurnContext, *, deadline: float, current_config: Callable[[], str]) -> StopOutcome:
-    """Reserve before dispatch and consume any correction before returning its wire payload."""
+    """Reserve the original session while a Stop reviewer can read or write its evidence."""
+    from forge.session.workers import session_worker_lease
+
+    with session_worker_lease(
+        context.forge_root, context.session, expected_instance_id=context.session_identity, label="Stop review"
+    ):
+        return _review_stop(context, deadline=deadline, current_config=current_config)
+
+
+def _review_stop(context: TurnContext, *, deadline: float, current_config: Callable[[], str]) -> StopOutcome:
     outcome = StopOutcome("unavailable", "missing_baseline")
     reservation: dict[str, Any] | None = None
     plan = read_plan(context.config)
@@ -634,7 +643,11 @@ def reset_review(forge_root: Path, session: str, *, apply: bool = False) -> dict
         )
 
     if apply:
-        update_review_checkpoint(forge_root, session, update, payload_validator=validate_payload)
+        from forge.session.workers import capture_session_instance, session_worker_lease
+
+        token = capture_session_instance(forge_root, session)
+        with session_worker_lease(forge_root, session, expected_instance_id=token, label="reset Stop review"):
+            update_review_checkpoint(forge_root, session, update, payload_validator=validate_payload, review_id=token)
     else:
         update(read_review_checkpoint(forge_root, session, payload_validator=validate_payload))
     return result
@@ -857,10 +870,19 @@ def _update(
             raise ValueError("Stop event belongs to a deleted or replaced session")
         return callback(previous)
 
-    return update_review_checkpoint(
-        context.forge_root,
-        context.session,
-        owned,
-        payload_validator=validate_payload,
-        review_id=context.session_identity,
-    )
+    from forge.session.exceptions import SessionNotFoundError
+    from forge.session.workers import session_worker_lease
+
+    try:
+        with session_worker_lease(
+            context.forge_root, context.session, expected_instance_id=context.session_identity, label="Stop evidence"
+        ):
+            return update_review_checkpoint(
+                context.forge_root,
+                context.session,
+                owned,
+                payload_validator=validate_payload,
+                review_id=context.session_identity,
+            )
+    except SessionNotFoundError as error:
+        raise ValueError("Stop event belongs to a deleted or replaced session") from error

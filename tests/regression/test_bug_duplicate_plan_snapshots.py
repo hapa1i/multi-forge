@@ -29,8 +29,10 @@ from typing import Any
 import pytest
 
 from forge.session.artifacts import get_artifact_paths, snapshot_plan_approved
+from forge.session.index import IndexStore
 from forge.session.models import create_session_state
 from forge.session.store import SessionStore
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -121,7 +123,7 @@ def test_hook_dedups_consecutive_identical_approvals(tmp_path: Path, monkeypatch
     """Hook must not append a duplicate audit entry for A -> A."""
     state = create_session_state("planner", worktree_path=str(tmp_path))
     state.forge_root = str(tmp_path)
-    SessionStore(str(tmp_path), "planner").write(state)
+    publish_session(IndexStore(), state, tmp_path)
 
     plan = tmp_path / "plan.md"
     plan.write_text("# Plan A")
@@ -137,7 +139,7 @@ def test_hook_dedups_non_consecutive_repeats(tmp_path: Path, monkeypatch: pytest
     results in [A, B], not [A, B, A]."""
     state = create_session_state("planner", worktree_path=str(tmp_path))
     state.forge_root = str(tmp_path)
-    SessionStore(str(tmp_path), "planner").write(state)
+    publish_session(IndexStore(), state, tmp_path)
 
     plan = tmp_path / "plan.md"
 

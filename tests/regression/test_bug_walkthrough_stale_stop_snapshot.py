@@ -22,7 +22,8 @@ from click.testing import CliRunner
 
 from forge.cli.hooks import hooks
 from forge.cli.main import main
-from forge.session import SessionStore, create_session_state
+from forge.session import IndexStore, SessionStore, create_session_state
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -62,7 +63,7 @@ def test_rebuild_index_sees_latest_turn_after_repeated_stop(
         proxy_base_url="http://localhost:8086",
     )
     store = SessionStore(str(project), session_name)
-    store.write(manifest)
+    publish_session(IndexStore(), manifest, project)
 
     transcript = project / "live-transcript.jsonl"
     _append_text_entry(

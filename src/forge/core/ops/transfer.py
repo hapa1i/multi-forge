@@ -16,12 +16,15 @@ from __future__ import annotations
 
 import difflib
 import re
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import ForgeSessionError, SessionManager, SessionState
+from forge.session.index import IndexStore
 from forge.session.prev_sessions import (
     child_notes_path,
     child_path,
@@ -37,6 +40,7 @@ from forge.session.transfer import (
     parse_transfer_context_strategy,
     parse_transfer_frontmatter,
 )
+from forge.session.workers import capture_session_instance, session_worker_lease
 
 from .context import ExecutionContext
 from .session import ForgeOpError
@@ -86,6 +90,37 @@ def _enforce_transfer_mutation_compatibility(forge_root: Path) -> None:
         enforce_project_compatibility(forge_root)
     except ProjectCompatibilityError as e:
         raise ForgeOpError(str(e)) from e
+
+
+@contextmanager
+def transfer_writer_lease(
+    forge_root: Path,
+    parent: str,
+    *,
+    child: str | None = None,
+    output_root: Path | None = None,
+) -> Iterator[None]:
+    """Protect the source and any published child throughout transfer writes."""
+    with ExitStack() as stack:
+        try:
+            token = capture_session_instance(forge_root, parent)
+            stack.enter_context(
+                session_worker_lease(forge_root, parent, expected_instance_id=token, label="transfer writer")
+            )
+            if child is not None:
+                child_root = output_root or forge_root
+                entry = IndexStore().peek_session(child, str(child_root))
+                # Stateless bridges use an unpublished child snapshot key.
+                if entry is not None:
+                    child_token = capture_session_instance(child_root, child)
+                    stack.enter_context(
+                        session_worker_lease(
+                            child_root, child, expected_instance_id=child_token, label="transfer writer"
+                        )
+                    )
+        except ForgeSessionError as error:
+            raise ForgeOpError(f"Cannot write transfer context: {error}") from error
+        yield
 
 
 def _child_names(forge_root: Path, parent: str) -> list[str]:
@@ -183,10 +218,11 @@ def resolve_notes_target(*, ctx: ExecutionContext, parent: str, child: str) -> P
     author notes for a child that was never created).
     """
     forge_root = _require_forge_root(ctx)
-    if not child_path(forge_root, parent, child).is_file():
-        raise ForgeOpError(f"No child transfer '{child}' under parent '{parent}'.")
-    _enforce_transfer_mutation_compatibility(forge_root)
-    return ensure_notes_template(forge_root, parent, child)
+    with transfer_writer_lease(forge_root, parent, child=child):
+        if not child_path(forge_root, parent, child).is_file():
+            raise ForgeOpError(f"No child transfer '{child}' under parent '{parent}'.")
+        _enforce_transfer_mutation_compatibility(forge_root)
+        return ensure_notes_template(forge_root, parent, child)
 
 
 def diff_transfer(*, ctx: ExecutionContext, parent: str, child: str) -> str:
@@ -232,6 +268,20 @@ def regenerate_transfer(
     cache to structured, nor flip a codex cache back to claude. Falls back to
     ``structured``/``1``/``claude`` only when no metadata exists.
     """
+    with transfer_writer_lease(_require_forge_root(ctx), parent):
+        return _regenerate_transfer(
+            ctx=ctx, parent=parent, strategy=strategy, depth=depth, target_runtime=target_runtime
+        )
+
+
+def _regenerate_transfer(
+    *,
+    ctx: ExecutionContext,
+    parent: str,
+    strategy: str | None,
+    depth: int | None,
+    target_runtime: str | None,
+) -> RegenerateResult:
     forge_root = _require_forge_root(ctx)
     _enforce_transfer_mutation_compatibility(forge_root)
     cache = generated_path(forge_root, parent)

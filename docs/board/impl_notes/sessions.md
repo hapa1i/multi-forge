@@ -82,9 +82,10 @@ and [authority-race regression](../../../tests/regression/test_bug_launch_args_a
 - **Validate a caller-supplied path component before joining it, never after.** `Path(base) / "/abs"` silently discards
   `base`. This bit three times here; the worst case aliased an artifact copy onto its own source, so rollback unlinked
   the user's native transcript.
-- **Adoption inverts transcript ownership.** For a session Forge launched, the transcript is Forge's to delete; for an
-  adopted one it is the user's. Deletion paths must exempt it -- including the automatic retention sweep that runs on
-  CLI startup, not just an explicit `session delete`.
+- **Historical adoption ownership rule.** The original implementation exempted adopted native transcripts from ordinary
+  deletion. The [session cleanup contract](../../design_sessions.md#session-cleanup) supersedes that split: delete and
+  retention preserve all native files; explicit purge includes verified adopted files and labels them in its preview.
+  Adoption provenance still matters for CWD/source verification and disclosure.
 
 ### Transcript role/turn parsing is single-sourced in `core/transcript.py` (test_mirror_and_contract_cleanup, shipped 2026-07-06)
 

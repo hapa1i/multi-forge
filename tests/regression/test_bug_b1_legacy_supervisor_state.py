@@ -19,9 +19,10 @@ from forge.policy.semantic.supervisor import (
     apply_supervisor_and_lane,
     apply_supervisor_to_intent,
 )
-from forge.session import SessionStore, create_session_state
+from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.launch import get_launch_preferences
 from forge.session.models import PolicyIntent, SupervisorConfig
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -100,9 +101,11 @@ def test_codex_setup_does_not_inherit_planner_claude_proxy(tmp_path):
     state = create_session_state("worker", worktree_path=str(tmp_path))
     state.overrides = {"proxy": {"template": "incomplete-unrelated-override"}}
     store = SessionStore(str(tmp_path), "worker")
-    store.write(state)
+    publish_session(IndexStore(), state, tmp_path, forge_root=tmp_path)
+    planner = create_session_state("planner", worktree_path=str(tmp_path))
+    publish_session(IndexStore(), planner, tmp_path, forge_root=tmp_path)
     with (
-        patch("forge.policy.semantic.supervisor.validate_supervisor_target", return_value=state),
+        patch("forge.policy.semantic.supervisor.validate_supervisor_target", return_value=planner),
         patch("forge.policy.semantic.supervisor.auto_seed_supervisor_proxy", return_value="planner-claude-proxy"),
     ):
         result = supervisor_set(

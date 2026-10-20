@@ -153,6 +153,23 @@ class TestAuthorityLifecycle:
         assert resumed.returncode == 0, resumed.stderr
         forked = forge_workspace.exec("cd /workspace && forge session fork route-parent --name route-fork")
         assert forked.returncode == 0, forked.stderr
+        # Observe the committed route before incognito purges its artifacts on exit.
+        observer = forge_workspace.write_file(
+            "/usr/local/bin/claude-route-observer",
+            """#!/bin/bash
+set -e
+if [ "${FORGE_SESSION:-}" = "route-incognito" ] && [ "${1:-}" != "--version" ]; then
+    cp /workspace/.forge/artifacts/route-incognito/routing/events.jsonl /tmp/route-incognito-routing.jsonl
+fi
+exec /usr/local/bin/claude-mock "$@"
+""",
+        )
+        assert observer.returncode == 0, observer.stderr
+        installed = forge_workspace.exec(
+            "chmod +x /usr/local/bin/claude-route-observer && "
+            "ln -sf /usr/local/bin/claude-route-observer /usr/local/bin/claude"
+        )
+        assert installed.returncode == 0, installed.stderr
         incognito = forge_workspace.exec("cd /workspace && forge session incognito route-incognito --no-proxy")
         assert incognito.returncode == 0, incognito.stderr
 
@@ -162,7 +179,12 @@ class TestAuthorityLifecycle:
             "route-incognito": ["incognito"],
         }
         for name, expected in expected_operations.items():
-            journal = forge_workspace.read_file(f"/workspace/.forge/artifacts/{name}/routing/events.jsonl")
+            journal_path = (
+                "/tmp/route-incognito-routing.jsonl"
+                if name == "route-incognito"
+                else f"/workspace/.forge/artifacts/{name}/routing/events.jsonl"
+            )
+            journal = forge_workspace.read_file(journal_path)
             events = [json.loads(line) for line in journal.splitlines()]
             assert [event["operation"] for event in events] == expected
             assert all(event["payload"]["route"]["kind"] == "direct" for event in events)
@@ -181,6 +203,7 @@ class TestAuthorityLifecycle:
             }
 
         assert not forge_workspace.file_exists("/workspace/.forge/sessions/route-incognito/forge.session.json")
+        assert forge_workspace.exec("test ! -e /workspace/.forge/artifacts/route-incognito").returncode == 0
 
     def test_show_reports_malformed_active_registry_without_repair(self, forge_workspace: ContainerLike) -> None:
         forge_workspace.exec("forge extension enable --scope user --profile standard")
@@ -840,13 +863,14 @@ print(entry['worktree_path'])
             "cd /workspace && forge session delete preview-guest --yes --force --delete-branch"
         )
         assert deleted.returncode == 0, deleted.stderr
-        assert "Worktree will be kept (used by preview-owner)" in deleted.stdout
-        assert "Worktree will be removed" not in deleted.stdout
-        assert "Branch will be kept" in deleted.stdout
-        assert "Branch will be deleted" not in deleted.stdout
+        preview = " ".join(deleted.stdout.split())
+        assert f"Keep worktree (shared): {wt_path}" in preview
+        assert "Remove worktree:" not in preview
 
         check = forge_workspace.exec(f"test -d {wt_path} && cd /workspace && forge session show preview-owner --json")
         assert check.returncode == 0, check.stderr
+        branch = forge_workspace.exec("cd /workspace && git show-ref --verify --quiet refs/heads/preview-owner")
+        assert branch.returncode == 0, "A shared worktree's branch must survive --delete-branch"
 
         forge_workspace.exec(f"cd {wt_path} && forge extension disable --scope local --yes")
         forge_workspace.exec("cd /workspace && forge session delete preview-owner --yes --force --delete-branch")

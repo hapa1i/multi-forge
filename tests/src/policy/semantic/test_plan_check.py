@@ -919,6 +919,13 @@ class TestPlanCheckEffort:
 
 
 class TestShadowCapture:
+    @pytest.fixture(autouse=True)
+    def published_executor(self, tmp_path: Path) -> None:
+        from forge.session.index import IndexStore
+        from tests.fixtures.session_state import publish_session_from_fields
+
+        publish_session_from_fields(IndexStore(), "test-session", tmp_path, tmp_path)
+
     """Capture is wired only at the FRESH (uncached) allow seam, gated on rate > 0, best-effort."""
 
     @patch("forge.policy.semantic.plan_check.run_plan_check")
@@ -966,3 +973,28 @@ class TestShadowCapture:
         ):
             decision = policy._check(_make_context())
         assert decision.decision == "allow"  # audit failure never blocks the hook
+
+
+def test_shadow_checker_return_does_not_capture_into_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from forge.session.index import IndexStore
+    from tests.fixtures.session_state import (
+        delete_published_session,
+        publish_session_from_fields,
+    )
+
+    index = IndexStore()
+    publish_session_from_fields(index, "test-session", tmp_path, tmp_path)
+    cfg = _config_with_plan(tmp_path, forge_root=str(tmp_path), shadow_sample_rate=1.0)
+
+    def complete_after_replacement(*_args, **_kwargs):
+        delete_published_session(index, "test-session", tmp_path)
+        publish_session_from_fields(index, "test-session", tmp_path, tmp_path)
+        return PlanCheckVerdict(aligned=True, reason="old result")
+
+    monkeypatch.setattr("forge.policy.semantic.plan_check.run_plan_check", complete_after_replacement)
+    decision = PlanCheckPolicy(config=cfg)._check(_make_context())
+
+    assert decision.decision == "allow"
+    assert not (tmp_path / ".forge/artifacts/test-session/shadow").exists()

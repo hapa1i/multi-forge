@@ -26,7 +26,9 @@ from click.testing import CliRunner
 
 from forge.cli.hooks.commands import hooks
 from forge.session import SessionStore, create_session_state
+from forge.session.index import IndexStore
 from forge.session.models import PolicyIntent
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -40,7 +42,7 @@ def _make_tdd_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Sessio
     manifest = create_session_state("blocked-state-session", worktree_path=str(tmp_path))
     manifest.forge_root = str(tmp_path)
     manifest.intent.policy = PolicyIntent(enabled=True, bundles=["tdd"])
-    store.write(manifest)
+    publish_session(IndexStore(), manifest, tmp_path)
     return store
 
 

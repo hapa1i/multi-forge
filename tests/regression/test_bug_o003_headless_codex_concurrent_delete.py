@@ -19,7 +19,7 @@ from forge.core.ops.context import ExecutionContext
 from forge.core.runtime.codex_preflight import CodexPreflight
 from forge.session import IndexStore, SessionManager, SessionNotFoundError, SessionStore
 from forge.session.models import CodexConfirmed, create_session_state
-from tests.fixtures.session_state import publish_session
+from tests.fixtures.session_state import delete_published_session, publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -59,12 +59,12 @@ def test_resume_returns_completed_turn_when_session_is_deleted_during_codex(
     ctx = ExecutionContext(cwd=project, worktree_root=project, project_root=project, forge_root=project)
 
     def _delete_then_complete(_invoker: Any, _request: Any) -> HeadlessResult:
-        SessionManager().delete_session(
-            state.name,
-            delete_transcripts=False,
-            delete_worktree=False,
-            forge_root=str(project),
-        )
+        from forge.session.exceptions import ForgeSessionError
+
+        with pytest.raises(ForgeSessionError, match="active|workers"):
+            SessionManager().delete_session(state.name, delete_worktree=False, forge_root=str(project))
+        # External removal still requires post-exit reconciliation; it bypasses cleanup admission.
+        delete_published_session(IndexStore(), state.name, project)
         return HeadlessResult(
             label="codex-resume",
             stdout="completed",

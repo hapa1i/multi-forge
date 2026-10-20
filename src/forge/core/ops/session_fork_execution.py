@@ -9,6 +9,7 @@ pre-launch failure, and returns caller-rendered events plus an optional
 from __future__ import annotations
 
 import logging
+import shlex
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -216,8 +217,9 @@ class ForkExecutionResult:
 class _ForkCompensation:
     """Owned artifacts that rollback may safely remove."""
 
-    delete_transcripts: bool = False
+    instance_id: str
     created_transfer_snapshot: Path | None = None
+    preexisting_transfer_snapshot: Path | None = None
 
 
 def execute_session_fork(
@@ -243,6 +245,7 @@ def execute_session_fork(
     into_branch = plan.target.branch if plan.target.is_into else None
     fork_warnings: list[str] = []
 
+    published_instances: list[str] = []
     parent, manifest = manager.fork_session(
         parent_name=request.parent_name,
         fork_name=plan.fork_name,
@@ -258,6 +261,7 @@ def execute_session_fork(
         warnings_sink=fork_warnings,
         authority=request.authority,
         authority_explicit=request.authority_explicit,
+        instance_sink=published_instances.append,
     )
 
     events: list[ForkExecutionEvent] = [
@@ -267,22 +271,33 @@ def execute_session_fork(
         )
         for warning in fork_warnings
     ]
-    compensation = _ForkCompensation()
+    if not published_instances:
+        raise ForkExecutionError("Created fork has no captured instance identity; retained for inspection")
+    compensation = _ForkCompensation(instance_id=published_instances[0])
 
     try:
-        result = _prepare_created_fork(
-            plan=plan,
-            manager=manager,
-            parent=parent,
-            manifest=manifest,
-            routing=routing,
-            supervisor_proxy=supervisor_proxy,
-            transfer_context_factory=transfer_context_factory,
-            rewind_artifact_factory=rewind_artifact_factory,
-            model_route_selection=model_route_selection,
-            events=events,
-            compensation=compensation,
-        )
+        from forge.session.workers import session_worker_lease
+
+        with session_worker_lease(
+            manifest.forge_root or str(plan.target.forge_root),
+            manifest.name,
+            expected_instance_id=compensation.instance_id,
+            label="prepare-fork",
+            index_store=manager.index_store,
+        ):
+            result = _prepare_created_fork(
+                plan=plan,
+                manager=manager,
+                parent=parent,
+                manifest=manifest,
+                routing=routing,
+                supervisor_proxy=supervisor_proxy,
+                transfer_context_factory=transfer_context_factory,
+                rewind_artifact_factory=rewind_artifact_factory,
+                model_route_selection=model_route_selection,
+                events=events,
+                compensation=compensation,
+            )
         return result
     except ForkExecutionError as error:
         raise _rollback_created_fork(
@@ -438,7 +453,6 @@ def _prepare_created_fork(
             state_context=state_context,
             events=events,
         )
-        compensation.delete_transcripts = True
     elif rewind_active:
         if parent_session_id is None or request.drop_last is None:
             raise ForkExecutionError("Parent session has no UUID", code="parent_uuid_missing")
@@ -462,7 +476,6 @@ def _prepare_created_fork(
         # namespace: either a fresh rewind UUID or the full parent-UUID fallback.
         # The manifest tracks the relevant id and manager cleanup protects copies
         # still referenced by another session.
-        compensation.delete_transcripts = True
         prompt_files: list[Path] = []
         if artifacts.context_path is not None:
             prompt_files.append(artifacts.context_path)
@@ -493,6 +506,8 @@ def _prepare_created_fork(
             else None
         )
         snapshot_existed = expected_snapshot is not None and expected_snapshot.exists()
+        if snapshot_existed:
+            compensation.preexisting_transfer_snapshot = expected_snapshot
         try:
             context_path, warnings = transfer_context_factory(
                 manager=manager,
@@ -576,6 +591,7 @@ def _prepare_created_fork(
         proxy_id=effective_proxy_id,
         incognito=request.is_incognito,
         render_post_exit=(not request.is_incognito or use_sidecar),
+        instance_id=compensation.instance_id,
         model_route_selection=model_route_selection,
         render_model_route=request.direct_model is not None,
     )
@@ -845,19 +861,25 @@ def _rollback_created_fork(
     compensation: _ForkCompensation,
 ) -> ForkExecutionError:
     try:
+        if compensation.preexisting_transfer_snapshot is not None:
+            raise ForgeOpError(
+                f"Automatic rollback retained the session to preserve pre-existing transfer snapshot "
+                f"{compensation.preexisting_transfer_snapshot}; inspect it before confirming deletion"
+            )
         manager.delete_session(
             manifest.name,
             delete_worktree=True,
             delete_branch=True,
-            delete_transcripts=compensation.delete_transcripts,
             force=True,
             forge_root=manifest.forge_root,
+            expected_instance_id=compensation.instance_id,
         )
     except Exception as cleanup_error:
         logger.debug("fork preparation rollback delete failed", exc_info=True)
         failure = str(cleanup_error) or type(cleanup_error).__name__
-        keep_transcripts = "" if compensation.delete_transcripts else " --keep-transcripts"
-        command = f"forge session delete {manifest.name} --yes --force{keep_transcripts}"
+        command = f"forge session delete {manifest.name} --yes --force --delete-branch"
+        if manifest.forge_root is not None:
+            command += f" --forge-root {shlex.quote(manifest.forge_root)}"
         tip = error.tip or "Retry after resolving the preparation error."
         snapshot_recovery = ""
         if compensation.created_transfer_snapshot is not None:
@@ -871,17 +893,4 @@ def _rollback_created_fork(
             events=tuple(events),
         )
 
-    if compensation.created_transfer_snapshot is not None:
-        try:
-            compensation.created_transfer_snapshot.unlink(missing_ok=True)
-        except OSError as cleanup_error:
-            failure = str(cleanup_error) or type(cleanup_error).__name__
-            tip = error.tip or "Retry after resolving the preparation error."
-            return ForkExecutionError(
-                f"{error} Session cleanup succeeded, but created transfer snapshot "
-                f"'{compensation.created_transfer_snapshot}' could not be removed: {failure}.",
-                code=error.code,
-                tip=f"Remove '{compensation.created_transfer_snapshot}' before retrying. {tip}",
-                events=tuple(events),
-            )
     return ForkExecutionError(str(error), code=error.code, tip=error.tip, events=tuple(events))

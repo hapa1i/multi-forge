@@ -178,6 +178,7 @@ class TestPersistPolicyState:
         store = MagicMock()
         _persist_policy_state(
             store=store,
+            expected_instance_id="test-instance",
             engine=self._make_engine(),
             result=self._make_result(),
             effective=self._make_effective(bundles=["default"]),
@@ -205,6 +206,7 @@ class TestPersistPolicyState:
         store = MagicMock()
         _persist_policy_state(
             store=store,
+            expected_instance_id="test-instance",
             engine=self._make_engine(),
             result=self._make_result(),
             effective=self._make_effective(bundles=[]),
@@ -240,6 +242,7 @@ class TestPersistPolicyState:
         store = MagicMock()
         _persist_policy_state(
             store=store,
+            expected_instance_id="test-instance",
             engine=self._make_engine(),
             result=self._make_result(),
             effective=self._make_effective(bundles=[]),
@@ -281,6 +284,7 @@ class TestPersistPolicyState:
         store = MagicMock()
         _persist_policy_state(
             store=store,
+            expected_instance_id="test-instance",
             engine=self._make_engine(),
             result=self._make_result(),
             effective=self._make_effective(bundles=[]),
@@ -325,6 +329,7 @@ class TestSupervisorLaneBindingFreeze:
         store = MagicMock()
         _persist_policy_state(
             store=store,
+            expected_instance_id="test-instance",
             engine=engine,
             result=result if result is not None else MagicMock(),
             effective=effective,
@@ -612,8 +617,10 @@ class TestSupervisorLaneBindingFreeze:
         from forge.cli.hooks.policy import _persist_policy_decisions
         from forge.core.telemetry.upstream import read_upstream_outcomes
         from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
-        from forge.session import SessionStore
+        from forge.session import IndexStore, SessionStore
         from forge.session.models import ConsumerLaneIntent, LaneRecord
+        from forge.session.workers import capture_session_instance
+        from tests.fixtures.session_state import publish_session
 
         mock_build.return_value = self._fresh_build_return()
         codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
@@ -621,7 +628,7 @@ class TestSupervisorLaneBindingFreeze:
         state.name = "worker"  # a real SessionStore validates the name (>= 2 chars); "t" is rejected
         state.intent.consumer_lanes = ConsumerLaneIntent(supervisor=codex)
         store = SessionStore(str(tmp_path), "worker")
-        store.write(state)
+        publish_session(IndexStore(), state, tmp_path)
 
         # Explicit None run-ids: a bare MagicMock would auto-vivify unserializable ids that the
         # best-effort emit would silently drop (leaving nothing to assert on).
@@ -638,6 +645,7 @@ class TestSupervisorLaneBindingFreeze:
 
         _persist_policy_decisions(
             store=store,
+            expected_instance_id=capture_session_instance(tmp_path, state.name),
             engine=engine,
             engine_state={},
             entries=[(exhausted, "ctx")],

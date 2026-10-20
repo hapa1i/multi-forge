@@ -65,6 +65,7 @@ from forge.session.transfer import (
 
 from .context import ExecutionContext
 from .session import ForgeOpError
+from .transfer import transfer_writer_lease
 
 _FORGE_SESSION_VAR = "FORGE_SESSION"
 _FORGE_FORGE_ROOT_VAR = "FORGE_FORGE_ROOT"
@@ -168,6 +169,23 @@ def assemble_codex_transfer(
     forge_root = ctx.forge_root
     if forge_root is None:
         raise ForgeOpError("Not inside a Forge project (no .forge/ directory found).")
+    with transfer_writer_lease(forge_root, parent, child=child, output_root=output_root):
+        return _assemble_codex_transfer(
+            ctx=ctx, parent=parent, child=child, strategy=strategy, depth=depth, output_root=output_root
+        )
+
+
+def _assemble_codex_transfer(
+    *,
+    ctx: ExecutionContext,
+    parent: str,
+    child: str,
+    strategy: str,
+    depth: int,
+    output_root: Path | None,
+) -> CodexTransferAssembly:
+    forge_root = ctx.forge_root
+    assert forge_root is not None
     try:
         resume_strategy = parse_transfer_context_strategy(strategy)
     except ValueError as e:

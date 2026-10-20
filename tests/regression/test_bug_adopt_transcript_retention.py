@@ -1,22 +1,4 @@
-"""Regression: deleting an adopted session deleted the user's native transcript.
-
-Bug: native_session_adoption Slice 2 review, HIGH.
-Root cause: `delete_session(delete_transcripts=True)` unlinks
-`get_transcript_path(...)` under `~/.claude/projects` for the session's bound
-UUID. Every other origination path created that transcript, so deleting it was
-safe; adoption binds one the *user* created and may still resume natively.
-`auto_clean_old_sessions` passes `delete_transcripts=True` and runs
-opportunistically on CLI startup (cleanup.py:225), so this fired with no
-explicit delete at all.
-
-Fix: `_adopted_source_uuids` feeds the same filter that already spares
-transcripts shared with another session. Keyed on provenance --
-`adoption.source_path` and the `reason="adopt"` artifact -- not on the bound
-id: hooks can move `claude_session_id` off the adoption source, while later
-Forge-created transcripts remain Forge's to clean up (the last test below).
-
-Affected: src/forge/session/manager.py
-"""
+"""Regression: ordinary delete preserves adopted, new and rollover native transcripts."""
 
 from __future__ import annotations
 
@@ -89,8 +71,8 @@ def test_protection_survives_the_bound_uuid_drifting_from_the_adopted_one(tmp_pa
     assert native.is_file(), "the adopted transcript must survive even after the binding drifted"
 
 
-def test_a_normal_session_still_has_its_transcript_deleted(tmp_path: Path) -> None:
-    """Guards against over-correcting: only adopted sessions are protected."""
+def test_a_normal_session_also_preserves_its_native_transcript(tmp_path: Path) -> None:
+    """The ordinary deletion contract now preserves all native conversations."""
     project = tmp_path / "proj"
     project.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=project, check=True)
@@ -105,16 +87,10 @@ def test_a_normal_session_still_has_its_transcript_deleted(tmp_path: Path) -> No
 
     manager.delete_session("owned", forge_root=str(project))
 
-    assert not owned.exists()
+    assert owned.read_text() == "{}\n"
 
 
-def test_only_the_adopted_source_is_spared_not_later_forge_transcripts(tmp_path: Path) -> None:
-    """Protection is keyed on provenance, so Forge's own transcripts still clean up.
-
-    Protecting every tracked id would preserve later Forge-created transcripts
-    indefinitely; `adoption.source_path` and the `reason="adopt"` artifact name
-    the user's conversation exactly.
-    """
+def test_adopted_source_and_later_native_transcripts_are_preserved(tmp_path: Path) -> None:
     project, native = _adopted_project(tmp_path)
     forge_owned = "dddd4444-5555-6666-7777-888899990000"
 
@@ -130,4 +106,4 @@ def test_only_the_adopted_source_is_spared_not_later_forge_transcripts(tmp_path:
     SessionManager().delete_session("adopted", forge_root=str(project))
 
     assert native.is_file(), "the adopted source is the user's"
-    assert not later.exists(), "a transcript Forge created for this session is Forge's to remove"
+    assert later.read_text() == "{}\n"

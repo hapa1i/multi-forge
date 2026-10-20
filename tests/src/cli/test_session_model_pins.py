@@ -1080,7 +1080,11 @@ def test_incognito_with_model(runner: CliRunner, temp_env: Path) -> None:
 def test_incognito_non_claude_model_uses_shared_route_and_cleans_session(
     runner: CliRunner,
     temp_env: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # Native subprocesses are mocked; no native client exists in this fixture.
+    monkeypatch.setattr("forge.session.purge_native.check_native_inactivity", lambda _runtime: ())
+    monkeypatch.setattr("forge.session.deletion.check_native_inactivity", lambda _runtime: ())
     with (
         mocked_model_route_proxy(
             template="openrouter-openai",
@@ -1105,7 +1109,7 @@ def test_incognito_non_claude_model_uses_shared_route_and_cleans_session(
     assert mock_invoke.call_args.kwargs["env_vars"]["ANTHROPIC_MODEL"] == "opus"
     assert result.stderr.count("Route:") == 1
     assert "Cleaning up incognito session" in result.output
-    assert not SessionStore(str(temp_env), "incog-gpt").exists()
+    assert not SessionStore(str(temp_env), "incog-gpt").exists(), result.output
 
 
 def test_fork_with_model_overrides_persisted_model_pin(runner: CliRunner, temp_env: Path) -> None:

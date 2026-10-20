@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -16,7 +17,6 @@ from forge.session import IndexStore, SessionManager, SessionStore, create_sessi
 from forge.session.active import ActiveSessionStore
 from forge.session.claude import ClaudeBinaryNotFoundError
 from forge.session.config import LAUNCH_MODE_HOST
-from forge.session.exceptions import DirtyWorktreeError, SessionNotFoundError
 from forge.session.routing import read_routing_events
 from tests.fixtures.session_state import publish_session, remove_index_row_only
 from tests.src.cli.session_command_support import (
@@ -631,571 +631,149 @@ class TestSessionStart:
 
 
 class TestSessionDelete:
-    """Tests for 'forge session delete' command."""
+    """Delete preserves native data and uses the same immutable admission as purge."""
 
     def test_delete_removes_session(self, runner: CliRunner, temp_env: Path) -> None:
-        """Should delete the session."""
-        with successful_claude_launch():
-            runner.invoke(main, ["session", "start", "delete-test"])
+        _seed_delete_session(temp_env, temp_env, "subject")
+        result = runner.invoke(main, ["session", "delete", "subject", "--yes"])
+        assert result.exit_code == 0, result.output
+        assert not SessionStore(str(temp_env), "subject").exists()
 
-        result = runner.invoke(main, ["session", "delete", "delete-test", "--yes"])
-
-        assert result.exit_code == 0
-        assert "Deleted session" in result.output
-
-    def test_delete_nonexistent_fails(self, runner: CliRunner, temp_env: Path) -> None:
-        """Should fail for nonexistent session."""
-        result = runner.invoke(main, ["session", "delete", "nonexistent", "--yes"])
-
+    def test_nonexistent_does_not_reach_project_compatibility(self, runner, temp_env):
+        with patch("forge.session.deletion.enforce_project_compatibility") as enforce:
+            result = runner.invoke(main, ["session", "delete", "missing", "--yes"])
         assert result.exit_code == 1
-        assert "not found" in result.output
-
-    def test_delete_nonexistent_preserves_not_found_before_compatibility(
-        self, runner: CliRunner, temp_env: Path
-    ) -> None:
-        """A pin cannot refuse a name that has no project-owned state to mutate."""
-        with patch("forge.cli.session_manage.enforce_project_compatibility") as enforce:
-            result = runner.invoke(main, ["session", "delete", "nonexistent", "--yes"])
-
-        assert result.exit_code == 1
-        assert "not found" in result.output
+        assert "no published record" in result.output
         enforce.assert_not_called()
 
-    def test_delete_prompts_without_yes(self, runner: CliRunner, temp_env: Path) -> None:
-        """Should prompt for confirmation without --yes."""
-        with successful_claude_launch():
-            runner.invoke(main, ["session", "start", "confirm-test"])
-
-        # Simulate 'n' response to confirmation
-        result = runner.invoke(main, ["session", "delete", "confirm-test"], input="n\n")
-
-        assert "Cancelled" in result.output
-
-    @pytest.mark.parametrize(
-        ("keep_transcripts", "expected_native_line"),
-        [
-            (False, "Native Claude transcript files will be deleted"),
-            (True, "Native Claude transcript files will be kept"),
-        ],
-    )
-    def test_delete_preview_distinguishes_native_transcripts_from_forge_artifacts(
-        self,
-        runner: CliRunner,
-        temp_env: Path,
-        keep_transcripts: bool,
-        expected_native_line: str,
-    ) -> None:
-        """The preview must not imply that retained Forge snapshots are native transcripts."""
-        runner.invoke(main, ["session", "start", "transcript-preview", "--no-launch"])
-        args = ["session", "delete", "transcript-preview"]
-        if keep_transcripts:
-            args.append("--keep-transcripts")
-
-        result = runner.invoke(main, args, input="n\n")
-
-        assert result.exit_code == 0
-        assert expected_native_line in result.output
-        assert "Forge artifact snapshots will be kept" in result.output
-        assert "Transcript files will also be deleted" not in result.output
-        assert "Cancelled" in result.output
-
-    def test_delete_preview_reports_artifacts_removed_with_containing_worktree(
-        self,
-        runner: CliRunner,
-        temp_env: Path,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """A nested Forge root cannot outlive removal of its containing worktree."""
-        worktree = temp_env / "owned-worktree"
-        forge_root = worktree / "nested-project"
-        forge_root.mkdir(parents=True)
-        state = create_session_state(
-            "nested-artifacts",
-            worktree_path=str(worktree),
-            worktree_branch="nested-artifacts-branch",
+    @pytest.mark.parametrize("force", [False, True])
+    def test_active_session_refuses_even_with_force(self, runner, temp_env, force):
+        _seed_delete_session(temp_env, temp_env, "active")
+        ActiveSessionStore().upsert_session(
+            "active",
+            worktree_path=str(temp_env),
+            forge_root=str(temp_env),
+            launch_mode=LAUNCH_MODE_HOST,
+            launcher_pid=os.getpid(),
         )
-        assert state.worktree is not None
-        state.forge_root = str(forge_root)
-        state.worktree.is_worktree = True
-        state.worktree.owns_worktree = True
-        publish_session(
-            IndexStore(),
-            state,
-            temp_env,
-            checkout_root=worktree,
-            forge_root=forge_root,
-        )
-        artifacts = forge_root / ".forge" / "artifacts" / "nested-artifacts"
-        artifacts.mkdir(parents=True)
-        (artifacts / "snapshot.jsonl").write_text("snapshot", encoding="utf-8")
-        monkeypatch.setattr("forge.session.worktree.is_worktree_dirty", lambda _path: False)
-        monkeypatch.chdir(forge_root)
-
-        result = runner.invoke(main, ["session", "delete", "nested-artifacts"], input="n\n")
-
-        assert result.exit_code == 0
-        assert "Worktree will be removed" in result.output
-        assert "Forge artifact snapshots will be removed with the worktree" in result.output
-        assert "Forge artifact snapshots will be kept" not in result.output
-        assert "Cancelled" in result.output
-
-    def test_delete_preview_keeps_artifacts_outside_removed_worktree(
-        self,
-        runner: CliRunner,
-        temp_env: Path,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        worktree = temp_env.parent / "artifact-preview-worktree"
-        worktree.mkdir()
-        state = create_session_state(
-            "external-artifacts",
-            worktree_path=str(worktree),
-            worktree_branch="external-artifacts-branch",
-        )
-        assert state.worktree is not None
-        state.forge_root = str(temp_env)
-        state.worktree.is_worktree = True
-        state.worktree.owns_worktree = True
-        publish_session(
-            IndexStore(),
-            state,
-            temp_env,
-            checkout_root=worktree,
-            forge_root=temp_env,
-        )
-        artifacts = temp_env / ".forge" / "artifacts" / "external-artifacts"
-        artifacts.mkdir(parents=True)
-        (artifacts / "snapshot.jsonl").write_text("snapshot", encoding="utf-8")
-        monkeypatch.setattr("forge.session.worktree.is_worktree_dirty", lambda _path: False)
-
-        result = runner.invoke(main, ["session", "delete", "external-artifacts"], input="n\n")
-
-        assert result.exit_code == 0
-        assert "Worktree will be removed" in result.output
-        assert "Forge artifact snapshots will be kept" in result.output
-        assert "removed with the worktree" not in result.output
-        assert "Cancelled" in result.output
-
-    def test_delete_preview_keeps_a_guest_session_shared_worktree(
-        self,
-        runner: CliRunner,
-        temp_env: Path,
-    ) -> None:
-        """The destructive preview must agree with ownership-aware deletion."""
-        worktree = temp_env.parent / "shared-delete-preview-worktree"
-        worktree.mkdir()
-        index = IndexStore()
-        for name, owns_worktree in (("preview-owner", True), ("preview-guest", False)):
-            state = create_session_state(name, worktree_path=str(worktree), worktree_branch="preview-branch")
-            assert state.worktree is not None
-            state.forge_root = str(temp_env)
-            state.worktree.is_worktree = True
-            state.worktree.owns_worktree = owns_worktree
-            publish_session(
-                index,
-                state,
-                temp_env,
-                checkout_root=worktree,
-                forge_root=temp_env,
-            )
-
         result = runner.invoke(
             main,
-            ["session", "delete", "preview-guest", "--delete-branch"],
-            input="n\n",
+            ["session", "delete", "active", "--yes", *(["--force"] if force else [])],
         )
-
-        assert result.exit_code == 0
-        assert "Worktree will be kept (used by preview-owner)" in result.output
-        assert "Worktree will be removed" not in result.output
-        assert "Branch will be kept: preview-branch" in result.output
-        assert "Branch will be deleted" not in result.output
-        assert "Cancelled" in result.output
-        assert SessionStore(str(temp_env), "preview-guest").exists()
-
-    def test_delete_blocks_active_session_without_force(self, runner: CliRunner, temp_env: Path) -> None:
-        """A live session is blocked before the confirm prompt unless --force."""
-        runner.invoke(main, ["session", "start", "active-delete", "--no-launch"])
-        ActiveSessionStore().upsert_session(
-            "active-delete",
-            worktree_path=str(temp_env),
-            launch_mode=LAUNCH_MODE_HOST,
-            launcher_pid=os.getpid(),
-            claude_session_id="uuid-live-123",
-        )
-
-        result = runner.invoke(main, ["session", "delete", "active-delete"])
-
         assert result.exit_code == 1
-        assert "appears to still be active" in result.output
-        assert "still running in Claude Code" in result.output
-        assert "--force" in result.output
-        # Blocked before the confirmation prompt; session not deleted.
-        assert "Are you sure" not in result.output
-        assert "Deleted session" not in result.output
+        assert "Session is active" in result.output
+        assert SessionStore(str(temp_env), "active").exists()
 
-    def test_delete_yes_blocks_active_without_force(self, runner: CliRunner, temp_env: Path) -> None:
-        """--yes alone no longer deletes a live session; --force is required."""
-        runner.invoke(main, ["session", "start", "forced-active-delete", "--no-launch"])
-        ActiveSessionStore().upsert_session(
-            "forced-active-delete",
-            worktree_path=str(temp_env),
-            launch_mode=LAUNCH_MODE_HOST,
-            launcher_pid=os.getpid(),
+    @pytest.mark.parametrize("force", [False, True])
+    def test_orphan_refuses_and_names_repair(self, runner, temp_env, force):
+        _seed_delete_session(temp_env, temp_env, "orphan")
+        # Intentionally remove only the index row to characterize an orphan manifest.
+        remove_index_row_only(IndexStore(), "orphan", temp_env)
+        result = runner.invoke(
+            main,
+            ["session", "delete", "orphan", "--yes", *(["--force"] if force else [])],
         )
-
-        result = runner.invoke(main, ["session", "delete", "forced-active-delete", "--yes"])
-
         assert result.exit_code == 1
-        assert "appears to still be active" in result.output
-        assert "--force" in result.output
-        assert "Deleted session" not in result.output
+        assert "session repair" in result.output
+        assert SessionStore(str(temp_env), "orphan").exists()
 
-    def test_delete_force_deletes_active_session(self, runner: CliRunner, temp_env: Path) -> None:
-        """--force overrides the active-session guard and deletes (warning stays informational)."""
-        runner.invoke(main, ["session", "start", "force-active", "--no-launch"])
+    def test_all_reports_active_refusal_and_deletes_idle(self, runner, temp_env):
+        for name in ("live", "idle"):
+            _seed_delete_session(temp_env, temp_env, name)
         ActiveSessionStore().upsert_session(
-            "force-active",
+            "live",
             worktree_path=str(temp_env),
+            forge_root=str(temp_env),
             launch_mode=LAUNCH_MODE_HOST,
             launcher_pid=os.getpid(),
         )
-
-        result = runner.invoke(main, ["session", "delete", "force-active", "--yes", "--force"])
-
-        assert result.exit_code == 0
-        assert "appears to still be active" in result.output
-        assert "Deleted session" in result.output
-
-    def test_delete_orphan_blocks_active_session_without_force(self, runner: CliRunner, temp_env: Path) -> None:
-        """A live session whose index entry is gone (orphan dir) is still blocked unless --force."""
-        from forge.core.ops.context import _cwd_forge_root
-        from forge.session.index import IndexStore
-
-        runner.invoke(main, ["session", "start", "orphan-live", "--no-launch"])
-        fr = _cwd_forge_root()
-        ActiveSessionStore().upsert_session(
-            "orphan-live",
-            worktree_path=fr or str(temp_env),
-            forge_root=fr,
-            launch_mode=LAUNCH_MODE_HOST,
-            launcher_pid=os.getpid(),
-        )
-        # Drop the index entry, leaving the dir on disk + a live active entry.
-        remove_index_row_only(IndexStore(), "orphan-live", fr or temp_env)
-
-        result = runner.invoke(main, ["session", "delete", "orphan-live"])
-
-        assert result.exit_code == 1
-        assert "still running in Claude Code" in result.output
-        # Orphan cleanup must NOT run while the launch is live.
-        assert "Cleaned up orphaned" not in result.output
-
-    def test_delete_orphan_force_deletes_active_session(self, runner: CliRunner, temp_env: Path) -> None:
-        """--force lets orphan cleanup remove a live session's directory."""
-        from forge.core.ops.context import _cwd_forge_root
-        from forge.session.index import IndexStore
-
-        runner.invoke(main, ["session", "start", "orphan-force", "--no-launch"])
-        fr = _cwd_forge_root()
-        ActiveSessionStore().upsert_session(
-            "orphan-force",
-            worktree_path=fr or str(temp_env),
-            forge_root=fr,
-            launch_mode=LAUNCH_MODE_HOST,
-            launcher_pid=os.getpid(),
-        )
-        # Deliberately leave the manifest behind to exercise force cleanup of an
-        # active orphan rather than the ordinary ownership-aware delete path.
-        remove_index_row_only(IndexStore(), "orphan-force", fr or temp_env)
-
-        result = runner.invoke(main, ["session", "delete", "orphan-force", "--yes", "--force"])
-
-        assert result.exit_code == 0
-        assert "Cleaned up orphaned" in result.output
-
-    def test_delete_all_skips_active_sessions_without_force(self, runner: CliRunner, temp_env: Path) -> None:
-        """--all skips live sessions (deletes the rest) unless --force is given."""
-        runner.invoke(main, ["session", "start", "idle-one", "--no-launch"])
-        runner.invoke(main, ["session", "start", "live-one", "--no-launch"])
-        ActiveSessionStore().upsert_session(
-            "live-one",
-            worktree_path=str(temp_env),
-            launch_mode=LAUNCH_MODE_HOST,
-            launcher_pid=os.getpid(),
-        )
-
-        result = runner.invoke(main, ["session", "delete", "--all", "--yes"])
-
-        assert result.exit_code == 0
-        assert "Skipping" in result.output
-        assert "live-one" in result.output
-        assert "--force" in result.output
-
-        list_result = runner.invoke(main, ["session", "list"])
-        assert "idle-one" not in list_result.output
-        assert "live-one" in list_result.output
-
-    def test_delete_all_force_deletes_active_sessions(self, runner: CliRunner, temp_env: Path) -> None:
-        """--all --force deletes live sessions too."""
-        runner.invoke(main, ["session", "start", "live-a", "--no-launch"])
-        runner.invoke(main, ["session", "start", "live-b", "--no-launch"])
-        for nm in ("live-a", "live-b"):
-            ActiveSessionStore().upsert_session(
-                nm,
-                worktree_path=str(temp_env),
-                launch_mode=LAUNCH_MODE_HOST,
-                launcher_pid=os.getpid(),
-            )
-
         result = runner.invoke(main, ["session", "delete", "--all", "--yes", "--force"])
+        assert result.exit_code == 1
+        assert SessionStore(str(temp_env), "live").exists()
+        assert not SessionStore(str(temp_env), "idle").exists()
 
-        assert result.exit_code == 0
-        list_result = runner.invoke(main, ["session", "list"])
-        assert "live-a" not in list_result.output
-        assert "live-b" not in list_result.output
-
-    def test_delete_multiple_sessions(self, runner: CliRunner, temp_env: Path) -> None:
-        """Should delete multiple sessions in one command."""
-        with successful_claude_launch():
-            runner.invoke(main, ["session", "start", "multi-1"])
-            runner.invoke(main, ["session", "start", "multi-2"])
-            runner.invoke(main, ["session", "start", "multi-3"])
-
-        result = runner.invoke(main, ["session", "delete", "multi-1", "multi-2", "multi-3", "--yes"])
-
-        assert result.exit_code == 0
-        assert "Deleted session" in result.output
-        assert "multi-1" in result.output
-        assert "multi-2" in result.output
-        assert "multi-3" in result.output
-        assert "3 deleted" in result.output
-
-        manager = SessionManager()
-        assert not manager.session_exists("multi-1")
-        assert not manager.session_exists("multi-2")
-        assert not manager.session_exists("multi-3")
-
-    @pytest.mark.parametrize(
-        "state",
-        ["incompatible", "malformed", "unsupported_schema", "unreadable"],
-    )
-    def test_delete_single_refuses_each_project_compatibility_state_before_mutation(
-        self,
-        runner: CliRunner,
-        temp_env: Path,
-        state: str,
-    ) -> None:
-        _seed_delete_session(temp_env, temp_env, "refused-single")
-        refusal = ProjectCompatibilityError(
-            str(temp_env / ".forge" / "project.toml"),
-            f"{state} pin",
-            state=state,
-        )
-
-        with patch(
-            "forge.cli.session_manage.enforce_project_compatibility",
-            side_effect=refusal,
-        ):
-            result = runner.invoke(
-                main,
-                ["session", "delete", "refused-single", "--yes", "--force"],
-            )
-
+    @pytest.mark.parametrize("state", ["incompatible", "malformed", "unsupported_schema", "unreadable"])
+    def test_compatibility_refuses_before_mutation(self, runner, temp_env, state):
+        _seed_delete_session(temp_env, temp_env, "refused")
+        refusal = ProjectCompatibilityError(str(temp_env / ".forge/project.toml"), f"{state} pin", state=state)
+        with patch("forge.session.deletion.enforce_project_compatibility", side_effect=refusal):
+            result = runner.invoke(main, ["session", "delete", "refused", "--yes", "--force"])
         assert result.exit_code == 1
         assert state in result.output
-        assert "Run a Forge version satisfying required_forge" in result.output
-        assert SessionStore(str(temp_env), "refused-single").exists()
+        assert SessionStore(str(temp_env), "refused").exists()
 
-    def test_delete_multiple_skips_incompatible_root_and_continues(
-        self,
-        runner: CliRunner,
-        temp_env: Path,
-    ) -> None:
-        refused_root = temp_env / "nested-project"
-        _seed_delete_session(temp_env, temp_env, "compatible-delete")
-        _seed_delete_session(temp_env, refused_root, "refused-delete")
+    def test_multi_name_compatibility_failure_does_not_block_admitted_target(self, runner, temp_env):
+        from forge.session.deletion import plan_session_deletion
 
-        def enforce(root: str | Path | None) -> None:
-            if root is not None and Path(root).resolve() == refused_root.resolve():
+        for name in ("refused", "admitted"):
+            _seed_delete_session(temp_env, temp_env, name)
+
+        def plan(index, name, **kwargs):
+            if name == "refused":
                 raise ProjectCompatibilityError(
-                    str(refused_root / ".forge" / "project.toml"),
-                    "version mismatch",
+                    str(temp_env / ".forge/project.toml"),
+                    "incompatible",
                     state="incompatible",
                 )
+            return plan_session_deletion(index, name, **kwargs)
 
-        with patch(
-            "forge.cli.session_manage.enforce_project_compatibility",
-            side_effect=enforce,
-        ):
-            result = runner.invoke(
-                main,
-                [
-                    "session",
-                    "delete",
-                    "refused-delete",
-                    "compatible-delete",
-                    "--yes",
-                    "--force",
-                ],
-            )
-
+        with patch("forge.cli.session_delete.plan_session_deletion", side_effect=plan):
+            result = runner.invoke(main, ["session", "delete", "refused", "admitted", "--yes"])
         assert result.exit_code == 1
-        assert "refused-delete" in result.output
-        assert "incompatible" in result.output
-        assert "1 deleted, 1 skipped (project compatibility)" in result.output
-        assert SessionStore(str(refused_root), "refused-delete").exists()
-        assert not SessionStore(str(temp_env), "compatible-delete").exists()
+        assert SessionStore(str(temp_env), "refused").exists()
+        assert not SessionStore(str(temp_env), "admitted").exists()
 
-    def test_delete_all_force_does_not_bypass_project_compatibility(
-        self,
-        runner: CliRunner,
-        temp_env: Path,
-    ) -> None:
-        _seed_delete_session(temp_env, temp_env, "all-refused-a")
-        _seed_delete_session(temp_env, temp_env, "all-refused-b")
-        refusal = ProjectCompatibilityError(
-            str(temp_env / ".forge" / "project.toml"),
-            "version mismatch",
-            state="incompatible",
+    def test_worktree_preview_lists_removed_content_and_native_directory_loss(self, runner, temp_env, git_repo):
+        worktree = temp_env.parent / "owned"
+        subprocess.run(
+            ["git", "worktree", "add", "-b", "subject-branch", str(worktree)],
+            cwd=git_repo,
+            check=True,
+            capture_output=True,
         )
+        state = create_session_state("subject", worktree_path=str(worktree), worktree_branch="subject-branch")
+        state.forge_root = str(temp_env)
+        assert state.worktree is not None
+        state.worktree.is_worktree = state.worktree.owns_worktree = True
+        publish_session(IndexStore(), state, temp_env, forge_root=str(temp_env))
+        artifact = temp_env / ".forge/artifacts/subject/copy.txt"
+        artifact.parent.mkdir(parents=True)
+        artifact.write_text("synthetic")
+        result = runner.invoke(main, ["session", "delete", "subject"], input="n\n")
+        assert result.exit_code == 0, result.output
+        assert "Remove worktree:" in result.output
+        assert "lose their original directory" in result.output
+        assert str(artifact) in result.output
+        assert artifact.exists()
+        assert worktree.exists()
 
-        with patch(
-            "forge.cli.session_manage.enforce_project_compatibility",
-            side_effect=refusal,
-        ):
-            result = runner.invoke(
-                main,
-                ["session", "delete", "--all", "--yes", "--force"],
-            )
+    def test_guest_preview_keeps_shared_worktree(self, runner, temp_env):
+        worktree = temp_env.parent / "shared"
+        worktree.mkdir()
+        for name, owns in (("owner", True), ("guest", False)):
+            state = create_session_state(name, worktree_path=str(worktree), worktree_branch="shared")
+            state.forge_root = str(temp_env)
+            assert state.worktree is not None
+            state.worktree.is_worktree = True
+            state.worktree.owns_worktree = owns
+            publish_session(IndexStore(), state, temp_env, forge_root=str(temp_env))
+        result = runner.invoke(main, ["session", "delete", "guest", "--delete-branch"], input="n\n")
+        assert result.exit_code == 0, result.output
+        assert "Keep worktree" in result.output
+        assert "Remove worktree" not in result.output
+        assert worktree.exists()
 
-        assert result.exit_code == 1
-        assert result.output.count("Skipped session") == 2
-        assert "0 deleted, 2 skipped (project compatibility)" in result.output
-        assert "About to delete" not in result.output
-        assert SessionStore(str(temp_env), "all-refused-a").exists()
-        assert SessionStore(str(temp_env), "all-refused-b").exists()
-
-    def test_delete_all_sessions(self, runner: CliRunner, temp_env: Path) -> None:
-        """--all should delete every session."""
-        with successful_claude_launch():
-            runner.invoke(main, ["session", "start", "all-1"])
-            runner.invoke(main, ["session", "start", "all-2"])
-
-        result = runner.invoke(main, ["session", "delete", "--all", "--yes"])
-
-        assert result.exit_code == 0
-        assert "Deleted session" in result.output
-        assert "2 deleted" in result.output
-
-        manager = SessionManager()
-        assert len(manager.list_sessions()) == 0
-
-    def test_delete_all_with_names_errors(self, runner: CliRunner, temp_env: Path) -> None:
-        """--all with explicit names should error."""
-        result = runner.invoke(main, ["session", "delete", "--all", "some-name", "--yes"])
-
-        assert result.exit_code == 1
-        assert "Cannot combine --all" in result.output
-
-    def test_delete_no_args_errors(self, runner: CliRunner, temp_env: Path) -> None:
-        """No names and no --all should error."""
-        result = runner.invoke(main, ["session", "delete"])
-
-        assert result.exit_code == 1
-        assert "Provide session name(s) or use --all" in result.output
-
-    def test_delete_all_empty_is_noop(self, runner: CliRunner, temp_env: Path) -> None:
-        """--all with no sessions should show a message and succeed."""
-        result = runner.invoke(main, ["session", "delete", "--all", "--yes"])
-
-        assert result.exit_code == 0
-        assert "No sessions to delete" in result.output
-
-    def test_delete_partial_failure(self, runner: CliRunner, temp_env: Path) -> None:
-        """Should continue deleting after a failure and report summary."""
-        with successful_claude_launch():
-            runner.invoke(main, ["session", "start", "exists-1"])
-
-        result = runner.invoke(main, ["session", "delete", "exists-1", "nonexistent", "--yes"])
-
-        assert result.exit_code == 1
-        assert "Deleted session" in result.output
-        assert "exists-1" in result.output
-        assert "not found" in result.output
-        assert "1 deleted" in result.output
-        assert "1 failed" in result.output
-
-    def test_delete_all_prompts_without_yes(self, runner: CliRunner, temp_env: Path) -> None:
-        """--all without --yes should prompt with session list."""
-        with successful_claude_launch():
-            runner.invoke(main, ["session", "start", "prompt-1"])
-            runner.invoke(main, ["session", "start", "prompt-2"])
-
-        result = runner.invoke(main, ["session", "delete", "--all"], input="n\n")
-
-        assert "all 2 session(s)" in result.output
-        assert "Cancelled" in result.output
-
-    def test_delete_all_reports_skipped_active_sessions(self, runner: CliRunner, temp_env: Path) -> None:
-        """--all (no --force) reports and skips live sessions, deleting only the rest."""
-        runner.invoke(main, ["session", "start", "all-active-1", "--no-launch"])
-        runner.invoke(main, ["session", "start", "all-active-2", "--no-launch"])
-        ActiveSessionStore().upsert_session(
-            "all-active-2",
-            worktree_path=str(temp_env),
-            launch_mode=LAUNCH_MODE_HOST,
-            launcher_pid=os.getpid(),
-        )
-
-        result = runner.invoke(main, ["session", "delete", "--all"], input="n\n")
-
-        assert result.exit_code == 0
-        assert "Skipping" in result.output
-        assert "all-active-2" in result.output
-        # Only the idle session remains as a deletion candidate.
-        assert "all 1 session(s)" in result.output
-        assert "Cancelled" in result.output
-
-    def test_delete_dirty_worktree_shows_force_tip(self, runner: CliRunner, temp_env: Path) -> None:
-        """Single-session dirty worktree failures should keep the force guidance."""
-        with patch(
-            "forge.cli.session_manage._delete_single_session",
-            side_effect=DirtyWorktreeError("/tmp/wt"),
-        ):
-            result = runner.invoke(main, ["session", "delete", "dirty-sess", "--yes"])
-
-        assert result.exit_code == 1
-        assert "Error:" in result.output
-        assert "/tmp/wt" in result.output
-        assert "Use --force to remove anyway, or commit/stash your changes first." in result.output
-
-    def test_delete_single_session_not_found_uses_cli_error_format(self, runner: CliRunner, temp_env: Path) -> None:
-        """Single-session ForgeSessionError should preserve standard CLI formatting."""
-        with patch(
-            "forge.cli.session_manage._delete_single_session",
-            side_effect=SessionNotFoundError("missing-sess"),
-        ):
-            result = runner.invoke(main, ["session", "delete", "missing-sess", "--yes"])
-
-        assert result.exit_code == 1
-        assert "Error:" in result.output
-        assert "missing-sess" in result.output
-        assert "Deleted session" not in result.output
-
-    def test_delete_multi_session_forge_error_uses_per_target_summary(self, runner: CliRunner, temp_env: Path) -> None:
-        """Multi-session ForgeSessionError should be reported per target without aborting immediately."""
-        with patch("forge.cli.session_manage._delete_single_session") as mock_delete:
-            mock_delete.side_effect = [None, SessionNotFoundError("missing-sess")]
-            result = runner.invoke(main, ["session", "delete", "ok-sess", "missing-sess", "--yes"])
-
-        assert result.exit_code == 1
-        assert "Deleted session" in result.output
-        assert "ok-sess" in result.output
-        assert "missing-sess" in result.output
-        assert "1 deleted" in result.output
-        assert "1 failed" in result.output
-        assert "Error:" in result.output
+    def test_explicit_root_ignores_current_project_name_collision(self, runner, temp_env):
+        target = temp_env.parent / "target"
+        target.mkdir()
+        _seed_delete_session(temp_env, temp_env, "same")
+        state = create_session_state("same", worktree_path=str(target))
+        state.forge_root = str(target)
+        publish_session(IndexStore(), state, target, forge_root=str(target))
+        result = runner.invoke(main, ["session", "delete", "same", "--forge-root", str(target), "--yes"])
+        assert result.exit_code == 0, result.output
+        assert SessionStore(str(temp_env), "same").exists()
+        assert not SessionStore(str(target), "same").exists()
 
     def test_delete_cross_project_resolves(self, runner: CliRunner, temp_env: Path) -> None:
         """Delete from wrong forge_root should resolve cross-project and succeed."""
@@ -1237,7 +815,7 @@ class TestSessionDelete:
         # (SessionStore at Path.cwd()) doesn't find the session on disk.
         with (
             patch(
-                "forge.cli.session_manage._cwd_forge_root",
+                "forge.cli.session_delete._cwd_forge_root",
                 return_value=str(forge_root_c),
             ),
             patch("os.getcwd", return_value=str(forge_root_c)),

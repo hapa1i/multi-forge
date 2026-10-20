@@ -15,6 +15,7 @@ def require_sidecar_contract(image: str, *, schema_version: int, reviewer: bool)
         "import os\n"
         "from time import monotonic\n"
         "from forge.session.models import SCHEMA_VERSION\n"
+        "from forge.session.workers import SIDECAR_LEASE_ENV\n"
         f"assert SCHEMA_VERSION >= {schema_version}, 'session schema is newer than the image'\n"
     )
     if reviewer:

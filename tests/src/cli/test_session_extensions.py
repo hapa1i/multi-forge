@@ -6,6 +6,7 @@ and _generate_parent_transfer_context() from forge.cli.session.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -18,8 +19,10 @@ from forge.cli.session import (
 )
 from forge.install.models import Installation, InstallModule
 from forge.install.ownership import attributed
+from forge.session.index import IndexStore
 from forge.session.launch import _resolve_worktree_extension_root
 from forge.session.models import SessionState, create_session_state
+from tests.fixtures.session_state import publish_session
 
 
 @pytest.fixture
@@ -148,7 +151,14 @@ class TestAutoInstallExtensions:
     def test_inherits_from_parent(self, worktree_root: Path, parent_root: Path) -> None:
         """Detected parent extensions triggers Installer.init() with inherited profile."""
         mock_plan = MagicMock()
-        mock_plan.modules = ["commands", "agents", "skills", "hooks", "status-line", "permissions"]
+        mock_plan.modules = [
+            "commands",
+            "agents",
+            "skills",
+            "hooks",
+            "status-line",
+            "permissions",
+        ]
         mock_plan.has_conflicts = False
 
         with (
@@ -318,10 +328,11 @@ class TestGenerateParentHandoffContext:
             worktree_path=str(tmp_path / "fork-wt"),
         )
         (tmp_path / "fork-wt").mkdir(exist_ok=True)
+        publish_session(IndexStore(), deepcopy(state), tmp_path, forge_root=tmp_path / "fork-wt")
         return state
 
-    def _make_parent_state(self, tmp_path: Path) -> SessionState:
-        """Create a parent session state."""
+    def _make_parent_state(self, tmp_path: Path, *, artifact_root: Path | None = None) -> SessionState:
+        """Publish ownership while returning the legacy snapshot used to test root fallback."""
         parent_dir = tmp_path / "parent-wt"
         parent_dir.mkdir(exist_ok=True)
         (parent_dir / ".git").mkdir(exist_ok=True)
@@ -331,6 +342,7 @@ class TestGenerateParentHandoffContext:
             worktree_path=str(parent_dir),
         )
         state.confirmed.claude_session_id = "parent-uuid"
+        publish_session(IndexStore(), deepcopy(state), tmp_path, forge_root=artifact_root or parent_dir)
         return state
 
     def test_strategy_threads_to_assemble_transfer_context(self, tmp_path: Path) -> None:
@@ -392,7 +404,7 @@ class TestGenerateParentHandoffContext:
     def test_project_root_is_main_repo_not_worktree(self, tmp_path: Path) -> None:
         """project_root must be the main repo root, not the parent worktree."""
         fork_state = self._make_fork_state(tmp_path)
-        parent_state = self._make_parent_state(tmp_path)
+        parent_state = self._make_parent_state(tmp_path, artifact_root=tmp_path / "main-repo")
 
         mock_manager = MagicMock()
         mock_manager.get_session.return_value = parent_state
@@ -410,8 +422,8 @@ class TestGenerateParentHandoffContext:
     def test_nested_forge_root_preferred_over_checkout_root(self, tmp_path: Path) -> None:
         """Nested forge_root should win over checkout-root fallback for artifact lookups."""
         fork_state = self._make_fork_state(tmp_path)
-        parent_state = self._make_parent_state(tmp_path)
         nested_root = tmp_path / "main-repo" / "packages" / "app"
+        parent_state = self._make_parent_state(tmp_path, artifact_root=nested_root)
         parent_state.forge_root = str(nested_root)
 
         mock_manager = MagicMock()
@@ -461,35 +473,15 @@ class TestWorktreeOwnership:
         (into_dir / ".git").mkdir()
         (into_dir / ".forge").mkdir()
 
-        from forge.session.exceptions import SessionNotFoundError
+        from forge.session import IndexStore
         from forge.session.manager import SessionManager
-        from forge.session.models import SessionIndexEntry
+        from tests.fixtures.session_state import publish_session
 
-        parent_entry = SessionIndexEntry(
-            worktree_path=str(tmp_path),
-            project_root=str(tmp_path),
-            last_accessed_at="2026-01-01T00:00:00Z",
-            forge_root=str(tmp_path),
-            checkout_root=str(tmp_path),
-            relative_path=".",
-        )
-
-        real_mgr = SessionManager()
-        real_mgr.index_store = MagicMock()
-        real_mgr.index_store.session_exists.return_value = False
-
-        def _get_session(name: str, forge_root: str | None = None) -> SessionIndexEntry:
-            if name == "planner" and forge_root is None:
-                return parent_entry
-            raise SessionNotFoundError(name)
-
-        real_mgr.index_store.get_session.side_effect = _get_session
-
-        with (
-            patch.object(real_mgr, "get_session", return_value=parent_state),
-            patch("forge.session.worktree.get_main_repo_root", return_value=tmp_path),
-            patch("forge.session.store.SessionStore.write"),
-        ):
+        parent_state.forge_root = str(tmp_path)
+        index = IndexStore()
+        publish_session(index, parent_state, tmp_path, forge_root=tmp_path)
+        real_mgr = SessionManager(index_store=index)
+        with patch("forge.session.worktree.get_main_repo_root", return_value=tmp_path):
             _, fork_state = real_mgr.fork_session(
                 "planner",
                 fork_name="reviewer",
@@ -522,9 +514,30 @@ class TestWorktreeDeleteGuard:
         mgr = SessionManager()
         mgr.index_store = MagicMock()
         mgr.index_store.list_sessions.return_value = [
-            ("session-a", SessionIndexEntry(worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at="")),
-            ("session-b", SessionIndexEntry(worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at="")),
-            ("session-c", SessionIndexEntry(worktree_path=other_path, project_root=str(tmp_path), last_accessed_at="")),
+            (
+                "session-a",
+                SessionIndexEntry(
+                    worktree_path=wt_path,
+                    project_root=str(tmp_path),
+                    last_accessed_at="",
+                ),
+            ),
+            (
+                "session-b",
+                SessionIndexEntry(
+                    worktree_path=wt_path,
+                    project_root=str(tmp_path),
+                    last_accessed_at="",
+                ),
+            ),
+            (
+                "session-c",
+                SessionIndexEntry(
+                    worktree_path=other_path,
+                    project_root=str(tmp_path),
+                    last_accessed_at="",
+                ),
+            ),
         ]
 
         result = mgr._find_co_resident_sessions(
@@ -543,7 +556,14 @@ class TestWorktreeDeleteGuard:
         mgr = SessionManager()
         mgr.index_store = MagicMock()
         mgr.index_store.list_sessions.return_value = [
-            ("solo", SessionIndexEntry(worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at="")),
+            (
+                "solo",
+                SessionIndexEntry(
+                    worktree_path=wt_path,
+                    project_root=str(tmp_path),
+                    last_accessed_at="",
+                ),
+            ),
         ]
 
         result = mgr._find_co_resident_sessions(
@@ -552,141 +572,48 @@ class TestWorktreeDeleteGuard:
         )
         assert result == []
 
-    def test_delete_skips_worktree_when_co_residents_exist(self, tmp_path: Path) -> None:
-        """delete_session should not call cleanup_worktree when other sessions share the worktree."""
-        from forge.session.index import SessionIndexEntry
-        from forge.session.manager import SessionManager
+    @pytest.mark.parametrize("owner_first", [False, True])
+    def test_shared_worktree_survives_owner_and_guest_cleanup(self, tmp_path: Path, owner_first: bool) -> None:
+        from forge.session import IndexStore, SessionManager, SessionStore
+        from tests.fixtures.session_state import publish_session
 
-        wt_path = str(tmp_path / "shared-wt")
-        (tmp_path / "shared-wt").mkdir()
-
-        state = create_session_state(name="doomed", worktree_path=wt_path, worktree_branch="feat")
-        assert state.worktree is not None
-        state.worktree.is_worktree = True
-
-        mgr = SessionManager()
-        mgr.index_store = MagicMock()
-        mgr.index_store.get_session.return_value = SessionIndexEntry(
-            worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at=""
-        )
-        mgr.index_store.list_sessions.return_value = [
-            ("doomed", SessionIndexEntry(worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at="")),
-            ("survivor", SessionIndexEntry(worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at="")),
-        ]
-
+        root = tmp_path / "project"
+        worktree = tmp_path / "shared-worktree"
+        root.mkdir()
+        worktree.mkdir()
+        for name, owns in (("owner", True), ("guest", False)):
+            state = create_session_state(name, worktree_path=str(worktree), worktree_branch="feat")
+            state.forge_root = str(root)
+            assert state.worktree is not None
+            state.worktree.is_worktree = True
+            state.worktree.owns_worktree = owns
+            publish_session(IndexStore(), state, root, forge_root=root)
+        manager = SessionManager(index_store=IndexStore())
         with (
-            patch("forge.session.store.SessionStore.exists", return_value=True),
-            patch("forge.session.store.SessionStore.read", return_value=state),
-            patch("forge.session.store.SessionStore.delete"),
-            patch("forge.session.claude.cleanup.cleanup_session"),
-            patch("forge.session.worktree.cleanup.cleanup_worktree") as mock_cleanup,
+            patch("forge.session.worktree.is_worktree_dirty", return_value=True) as dirty,
+            patch("forge.session.worktree.cleanup_worktree") as cleanup,
         ):
-            mgr.delete_session("doomed", force=True)
+            manager.delete_session("owner" if owner_first else "guest", forge_root=str(root))
+            if owner_first:
+                manager.delete_session("guest", forge_root=str(root))
+            dirty.assert_not_called()
+            cleanup.assert_not_called()
+        assert worktree.exists()
+        assert not SessionStore(str(root), "guest").exists()
 
-        mock_cleanup.assert_not_called()
+    def test_unowned_last_session_preserves_its_worktree(self, tmp_path: Path) -> None:
+        from forge.session import IndexStore, SessionManager, SessionStore
+        from tests.fixtures.session_state import publish_session
 
-    def test_delete_into_session_never_removes_worktree(self, tmp_path: Path) -> None:
-        """--into session (owns_worktree=False) never removes worktree even if last."""
-        from forge.session.index import SessionIndexEntry
-        from forge.session.manager import SessionManager
-
-        wt_path = str(tmp_path / "executor-wt")
-        (tmp_path / "executor-wt").mkdir()
-
-        state = create_session_state(name="reviewer", worktree_path=wt_path, worktree_branch="feat")
+        worktree = tmp_path / "external-worktree"
+        worktree.mkdir()
+        state = create_session_state("guest", worktree_path=str(worktree), worktree_branch="external")
+        state.forge_root = str(worktree)
         assert state.worktree is not None
         state.worktree.is_worktree = True
         state.worktree.owns_worktree = False
-
-        mgr = SessionManager()
-        mgr.index_store = MagicMock()
-        mgr.index_store.get_session.return_value = SessionIndexEntry(
-            worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at=""
-        )
-        mgr.index_store.list_sessions.return_value = [
-            ("reviewer", SessionIndexEntry(worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at="")),
-        ]
-
-        with (
-            patch("forge.session.store.SessionStore.exists", return_value=True),
-            patch("forge.session.store.SessionStore.read", return_value=state),
-            patch("forge.session.store.SessionStore.delete"),
-            patch("forge.session.claude.cleanup.cleanup_session"),
-            patch("forge.session.worktree.cleanup.cleanup_worktree") as mock_cleanup,
-        ):
-            mgr.delete_session("reviewer", force=True)
-
-        mock_cleanup.assert_not_called()
-
-    def test_delete_shared_worktree_no_dirty_error(self, tmp_path: Path) -> None:
-        """Deleting from a shared dirty worktree should NOT raise DirtyWorktreeError."""
-        from forge.session.index import SessionIndexEntry
-        from forge.session.manager import SessionManager
-
-        wt_path = str(tmp_path / "dirty-shared-wt")
-        (tmp_path / "dirty-shared-wt").mkdir()
-
-        state = create_session_state(name="session-a", worktree_path=wt_path, worktree_branch="feat")
-        assert state.worktree is not None
-        state.worktree.is_worktree = True
-
-        mgr = SessionManager()
-        mgr.index_store = MagicMock()
-        mgr.index_store.get_session.return_value = SessionIndexEntry(
-            worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at=""
-        )
-        # Two sessions share the worktree
-        mgr.index_store.list_sessions.return_value = [
-            ("session-a", SessionIndexEntry(worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at="")),
-            ("session-b", SessionIndexEntry(worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at="")),
-        ]
-
-        with (
-            patch("forge.session.store.SessionStore.exists", return_value=True),
-            patch("forge.session.store.SessionStore.read", return_value=state),
-            patch("forge.session.store.SessionStore.delete"),
-            patch("forge.session.claude.cleanup.cleanup_session"),
-            patch("forge.session.worktree.cleanup.is_worktree_dirty", return_value=True) as mock_dirty,
-            patch("forge.session.worktree.cleanup.cleanup_worktree") as mock_cleanup,
-        ):
-            # Should NOT raise DirtyWorktreeError even though worktree is dirty
-            mgr.delete_session("session-a")  # no --force needed
-
-        mock_dirty.assert_not_called()  # Dirty check should be skipped entirely
-        mock_cleanup.assert_not_called()
-
-    def test_owner_first_guest_last_cleans_up(self, tmp_path: Path) -> None:
-        """Deleting owner first, then guest last: guest should NOT clean up (it doesn't own)."""
-        from forge.session.index import SessionIndexEntry
-        from forge.session.manager import SessionManager
-
-        wt_path = str(tmp_path / "shared-wt")
-        (tmp_path / "shared-wt").mkdir()
-
-        # Guest session (--into, owns_worktree=False) is the last one
-        guest_state = create_session_state(name="reviewer", worktree_path=wt_path, worktree_branch="feat")
-        assert guest_state.worktree is not None
-        guest_state.worktree.is_worktree = True
-        guest_state.worktree.owns_worktree = False
-
-        mgr = SessionManager()
-        mgr.index_store = MagicMock()
-        mgr.index_store.get_session.return_value = SessionIndexEntry(
-            worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at=""
-        )
-        # Owner already deleted — guest is the only one left
-        mgr.index_store.list_sessions.return_value = [
-            ("reviewer", SessionIndexEntry(worktree_path=wt_path, project_root=str(tmp_path), last_accessed_at="")),
-        ]
-
-        with (
-            patch("forge.session.store.SessionStore.exists", return_value=True),
-            patch("forge.session.store.SessionStore.read", return_value=guest_state),
-            patch("forge.session.store.SessionStore.delete"),
-            patch("forge.session.claude.cleanup.cleanup_session"),
-            patch("forge.session.worktree.cleanup.cleanup_worktree") as mock_cleanup,
-        ):
-            mgr.delete_session("reviewer", force=True)
-
-        # Guest never removes worktree — it's orphaned (expected, documented behavior)
-        mock_cleanup.assert_not_called()
+        index = IndexStore()
+        publish_session(index, state, worktree, forge_root=worktree)
+        SessionManager(index_store=index).delete_session("guest", forge_root=str(worktree), force=True)
+        assert worktree.exists()
+        assert not SessionStore(str(worktree), "guest").exists()

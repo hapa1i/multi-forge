@@ -15,6 +15,12 @@ from click.testing import CliRunner
 from forge.cli.hooks._group import hooks
 from forge.cli.hooks.policy import _derive_policy_source_label
 
+
+@pytest.fixture(autouse=True)
+def captured_mock_session_instance(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("forge.cli.hooks.commands.capture_hook_instance", lambda store: "test-instance")
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

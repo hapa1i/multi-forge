@@ -458,7 +458,7 @@ class TestConcurrencyAndRollback:
         source = _write_transcript(project)
         adopt_session(ctx, plan_adoption(ctx, _UUID), name="doomed")
         store = SessionStore(str(project), "doomed")
-        real_delete = store.delete
+        real_delete = store.delete_locked
         blocked: list[str] = []
 
         # Keep the mutation check cheap: before rollback held one transaction
@@ -472,13 +472,16 @@ class TestConcurrencyAndRollback:
                 blocked.append("blocked")
             return real_delete()
 
-        monkeypatch.setattr(store, "delete", _delete_while_probing_the_index)
+        monkeypatch.setattr(store, "delete_locked", _delete_while_probing_the_index)
 
+        instance_id = store.review_identity()
+        assert instance_id is not None
         _rollback_adoption(
             "doomed",
             ctx=ctx,
             store=store,
             artifact_abs=None,
+            expected_instance_id=instance_id,
         )
 
         assert blocked == ["blocked"], "rollback must hold the index lock while deleting the manifest"
@@ -508,9 +511,10 @@ class TestConcurrencyAndRollback:
                 ctx=ctx,
                 store=store,
                 artifact_abs=None,
+                expected_instance_id="a" * 32,
             )
 
-        assert "Adopt rollback skipped session state for 'doomed': name is now owned by a replacement" in caplog.text
+        assert "Adopt rollback skipped 'doomed': a replacement owns the name" in caplog.text
 
     def test_threaded_adopts_of_one_uuid_bind_once(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Claude-arm counterpart of the Codex interleaved-adopt regression.

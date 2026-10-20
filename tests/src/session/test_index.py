@@ -97,7 +97,7 @@ class TestIndexStoreRead:
         assert index.sessions == {}
 
     def test_read_valid_index(self, store: IndexStore, index_path: Path) -> None:
-        """read() should parse valid v1 index with scoped keys."""
+        """read() should parse the current index schema with scoped keys."""
         from forge.session.identity import make_scoped_key
 
         scoped_key = make_scoped_key("test-session", "/path/to/worktree")
@@ -108,6 +108,7 @@ class TestIndexStoreRead:
                     "worktree_path": "/path/to/worktree",
                     "project_root": "/path/to/project",
                     "last_accessed_at": "2024-12-17T10:00:00",
+                    "instance_id": None,
                     "is_fork": False,
                     "is_incognito": False,
                     "parent_session": None,
@@ -425,10 +426,10 @@ class TestIndexStoreUuidFields:
         reloaded = store.get_session("test-session")
         assert reloaded.claude_session_id == "abc-123"
 
-    def test_v2_index_rejected(self, store: IndexStore, index_path: Path) -> None:
-        """v2 index is rejected (no migration in OSS release)."""
+    def test_future_index_rejected(self, store: IndexStore, index_path: Path) -> None:
+        """Unknown future index versions are rejected."""
         old_index = {
-            "version": 2,
+            "version": INDEX_VERSION + 1,
             "sessions": {},
         }
         index_path.write_text(json.dumps(old_index))
@@ -679,7 +680,7 @@ class TestProjectIdentityFields:
 
     def test_read_future_version_raises(self, store: IndexStore, index_path: Path) -> None:
         """Reading a future version raises IndexCorruptedError."""
-        data = {"version": 2, "sessions": {}}
+        data = {"version": INDEX_VERSION + 1, "sessions": {}}
         index_path.write_text(json.dumps(data))
 
         with pytest.raises(IndexCorruptedError) as exc_info:

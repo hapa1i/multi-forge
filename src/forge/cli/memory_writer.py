@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import ExitStack
 from pathlib import Path
 
 import click
@@ -53,99 +54,118 @@ def run_cmd(
     worktree = Path(worktree_path).resolve()
     effective_root = Path(forge_root).resolve() if forge_root else worktree
 
-    from forge.install.project_compat import (
-        ProjectCompatibilityError,
-        enforce_project_compatibility,
-        format_project_compatibility_recovery,
+    from forge.session.exceptions import SessionNotFoundError
+    from forge.session.store import SessionStore
+    from forge.session.workers import (
+        SESSION_INSTANCE_ENV,
+        capture_session_instance,
+        session_worker_lease,
     )
 
-    try:
-        enforce_project_compatibility(effective_root)
-    except ProjectCompatibilityError as e:
-        from forge.session.memory_writer import record_memory_writer_outcome
-
-        record_memory_writer_outcome(
-            session_name,
-            "skipped",
-            reason_code="project_compatibility_refused",
-            message=f"state={e.state}; {e.reason}. {format_project_compatibility_recovery()}",
-        )
+    store = SessionStore(str(effective_root), session_name)
+    if not store.exists():
+        logger.info("No session manifest for %s in %s", session_name, effective_root)
         return
+    with ExitStack() as leases:
+        try:
+            token = os.environ.get(SESSION_INSTANCE_ENV) or capture_session_instance(effective_root, session_name)
+            leases.enter_context(
+                session_worker_lease(effective_root, session_name, expected_instance_id=token, label="memory writer")
+            )
+        except SessionNotFoundError:
+            logger.info("Session %s was removed or replaced before memory writer admission; skipping", session_name)
+            return
+        from forge.install.project_compat import (
+            ProjectCompatibilityError,
+            enforce_project_compatibility,
+            format_project_compatibility_recovery,
+        )
 
-    # We use SessionStore directly (not resolve_session_store) because this
-    # runs as a detached background process without FORGE_SESSION env var set.
-    # The marker payload carries session_name explicitly.
-    try:
-        from forge.session.effective import compute_effective_intent
-        from forge.session.store import SessionStore
+        try:
+            enforce_project_compatibility(effective_root)
+        except ProjectCompatibilityError as e:
+            from forge.session.memory_writer import record_memory_writer_outcome
 
-        store = SessionStore(str(effective_root), session_name)
-        if not store.exists():
-            logger.info("No session manifest for %s in %s", session_name, worktree)
+            record_memory_writer_outcome(
+                session_name,
+                "skipped",
+                reason_code="project_compatibility_refused",
+                message=f"state={e.state}; {e.reason}. {format_project_compatibility_recovery()}",
+            )
             return
 
-        manifest = store.read()
-        effective = compute_effective_intent(manifest)
-    except Exception as e:
-        logger.warning("Failed to read session manifest for %s: %s", session_name, e)
-        raise SystemExit(1)
+        # We use SessionStore directly (not resolve_session_store) because this
+        # runs as a detached background process without FORGE_SESSION env var set.
+        # The marker payload carries session_name explicitly.
+        try:
+            from forge.session.effective import compute_effective_intent
 
-    import dataclasses
+            if not store.exists():
+                logger.info("No session manifest for %s in %s", session_name, worktree)
+                return
 
-    from forge.cli.consumer_lane_freeze import persist_lane_freeze
-    from forge.session.consumer_lanes import read_bound_backend_id, read_bound_lane
-    from forge.session.memory_writer import (
-        MEMORY_WRITER_CONSUMER,
-        resolve_writer_base_url,
-        run_memory_writer,
-    )
-    from forge.session.project_memory import (
-        DEFAULT_SCAN_ROOTS,
-        is_memory_enabled,
-        scan_passported_docs,
-    )
+            manifest = store.read()
+            effective = compute_effective_intent(manifest)
+        except Exception as e:
+            logger.warning("Failed to read session manifest for %s: %s", session_name, e)
+            raise SystemExit(1)
 
-    if not is_memory_enabled(manifest, effective):
-        logger.info("Memory writer not activated for session %s", session_name)
-        return
+        import dataclasses
 
-    assert effective.memory is not None and effective.memory.auto_update is not None
-    config = dataclasses.replace(effective.memory.auto_update, enabled=True)
+        from forge.cli.consumer_lane_freeze import persist_lane_freeze
+        from forge.session.consumer_lanes import read_bound_backend_id, read_bound_lane
+        from forge.session.memory_writer import (
+            MEMORY_WRITER_CONSUMER,
+            resolve_writer_base_url,
+            run_memory_writer,
+        )
+        from forge.session.project_memory import (
+            DEFAULT_SCAN_ROOTS,
+            is_memory_enabled,
+            scan_passported_docs,
+        )
 
-    confirmed_proxy_url = None
-    if manifest.confirmed.started_with_proxy:
-        confirmed_proxy_url = manifest.confirmed.started_with_proxy.base_url
+        if not is_memory_enabled(manifest, effective):
+            logger.info("Memory writer not activated for session %s", session_name)
+            return
 
-    base_url = resolve_writer_base_url(
-        proxy_id=config.proxy,
-        confirmed_proxy_base_url=confirmed_proxy_url,
-        env_base_url=os.environ.get("ANTHROPIC_BASE_URL"),
-        direct=config.direct,
-        subprocess_proxy=subprocess_proxy or effective.subprocess_proxy,
-    )
+        assert effective.memory is not None and effective.memory.auto_update is not None
+        config = dataclasses.replace(effective.memory.auto_update, enabled=True)
 
-    designated_docs = scan_passported_docs(effective_root, DEFAULT_SCAN_ROOTS, session_name)
+        confirmed_proxy_url = None
+        if manifest.confirmed.started_with_proxy:
+            confirmed_proxy_url = manifest.confirmed.started_with_proxy.base_url
 
-    dispatched_lane = read_bound_lane(manifest, MEMORY_WRITER_CONSUMER)
-    backend_id = read_bound_backend_id(manifest, MEMORY_WRITER_CONSUMER)
+        base_url = resolve_writer_base_url(
+            proxy_id=config.proxy,
+            confirmed_proxy_base_url=confirmed_proxy_url,
+            env_base_url=os.environ.get("ANTHROPIC_BASE_URL"),
+            direct=config.direct,
+            subprocess_proxy=subprocess_proxy or effective.subprocess_proxy,
+        )
 
-    success = run_memory_writer(
-        session_name=session_name,
-        forge_root=effective_root,
-        transcript_snapshot_rel=transcript_rel,
-        config=config,
-        base_url=base_url,
-        timeout_seconds=timeout,
-        designated_docs=designated_docs,
-        backend_id=backend_id,
-        # The bound lane selects the dispatch arm (claude_code default vs codex); validated in
-        # run_memory_writer and degraded to a no-call on a stale binding.
-        lane_record=dispatched_lane,
-        # Freeze only if the writer actually dispatches (on_dispatch fires at the claude -p
-        # call); the threaded lane + under-lock equality guard keep confirmed consistent with
-        # the billed backend.
-        on_dispatch=lambda: persist_lane_freeze(store, MEMORY_WRITER_CONSUMER, dispatched_lane),
-    )
+        designated_docs = scan_passported_docs(effective_root, DEFAULT_SCAN_ROOTS, session_name)
 
-    if not success:
-        raise SystemExit(1)
+        dispatched_lane = read_bound_lane(manifest, MEMORY_WRITER_CONSUMER)
+        backend_id = read_bound_backend_id(manifest, MEMORY_WRITER_CONSUMER)
+
+        success = run_memory_writer(
+            session_name=session_name,
+            forge_root=effective_root,
+            transcript_snapshot_rel=transcript_rel,
+            config=config,
+            base_url=base_url,
+            timeout_seconds=timeout,
+            designated_docs=designated_docs,
+            backend_id=backend_id,
+            # The bound lane selects the dispatch arm (claude_code default vs codex); validated in
+            # run_memory_writer and degraded to a no-call on a stale binding.
+            lane_record=dispatched_lane,
+            # Freeze only if the writer actually dispatches (on_dispatch fires at the claude -p
+            # call); the threaded lane + under-lock equality guard keep confirmed consistent with
+            # the billed backend.
+            on_dispatch=lambda: persist_lane_freeze(store, MEMORY_WRITER_CONSUMER, dispatched_lane),
+        )
+
+        if not success:
+            raise SystemExit(1)

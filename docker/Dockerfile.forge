@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
     gnupg \
+    procps \
     vim-tiny \
     && rm -rf /var/lib/apt/lists/* \
     && ln -s /usr/bin/vim.tiny /usr/bin/vim

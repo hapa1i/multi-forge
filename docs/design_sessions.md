@@ -38,24 +38,18 @@ every thread-id match and filters by the rollout head's `cwd`, refusing an ambig
 `find_rollout_path`'s newest-mtime tie-break. The id must be a canonical UUID: it is the only caller-supplied component
 of every path adoption reads or writes. Omitting it previews the unbound Claude conversations whose recorded `cwd` is
 the current directory — a read-only CLI scan of one encoded project directory, which does not relax §3.10: hooks still
-resolve sessions by identity and never scan. Adoption also inverts transcript ownership, so
-`SessionManager.delete_session` exempts an adopted session's native transcript from `delete_transcripts` (including the
-`delete_transcripts=True` automatic retention sweep) using the same filter that spares transcripts shared with another
-session. Relocated transcripts use the same ownership scan; a cached owner remains conservatively protected, while a
-cached absence is rescanned at the unlink boundary after another process may have published a sibling during ordinary
-cleanup. The final negative scan and unlink share the global index-publication lock, so a sibling manifest cannot be
-published between the ownership decision and removal. When the current and relocated UUIDs alias, ordinary cleanup
-excludes that UUID; the locked final scan owns removal of its transcript and preidentified agent logs. Noncanonical raw
-current and artifact IDs from corrupt manifests grant no transcript or agent-log deletion authority, regardless of
-relocation metadata: case-insensitive filesystems can resolve case variants to a canonical UUID whose ownership scans
-use exact spelling. Agent-log discovery refuses symlinked encoded project, session and subagents directories. Adoption
-resolves the `.forge/artifacts` root before enforcing destination containment, so relocating that root with a symlink is
-supported; a descendant destination that escapes the resolved root or aliases the native transcript is refused, and
-rollback only unlinks an artifact created by the current copy attempt. Stop and StopFailure also reconcile
-`claude_session_id` and `transcript_path` from their hook payloads to correct fork-session launches where SessionStart
-sees an inherited parent UUID. Because the start path pre-seeds, a non-null `claude_session_id` does **not** by itself
-mean the session ran (a `--no-launch` or not-yet-launched start session already carries a pre-seeded UUID);
-"used"/resumable requires hook confirmation or transcript-backed evidence (see Default resume behavior).
+resolve sessions by identity and never scan. Ordinary delete and retention preserve all native conversations, including
+adopted files. Explicit `forge session purge` includes adopted conversations and labels that ownership in its preview.
+Its exact native inventory must prove runtime/version, UUID, CWD, provenance and path containment; a stored path alone
+never authorizes unlink. Existing dependents refuse both verbs. See [session cleanup](#session-cleanup) for the shared
+admission and retry contract. Adoption resolves the `.forge/artifacts` root before enforcing destination containment, so
+relocating that root with a symlink is supported; a descendant destination that escapes the resolved root or aliases the
+native transcript is refused, and rollback only unlinks an artifact created by the current copy attempt. Stop and
+StopFailure also reconcile `claude_session_id` and `transcript_path` from their hook payloads to correct fork-session
+launches where SessionStart sees an inherited parent UUID. Because the start path pre-seeds, a non-null
+`claude_session_id` does **not** by itself mean the session ran (a `--no-launch` or not-yet-launched start session
+already carries a pre-seeded UUID); "used"/resumable requires hook confirmation or transcript-backed evidence (see
+Default resume behavior).
 
 **Default resume behavior.** `forge session resume <name>` reattaches to the same Claude conversation without creating a
 child when the session has resumable evidence (hook confirmation or transcript-backed state) and is not currently
@@ -227,3 +221,49 @@ started_with_proxy:
 > **Note:** There is no "merging"—overrides simply win. The only subtlety is nested dicts: you can override
 > `memory.tags` without losing `memory.auto_recall`. This applies to session-owned fields only (`tdd_mode`, `memory.*`,
 > etc.). Proxy-owned fields come directly from the proxy.
+
+### Session cleanup
+
+`session/deletion.py` owns the immutable plan and coordinated apply for delete, purge, clean, retention and incognito.
+`cleanup_dependencies.py` reads indexed sessions and orphan manifests in registered roots; existing children, lineage,
+borrowed plans/contexts, supervisor bindings and shared native identities block removal, even when inactive. Unreadable
+state refuses. A selected batch does not imply a cascade: all targets are admitted before any mutation and initially
+refused targets stay refused, independent of processing order.
+
+Ordinary delete removes the session manifest and its unreferenced Forge content: artifacts, authority/routing/review
+journals, plans, reports, compaction copies, transfer snapshots and author notes, attributable pending QA/reviewer
+copies, queue markers and derived search records. `cleanup_content.py` owns the exact file inventory and retry
+validation; `search/cleanup.py` updates documents, BM25, content and fingerprint stores together. `forge clean`
+separately previews safe orphan artifact trees left by older deletes. Unattributable copies and unsafe/shared trees are
+report-only.
+
+Purge adds `purge_native.py`'s exact native-file inventory. It admits verified Claude 2.1.245 and Codex 0.162.1 layouts;
+other layouts refuse. Native identity checks include original and rollover IDs, adopted CWD, source-byte evidence for
+relocation/rewind, agent-log ancestry and Codex parent references. The process census conservatively refuses any
+observed client of the selected runtime, including unmanaged clients. It repeats before unlink; unknown visibility
+refuses. It observes inactivity and cannot prevent an external client from starting afterward. Native indexes,
+unrecorded external copies, provider data, Git history, global telemetry and project memory documents are outside the
+removal guarantee.
+
+The existing per-creation `review-identity` token is the session instance. Index schema v2 mirrors it in `instance_id`;
+v1 reads project `null` without writes. Confirmed cleanup and content-producing operations explicitly migrate validated
+legacy rows under index then manifest locks. Old review history without an owner refuses migration. A plan binds the
+manifest digest and instance before cleanup; neither names nor timestamps identify a replacement.
+
+Apply holds the index publication and target manifest locks from final admission through bounded removal. It validates
+paths, ownership, dependencies, activity and workers again before mutation. Hooks, queue consumers, detached workers,
+launch registration and event writers carry the admitted instance. Worker leases span provider calls without holding the
+index lock; cleanup refuses live or abandoned leases. An abandoned lease requires explicit inspection/recovery, not
+inference from its parent process having exited.
+
+Worktree removal refuses containment overlap with configured native homes or recorded native sources, including those of
+other discovered sessions. Admission checks lexical and resolved paths again before apply; `--keep-worktree` preserves
+the checkout and prevents removal of native state outside the file inventory.
+
+Before its first removal, apply saves a private retry inventory under `$FORGE_HOME/session-cleanup/`, outside the
+checkout. The inventory reserves the name, stops new producers and survives worktree removal. Failures leave the index
+owner and inventory for retry; missing already-removed files are accepted, changed files and new targets refuse. Only
+successful completion removes the record and inventory. `--forge-root` selects the original root even when its checkout
+no longer exists. `--force` bypasses dirty-worktree protection only. Incognito exit attempts purge after runtime exit.
+Verified original ownership permits a new preview after initial refusal or the exact retry of an interrupted inventory;
+unverified or replacement ownership receives no cleanup command.

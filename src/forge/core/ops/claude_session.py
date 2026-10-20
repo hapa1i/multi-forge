@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shlex
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -293,6 +294,7 @@ class ResumeLaunchPlan:
     action: ClaudeResumeAction
     context_limit: int
     launch_preferences: ClaudeLaunchPreferences
+    instance_id: str | None = None
     direct_model_override: str | None = None
     model_route_selection: ResolvedModelRoute | None = None
     render_model_route: bool = False
@@ -318,6 +320,7 @@ class ForkLaunchPlan:
     proxy_id: str | None
     incognito: bool
     render_post_exit: bool
+    instance_id: str | None = None
     model_route_selection: ResolvedModelRoute | None = None
     render_model_route: bool = False
     launch_args: RuntimeLaunchArgs = field(default_factory=RuntimeLaunchArgs)
@@ -480,6 +483,7 @@ def launch_claude_session(
     launch_args: RuntimeLaunchArgs | None = None,
     proxy_id: str | None = None,
     authority_operation: str = "resume",
+    expected_instance_id: str | None = None,
     before_launch: Callable[[Path], None] | None = None,
     on_routing_payload: Callable[[dict[str, Any]], None] | None = None,
     on_sidecar_launch: Callable[[ClaudeSidecarLaunch], None] | None = None,
@@ -563,6 +567,7 @@ def launch_claude_session(
     launch_mode = LAUNCH_MODE_SIDECAR if use_sidecar else LAUNCH_MODE_HOST
     with authority_launch_transaction(
         store=store,
+        expected_instance_id=expected_instance_id,
         launch_args=launch_args,
         root=root,
         operation=authority_operation,
@@ -706,6 +711,7 @@ def start_claude_session(
     operation_started_at = datetime.now(timezone.utc)
     pre_seeded_uuid = str(uuid.uuid4())
 
+    published_instances: list[str] = []
     manifest = _create_claude_session(
         manager,
         name=name,
@@ -724,6 +730,7 @@ def start_claude_session(
         pre_seeded_uuid=pre_seeded_uuid,
         authority=authority,
         authority_explicit=authority_explicit,
+        instance_sink=published_instances.append,
     )
 
     operation_cwd = Path.cwd()
@@ -805,6 +812,7 @@ def start_claude_session(
                 launch_args=launch_args,
                 proxy_id=proxy_id,
                 authority_operation="incognito" if incognito else "start",
+                expected_instance_id=published_instances[0] if published_instances else None,
                 before_launch=presenter.before_launch,
                 on_routing_payload=(presenter.on_routing_payload if model_route is not None else None),
                 on_sidecar_launch=presenter.on_sidecar_launch,
@@ -818,7 +826,12 @@ def start_claude_session(
             launch_failed = True
     finally:
         if incognito:
-            _run_incognito_cleanup(manager, manifest, presenter)
+            _run_incognito_cleanup(
+                manager,
+                manifest,
+                presenter,
+                expected_instance_id=(published_instances[0] if published_instances else None),
+            )
 
     if launch_failed or launch_result is None:
         return ClaudeSessionStartResult(
@@ -942,6 +955,7 @@ def resume_claude_session(
             launch_args=plan.launch_args,
             proxy_id=effective_proxy_id,
             authority_operation="resume",
+            expected_instance_id=plan.instance_id,
             before_launch=presenter.before_launch,
             on_routing_payload=(presenter.on_routing_payload if plan.render_model_route else None),
             on_sidecar_launch=presenter.on_sidecar_launch,
@@ -1011,6 +1025,7 @@ def fork_claude_session(
             launch_args=plan.launch_args,
             proxy_id=plan.proxy_id,
             authority_operation="incognito" if plan.incognito else "fork",
+            expected_instance_id=plan.instance_id,
             before_launch=presenter.before_launch,
             on_routing_payload=(presenter.on_routing_payload if plan.render_model_route else None),
             on_sidecar_launch=presenter.on_sidecar_launch,
@@ -1020,7 +1035,7 @@ def fork_claude_session(
     except ForgeOpError as e:
         presenter.on_launch_error(e)
         if plan.incognito:
-            _run_incognito_cleanup(manager, manifest, presenter)
+            _run_incognito_cleanup(manager, manifest, presenter, expected_instance_id=plan.instance_id)
         return ClaudeForkResult(
             exit_code=1,
             session=manifest.name,
@@ -1034,11 +1049,11 @@ def fork_claude_session(
         )
     except Exception:
         if plan.incognito:
-            _run_incognito_cleanup(manager, manifest, presenter)
+            _run_incognito_cleanup(manager, manifest, presenter, expected_instance_id=plan.instance_id)
         raise
 
     if plan.incognito:
-        _run_incognito_cleanup(manager, manifest, presenter)
+        _run_incognito_cleanup(manager, manifest, presenter, expected_instance_id=plan.instance_id)
 
     return ClaudeForkResult(
         exit_code=launch_result.exit_code,
@@ -1237,6 +1252,7 @@ def _create_claude_session(
     pre_seeded_uuid: str,
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
+    instance_sink: Callable[[str], None] | None = None,
 ) -> SessionState:
     """Create the session (row 1), mapping create failures to structured op errors."""
     try:
@@ -1256,6 +1272,7 @@ def _create_claude_session(
             claude_session_id=pre_seeded_uuid,
             authority=authority,
             authority_explicit=authority_explicit,
+            instance_sink=instance_sink,
         )
     except SessionExistsError as e:
         raise ClaudeStartError(
@@ -1366,19 +1383,42 @@ def _run_incognito_cleanup(
     manager: SessionManager,
     manifest: SessionState,
     presenter: ClaudeIncognitoCleanupPresenter,
+    *,
+    expected_instance_id: str | None,
 ) -> None:
     """Delete the incognito session on exit; wraps ONLY the launch (never create)."""
     presenter.on_incognito_cleanup_start()
     try:
-        manager.delete_session(
+        if expected_instance_id is None:
+            raise ForgeSessionError("Incognito cleanup has no captured instance identity; retained for inspection")
+        manager.purge_session(
             manifest.name,
-            delete_transcripts=True,
             force=True,
             forge_root=manifest.forge_root,
+            expected_instance_id=expected_instance_id,
         )
         presenter.on_incognito_cleanup_ok()
     except ForgeSessionError as e:
-        presenter.on_incognito_cleanup_warning(str(e))
+        message = str(e)
+        try:
+            if (
+                expected_instance_id is not None
+                and manifest.forge_root is not None
+                and manager.index_store.run_session_instance_txn(
+                    manifest.name,
+                    manifest.forge_root,
+                    expected_instance_id=expected_instance_id,
+                    callback=lambda: None,
+                )
+            ):
+                # Initial refusal has no reserved inventory; require a fresh preview.
+                command = shlex.join(
+                    ["forge", "session", "purge", manifest.name, "--forge-root", manifest.forge_root, "--force"]
+                )
+                message += f". After resolving the refusal, review a new purge preview with: {command}"
+        except Exception:
+            logger.debug("Cannot verify incognito cleanup recovery ownership", exc_info=True)
+        presenter.on_incognito_cleanup_warning(message)
 
 
 def _update_manifest_best_effort(
@@ -1584,18 +1624,31 @@ def _run_sidecar_claude_session(
     try:
 
         def runner() -> int:
-            return run_sidecar_session(
-                image=sidecar_image,
-                template=effective_template,
-                session_name=manifest.name,
-                project_dir=launch_root,
-                proxy_id=proxy_id,
-                extra_mounts=all_mounts,
-                context_limit=context_limit,
-                env_vars=container_env,
-                claude_args=claude_args,
-                run_identity=run_identity,
+            from forge.session.workers import (
+                SESSION_INSTANCE_ENV,
+                SIDECAR_LEASE_ENV,
+                SIDECAR_LEASE_MOUNT,
+                sidecar_session_lease,
             )
+
+            with sidecar_session_lease(
+                host_forge_root, manifest.name, expected_instance_id=container_env[SESSION_INSTANCE_ENV]
+            ) as lease_path:
+                return run_sidecar_session(
+                    image=sidecar_image,
+                    template=effective_template,
+                    session_name=manifest.name,
+                    project_dir=launch_root,
+                    proxy_id=proxy_id,
+                    extra_mounts=all_mounts + [(str(lease_path.parent), SIDECAR_LEASE_MOUNT, "ro")],
+                    context_limit=context_limit,
+                    env_vars={
+                        **container_env,
+                        SIDECAR_LEASE_ENV: f"{SIDECAR_LEASE_MOUNT}/{lease_path.name}",
+                    },
+                    claude_args=claude_args,
+                    run_identity=run_identity,
+                )
 
         if authority_attempt is not None:
             sidecar_exit = runner()

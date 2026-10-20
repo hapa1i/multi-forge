@@ -4,9 +4,8 @@ Mirrors the log management cleanup pattern (forge.cli.logs):
 - auto_clean_old_sessions(): called on CLI startup (best-effort)
 - clean_old_sessions(): core logic for both auto and manual cleanup
 
-Uses SessionManager.delete_session() for all actual deletion — it already
-handles manifests, index, transcripts, worktrees, co-resident sessions,
-and active-registry cleanup.
+Uses the shared read-only deletion planner and freezes all admissions before
+applying. Native conversations are always retained.
 """
 
 from __future__ import annotations
@@ -24,6 +23,12 @@ from forge.install.project_compat import (
 from forge.runtime_config import get_runtime_config
 from forge.session import SessionManager
 from forge.session.active import ActiveSessionStore
+from forge.session.cleanup_dependencies import session_entries
+from forge.session.deletion import (
+    SessionDeletionPlan,
+    apply_session_deletion,
+    plan_session_deletion,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +42,7 @@ class SessionCleanupResult:
     """
 
     deleted: list[str] = field(default_factory=list)
+    plans: list[SessionDeletionPlan] = field(default_factory=list)
     skipped_active: list[str] = field(default_factory=list)
     skipped_unparseable: list[str] = field(default_factory=list)
     skipped_project_compatibility: list[ProjectCompatibilitySkip] = field(default_factory=list)
@@ -53,6 +59,7 @@ class SessionCleanupResult:
         """Return True when cleanup found nothing actionable and did not abort."""
         return (
             not self.deleted
+            and not self.plans
             and not self.skipped_active
             and not self.skipped_unparseable
             and not self.skipped_project_compatibility
@@ -116,7 +123,7 @@ class SessionCleanupResult:
 def clean_old_sessions(
     older_than_days: int,
     *,
-    delete_transcripts: bool = True,
+    apply: bool = True,
     delete_worktree: bool = False,
     delete_branch: bool = False,
     force: bool = False,
@@ -128,9 +135,7 @@ def clean_old_sessions(
 
     Args:
         older_than_days: Age threshold in days.
-        delete_transcripts: Delete Claude transcript files (~/.claude/projects/*.jsonl).
-            This flag does not control Forge artifact snapshots; snapshots remain
-            unless their containing worktree is removed.
+        apply: Apply the initially admitted plans; false returns a read-only preview.
         delete_worktree: Delete git worktree directories (default False for safety).
         delete_branch: Delete git branches (requires delete_worktree=True).
         force: Bypass dirty-worktree protection (only relevant when delete_worktree=True).
@@ -138,7 +143,7 @@ def clean_old_sessions(
     result = SessionCleanupResult()
     manager = SessionManager()
 
-    all_sessions = manager.list_sessions(include_incognito=True)
+    all_sessions = session_entries(manager.index_store)
 
     # One-pass active session lookup (single lock/read/probe cycle).
     # Fail-closed: if we can't determine liveness, abort cleanup entirely.
@@ -146,7 +151,7 @@ def clean_old_sessions(
     # still running would destroy state.
     active_store = ActiveSessionStore()
     try:
-        active_entries = active_store.list_sessions()
+        active_entries = active_store.peek_sessions_strict()
         # Use (name, forge_root) tuples to avoid cross-project false positives
         active_identities = {(name, ae.forge_root or ae.worktree_path) for name, ae in active_entries}
     except Exception as e:
@@ -187,18 +192,30 @@ def clean_old_sessions(
             continue
 
         try:
-            manager.delete_session(
+            plan = plan_session_deletion(
+                manager.index_store,
                 name,
-                delete_transcripts=delete_transcripts,
+                forge_root=forge_root,
                 delete_worktree=delete_worktree,
                 delete_branch=delete_branch,
                 force=force,
-                forge_root=forge_root,
             )
-            result.deleted.append(name)
+            if plan.refusals:
+                result.failed.append((name, "; ".join(plan.refusals)))
+            else:
+                result.plans.append(plan)
         except Exception as e:
             result.failed.append((name, str(e)))
-            logger.debug("Failed to clean session '%s': %s", name, e, exc_info=True)
+            logger.debug("Failed to plan cleanup for '%s': %s", name, e, exc_info=True)
+
+    if apply:
+        for plan in result.plans:
+            try:
+                apply_session_deletion(manager.index_store, plan)
+                result.deleted.append(plan.name)
+            except Exception as e:
+                result.failed.append((plan.name, str(e)))
+                logger.debug("Failed to clean session '%s': %s", plan.name, e, exc_info=True)
 
     return result
 
@@ -210,9 +227,7 @@ def auto_clean_old_sessions() -> None:
     exceptions to avoid breaking CLI commands.
 
     Auto-cleanup uses safe defaults:
-    - delete_transcripts=True (a transcript Forge created is useless without its
-      session; an adopted session's native transcript is exempted downstream in
-      SessionManager.delete_session, since the user created it)
+    - native conversations are retained
     - delete_worktree=False (too destructive for automatic operation)
     - delete_branch=False (branches are lightweight, keep them)
     - force=True (safe because delete_worktree=False means dirty-check is never reached)
@@ -224,7 +239,6 @@ def auto_clean_old_sessions() -> None:
 
         cleanup_result = clean_old_sessions(
             older_than_days=rc.session_retention_days,
-            delete_transcripts=True,
             delete_worktree=False,
             delete_branch=False,
             force=True,

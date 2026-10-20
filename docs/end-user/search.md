@@ -41,7 +41,7 @@ Session stops
   → Stop hook enqueues "index" work marker
   → (session ends)
 
-Later queue-processing forge command (hook, status-line, logs, and clean are exempt)
+Later queue-processing forge command (hook, status-line, logs, session, and clean are exempt)
   → Work queue processes pending markers
   → Transcript is extracted, tokenized, and added to the BM25 index
 ```

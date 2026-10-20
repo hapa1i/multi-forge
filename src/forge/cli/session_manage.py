@@ -9,7 +9,6 @@ from __future__ import annotations
 import dataclasses
 import os
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -20,32 +19,20 @@ from rich.table import Table
 from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.cli.session import (  # noqa: E402
     _format_relative_time,
-    _get_active_session_entry,
     _get_session_type,
     _hint_cross_project_session,
-    _peek_active_session_entry,
-    _print_active_delete_warning,
-    _resolve_session_artifact_root,
     _session_list_location,
     _session_scope_key,
     _template_display_label,
     console,
     handle_session_error,
-    logger,
 )
 from forge.cli.session import session as _session_untyped  # noqa: E402
 from forge.core.ops.context import _cwd_forge_root
 from forge.core.ops.session_context import SessionContext
 from forge.core.paths import display_path
-from forge.core.state import parse_iso
-from forge.install.project_compat import (
-    ProjectCompatibilityError,
-    ProjectCompatibilitySkip,
-    enforce_project_compatibility,
-)
 from forge.session import (
     ForgeSessionError,
-    IndexStore,
     SessionIndexEntry,
     SessionManager,
     SessionState,
@@ -54,9 +41,10 @@ from forge.session.models import session_runtime
 
 session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
 
+from forge.cli.session_delete import delete as delete  # noqa: E402,F401
+from forge.cli.session_delete import purge as purge  # noqa: E402,F401
 from forge.session.exceptions import (  # noqa: E402
     AmbiguousSessionError,
-    DirtyWorktreeError,
     SessionNotFoundError,
 )
 from forge.session.plan_resolution import (  # noqa: E402
@@ -68,480 +56,6 @@ from forge.session.plan_resolution import (  # noqa: E402
     resolve_plan_info,
     resolve_plan_launch_root,
 )
-
-
-@session.command()
-@click.argument("names", nargs=-1)
-@click.option("--all", "-a", "delete_all", is_flag=True, help="Delete all sessions")
-@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
-@click.option(
-    "--force",
-    "-f",
-    is_flag=True,
-    help="Override dirty-worktree, corruption, and active-session guards",
-)
-@click.option(
-    "--keep-transcripts",
-    "-k",
-    is_flag=True,
-    help="Keep native Claude transcripts (does not control Forge artifact snapshots)",
-)
-@click.option("--keep-worktree", "-K", is_flag=True, help="Preserve worktree directory")
-@click.option("--delete-branch", "-d", is_flag=True, help="Also delete git branch")
-def delete(
-    names: tuple[str, ...],
-    delete_all: bool,
-    yes: bool,
-    force: bool,
-    keep_transcripts: bool,
-    keep_worktree: bool,
-    delete_branch: bool,
-) -> None:
-    """Delete one or more sessions and their data.
-
-    \b
-    Examples:
-      forge session delete my-session
-      forge session delete my-session --yes             # Skip confirmation
-      forge session delete my-session --yes --force     # Skip confirmation + override dirty worktree
-      forge session delete --all --yes
-
-    By default, removes the worktree directory but keeps the git branch.
-    Use --delete-branch to also delete the branch.
-    Use --keep-worktree to preserve the worktree directory.
-    """
-    if delete_all and names:
-        print_error("Cannot combine --all with explicit session names")
-        sys.exit(1)
-
-    if not delete_all and not names:
-        print_error("Provide session name(s) or use --all")
-        sys.exit(1)
-
-    manager = SessionManager()
-    _fr = _cwd_forge_root()
-    deleted = 0
-    failed = 0
-    skipped_project_compatibility: list[ProjectCompatibilitySkip] = []
-
-    if delete_all:
-        if _fr is None:
-            print_error_with_tip(
-                "--all requires being inside a Forge project (directory with .forge/)",
-                "Use explicit session names instead, or cd into a Forge project.",
-            )
-            sys.exit(1)
-        if yes:
-            all_sessions = manager.list_sessions(include_incognito=True, forge_root_filter=_fr)
-        else:
-            all_sessions = manager.index_store.peek_sessions(include_incognito=True, forge_root_filter=_fr)
-        if not all_sessions:
-            console.print("[dim]No sessions to delete.[/dim]")
-            return
-        targets = [name for name, _ in all_sessions]
-
-        active_lookup = _get_active_session_entry if yes else _peek_active_session_entry
-        active_targets = [
-            (target, active_entry)
-            for target in targets
-            if (active_entry := active_lookup(target, forge_root=_fr)) is not None
-        ]
-
-        # Active sessions are protected unless --force: skip the live ones and
-        # delete the rest rather than aborting the whole batch.
-        if active_targets and not force:
-            live_names = {target for target, _ in active_targets}
-            targets = [t for t in targets if t not in live_names]
-            console.print(f"[yellow]Skipping[/yellow] {len(live_names)} session(s) still running in Claude Code:")
-            for target, active_entry in active_targets:
-                details = [active_entry.launch_mode]
-                if active_entry.container_name:
-                    details.append(active_entry.container_name)
-                elif active_entry.launcher_pid is not None:
-                    details.append(f"pid {active_entry.launcher_pid}")
-                console.print(f"  - {target} ({', '.join(details)})")
-            print_tip(
-                "Exit those sessions first, or re-run with --force to delete them too.",
-                blank_before=False,
-                console=console,
-            )
-            if not targets:
-                return
-            console.print()
-
-        # ``--all`` is project-scoped, so every candidate has the same state
-        # owner. Refuse before the confirmation prompt while still reporting
-        # every session that apply would skip.
-        try:
-            enforce_project_compatibility(_fr)
-        except ProjectCompatibilityError as e:
-            for name in targets:
-                skip = ProjectCompatibilitySkip.from_error(
-                    target=name,
-                    forge_root=_fr,
-                    error=e,
-                )
-                skipped_project_compatibility.append(skip)
-                _print_project_compatibility_skip(skip)
-            console.print(
-                f"\n[dim]Summary: 0 deleted, {len(skipped_project_compatibility)} "
-                "skipped (project compatibility)[/dim]"
-            )
-            raise SystemExit(1)
-
-        console.print(f"About to delete [bold]all {len(targets)} session(s)[/bold]:")
-        for t in targets:
-            console.print(f"  - {t}")
-        if active_targets and force:
-            console.print()
-            console.print(
-                "[yellow]Warning:[/yellow] "
-                "The following sessions appear to still be active in running Claude Code launches:"
-            )
-            for target, active_entry in active_targets:
-                details = [active_entry.launch_mode]
-                if active_entry.container_name:
-                    details.append(active_entry.container_name)
-                elif active_entry.launcher_pid is not None:
-                    details.append(f"pid {active_entry.launcher_pid}")
-                console.print(f"  - {target} ({', '.join(details)})")
-            console.print(
-                "  Deleting them will remove Forge state while Claude keeps running until those launches exit."
-            )
-        console.print()
-        if not yes:
-            if not click.confirm(f"Are you sure you want to delete these {len(targets)} session(s)?"):
-                console.print("[dim]Cancelled[/dim]")
-                sys.exit(0)
-    else:
-        targets = list(dict.fromkeys(names))
-
-    for name in targets:
-        # Resolve across forge_roots within the repo (named deletes only)
-        actual_fr = _fr
-        target_has_project_state = delete_all
-        if not delete_all:
-            try:
-                from forge.core.ops.resolution import resolve_session_repo_wide
-
-                # Keep resolution observational. Confirmed repair belongs to the
-                # target deletion below so row-only residue can still be explained
-                # and handled as a successful repair rather than a later not-found.
-                resolved = resolve_session_repo_wide(name, _fr, manager=manager, repair_stale=False)
-                actual_fr = resolved.forge_root
-                target_has_project_state = True
-                if resolved.is_cross_project:
-                    console.print(f"[dim]Deleting session from {display_path(actual_fr)}[/dim]")
-            except AmbiguousSessionError as e:
-                print_error(f"{e}")
-                failed += 1
-                continue
-            except SessionNotFoundError:
-                pass  # Fall through to _delete_single_session for orphan handling
-            except ForgeSessionError:
-                # Manifest corrupt but session exists in index -- resolve the
-                # forge_root from the index so force-delete can clean it up.
-                try:
-                    index = IndexStore()
-                    entry = (
-                        index.get_session(name, forge_root=None) if yes else index.peek_session(name, forge_root=None)
-                    )
-                    if entry is not None:
-                        idx_fr = entry.root
-                        if idx_fr:
-                            actual_fr = idx_fr
-                            target_has_project_state = True
-                except (SessionNotFoundError, AmbiguousSessionError, ForgeSessionError):
-                    pass
-
-            if not target_has_project_state:
-                from forge.session.store import SessionStore
-
-                target_has_project_state = SessionStore(str(Path.cwd()), name).session_dir.is_dir()
-
-        if target_has_project_state and actual_fr is not None:
-            try:
-                enforce_project_compatibility(actual_fr)
-            except ProjectCompatibilityError as e:
-                skip = ProjectCompatibilitySkip.from_error(
-                    target=name,
-                    forge_root=actual_fr,
-                    error=e,
-                )
-                if len(targets) == 1:
-                    print_error(
-                        f"Project compatibility refused session '{skip.target}' "
-                        f"at {display_path(skip.forge_root)} ({skip.state}): {skip.reason}"
-                    )
-                    print_tip(skip.recovery, console=err_console)
-                    raise SystemExit(1)
-                skipped_project_compatibility.append(skip)
-                _print_project_compatibility_skip(skip)
-                continue
-
-        try:
-            _delete_single_session(
-                manager=manager,
-                name=name,
-                yes=yes or delete_all,
-                force=force,
-                keep_transcripts=keep_transcripts,
-                keep_worktree=keep_worktree,
-                delete_branch=delete_branch,
-                forge_root=actual_fr,
-                warn_active=not delete_all,
-            )
-            console.print(f"Deleted session [green]{name}[/green]")
-            deleted += 1
-        except SystemExit as e:
-            if len(targets) == 1:
-                raise
-            if e.code not in (0, None):
-                failed += 1
-        except DirtyWorktreeError as e:
-            if len(targets) == 1:
-                print_error_with_tip(
-                    str(e),
-                    "Use --force to remove anyway, or commit/stash your changes first.",
-                )
-                raise SystemExit(1)
-            print_error(f"{name}: {e}")
-            failed += 1
-        except ForgeSessionError as e:
-            if len(targets) == 1:
-                handle_session_error(e)
-            else:
-                print_error(f"{name}: {e}")
-                failed += 1
-        except Exception as e:
-            print_error(f"{name}: {e}")
-            failed += 1
-
-    if len(targets) > 1:
-        parts = [f"{deleted} deleted"]
-        if skipped_project_compatibility:
-            parts.append(f"{len(skipped_project_compatibility)} skipped (project compatibility)")
-        if failed:
-            parts.append(f"{failed} failed")
-        console.print(f"\n[dim]Summary: {', '.join(parts)}[/dim]")
-
-    if failed or skipped_project_compatibility:
-        sys.exit(1)
-
-
-def _print_project_compatibility_skip(skip: ProjectCompatibilitySkip) -> None:
-    """Report one refused target without aborting a multi-target command."""
-
-    print_error(
-        f"Skipped session '{skip.target}' at {display_path(skip.forge_root)} "
-        f"for project compatibility ({skip.state}): {skip.reason}"
-    )
-    print_tip(skip.recovery, blank_before=False, console=err_console)
-
-
-def _delete_single_session(
-    *,
-    manager: SessionManager,
-    name: str,
-    yes: bool,
-    force: bool,
-    keep_transcripts: bool,
-    keep_worktree: bool,
-    delete_branch: bool,
-    forge_root: str | None = None,
-    warn_active: bool = True,
-) -> None:
-    """Delete a single session, handling orphans and confirmation.
-
-    Args:
-        yes: Skip confirmation prompts (informational output stays visible).
-        force: Override dirty-worktree, corruption, and active-session guards.
-        warn_active: Print the per-session live-launch warning. The --all path
-            passes False because it already summarizes active sessions, avoiding
-            a duplicate warning.
-
-    Raises:
-        SystemExit: If the user cancels, the session is not found, or it is still
-            running in Claude Code without --force.
-        DirtyWorktreeError: If worktree has uncommitted changes and not force.
-        ForgeSessionError: On other session errors.
-    """
-    # Live sessions are protected before any deletion path (index-tracked or
-    # orphaned directory) so a running launch cannot lose its state without --force.
-    active_lookup = _get_active_session_entry if yes else _peek_active_session_entry
-    active_entry = active_lookup(name, forge_root=forge_root)
-    if active_entry is not None:
-        if warn_active:
-            _print_active_delete_warning(name, active_entry)
-        if not force:
-            print_error_with_tip(
-                "refusing to delete a session that is still running in Claude Code.",
-                "Exit that Claude Code session first, or pass --force to delete it anyway.",
-            )
-            raise SystemExit(1)
-
-    indexed_session_exists = manager.session_exists(name, forge_root=forge_root)
-    if not indexed_session_exists:
-        from forge.session.store import SessionStore
-
-        orphan_store = SessionStore(str(Path.cwd()), name)
-        if orphan_store.session_dir.is_dir():
-            import shutil
-
-            console.print(
-                f"Found orphaned session directory [bold]{name}[/bold] " "(exists on disk but not in session index)"
-            )
-            console.print(f"  Path: {display_path(orphan_store.session_dir)}")
-            if not yes:
-                if not click.confirm("Delete this orphaned session directory?"):
-                    console.print("[dim]Cancelled[/dim]")
-                    raise SystemExit(0)
-
-            shutil.rmtree(orphan_store.session_dir)
-            try:
-                from forge.session.active import ActiveSessionStore
-
-                ActiveSessionStore().clear_session(name, forge_root=forge_root)
-            except Exception:
-                logger.debug(
-                    "Failed to clear active-session entry for orphan '%s'",
-                    name,
-                    exc_info=True,
-                )
-            console.print(f"Cleaned up orphaned session directory [green]{name}[/green]")
-            return
-        print_error(f"session '{name}' not found")
-        raise SystemExit(1)
-
-    manifest: SessionState | None = None
-    manifest_entry: SessionIndexEntry | None = None
-    manifest_error: ForgeSessionError | None = None
-    row_only_residue = False
-    try:
-        from forge.session.store import SessionStore
-
-        if yes:
-            try:
-                manifest_entry = manager.index_store.get_session(name, forge_root=forge_root)
-                manifest = SessionStore(manifest_entry.root, name).read()
-            except SessionNotFoundError:
-                # A confirmed read may repair a row-only publication residue.
-                row_only_residue = True
-            except ForgeSessionError as e:
-                if not force:
-                    raise
-                manifest_error = e
-        else:
-            manifest_entry = manager.index_store.peek_session(name, forge_root=forge_root)
-            if manifest_entry is None:
-                row_only_residue = True
-            else:
-                try:
-                    manifest = SessionStore(manifest_entry.root, name).read()
-                except ForgeSessionError as e:
-                    if not force:
-                        raise
-                    manifest_error = e
-
-        if row_only_residue:
-            console.print(f"About to repair stale session record [bold]{name}[/bold]")
-            console.print("  [dim]The index row remains, but its session manifest is missing[/dim]")
-        else:
-            console.print(f"About to delete session [bold]{name}[/bold]")
-
-        if manifest_error is not None:
-            console.print(f"  [yellow]Manifest details unavailable: {escape(str(manifest_error))}[/yellow]")
-
-        if manifest is not None and manifest.confirmed.claude_session_id:
-            console.print(f"  UUID: {manifest.confirmed.claude_session_id}")
-
-        artifact_snapshots_removed = False
-        if manifest is not None and manifest.worktree and manifest.worktree.is_worktree:
-            assert manifest_entry is not None
-            cleanup_plan = manager.plan_worktree_cleanup(
-                name,
-                manifest,
-                delete_worktree=not keep_worktree,
-                forge_root=manifest_entry.root,
-            )
-            if cleanup_plan.remove and not force and not yes:
-                from forge.session.worktree import is_worktree_dirty
-
-                worktree_path = Path(manifest.worktree.path)
-                if worktree_path.exists() and is_worktree_dirty(worktree_path):
-                    raise DirtyWorktreeError(str(worktree_path))
-            if cleanup_plan.remove:
-                console.print(f"  Worktree will be removed: {display_path(manifest.worktree.path)}")
-                artifact_root = _resolve_session_artifact_root(manager=manager, state=manifest)
-                artifact_path = artifact_root / ".forge" / "artifacts" / name
-                artifact_snapshots_removed = artifact_path.resolve().is_relative_to(
-                    Path(manifest.worktree.path).resolve()
-                )
-            else:
-                reason = ""
-                if cleanup_plan.reason == "shared":
-                    residents = ", ".join(cleanup_plan.co_residents[:3])
-                    reason = f" (used by {residents})"
-                elif cleanup_plan.reason == "not_owned":
-                    reason = " (session does not own it)"
-                console.print(f"  [dim]Worktree will be kept{reason}: {display_path(manifest.worktree.path)}[/dim]")
-            if delete_branch and cleanup_plan.remove:
-                console.print(f"  Branch will be deleted: {manifest.worktree.branch}")
-            else:
-                console.print(f"  [dim]Branch will be kept: {manifest.worktree.branch}[/dim]")
-
-        if manifest is not None and session_runtime(manifest) == "claude_code":
-            if not keep_transcripts:
-                console.print("  [dim]Native Claude transcript files will be deleted[/dim]")
-            else:
-                console.print("  [dim]Native Claude transcript files will be kept[/dim]")
-        if manifest is not None:
-            if artifact_snapshots_removed:
-                console.print("  Forge artifact snapshots will be removed with the worktree")
-            else:
-                console.print("  [dim]Forge artifact snapshots will be kept[/dim]")
-
-        console.print()
-    except ForgeSessionError:
-        raise
-
-    if not yes:
-        if not click.confirm("Are you sure you want to delete this session?"):
-            console.print("[dim]Cancelled[/dim]")
-            raise SystemExit(0)
-
-    if row_only_residue:
-        if forge_root is None:
-            raise ForgeSessionError(
-                f"cannot safely repair stale session record '{name}' without its Forge root; "
-                "cd to the owning project and retry"
-            )
-        repaired = manager.repair_stale_session_record(name, forge_root=forge_root)
-        if not repaired:
-            raise ForgeSessionError(
-                f"session '{name}' changed while deletion was being prepared; "
-                f"a manifest-backed session now owns the name. Inspect it and retry 'forge session delete {name}'."
-            )
-        try:
-            from forge.session.active import ActiveSessionStore
-
-            ActiveSessionStore().clear_session(name, forge_root=forge_root)
-        except Exception:
-            logger.debug(
-                "Failed to clear active-session entry for repaired residue '%s'",
-                name,
-                exc_info=True,
-            )
-        return
-
-    manager.delete_session(
-        name,
-        delete_transcripts=not keep_transcripts,
-        delete_worktree=not keep_worktree,
-        delete_branch=delete_branch,
-        force=force,
-        forge_root=forge_root,
-    )
 
 
 @session.command("list")
@@ -735,12 +249,6 @@ def _print_session_list_tips(items: list) -> None:
 @click.option("--yes", "-y", is_flag=True, help="Actually delete (default is a preview)")
 @click.option("--force", "-f", is_flag=True, help="Bypass dirty-worktree protection")
 @click.option(
-    "--keep-transcripts",
-    "-k",
-    is_flag=True,
-    help="Keep Claude transcript files (~/.claude/projects/*.jsonl); does not control Forge artifact snapshots",
-)
-@click.option(
     "--delete-worktree",
     is_flag=True,
     help="Also remove worktree directories (default: keep)",
@@ -751,248 +259,51 @@ def _print_session_list_tips(items: list) -> None:
     is_flag=True,
     help="Also delete git branches (requires --delete-worktree)",
 )
-def clean(
-    older_than: int,
-    yes: bool,
-    force: bool,
-    keep_transcripts: bool,
-    delete_worktree: bool,
-    delete_branch: bool,
-) -> None:
-    """Delete sessions older than a given age.
+def clean(older_than: int, yes: bool, force: bool, delete_worktree: bool, delete_branch: bool) -> None:
+    """Preview old Forge sessions for deletion while retaining native conversations.
 
-    \b
-    Examples:
-        forge session clean --older-than 30          # Preview sessions > 30 days old
-        forge session clean --older-than 30 --yes    # Actually delete them
-        forge session clean --older-than 90 -k --yes # Delete but keep transcript files
-
-    Previews by default; pass --yes to delete. Active sessions are always
-    skipped. Worktrees are preserved by default (use --delete-worktree to
-    remove them).
+    Pass --yes to apply. Active sessions and dependent sessions are retained.
+    Worktrees are kept unless --delete-worktree is explicitly selected.
     """
     if older_than < 1:
-        print_error("--older-than must be >= 1")
-        sys.exit(1)
-
+        raise click.UsageError("--older-than must be >= 1")
     if delete_branch and not delete_worktree:
-        print_error("--delete-branch requires --delete-worktree")
-        sys.exit(1)
-
-    if not yes:
-        deletable = _clean_sessions_dry_run(
-            older_than,
-            delete_worktree=delete_worktree,
-            force=force,
-        )
-        if deletable:
-            print_tip("Use --yes to delete.", console=console)
-        return
-
+        raise click.UsageError("--delete-branch requires --delete-worktree")
+    from forge.cli.session_delete import print_deletion_plan
     from forge.session.cleanup import clean_old_sessions
 
     result = clean_old_sessions(
         older_than_days=older_than,
-        delete_transcripts=not keep_transcripts,
+        apply=yes,
         delete_worktree=delete_worktree,
         delete_branch=delete_branch,
         force=force,
     )
-
     if result.is_empty:
         console.print(f"[dim]No sessions older than {older_than} days found.[/dim]")
         return
-
-    if result.aborted:
-        print_error("Session cleanup aborted before evaluation completed.")
-        err_console.print(f"  [dim]{result.aborted_error}[/dim]")
-
-    if result.deleted:
-        console.print(
-            f"Cleaned {len(result.deleted)} session{'s' if len(result.deleted) != 1 else ''}"
-            f" older than {older_than} days."
-        )
-    elif not result.aborted:
+    if not yes:
+        for plan in result.plans:
+            print_deletion_plan(plan)
+        console.print(f"Would delete {len(result.plans)} session(s).")
+        if result.plans:
+            print_tip("Use --yes to delete.", console=console)
+    elif result.deleted:
+        console.print(f"Cleaned {len(result.deleted)} session(s) older than {older_than} days.")
+    else:
         console.print("[dim]No sessions cleaned.[/dim]")
-
-    if result.skipped_active:
-        console.print(
-            f"[dim]Kept {len(result.skipped_active)} active session{'s' if len(result.skipped_active) != 1 else ''}.[/dim]"
-        )
-
-    if result.skipped_unparseable:
-        console.print(
-            f"[dim]Skipped {len(result.skipped_unparseable)} session{'s' if len(result.skipped_unparseable) != 1 else ''}"
-            f" with unparseable timestamps.[/dim]"
-        )
-
-    if result.skipped_project_compatibility:
-        count = len(result.skipped_project_compatibility)
-        console.print(f"[yellow]Skipped {count} session{'s' if count != 1 else ''} for project compatibility.[/yellow]")
-        for skip in result.skipped_project_compatibility:
-            console.print(
-                f"  [dim]{skip.target} ({skip.state}) at {display_path(skip.forge_root)}: {skip.reason}[/dim]"
-            )
-            print_tip(skip.recovery, blank_before=False, console=console)
-
-    if result.has_failures:
-        console.print(
-            f"[yellow]Encountered {result.summary_failed_count} cleanup {result.summary_failed_label}.[/yellow]"
-        )
-        for name, err in result.failure_items():
-            console.print(f"  [dim]{name}: {err}[/dim]")
-
+    for name in result.skipped_active:
+        console.print(f"Kept active session: {escape(name)}")
+    for name in result.skipped_unparseable:
+        console.print(f"Skipped session with unparseable timestamp: {escape(name)}")
+    for skip in result.skipped_project_compatibility:
+        console.print(f"Refused {escape(skip.target)} ({escape(skip.state)}): {escape(skip.reason)}")
+        print_tip(skip.recovery, console=console)
+    for name, reason in result.failure_items():
+        console.print(f"Refused {escape(name)}: {escape(reason)}")
     if result.should_exit_nonzero:
-        sys.exit(1)
-
-
-def _clean_sessions_dry_run(
-    older_than_days: int,
-    *,
-    delete_worktree: bool,
-    force: bool,
-) -> int:
-    """Preview which sessions would be cleaned; return the deletable count.
-
-    Iterates all sessions directly (same path as clean_old_sessions) so that
-    unparseable timestamps and active-registry errors are visible in the preview.
-    The returned count lets the caller offer a `--yes` tip only when there is
-    something to delete.
-    """
-    from forge.session.active import ActiveSessionStore
-
-    manager = SessionManager()
-    all_sessions = manager.index_store.peek_sessions(include_incognito=True)
-    remaining_sessions = list(all_sessions)
-
-    # One-pass active lookup -- fail-closed matches cleanup behavior
-    active_store = ActiveSessionStore()
-    registry_error = False
-    try:
-        active_entries = active_store.peek_sessions()
-        active_identities = {(name, ae.forge_root or ae.worktree_path) for name, ae in active_entries}
-    except Exception:
-        active_identities = set()
-        registry_error = True
-
-    table = Table(show_header=True, header_style="bold")
-    table.add_column("SESSION")
-    table.add_column("AGE")
-    table.add_column("STATUS")
-
-    deletable = 0
-    skipped = 0
-    would_fail = 0
-    any_old = False
-    compatibility_skips: list[ProjectCompatibilitySkip] = []
-    for name, entry in all_sessions:
-        try:
-            dt = parse_iso(entry.last_accessed_at)
-            age_days = (datetime.now(UTC) - dt).total_seconds() / 86400
-        except (ValueError, TypeError, AttributeError):
-            table.add_row(name, "?", "[dim]unparseable timestamp (skip)[/dim]")
-            skipped += 1
-            any_old = True
-            continue
-
-        if age_days <= older_than_days:
-            continue
-
-        any_old = True
-        age_str = f"{int(age_days)}d"
-        if (name, entry.forge_root or entry.worktree_path) in active_identities:
-            table.add_row(name, age_str, "[yellow]active (skip)[/yellow]")
-            skipped += 1
-        else:
-            forge_root = entry.forge_root or entry.worktree_path
-            try:
-                enforce_project_compatibility(forge_root)
-            except ProjectCompatibilityError as e:
-                skip = ProjectCompatibilitySkip.from_error(
-                    target=name,
-                    forge_root=forge_root,
-                    error=e,
-                )
-                compatibility_skips.append(skip)
-                table.add_row(
-                    name,
-                    age_str,
-                    f"[yellow]{skip.state} (apply skip)[/yellow]",
-                )
-                skipped += 1
-            else:
-                try:
-                    manifest: SessionState | None = None
-                    if not force:
-                        from forge.session.store import SessionStore
-
-                        # Apply always validates the manifest unless --force was
-                        # explicitly selected, even when the worktree is kept.
-                        manifest = SessionStore(forge_root, name).read()
-                    if delete_worktree and not force:
-                        from forge.session.worktree import is_worktree_dirty
-
-                        assert manifest is not None
-                        cleanup_plan = manager.plan_worktree_cleanup(
-                            name,
-                            manifest,
-                            delete_worktree=True,
-                            forge_root=forge_root,
-                            sessions=remaining_sessions,
-                        )
-                        worktree = manifest.worktree
-                        dirty_owned_worktree = (
-                            cleanup_plan.remove
-                            and worktree is not None
-                            and Path(worktree.path).exists()
-                            and is_worktree_dirty(Path(worktree.path))
-                        )
-                        if dirty_owned_worktree:
-                            table.add_row(
-                                name,
-                                age_str,
-                                "[red]dirty worktree (apply failure)[/red]",
-                            )
-                            would_fail += 1
-                            continue
-                except Exception as e:
-                    table.add_row(name, age_str, f"[red]apply failure: {escape(str(e))}[/red]")
-                    would_fail += 1
-                    continue
-                table.add_row(name, age_str, "[green]will delete[/green]")
-                deletable += 1
-                remaining_sessions = [
-                    (other_name, other_entry)
-                    for other_name, other_entry in remaining_sessions
-                    if not (other_name == name and (other_entry.forge_root or other_entry.worktree_path) == forge_root)
-                ]
-
-    if not any_old:
-        console.print(f"[dim]No sessions older than {older_than_days} days found.[/dim]")
-        return 0
-
-    console.print(table)
-
-    for skip in compatibility_skips:
-        console.print(
-            f"[yellow]Apply would skip[/yellow] {skip.target} ({skip.state}) at "
-            f"{display_path(skip.forge_root)}: {skip.reason}"
-        )
-        print_tip(skip.recovery, blank_before=False, console=console)
-
-    if registry_error:
-        console.print(
-            "[yellow]Warning:[/yellow] Could not read active session registry."
-            " Actual cleanup would abort to protect running sessions."
-        )
-
-    console.print(
-        f"\n[dim]Would delete {deletable} session{'s' if deletable != 1 else ''}"
-        + (f", skip {skipped}" if skipped else "")
-        + (f", fail {would_fail}" if would_fail else "")
-        + ".[/dim]"
-    )
-    return deletable
+        print_error("Session cleanup refused or failed one or more targets.")
+        raise SystemExit(1)
 
 
 @session.command()

@@ -92,12 +92,12 @@ def delete_published_session(index_store: IndexStore, name: str, forge_root: str
     store = SessionStore(root, name)
 
     def delete_manifest() -> None:
-        store.delete()
+        store.delete_locked()
 
     return index_store.delete_session_txn(
         name,
         root,
-        expect_manifest_absent=False,
+        expected_instance_id=index_store.migrate_session_identity(name, root),
         delete_manifest=delete_manifest,
     )
 

@@ -254,21 +254,26 @@ def _rollback_created_session(
     error: str,
     tip: str,
     log_context: str,
+    expected_instance_id: str | None,
 ) -> tuple[str, str]:
     """Delete a failed child or add explicit recovery when that rollback also fails."""
     try:
+        if expected_instance_id is None:
+            raise ForgeSessionError("Created child has no captured instance identity; retained for inspection")
         manager.delete_session(
             session_name,
             delete_worktree=delete_worktree,
-            delete_transcripts=False,
             force=True,
             forge_root=forge_root,
+            expected_instance_id=expected_instance_id,
         )
     except Exception as exc:
         logger.debug("%s rollback delete failed", log_context, exc_info=True)
         failure = str(exc) or type(exc).__name__
         keep_worktree = " --keep-worktree" if not delete_worktree else ""
-        command = f"forge session delete {session_name} --yes --force --keep-transcripts{keep_worktree}"
+        command = f"forge session delete {session_name} --yes --force{keep_worktree}"
+        if forge_root is not None:
+            command += f" --forge-root {shlex.quote(forge_root)}"
         return (
             f"{error} Cleanup also failed for created session '{session_name}': {failure}.",
             f"Run '{command}' after resolving the cleanup error. {tip}",
@@ -1024,7 +1029,7 @@ def launch_new_session(
     is_flag=True,
     help="Bypass the proxy and talk to Anthropic directly",
 )
-@click.option("--incognito", "-i", is_flag=True, help="Auto-delete session on exit")
+@click.option("--incognito", "-i", is_flag=True, help="Attempt guarded purge after runtime exit")
 @click.option("--system-prompt", "-s", help="Append system prompt text")
 @click.option(
     "--system-prompt-file",
@@ -2198,10 +2203,7 @@ def _resume_fresh(
 ) -> None:
     """Create a fresh child session with context assembled from parent.
 
-    This is the --fresh path of ``forge session resume``. Creates a new
-    derived session with a context summary, then launches Claude fresh.
-    When ``review`` is True, opens the per-child transfer file in $EDITOR
-    before launching (user can curate the context).
+    ``review`` opens the child's notes in $EDITOR before launch.
     """
     effective_proxy_ref = _resume_context_ref(state=parent_state, routing=routing, direct=direct)
     context_limit = (
@@ -2215,10 +2217,12 @@ def _resume_fresh(
         direct_model_override=direct_model_override,
     )
 
+    created_instances: list[str] = []
     try:
         child_manifest, transfer_result = manager.resume_session(
             parent,
             child_name=child_name,
+            instance_sink=created_instances.append,
             strategy=strategy,
             depth=depth,
             context_limit=context_limit,
@@ -2235,77 +2239,85 @@ def _resume_fresh(
         print_error(str(e))
         sys.exit(1)
 
-    console.print(f"[dim]Context assembled: {transfer_result.context_file_rel}[/dim]")
-    if transfer_result.warnings:
-        for warning in transfer_result.warnings:
-            console.print(f"[yellow]Warning:[/yellow] {warning}")
-    console.print()
+    from forge.session.workers import session_worker_lease
 
-    if review and transfer_result.context_file is not None:
-        # Unify on the overlay: --review edits the user-notes overlay, never the
-        # pure AI snapshot. Notes are merged into the launch context below.
-        notes_overlay = ensure_notes_overlay(transfer_result.context_file)
-        console.print(
-            f"[dim]Opening notes overlay {display_path(notes_overlay)} in $EDITOR "
-            f"(AI snapshot at {transfer_result.context_file_rel} stays read-only)...[/dim]"
+    child_root = Path(child_manifest.forge_root or str(Path.cwd()))
+    with session_worker_lease(
+        child_root,
+        child_manifest.name,
+        expected_instance_id=created_instances[0],
+        label="fresh transfer launch",
+    ):
+        console.print(f"[dim]Context assembled: {transfer_result.context_file_rel}[/dim]")
+        if transfer_result.warnings:
+            for warning in transfer_result.warnings:
+                console.print(f"[yellow]Warning:[/yellow] {warning}")
+        console.print()
+
+        if review and transfer_result.context_file is not None:
+            notes_overlay = ensure_notes_overlay(transfer_result.context_file)
+            console.print(
+                f"[dim]Opening notes overlay {display_path(notes_overlay)} in $EDITOR "
+                f"(AI snapshot at {transfer_result.context_file_rel} stays read-only)...[/dim]"
+            )
+            open_in_editor(
+                notes_overlay,
+                console=console,
+                abort_tip=(
+                    f"Your notes at {display_path(notes_overlay)} are preserved. "
+                    f"Run 'forge session resume {child_manifest.name}' to launch with the current content."
+                ),
+            )
+
+        console.print(f"Created derived session [green]{child_manifest.name}[/green] from [cyan]{parent}[/cyan]")
+        depth_label = "all" if depth is None else str(depth)
+        console.print(f"[dim]Strategy: {strategy}, Depth: {depth_label}[/dim]")
+        console.print()
+
+        # Launch Claude as a NEW session (not resuming parent's conversation)
+        child_worktree = Path(child_manifest.worktree.path) if child_manifest.worktree else Path.cwd()
+        prompt_files: list[Path] = []
+        configured_prompt = resolve_manifest_prompt_file(child_manifest)
+        if configured_prompt is not None:
+            prompt_files.append(configured_prompt)
+        if transfer_result.context_file is not None:
+            snapshot = transfer_result.context_file.resolve()
+            prompt_files.append(snapshot)
+            # Merge the user-notes overlay (e.g. just authored via --review) after
+            # the pure AI snapshot. _combine_prompt_files concatenates both into one
+            # appended system-prompt file; the snapshot itself is never edited.
+            notes_overlay = notes_for_snapshot(snapshot)
+            if notes_has_user_content(notes_overlay):
+                prompt_files.append(notes_overlay)
+        prompt_file = _combine_prompt_files(
+            worktree_path=child_worktree,
+            session_name=child_manifest.name,
+            prompt_files=prompt_files,
         )
-        open_in_editor(
-            notes_overlay,
-            console=console,
-            abort_tip=(
-                f"Your notes at {display_path(notes_overlay)} are preserved. "
-                f"Run 'forge session resume {child_manifest.name}' to launch with the current content."
+
+        use_sidecar, mounts, image = _get_resume_launch_preferences(child_manifest, direct=direct)
+
+        _execute_resume_launch_plan(
+            manager=manager,
+            plan=ResumeLaunchPlan(
+                manifest=child_manifest,
+                instance_id=created_instances[0],
+                routing=_resume_routing_for_op(routing),
+                direct=direct,
+                resume_id=None,
+                session_id=str(_uuid.uuid4()),
+                fork_session=False,
+                prompt_file=Path(prompt_file) if prompt_file else None,
+                action=ClaudeResumeAction.FRESH_DERIVED,
+                context_limit=context_limit,
+                launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
+                direct_model_override=direct_model_override,
+                model_route_selection=model_route_selection,
+                render_model_route=render_model_route,
+                launch_args=launch_args or RuntimeLaunchArgs(),
+                parent_name=parent,
             ),
         )
-
-    console.print(f"Created derived session [green]{child_manifest.name}[/green] from [cyan]{parent}[/cyan]")
-    depth_label = "all" if depth is None else str(depth)
-    console.print(f"[dim]Strategy: {strategy}, Depth: {depth_label}[/dim]")
-    console.print()
-
-    # Launch Claude as a NEW session (not resuming parent's conversation)
-    child_worktree = Path(child_manifest.worktree.path) if child_manifest.worktree else Path.cwd()
-    prompt_files: list[Path] = []
-    configured_prompt = resolve_manifest_prompt_file(child_manifest)
-    if configured_prompt is not None:
-        prompt_files.append(configured_prompt)
-    if transfer_result.context_file is not None:
-        snapshot = transfer_result.context_file.resolve()
-        prompt_files.append(snapshot)
-        # Merge the user-notes overlay (e.g. just authored via --review) after
-        # the pure AI snapshot. _combine_prompt_files concatenates both into one
-        # appended system-prompt file; the snapshot itself is never edited.
-        notes_overlay = notes_for_snapshot(snapshot)
-        if notes_has_user_content(notes_overlay):
-            prompt_files.append(notes_overlay)
-    prompt_file = _combine_prompt_files(
-        worktree_path=child_worktree,
-        session_name=child_manifest.name,
-        prompt_files=prompt_files,
-    )
-
-    use_sidecar, mounts, image = _get_resume_launch_preferences(child_manifest, direct=direct)
-
-    _execute_resume_launch_plan(
-        manager=manager,
-        plan=ResumeLaunchPlan(
-            manifest=child_manifest,
-            routing=_resume_routing_for_op(routing),
-            direct=direct,
-            resume_id=None,
-            session_id=str(_uuid.uuid4()),
-            fork_session=False,
-            prompt_file=Path(prompt_file) if prompt_file else None,
-            action=ClaudeResumeAction.FRESH_DERIVED,
-            context_limit=context_limit,
-            launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
-            direct_model_override=direct_model_override,
-            model_route_selection=model_route_selection,
-            render_model_route=render_model_route,
-            launch_args=launch_args or RuntimeLaunchArgs(),
-            parent_name=parent,
-        ),
-    )
 
 
 @session.command(cls=RuntimePassthroughCommand)
@@ -2377,8 +2389,8 @@ def incognito(
 ) -> None:
     """Start an incognito session.
 
-    Shortcut for ``forge session start --incognito``. The session is
-    automatically deleted when exited.
+    Shortcut for ``forge session start --incognito``. Attempts guarded purge
+    after runtime exit; refused cleanup retains the session for inspection.
 
     \b
     Examples:

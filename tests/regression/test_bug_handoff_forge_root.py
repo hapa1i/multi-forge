@@ -20,6 +20,8 @@ from forge.core.workqueue.queue import (
     enqueue_index_marker,
     enqueue_stop_marker,
 )
+from forge.session.index import IndexStore
+from tests.fixtures.session_state import publish_session_from_fields
 
 pytestmark = pytest.mark.regression
 
@@ -29,16 +31,18 @@ def test_bug_stop_marker_includes_forge_root(tmp_path: Path, monkeypatch: pytest
 
     import json
 
+    root = tmp_path / "checkout" / "nested"
+    publish_session_from_fields(IndexStore(), "my-session", root, root)
     result = enqueue_stop_marker(
         session_id="test-123",
         worktree_path=tmp_path / "checkout",
         session_name="my-session",
         transcript_snapshot_rel=".forge/artifacts/transcript.jsonl",
-        forge_root="/nested/forge/root",
+        forge_root=str(root),
     )
     assert result is not None
     payload = json.loads(result.read_text())["payload"]
-    assert payload["forge_root"] == "/nested/forge/root"
+    assert payload["forge_root"] == str(root)
     assert payload["worktree_path"] == str(tmp_path / "checkout")
 
 
@@ -47,16 +51,18 @@ def test_bug_index_marker_includes_forge_root(tmp_path: Path, monkeypatch: pytes
 
     import json
 
+    root = tmp_path / "checkout" / "nested"
+    publish_session_from_fields(IndexStore(), "my-session", root, root)
     result = enqueue_index_marker(
         session_id="test-123",
         worktree_path=tmp_path / "checkout",
         session_name="my-session",
         transcript_snapshot_rel=".forge/artifacts/transcript.jsonl",
-        forge_root="/nested/forge/root",
+        forge_root=str(root),
     )
     assert result is not None
     payload = json.loads(result.read_text())["payload"]
-    assert payload["forge_root"] == "/nested/forge/root"
+    assert payload["forge_root"] == str(root)
 
 
 def test_bug_handoff_marker_includes_forge_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -64,31 +70,35 @@ def test_bug_handoff_marker_includes_forge_root(tmp_path: Path, monkeypatch: pyt
 
     import json
 
+    root = tmp_path / "checkout" / "nested"
+    publish_session_from_fields(IndexStore(), "my-session", root, root)
     result = enqueue_handoff_marker(
         session_id="test-123",
         worktree_path=tmp_path / "checkout",
         session_name="my-session",
         transcript_snapshot_rel=".forge/artifacts/transcript.jsonl",
-        forge_root="/nested/forge/root",
+        forge_root=str(root),
     )
     assert result is not None
     payload = json.loads(result.read_text())["payload"]
-    assert payload["forge_root"] == "/nested/forge/root"
+    assert payload["forge_root"] == str(root)
 
 
 def test_bug_markers_backward_compat_no_forge_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Omitting forge_root should not add it to the payload (backward compat)."""
+    """Omitting forge_root binds ownership to the supplied worktree."""
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
 
     import json
 
+    root = tmp_path / "checkout" / "nested"
+    publish_session_from_fields(IndexStore(), "my-session", root, root)
     result = enqueue_stop_marker(
         session_id="compat-123",
-        worktree_path=tmp_path / "checkout",
+        worktree_path=root,
         session_name="my-session",
         transcript_snapshot_rel=".forge/artifacts/transcript.jsonl",
     )
     assert result is not None
     payload = json.loads(result.read_text())["payload"]
-    assert "forge_root" not in payload
-    assert payload["worktree_path"] == str(tmp_path / "checkout")
+    assert payload["forge_root"] == str(root)
+    assert payload["worktree_path"] == str(root)

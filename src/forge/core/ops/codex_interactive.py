@@ -88,6 +88,7 @@ from forge.session.models import (
 )
 from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.transfer import parse_transfer_context_strategy
+from forge.session.workers import capture_session_instance, session_worker_lease
 
 from .session_authority_launch import authority_launch_transaction, require_launch_args
 from .session_routing import build_runtime_native_routing_payload, commit_launch_routing
@@ -207,9 +208,11 @@ def start_interactive_codex_session(
             f"or use the default initial-message delivery."
         )
 
+    created_instances: list[str] = []
     try:
         state = manager.start_session(
             name,
+            instance_sink=created_instances.append,
             create_worktree=create_worktree,
             branch=branch,
             direct=True,
@@ -233,13 +236,17 @@ def start_interactive_codex_session(
     warnings: list[str] = []
     if parent is not None:
         try:
-            _clear_stale_child_snapshot(transfer_root, parent, name, warnings)
+            with session_worker_lease(
+                child_forge_root, name, expected_instance_id=created_instances[0], label="Codex launch preparation"
+            ):
+                _clear_stale_child_snapshot(transfer_root, parent, name, warnings)
         except Exception:
             # Nothing of ours is on disk yet: remove only the session (a referenced
             # pre-existing snapshot is another session's property).
             _rollback_created_session(
                 manager,
                 name,
+                expected_instance_id=created_instances[0],
                 forge_root=str(child_forge_root),
                 delete_branch=create_worktree,
             )
@@ -249,46 +256,50 @@ def start_interactive_codex_session(
     assembly = None
     initial_prompt: str | None = None
     try:
-        store = manager.get_session_store(name, forge_root=str(child_forge_root))
-        # Receipts must describe THIS launch only; the session dir is fresh, but the
-        # clears are cheap insurance against any leftover state.
-        clear_observation_receipt(store.session_dir)
-        clear_pending_context(store.session_dir)
-        if parent is not None:
-            # The curation usage event lands under the SAME root the TUI inherits
-            # (invoke takes run_identity=root below) -- one run tree.
-            with _temporary_run_env(root, name, forge_root=str(transfer_root)):
-                assembly = assemble_codex_transfer(
-                    ctx=ctx,
-                    parent=parent,
-                    child=name,
-                    strategy=strategy,
-                    depth=depth,
-                    output_root=output_root,
-                )
-            if context_delivery == "hook":
-                stage_pending_context(store.session_dir, compose_codex_handoff_context(assembly.body))
-            else:
-                initial_prompt = compose_codex_interactive_context(assembly.body)
+        with session_worker_lease(
+            child_forge_root, name, expected_instance_id=created_instances[0], label="Codex launch preparation"
+        ):
+            store = manager.get_session_store(name, forge_root=str(child_forge_root))
+            # Receipts must describe THIS launch only; the session dir is fresh, but the
+            # clears are cheap insurance against any leftover state.
+            clear_observation_receipt(store.session_dir)
+            clear_pending_context(store.session_dir)
+            if parent is not None:
+                # The curation usage event lands under the SAME root the TUI inherits
+                # (invoke takes run_identity=root below) -- one run tree.
+                with _temporary_run_env(root, name, forge_root=str(transfer_root)):
+                    assembly = assemble_codex_transfer(
+                        ctx=ctx,
+                        parent=parent,
+                        child=name,
+                        strategy=strategy,
+                        depth=depth,
+                        output_root=output_root,
+                    )
+                if context_delivery == "hook":
+                    stage_pending_context(store.session_dir, compose_codex_handoff_context(assembly.body))
+                else:
+                    initial_prompt = compose_codex_interactive_context(assembly.body)
 
-        # Tight discovery window: taken AFTER assembly (which can run 30s+ of LLM
-        # curation) and immediately before the TUI spawns.
-        discovery_started_at = datetime.now(timezone.utc)
-        if announce is not None:
-            announce(
-                CodexInteractiveLaunch(
-                    session=name,
-                    parent=parent,
-                    worktree_path=state.worktree.path if state.worktree else None,
-                    transfer_path=(assembly.transfer_path if assembly is not None else None),
-                    context_delivery=context_delivery if parent is not None else None,
+            # Tight discovery window: taken AFTER assembly (which can run 30s+ of LLM
+            # curation) and immediately before the TUI spawns.
+            discovery_started_at = datetime.now(timezone.utc)
+            if announce is not None:
+                announce(
+                    CodexInteractiveLaunch(
+                        session=name,
+                        parent=parent,
+                        worktree_path=state.worktree.path if state.worktree else None,
+                        transfer_path=(assembly.transfer_path if assembly is not None else None),
+                        context_delivery=context_delivery if parent is not None else None,
+                    )
                 )
-            )
     except Exception:
         # Past the stale-snapshot guard, any snapshot at this key was written by this run.
         _rollback_created_session(
             manager,
             name,
+            expected_instance_id=created_instances[0],
             forge_root=str(child_forge_root),
             snapshot=(child_path(transfer_root, parent, name) if parent is not None else None),
             notes=(child_notes_path(transfer_root, parent, name) if parent is not None else None),
@@ -299,6 +310,7 @@ def start_interactive_codex_session(
     # The TUI launch: NO rollback past this point -- the session is the user's.
     with authority_launch_transaction(
         store=store,
+        expected_instance_id=created_instances[0],
         launch_args=launch_args,
         root=root,
         operation="start",
@@ -445,6 +457,7 @@ def reattach_codex_session(
     operation_started_at = datetime.now(timezone.utc)
     manager = SessionManager()
     entry, state = resolve_codex_session(manager, name, forge_root=ctx.forge_root)
+    instance_id = capture_session_instance(entry.forge_root or entry.worktree_path, name)
     thread_id = require_codex_thread_id(state, name)
     launch_args = require_launch_args(launch_args, runtime="codex", authority=state.intent.authority)
 
@@ -458,9 +471,12 @@ def reattach_codex_session(
     store = manager.get_session_store(name, forge_root=entry.forge_root)
     # One-shot invariant, defensively: a staged handoff that survived the start turn
     # (crash window) must never late-deliver into a resume turn from an enrolled home.
-    if clear_pending_context(store.session_dir):
-        warnings.append("Cleared a stale staged handoff (its start turn never delivered it).")
-    clear_observation_receipt(store.session_dir)
+    with session_worker_lease(
+        session_forge_root, name, expected_instance_id=instance_id, label="Codex resume preparation"
+    ):
+        if clear_pending_context(store.session_dir):
+            warnings.append("Cleared a stale staged handoff (its start turn never delivered it).")
+        clear_observation_receipt(store.session_dir)
 
     cwd = state.worktree.path if state.worktree else str(ctx.cwd)
     root = new_root_run_identity()
@@ -478,6 +494,7 @@ def reattach_codex_session(
 
     with authority_launch_transaction(
         store=store,
+        expected_instance_id=instance_id,
         launch_args=launch_args,
         root=root,
         operation="resume",

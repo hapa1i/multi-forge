@@ -121,6 +121,41 @@ def authority_launch_transaction(
     claude_session_id: str | None = None,
     codex_preflight: CodexPreflight | None = None,
     active_store: ActiveSessionStore | None = None,
+    expected_instance_id: str | None = None,
+) -> Iterator[AuthorityLaunchAttempt | None]:
+    """Reserve the original session through launch preflight and native exit."""
+    from forge.session.workers import capture_session_instance, session_worker_lease
+
+    instance_id = expected_instance_id or capture_session_instance(store.forge_root, store.session_name)
+    with session_worker_lease(
+        store.forge_root, store.session_name, expected_instance_id=instance_id, label="session launch"
+    ):
+        with _authority_launch_transaction(
+            store=store,
+            root=root,
+            operation=operation,
+            launch_mode=launch_mode,
+            worktree_path=worktree_path,
+            launch_args=launch_args,
+            claude_session_id=claude_session_id,
+            codex_preflight=codex_preflight,
+            active_store=active_store,
+        ) as attempt:
+            yield attempt
+
+
+@contextmanager
+def _authority_launch_transaction(
+    *,
+    store: SessionStore,
+    root: RunIdentity,
+    operation: str,
+    launch_mode: str,
+    worktree_path: Path,
+    launch_args: RuntimeLaunchArgs,
+    claude_session_id: str | None = None,
+    codex_preflight: CodexPreflight | None = None,
+    active_store: ActiveSessionStore | None = None,
 ) -> Iterator[AuthorityLaunchAttempt | None]:
     """Serialize authority posture and preflight and journal a marked launch.
 
@@ -344,7 +379,7 @@ def _begin_marked_authority_launch(
         raise ForgeOpError(f"session '{state.name}' is already active")
 
     try:
-        active_store.upsert_session(
+        active_store.register_session(
             state.name,
             worktree_path=str(worktree_path),
             launch_mode=launch_mode,

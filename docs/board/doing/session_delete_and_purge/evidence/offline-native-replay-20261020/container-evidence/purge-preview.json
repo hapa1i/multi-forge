@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "name": "probe-purge",
+  "forge_root": "/probe/workspace",
+  "instance_id": "7348ea2997454fb180f602258a24cb81",
+  "mode": "purge",
+  "retry": false,
+  "manifest_directory": "/probe/workspace/.forge/sessions/probe-purge",
+  "manifest_directory_scope": "entire-directory",
+  "content": {
+    "schema_version": 1,
+    "forge_root": "/probe/workspace",
+    "session_name": "probe-purge",
+    "files": [],
+    "directories": [],
+    "absent_paths": [
+      "/probe/workspace/.forge/artifacts/probe-purge",
+      "/probe/workspace/.forge/prev_sessions/probe-purge"
+    ],
+    "search_keys": [],
+    "reviewer_homes": [],
+    "refusals": [],
+    "exclusions": [],
+    "notes": []
+  },
+  "native": {
+    "files": [
+      {
+        "path": "/probe/home/.claude/projects/-probe-workspace/3da5a2ec-3a40-49a9-94a3-5c871964cca5/subagents/agent-aa65db83b311cbc1b.meta.json",
+        "store_root": "/probe/home/.claude",
+        "runtime": "claude",
+        "provenance": "subagent-metadata",
+        "native_id": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+        "expected_cwd": "/probe/workspace",
+        "created_outside_forge": false,
+        "fingerprint": {
+          "device": 63,
+          "inode": 339648,
+          "size": 131,
+          "mtime_ns": 1792514811000000000,
+          "sha256": "8ffdcd83334a91c8cc2e005211c5f72a8e2416fee94b850663c8f29f6594124b",
+          "parent_device": 63,
+          "parent_inode": 339646
+        },
+        "source_path": null,
+        "source_sha256": null
+      },
+      {
+        "path": "/probe/home/.claude/projects/-probe-workspace/3da5a2ec-3a40-49a9-94a3-5c871964cca5/subagents/agent-aa65db83b311cbc1b.jsonl",
+        "store_root": "/probe/home/.claude",
+        "runtime": "claude",
+        "provenance": "subagent",
+        "native_id": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+        "expected_cwd": "/probe/workspace",
+        "created_outside_forge": false,
+        "fingerprint": {
+          "device": 63,
+          "inode": 339647,
+          "size": 1781,
+          "mtime_ns": 1792514811000000000,
+          "sha256": "91a6bb09ff31e9453f42bc70d371ea2ea6ffb0e16bfd060ea44d6fb701326226",
+          "parent_device": 63,
+          "parent_inode": 339646
+        },
+        "source_path": null,
+        "source_sha256": null
+      },
+      {
+        "path": "/probe/home/.claude/projects/-probe-workspace/3da5a2ec-3a40-49a9-94a3-5c871964cca5.jsonl",
+        "store_root": "/probe/home/.claude",
+        "runtime": "claude",
+        "provenance": "original",
+        "native_id": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+        "expected_cwd": "/probe/workspace",
+        "created_outside_forge": false,
+        "fingerprint": {
+          "device": 63,
+          "inode": 339644,
+          "size": 14540,
+          "mtime_ns": 1792514811000000000,
+          "sha256": "1d78189acbc978ac2e09ba1eaa2c79e745d39396cd55ae81f8314fd6b496fca5",
+          "parent_device": 63,
+          "parent_inode": 339643
+        },
+        "source_path": null,
+        "source_sha256": null
+      }
+    ],
+    "refusals": [],
+    "outside_scope": [
+      "Provider-side request copies",
+      "Project memory documents and Git history",
+      "Global Forge telemetry",
+      "Claude history.jsonl, file-history, and other uncharacterized runtime state",
+      "Codex indexes, archived stores, and other uncharacterized runtime state",
+      "Native copies outside the recorded runtime store"
+    ]
+  },
+  "worktree_path": null,
+  "branch": null,
+  "refusals": [],
+  "notes": []
+}

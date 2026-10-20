@@ -254,7 +254,7 @@ Session stops
   → Stop hook enqueues "handoff" work marker
   → (session ends)
 
-Later queue-processing CLI startup (hook, status-line, logs, and clean are exempt)
+Later queue-processing CLI startup (hook, status-line, logs, session, and clean are exempt)
   → Work queue processes pending markers
   → Memory-writer handler spawns detached background process:
       forge memory-writer run --session-name <name> --worktree-path <path> --transcript-rel <rel>

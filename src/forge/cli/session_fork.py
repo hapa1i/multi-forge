@@ -327,7 +327,7 @@ def _render_fork_execution_error(error: ForkExecutionError) -> None:
     default=None,
     help=_MODEL_TIER_HELP,
 )
-@click.option("--incognito", "-i", is_flag=True, help="Auto-delete fork on exit")
+@click.option("--incognito", "-i", is_flag=True, help="Attempt guarded purge of the fork after runtime exit")
 @click.option("--worktree", "-w", is_flag=True, help="Create git worktree for fork isolation")
 @click.option("--branch", "-b", help="Override branch name (implies --worktree)")
 @click.option("--no-launch", is_flag=True, help="Create fork without launching Claude")

@@ -22,9 +22,10 @@ from forge.core.ops.claude_session import (
     ClaudeSessionLaunchResult,
     launch_claude_session,
 )
-from forge.session import create_session_state
+from forge.session import IndexStore, create_session_state
 from forge.session.claude.paths import resolve_claude_project_root
 from forge.session.models import SessionState, Worktree
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -117,7 +118,7 @@ class TestPersistedClaudeProjectRoot:
         """When claude_project_root is persisted, resume uses it — not the computed root."""
         from unittest.mock import patch
 
-        from forge.session import SessionStore, create_session_state
+        from forge.session import create_session_state
         from forge.session.models import Worktree
 
         checkout = tmp_path / "repo-executor"
@@ -131,7 +132,7 @@ class TestPersistedClaudeProjectRoot:
         state.worktree = Worktree(path=str(checkout), branch="executor", is_worktree=True)
         state.forge_root = nested_root
         state.confirmed.claude_project_root = persisted_root
-        SessionStore(nested_root, "executor").write(state)
+        publish_session(IndexStore(), state, nested_root)
 
         captured_cwd: list[str | None] = []
 
@@ -180,7 +181,7 @@ class TestPersistedClaudeProjectRoot:
         # No claude_project_root set (first launch)
         assert state.confirmed.claude_project_root is None
         store = SessionStore(nested_root, "executor")
-        store.write(state)
+        publish_session(IndexStore(), state, store.forge_root)
 
         def _fake_invoke(**kwargs):
             return 0
@@ -224,7 +225,7 @@ class TestPersistedClaudeProjectRoot:
         state.worktree = Worktree(path=str(checkout), branch="executor", is_worktree=True)
         state.forge_root = str(checkout)
         store = SessionStore(str(checkout), "executor")
-        store.write(state)
+        publish_session(IndexStore(), state, store.forge_root)
 
         captured: list[dict] = []
 
@@ -276,7 +277,7 @@ class TestPersistedClaudeProjectRoot:
         """Sessions without claude_project_root (pre-field) use the computed root."""
         from unittest.mock import patch
 
-        from forge.session import SessionStore, create_session_state
+        from forge.session import create_session_state
         from forge.session.models import Worktree
 
         checkout = tmp_path / "repo-executor"
@@ -288,7 +289,7 @@ class TestPersistedClaudeProjectRoot:
         state.worktree = Worktree(path=str(checkout), branch="executor", is_worktree=True)
         state.forge_root = nested_root
         # No persisted root — will use computed (forge_root for nested)
-        SessionStore(nested_root, "executor").write(state)
+        publish_session(IndexStore(), state, nested_root)
 
         captured_cwd: list[str | None] = []
 
@@ -360,7 +361,7 @@ class TestLaunchCallsitesUseLaunchRoot:
         """Host launch path passes forge_root CWD for nested projects."""
         from unittest.mock import patch
 
-        from forge.session import SessionStore, create_session_state
+        from forge.session import create_session_state
         from forge.session.models import Worktree
 
         state = create_session_state("executor")
@@ -368,7 +369,7 @@ class TestLaunchCallsitesUseLaunchRoot:
         nested_root = str(tmp_path / "checkout" / "nested" / "project")
         state.forge_root = nested_root
         # Seed manifest so store.update() works
-        SessionStore(nested_root, "executor").write(state)
+        publish_session(IndexStore(), state, nested_root)
 
         captured_cwd: list[str | None] = []
 
@@ -404,7 +405,7 @@ class TestLaunchCallsitesUseLaunchRoot:
         """Root-level worktree (forge_root at parent) launches from worktree.path."""
         from unittest.mock import patch
 
-        from forge.session import SessionStore, create_session_state
+        from forge.session import create_session_state
         from forge.session.models import Worktree
 
         state = create_session_state("executor")
@@ -414,7 +415,7 @@ class TestLaunchCallsitesUseLaunchRoot:
         parent_repo = str(tmp_path / "repo")
         state.forge_root = parent_repo  # Parent repo, not inside checkout
         # Seed manifest at forge_root (parent repo)
-        SessionStore(parent_repo, "executor").write(state)
+        publish_session(IndexStore(), state, parent_repo)
 
         captured_cwd: list[str | None] = []
 

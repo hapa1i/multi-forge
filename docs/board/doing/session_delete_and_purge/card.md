@@ -1,11 +1,11 @@
 # Split session delete from purge
 
-**Status**: Active discovery and execution planning, 2026-10-20, on `codex/session-delete-and-purge` from `a33c4d24`.
+**Status**: Implementation and final verification, 2026-10-20, on `codex/session-delete-and-purge` from `a33c4d24`.
 Proposed 2026-10-19 from an owner decision: normal delete removes Forge data only; a separate purge removes the
 session's identified local content within its declared scope. The [checklist](checklist.md) orders the implementation
 gates. Related: [`session_delete_generation_token`](../../proposed/session_delete_generation_token/card.md), the
-proposed instance-identity prerequisite. The [source audit](evidence/ownership-audit.md) records verified behavior and
-remaining native-layout questions.
+proposed instance-identity prerequisite. The [source audit](evidence/ownership-audit.md) records the earlier behavior;
+[verification](evidence/verification.md) and [native evidence](evidence/README.md) record the implementation checks.
 
 ## Problem
 
@@ -21,8 +21,9 @@ Observed at `ad8b8245`, `forge session delete <name>` mixes two intents and serv
 | Transfer snapshots in `.forge/prev_sessions/`                           | Kept; `forge clean` removes orphans   |
 | Owned, unshared worktree / branch                                       | Removed / kept                        |
 
-Adopted conversations and transcript UUIDs referenced by another session are exempt from transcript removal
-([`SessionManager.delete_session`](../../../../src/forge/session/manager.py#L2125)).
+At the audited base, adopted conversations and transcript UUIDs referenced by another session were exempt from
+transcript removal
+([`SessionManager.delete_session`](https://github.com/hapa1i/multi-forge/blob/a33c4d244d323728b55a94beac4f66010b9c0e15/src/forge/session/manager.py#L2122)).
 
 - A user who only wants Forge to forget the session loses the native Claude conversation, which would otherwise stay
   resumable from its original directory and re-adoptable with `forge session adopt`.
@@ -35,9 +36,9 @@ Adopted conversations and transcript UUIDs referenced by another session are exe
 Two gaps were reproduced with synthetic state on 2026-10-20:
 
 - **Incognito leftovers.** Stop copies the transcript into `.forge/artifacts/<name>/transcripts/`
-  ([`_capture_transcript_artifact`](../../../../src/forge/cli/hooks/commands.py#L139)). No incognito guard was found on
-  that path, and incognito exit runs an ordinary delete, which keeps artifacts. The reproduction removed the native
-  transcript and session record but retained a byte-identical Forge transcript copy.
+  ([`_capture_transcript_artifact`](https://github.com/hapa1i/multi-forge/blob/a33c4d244d323728b55a94beac4f66010b9c0e15/src/forge/cli/hooks/commands.py#L139)).
+  No incognito guard was found on that path, and incognito exit runs an ordinary delete, which keeps artifacts. The
+  reproduction removed the native transcript and session record but retained a byte-identical Forge transcript copy.
 - **Name reuse.** Artifacts are keyed by session name. The review journal is scoped to a per-instance owner, but the
   authority and routing journals (`.forge/artifacts/<name>/{authority,routing}/events.jsonl`) showed no instance
   binding. After real manager deletion and same-name publication, the reproduction read both predecessor event IDs from
@@ -142,10 +143,13 @@ recreate content after a successful delete.
 1. Follow the proposed separate `forge session purge` verb and removal of all session journals. An artifact-retention
    option is outside the first version.
 2. Both verbs refuse dependencies; there is no implicit cascade or acknowledged partial purge.
-3. Instance identity is a prerequisite, not an optional cleanup improvement. Review the
-   [generation-token card](../../proposed/session_delete_generation_token/card.md) before implementation; keep its
-   separate branch/PR unless board coordination explicitly authorizes folding or batching. This card must additionally
-   protect artifact writers, queued jobs and retry inventories with that identity.
+3. Instance identity is a prerequisite, not an optional cleanup improvement. The
+   [generation-token proposal](../../proposed/session_delete_generation_token/card.md) is folded into this card's
+   implementation and PR: its row guard alone cannot authorize content removal without the same writer and retry fences.
+   The branch starts at `a33c4d24`; identity lands before cleanup integration, and this card owns the combined tests,
+   review and closeout. The proposal will retire as absorbed when this implementation ships, with no separate shipped
+   credit. The existing per-creation review owner becomes the session instance; index v1 is read without mutation and
+   confirmed operations explicitly bind legacy rows before destructive work.
 4. Native inactivity, relocated/rewind identity, corrupt or missing inventories, and recovery when the Forge root itself
    is removed remain gated by the checklist. Do not present current adoption lookup or the Forge active registry alone
    as proof of safe native deletion.

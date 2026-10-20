@@ -1762,7 +1762,15 @@ def shadow_run_cmd(session_name: str, forge_root: str | None) -> None:
             f"{format_project_compatibility_recovery()}"
         ) from e
 
-    counts = run_shadow_for_session(session_name, forge_root)
+    from forge.session.workers import (
+        SESSION_INSTANCE_ENV,
+        capture_session_instance,
+        session_worker_lease,
+    )
+
+    token = os.environ.get(SESSION_INSTANCE_ENV) or capture_session_instance(forge_root, session_name)
+    with session_worker_lease(forge_root, session_name, expected_instance_id=token, label="supervisor shadow"):
+        counts = run_shadow_for_session(session_name, forge_root)
     click.echo(json.dumps({"session": session_name, "drained": counts}))
 
 

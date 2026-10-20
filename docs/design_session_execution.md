@@ -202,6 +202,19 @@ an empty queue simply ignores it. Malformed JSON is known-bad content and moves 
 Extracted from [design.md §3.13](design_session_execution.md#313-async-work-queue). Design goals and rationale remain in
 design.md.
 
+Session content markers capture `instance_id` at enqueue. Managed consumers reject legacy markers without an instance
+instead of attributing them to the current occupant of the name. A worker lease is admitted under the index lock before
+the marker lock; provider work runs after releasing the index. Detached memory, curation and shadow processes carry the
+same instance. Their lease prevents deletion during direct provider writes, and final persistence rechecks ownership.
+Session cleanup commands bypass opportunistic queue draining and retention before preview or confirmation. See
+[session cleanup](design_sessions.md#session-cleanup) for refusal and crash-recovery rules.
+
+Sidecar launches delegate their host lifetime lease through a read-only mount of the instance's lease directory. Hooks
+validate that lease against the mounted manifest's name, host root and instance before writing content or host queue
+markers; they neither migrate ownership nor require the host's global index inside the container. The host releases the
+lease only after Docker confirms the container has exited. An interrupted launcher or an unavailable Docker daemon
+retains the lease for explicit recovery, and container PIDs are never interpreted as host liveness evidence.
+
 ### B.1 Marker schema (v1)
 
 ```json

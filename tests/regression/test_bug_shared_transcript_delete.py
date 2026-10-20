@@ -8,9 +8,8 @@ Bug:
 - ``forge session delete <fork>`` used to unlink that UUID unconditionally,
   destroying the parent conversation.
 
-Fix:
-- Session deletion treats raw Claude transcripts like worktrees: a UUID is
-  unlinked only if no other indexed session still references that transcript.
+Current contract: ordinary delete preserves all native transcripts. Shared identities
+and manifest dependencies refuse cleanup before Forge-owned content is removed.
 """
 
 from __future__ import annotations
@@ -20,7 +19,13 @@ from pathlib import Path
 
 import pytest
 
-from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
+from forge.session import (
+    ForgeSessionError,
+    IndexStore,
+    SessionManager,
+    SessionStore,
+    create_session_state,
+)
 from forge.session.claude.paths import get_transcript_path
 from forge.session.models import Derivation, session_state_to_dict
 from tests.fixtures.session_state import publish_session, seed_row_only_session
@@ -110,18 +115,19 @@ def test_delete_same_dir_fork_preserves_parent_transcript(project: Path) -> None
     _write_session(manager, project, "executor", session_id=SHARED_ID, parent="planner")
     shared_transcript = _write_raw_transcript(project, SHARED_ID)
 
-    manager.delete_session("executor", force=True, forge_root=str(project))
+    with pytest.raises(ForgeSessionError):
+        manager.delete_session("executor", force=True, forge_root=str(project))
 
     assert shared_transcript.exists()
     assert SessionStore(str(project), "planner").exists() is True
-    assert SessionStore(str(project), "executor").exists() is False
-    assert manager.session_exists("executor", forge_root=str(project)) is False
+    assert SessionStore(str(project), "executor").exists() is True
+    assert manager.session_exists("executor", forge_root=str(project)) is True
 
 
-def test_delete_filters_shared_transcript_ids_but_removes_unshared_ids(
+def test_shared_native_identity_refuses_cleanup_and_preserves_all_transcripts(
     project: Path,
 ) -> None:
-    """Shared artifact UUIDs survive while the deleted session's private UUIDs are removed."""
+    """A shared UUID blocks cleanup before either native transcript is touched."""
     manager = SessionManager(index_store=IndexStore())
     _write_session(
         manager,
@@ -142,17 +148,18 @@ def test_delete_filters_shared_transcript_ids_but_removes_unshared_ids(
     child_transcript = _write_raw_transcript(project, CHILD_ID)
     rollover_transcript = _write_raw_transcript(project, ROLLOVER_ID)
 
-    manager.delete_session("executor", force=True, forge_root=str(project))
+    with pytest.raises(ForgeSessionError):
+        manager.delete_session("executor", force=True, forge_root=str(project))
 
     assert shared_transcript.exists()
-    assert not child_transcript.exists()
-    assert not rollover_transcript.exists()
+    assert child_transcript.exists()
+    assert rollover_transcript.exists()
 
 
-def test_delete_uses_confirmed_claude_project_root_for_raw_cleanup(
+def test_delete_preserves_native_transcript_at_recorded_launch_root(
     project: Path,
 ) -> None:
-    """Cleanup removes the launch-root transcript, not the manifest-root path."""
+    """Ordinary delete preserves native content even when its launch root differs."""
     manager = SessionManager(index_store=IndexStore())
     launch_root = project.parent / "executor-checkout"
     launch_root.mkdir()
@@ -169,12 +176,12 @@ def test_delete_uses_confirmed_claude_project_root_for_raw_cleanup(
 
     manager.delete_session("executor", force=True, forge_root=str(project))
 
-    assert not launch_transcript.exists()
+    assert launch_transcript.exists()
     assert forge_root_decoy.exists()
 
 
-def test_force_delete_corrupt_manifest_uses_raw_confirmed_claude_project_root(project: Path) -> None:
-    """Raw-manifest force delete must still clean the persisted launch-root transcript."""
+def test_force_delete_corrupt_manifest_refuses_without_touching_native_files(project: Path) -> None:
+    """Force cannot supply missing ownership evidence from a corrupt manifest."""
     manager = SessionManager(index_store=IndexStore())
     launch_root = project.parent / "executor-checkout"
     launch_root.mkdir()
@@ -194,9 +201,10 @@ def test_force_delete_corrupt_manifest_uses_raw_confirmed_claude_project_root(pr
     launch_transcript = _write_raw_transcript(launch_root, CHILD_ID)
     forge_root_decoy = _write_raw_transcript(project, CHILD_ID)
 
-    manager.delete_session("executor", force=True, forge_root=str(project))
+    with pytest.raises(ForgeSessionError):
+        manager.delete_session("executor", force=True, forge_root=str(project))
 
-    assert not launch_transcript.exists()
+    assert launch_transcript.exists()
     assert forge_root_decoy.exists()
 
 
@@ -217,7 +225,7 @@ def test_same_uuid_in_different_claude_project_root_does_not_block_cleanup(
 
     manager.delete_session("planner", force=True, forge_root=str(project))
 
-    assert not doomed_transcript.exists()
+    assert doomed_transcript.exists()
     assert other_transcript.exists()
 
 
@@ -235,7 +243,8 @@ def test_delete_preserves_uuid_referenced_by_sibling_derivation(project: Path) -
     )
     shared_transcript = _write_raw_transcript(project, SHARED_ID)
 
-    manager.delete_session("planner", force=True, forge_root=str(project))
+    with pytest.raises(ForgeSessionError):
+        manager.delete_session("planner", force=True, forge_root=str(project))
 
     assert shared_transcript.exists()
 
@@ -273,6 +282,7 @@ def test_delete_preserves_uuid_referenced_by_corrupt_sibling_raw_manifest(
     )
     shared_transcript = _write_raw_transcript(project, SHARED_ID)
 
-    manager.delete_session("planner", force=True, forge_root=str(project))
+    with pytest.raises(ForgeSessionError):
+        manager.delete_session("planner", force=True, forge_root=str(project))
 
     assert shared_transcript.exists()

@@ -80,6 +80,7 @@ def _build_manifest(
         SESSION_NAME,
         proxy_template=PROXY_TEMPLATE,
         proxy_base_url=PROXY_URL,
+        worktree_path="/workspace",
     )
     manifest.intent.memory = MemoryIntent(
         auto_update=MemoryWriterConfig(
@@ -89,6 +90,24 @@ def _build_manifest(
         ),
     )
     return asdict(manifest)
+
+
+def _publish_manifest(workspace: ContainerLike, manifest: dict) -> None:
+    """Publish a coherent session inside the test container."""
+    workspace.write_json("/tmp/handoff-session.json", manifest)
+    result = workspace.exec("""cd /forge && /forge/.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+import dacite
+from forge.session import IndexStore
+from forge.session.models import SessionState
+from tests.fixtures.session_state import publish_session
+
+data = json.loads(Path("/tmp/handoff-session.json").read_text())
+state = dacite.from_dict(SessionState, data, config=dacite.Config(strict=True))
+publish_session(IndexStore(), state, "/workspace", forge_root="/workspace")
+PY""")
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def _build_transcript(turn_count: int = 10) -> str:
@@ -171,11 +190,7 @@ class TestHandoffRunMultiDoc:
         (use ``_passported_content()`` to prepend it).
         """
         manifest = manifest_dict or _build_manifest()
-        workspace.mkdir(f"/workspace/.forge/sessions/{SESSION_NAME}", parents=True)
-        workspace.write_json(
-            f"/workspace/.forge/sessions/{SESSION_NAME}/forge.session.json",
-            manifest,
-        )
+        _publish_manifest(workspace, manifest)
 
         transcript_path = f"/workspace/{TRANSCRIPT_REL}"
         workspace.exec(f"mkdir -p $(dirname {transcript_path})")
@@ -409,11 +424,7 @@ class TestHandoffRunDisabled:
 
     def _setup_session(self, workspace: ContainerLike, manifest_dict: dict) -> None:
         """Create session manifest and transcript."""
-        workspace.mkdir(f"/workspace/.forge/sessions/{SESSION_NAME}", parents=True)
-        workspace.write_json(
-            f"/workspace/.forge/sessions/{SESSION_NAME}/forge.session.json",
-            manifest_dict,
-        )
+        _publish_manifest(workspace, manifest_dict)
         transcript_path = f"/workspace/{TRANSCRIPT_REL}"
         workspace.exec(f"mkdir -p $(dirname {transcript_path})")
         workspace.write_file(transcript_path, _build_transcript())

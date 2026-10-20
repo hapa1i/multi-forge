@@ -17,9 +17,22 @@ from forge.cli.main import _process_pending_work_best_effort
 from forge.core.ops.claude_session import _stage_sidecar_hook_settings
 from forge.core.paths import get_forge_home
 from forge.core.workqueue import pending_work_dir
-from forge.session import LAUNCH_MODE_SIDECAR, SessionStore, create_session_state
+from forge.session import (
+    LAUNCH_MODE_SIDECAR,
+    IndexStore,
+    SessionStore,
+    create_session_state,
+)
 from forge.session.artifacts import get_artifact_paths
+from forge.session.workers import (
+    SESSION_INSTANCE_ENV,
+    SIDECAR_LEASE_ENV,
+    SIDECAR_LEASE_MOUNT,
+    _sidecar_exit_confirmed,
+    sidecar_session_lease,
+)
 from forge.sidecar.docker import is_docker_available
+from tests.fixtures.session_state import publish_session
 
 pytestmark = [pytest.mark.integration, pytest.mark.docker_host]
 
@@ -194,7 +207,8 @@ def test_sidecar_stop_routes_mounted_shadow_candidate_to_host_drain(
     state.forge_root = str(project)
     state.confirmed.claude_session_id = session_id
     state.confirmed.transcript_path = str(transcript)
-    SessionStore(str(project), session_name).write(state)
+    entry = publish_session(IndexStore(), state, project, forge_root=project)
+    assert entry.instance_id is not None
 
     shadow_dir = get_artifact_paths(project, session_name).shadow_abs
     shadow_dir.mkdir(parents=True)
@@ -202,57 +216,65 @@ def test_sidecar_stop_routes_mounted_shadow_candidate_to_host_drain(
 
     host_queue = pending_work_dir()
     host_queue.mkdir(parents=True)
-    result = subprocess.run(
-        [
-            "docker",
-            "run",
-            "-i",
-            "--rm",
-            "--entrypoint",
-            "/bin/sh",
-            *_user_args(),
-            "-v",
-            f"{project}:/workspace",
-            "-v",
-            f"{host_queue}:/root/.forge/pending-work",
-            "-e",
-            "HOME=/root",
-            "-e",
-            "FORGE_SIDECAR=1",
-            "-e",
-            f"FORGE_SESSION={session_name}",
-            "-e",
-            "FORGE_FORGE_ROOT=/workspace",
-            "-e",
-            f"FORGE_SIDECAR_HOST_WORKTREE_PATH={project}",
-            "-e",
-            f"FORGE_SIDECAR_HOST_FORGE_ROOT={project}",
-            "-w",
-            "/workspace",
-            sidecar_image,
-            "-c",
-            "forge hook stop",
-        ],
-        input=json.dumps(
-            {
-                "hook_event_name": "Stop",
-                "session_id": session_id,
-                "transcript_path": "/workspace/transcript.jsonl",
-                "cwd": "/workspace",
-            }
-        ),
-        text=True,
-        capture_output=True,
-        timeout=30,
-    )
+    with sidecar_session_lease(project, session_name, expected_instance_id=entry.instance_id) as lease_path:
+        result = subprocess.run(
+            [
+                "docker",
+                "run",
+                "-i",
+                "--rm",
+                "--entrypoint",
+                "/bin/sh",
+                *_user_args(),
+                "-v",
+                f"{project}:/workspace",
+                "-v",
+                f"{host_queue}:/root/.forge/pending-work",
+                "-v",
+                f"{lease_path.parent}:{SIDECAR_LEASE_MOUNT}:ro",
+                "-e",
+                "HOME=/root",
+                "-e",
+                "FORGE_SIDECAR=1",
+                "-e",
+                f"FORGE_SESSION={session_name}",
+                "-e",
+                f"{SESSION_INSTANCE_ENV}={entry.instance_id}",
+                "-e",
+                f"{SIDECAR_LEASE_ENV}={SIDECAR_LEASE_MOUNT}/{lease_path.name}",
+                "-e",
+                "FORGE_FORGE_ROOT=/workspace",
+                "-e",
+                f"FORGE_SIDECAR_HOST_WORKTREE_PATH={project}",
+                "-e",
+                f"FORGE_SIDECAR_HOST_FORGE_ROOT={project}",
+                "-w",
+                "/workspace",
+                sidecar_image,
+                "-c",
+                "forge hook stop",
+            ],
+            input=json.dumps(
+                {
+                    "hook_event_name": "Stop",
+                    "session_id": session_id,
+                    "transcript_path": "/workspace/transcript.jsonl",
+                    "cwd": "/workspace",
+                }
+            ),
+            text=True,
+            capture_output=True,
+            timeout=30,
+        )
 
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout)["queued_shadow"] is True
+    assert json.loads(result.stdout).get("queued_shadow") is True, result.stdout
     markers = list(host_queue.glob(f"shadow-{session_id}.json"))
     assert len(markers) == 1
     marker = json.loads(markers[0].read_text(encoding="utf-8"))
     assert marker["payload"]["worktree_path"] == str(project)
     assert marker["payload"]["forge_root"] == str(project)
+    assert marker["payload"]["instance_id"] == entry.instance_id
 
     with patch("subprocess.Popen") as popen:
         _process_pending_work_best_effort()
@@ -262,6 +284,38 @@ def test_sidecar_stop_routes_mounted_shadow_candidate_to_host_drain(
     assert command[:4] == ["forge", "policy", "shadow", "run"]
     assert command[command.index("--root") + 1] == str(project)
     assert not markers[0].exists()
+
+
+def test_sidecar_exit_census_refuses_running_named_container(sidecar_image: str) -> None:
+    session_name = f"census-{uuid.uuid4().hex[:12]}"
+    container_name = f"forge-{session_name}"
+    started = subprocess.run(
+        [
+            "docker",
+            "run",
+            "-d",
+            "--rm",
+            "--network",
+            "none",
+            "--name",
+            container_name,
+            "--entrypoint",
+            "/bin/sh",
+            sidecar_image,
+            "-c",
+            "sleep 60",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert started.returncode == 0, started.stderr
+    try:
+        assert _sidecar_exit_confirmed(session_name) is False
+    finally:
+        stopped = subprocess.run(["docker", "rm", "-f", container_name], capture_output=True, text=True, timeout=15)
+        assert stopped.returncode == 0, stopped.stderr
+    assert _sidecar_exit_confirmed(session_name) is True
 
 
 @pytest.mark.slow
@@ -287,7 +341,8 @@ def test_real_claude_sidecar_hooks_persist_artifacts_and_host_queue(
     )
     state.forge_root = str(project)
     state.confirmed.claude_session_id = session_id
-    SessionStore(str(project), session_name).write(state)
+    entry = publish_session(IndexStore(), state, project, forge_root=project)
+    assert entry.instance_id is not None
     (project / ".claude" / "settings.json").write_text(
         json.dumps({"statusLine": {"type": "command", "command": "forge status-line", "padding": 0}}) + "\n"
     )
@@ -337,7 +392,16 @@ def test_real_claude_sidecar_hooks_persist_artifacts_and_host_queue(
     ]
 
     try:
-        result = subprocess.run(command, text=True, capture_output=True, timeout=180)
+        with sidecar_session_lease(project, session_name, expected_instance_id=entry.instance_id) as lease_path:
+            command[2:2] = [
+                "-v",
+                f"{lease_path.parent}:{SIDECAR_LEASE_MOUNT}:ro",
+                "-e",
+                f"{SESSION_INSTANCE_ENV}={entry.instance_id}",
+                "-e",
+                f"{SIDECAR_LEASE_ENV}={SIDECAR_LEASE_MOUNT}/{lease_path.name}",
+            ]
+            result = subprocess.run(command, text=True, capture_output=True, timeout=180)
     finally:
         os.unlink(env_file)
 

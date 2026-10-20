@@ -25,9 +25,8 @@ def test_recreation_has_no_old_scope_or_spending(tmp_path: Path, monkeypatch, an
         old.session,
         forge_root=str(old.forge_root),
         delete_worktree=False,
-        delete_transcripts=False,
     )
-    assert journal.read_bytes() == saved
+    assert not journal.exists()
     checkout = old.checkout
     if another_checkout:
         checkout = tmp_path / "new-checkout"
@@ -51,7 +50,10 @@ def test_recreation_has_no_old_scope_or_spending(tmp_path: Path, monkeypatch, an
         review.review_stop(fresh, deadline=deadline(), current_config=lambda: fresh.config_digest).status
         == "no_changes"
     )
-    assert journal.read_bytes() == saved
+    assert not journal.exists()
+    fresh_journal = fresh.storage.parent / "events.jsonl"
+    assert fresh_journal.read_bytes() != saved
+    assert old.session_identity not in fresh_journal.read_text()
     assert review.reset_review(fresh.forge_root, fresh.session, apply=True)["applied"]
     with pytest.raises(ValueError, match="deleted or replaced"):
         review.begin_turn(old, deadline=deadline())

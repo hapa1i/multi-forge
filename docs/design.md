@@ -133,12 +133,13 @@ when no `.claude/` directory exists.
 - **`workspace worktrees`**: derives the registered worktree family from Git's common directory and overlays
   workspace-scoped session and active counts. Membership is read-only and never persisted by Forge; outside Git, the
   command degrades to one directory member. Git records whose checkout is unavailable remain visible as `missing`.
-- **`session show`, `session delete` (named), `session set`, `session reset`**: workspace-scoped with current-project
-  preference. Two-tier resolution: try current `forge_root` first (O(1)), fall back to a workspace-scoped scan. Prefers
-  current `forge_root` as tiebreaker when the same name exists in multiple projects. Raises `AmbiguousSessionError` if
-  truly ambiguous. Prints a cross-project note when resolving from a different `forge_root`.
-- **`session delete --all`**: project-scoped (current `forge_root` only). Requires being inside a Forge project
-  (`_cwd_forge_root() != None`); refuses to run outside one to prevent accidental global deletion.
+- **`session show`, `session delete|purge` (named), `session set`, `session reset`**: workspace-scoped with
+  current-project preference. Two-tier resolution: try current `forge_root` first (O(1)), fall back to a
+  workspace-scoped scan. Prefers current `forge_root` as tiebreaker when the same name exists in multiple projects.
+  Raises `AmbiguousSessionError` if truly ambiguous. Prints a cross-project note when resolving from a different
+  `forge_root`.
+- **`session delete --all`, `session purge --all`**: project-scoped (current `forge_root` only). Requires being inside a
+  Forge project (`_cwd_forge_root() != None`); refuses to run outside one to prevent accidental global deletion.
 - **Claude `session resume`, `session fork`**: project-scoped. Cannot resolve cross-project because Claude Code's
   `--resume` and CWD namespace are tied to the project directory. Hints where the session lives on cross-project miss.
   **Codex `session resume`** is intentionally cross-CWD: Forge resolves the named session and runs `codex resume` or
@@ -204,7 +205,7 @@ for cross-session transfer. Worktrees are used when sessions write concurrently.
 | --------------------- | ---------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
 | Session file          | `<forge_root>/.forge/sessions/<session_name>/forge.session.json` | Forge Session + Hooks    | Session `intent`, `overrides`, and field-owned `confirmed` runtime facts                |
 | Global session index  | `~/.forge/sessions/index.json`                                   | Forge Session            | Session metadata (name, `forge_root`, `project_root`); fast listing + project filtering |
-| Active session index  | `~/.forge/sessions/active.json`                                  | Forge Session            | Ephemeral live-launch registry for delete warnings + stale pruning                      |
+| Active session index  | `~/.forge/sessions/active.json`                                  | Forge Session            | Live-launch registry; cleanup admission + stale pruning                                 |
 | Session event journal | `<forge_root>/.forge/artifacts/<session>/<domain>/events.jsonl`  | Forge Session            | Durable domain events using the shared schema-v1 envelope and required append seam      |
 | Proxy registry        | `~/.forge/proxies/index.json`                                    | Forge Proxy Orchestrator | Running proxies (template ↔ base_url/port ↔ pid)                                        |
 | Runtime config        | `~/.forge/config.yaml`                                           | Forge CLI                | Global runtime preferences (proxy mode, timeouts, context limit)                        |
@@ -273,27 +274,14 @@ intervening `session list` or `session delete`. Creation pre-checks use `live_se
 they fail fast on a real collision without rejecting a residue; `_name_is_taken` keeps the cheaper row-only check, where
 skipping a residue name costs an auto-name suffix rather than an error.
 
-**Deletion is the other producer of row-without-manifest, and is coordinated with creation.** `delete_session` removes
-the manifest -- or the worktree containing it, for a nested project -- before it removes the row, and its transcript
-phase runs in between, so the name reads as residue for as long as that takes. A concurrent creation may therefore
-reclaim the name and publish a whole new session mid-delete; that is allowed, since the session being deleted is on its
-way out. What must not happen is the delete then removing the replacement's row and manifest, so its terminal removal
-goes through `IndexStore.delete_session_txn`, which removes the row **and** runs the manifest delete inside one index-
-lock acquisition, and declines outright when a manifest exists at a name whose manifest that delete had already
-destroyed. Verifying ownership and then deleting outside the lock would let a replacement land in between. The "already
-destroyed" fact is derived from what the delete did -- the manifest was absent when it started, or it lives inside the
-worktree being removed -- never from a probe taken later, which may already be looking at the replacement. Timestamps
-cannot substitute either: `now_iso` has second granularity, so a same-second replacement is indistinguishable by
-`created_at`. `fork --force` frees a stale target the same way and so declines the same way, raising
-`SessionExistsError` rather than replacing a session that claimed the name during its cleanup.
-
-The terminal transaction deletes the manifest before its row while holding the index lock, and `SessionStore.delete`
-takes the same manifest lock as `update`. This preserves index -> manifest lock order, prevents an in-flight hook update
-from recreating a manifest after the row is gone, and means manifest-lock failure leaves the still-complete session
-published. Creation is protected separately by the outer index transaction; unconditional `write` is not a supported
-production mutation of a published session. Deletion may wait up to the five-second CLI manifest-lock timeout while it
-holds the global index lock, preferring a completed user-requested delete over a shorter contention failure. Once the
-manifest is absent, any later failure leaves only a prunable row.
+**Deletion reserves the captured instance through cleanup.** Index schema v2 records the per-creation review owner as
+`instance_id`; v1 reads project null and confirmed operations migrate explicitly. Delete removes Forge content while
+purge additionally removes verified native files. Both refuse dependencies, active sessions and admitted workers.
+`IndexStore.delete_session_txn` checks the captured instance and holds index -> manifest locks across final admission
+and bounded cleanup. A private inventory outside the checkout survives interruption, reserves the name and prevents
+producer writes until retry finishes. Worktree removal cannot turn an unfinished delete into reclaimable crash residue.
+The [session cleanup contract](design_sessions.md#session-cleanup) owns inventories, native verification, legacy state,
+worker leases and retry behavior. Ordinary reads never migrate or authorize removal.
 
 An exception from the manifest callback does not prove the manifest is absent -- `atomic_write_json` makes it durable at
 `os.replace`, and a signal can arrive after that -- so compensation removes the row only when the manifest is provably

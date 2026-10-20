@@ -57,16 +57,16 @@
       "tokens": 21164
     },
     "docs/design.md": {
-      "sha256": "f0bd625c4385ab454fcd41b57c0ce6684e57b5f1a3d916df5d17d41a630b4e41",
+      "sha256": "32dc79cd0c51b815510c1c7d31f9324bda7d2a47045a49dfc8c9541684fa4311",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 20706
+      "tokens": 20315
     },
     "docs/design_installation.md": {
-      "sha256": "80011d7bd8427fee739251aa3676b8c1dfeda5abdeec48105c78cb650f68d1b6",
+      "sha256": "aa8eb9cd4c02148eb555b625c41da3f8fcca70e1cb24aa28da2107d69c7bf9b4",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 23665
+      "tokens": 23772
     },
     "docs/design_telemetry.md": {
       "sha256": "176f6f353211b84cd23b81bf00a0ee1f8cf61810c59553b4b471ce377bb39e44",
@@ -87,10 +87,10 @@
       "tokens": 27615
     },
     "docs/end-user/session.md": {
-      "sha256": "5075b3b2a7b89cf9074c72404d742d777d38ace998d63adb5a0bf6441137409f",
+      "sha256": "adbbaeb4aee3fb3015a214b7b86236d455617a60fcea4a726978c1e4a45c6770",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 25235
+      "tokens": 25769
     },
     "src/skills/qa/SKILL.md": {
       "sha256": "b77bbc8b673c69065d42d459615eae15d869e80acc5eede5119f7f97e2b22d75",

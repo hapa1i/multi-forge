@@ -181,10 +181,12 @@ it must never recreate missing worktrees or accept collision/corrupt records. Va
 visible but unlaunchable until the checkout returns.
 
 For session deletion or cleanup changes, cancel an unconfirmed `forge session delete <name>` and compare the default
-`forge session clean --older-than <days>` preview with the corresponding `--yes` apply, including `--delete-worktree`
-cases. Pre-confirmation reads must not rewrite session or active indexes, preview and apply must agree on targets and
-refusals, and artifact-retention output is valid only when the containing Forge root survives. Confirmed deletion may
-still repair derived index state.
+`forge session clean --older-than <days>` preview with its `--yes` apply. Verify `forge session purge <name> --json` and
+project-scoped `purge --all`, then apply only to isolated fixtures. Delete/clean preserve native files and remove
+unreferenced Forge content; purge additionally removes verified native paths. Both refuse active sessions, workers and
+dependents. Include `--delete-worktree` and missing-root retries through `--forge-root`. Pre-confirmation reads must not
+repair indexes or drain work. Test stale instance writers, changed inventories and partial failures; retain external
+retry evidence until all removals succeed. Native-layout probes require a separately approved concrete manifest.
 
 For Claude model-route changes, exercise `forge session start|resume|fork|incognito --model <catalog-id-or-alias>` and
 use `--model-tier haiku|sonnet|opus` only to disambiguate a multi-tier proxy match. Inspect intent, durable commitment,

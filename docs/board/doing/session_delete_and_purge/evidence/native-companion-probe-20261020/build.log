@@ -1,0 +1,109 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.forge
+#1 transferring dockerfile: 6.57kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.12-slim-bookworm
+#2 DONE 1.1s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 648B done
+#3 DONE 0.0s
+
+#4 [base 1/6] FROM docker.io/library/python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258
+#4 resolve docker.io/library/python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258 done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 6.02MB 0.1s done
+#5 DONE 0.2s
+
+#6 [forge-install  1/15] RUN apt-get update && apt-get install -y --no-install-recommends     nodejs     npm     && rm -rf /var/lib/apt/lists/*
+#6 CACHED
+
+#7 [base 6/6] RUN cert_count=$(find /forge/docker/certs/ -maxdepth 1 -type f \( -name '*.pem' -o -name '*.crt' \) | wc -l) &&     if [ "$cert_count" -gt 0 ]; then         echo "Installing $cert_count additional CA certificate(s)..." &&         find /forge/docker/certs/ -maxdepth 1 -type f \( -name '*.pem' -o -name '*.crt' \) -exec cp -t /usr/local/share/ca-certificates/ {} + &&         for f in /usr/local/share/ca-certificates/*.pem; do [ -f "$f" ] && mv "$f" "${f%.pem}.crt"; done &&         update-ca-certificates &&         echo "Additional CA installed successfully";     else         echo "No additional CA certificates found in docker/certs/";     fi
+#7 CACHED
+
+#8 [forge-install  3/15] COPY pyproject.toml uv.lock ./
+#8 CACHED
+
+#9 [base 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     git     ca-certificates     gnupg     procps     vim-tiny     && rm -rf /var/lib/apt/lists/*     && ln -s /usr/bin/vim.tiny /usr/bin/vim
+#9 CACHED
+
+#10 [npm-toolchain 1/3] RUN apt-get update && apt-get install -y --no-install-recommends     nodejs     npm     ripgrep     && rm -rf /var/lib/apt/lists/*
+#10 CACHED
+
+#11 [npm-toolchain 3/3] RUN CI=1 claude --version     || (echo "ERROR: claude not available after npm install" && exit 1)
+#11 CACHED
+
+#12 [forge-install  2/15] RUN npm install -g @openai/codex@0.149.1     && CI=1 claude --version     && codex --version
+#12 CACHED
+
+#13 [base 4/6] WORKDIR /forge
+#13 CACHED
+
+#14 [npm-toolchain 2/3] RUN npm install -g @anthropic-ai/claude-code@2.1.245     && binary="$(readlink -f "$(command -v claude)")"     && cp --reflink=never "$binary" "$binary.forge-copy"     && mv "$binary.forge-copy" "$binary"     && sync
+#14 CACHED
+
+#15 [base 3/6] RUN pip install --no-cache-dir uv
+#15 CACHED
+
+#16 [base 5/6] COPY docker/certs/ /forge/docker/certs/
+#16 CACHED
+
+#17 [forge-install  4/15] RUN uv sync --no-install-project
+#17 CACHED
+
+#18 [forge-install  5/15] COPY README.md ./
+#18 CACHED
+
+#19 [forge-install  6/15] COPY src/forge ./src/forge
+#19 DONE 0.2s
+
+#20 [forge-install  7/15] COPY src/skills ./src/skills
+#20 DONE 0.1s
+
+#21 [forge-install  8/15] COPY src/commands ./src/commands
+#21 DONE 0.0s
+
+#22 [forge-install  9/15] COPY src/agents ./src/agents
+#22 DONE 0.0s
+
+#23 [forge-install 10/15] RUN uv sync
+#23 0.144 Resolved 127 packages in 2ms
+#23 0.180    Building multi-forge @ file:///forge
+#23 0.926       Built multi-forge @ file:///forge
+#23 0.931 Prepared 1 package in 751ms
+#23 0.935 Installed 1 package in 3ms
+#23 0.935  + multi-forge==1.1.1 (from file:///forge)
+#23 DONE 1.0s
+
+#24 [forge-install 11/15] COPY tests ./tests
+#24 DONE 0.3s
+
+#25 [forge-install 12/15] COPY docs ./docs
+#25 DONE 0.2s
+
+#26 [forge-install 13/15] COPY scripts ./scripts
+#26 DONE 0.0s
+
+#27 [forge-install 14/15] COPY docker ./docker
+#27 DONE 0.0s
+
+#28 [forge-install 15/15] COPY CLAUDE.md CONTRIBUTING.md LICENSE Makefile ./
+#28 DONE 0.0s
+
+#29 exporting to image
+#29 exporting layers
+#29 exporting layers 0.7s done
+#29 exporting manifest sha256:4090a8905efdef5ff56b0239a7e1376eb29767946271b2eeec0664591d5bde34 done
+#29 exporting config sha256:d2f80ee895e9d7d80544c8dc22070710749e99bb9dabfe790cc2e73ca644e131 done
+#29 exporting attestation manifest sha256:8bb9c4be1303a083c0917fead2239471ff957645c1128bd97f691f2545910ce9 done
+#29 exporting manifest list sha256:408ea45b022628e31f0704122453ddc7f0d5b4dc409614aa8dbf8ecff78a9445 done
+#29 naming to docker.io/library/forge-native-purge:claude-2.1.245-codex-0.149.1 done
+#29 unpacking to docker.io/library/forge-native-purge:claude-2.1.245-codex-0.149.1
+#29 unpacking to docker.io/library/forge-native-purge:claude-2.1.245-codex-0.149.1 0.3s done
+#29 DONE 1.0s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/z3ucla15chur4z3841whcm4m2

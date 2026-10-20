@@ -1,0 +1,92 @@
+{
+  "delete_preserved_native_hashes": {
+    "/probe/home/.claude/projects/-probe-workspace/3da5a2ec-3a40-49a9-94a3-5c871964cca5/subagents/agent-aa65db83b311cbc1b.meta.json": "8ffdcd83334a91c8cc2e005211c5f72a8e2416fee94b850663c8f29f6594124b",
+    "/probe/home/.claude/projects/-probe-workspace/3da5a2ec-3a40-49a9-94a3-5c871964cca5/subagents/agent-aa65db83b311cbc1b.jsonl": "91a6bb09ff31e9453f42bc70d371ea2ea6ffb0e16bfd060ea44d6fb701326226",
+    "/probe/home/.claude/projects/-probe-workspace/3da5a2ec-3a40-49a9-94a3-5c871964cca5.jsonl": "1d78189acbc978ac2e09ba1eaa2c79e745d39396cd55ae81f8314fd6b496fca5"
+  },
+  "purge_removed_exact_paths": [
+    "/probe/home/.claude/projects/-probe-workspace/3da5a2ec-3a40-49a9-94a3-5c871964cca5/subagents/agent-aa65db83b311cbc1b.meta.json",
+    "/probe/home/.claude/projects/-probe-workspace/3da5a2ec-3a40-49a9-94a3-5c871964cca5/subagents/agent-aa65db83b311cbc1b.jsonl",
+    "/probe/home/.claude/projects/-probe-workspace/3da5a2ec-3a40-49a9-94a3-5c871964cca5.jsonl"
+  ],
+  "unrelated_sentinel_preserved": true,
+  "offline_copies": {
+    "relocated": {
+      "preview": {
+        "files": [
+          {
+            "path": "/probe/home/.claude/projects/-probe-relocated/3da5a2ec-3a40-49a9-94a3-5c871964cca5.jsonl",
+            "store_root": "/probe/home/.claude",
+            "runtime": "claude",
+            "provenance": "relocated",
+            "native_id": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+            "expected_cwd": "/probe/relocated",
+            "created_outside_forge": false,
+            "fingerprint": {
+              "device": 63,
+              "inode": 339657,
+              "size": 14540,
+              "mtime_ns": 1792515357224080463,
+              "sha256": "1d78189acbc978ac2e09ba1eaa2c79e745d39396cd55ae81f8314fd6b496fca5",
+              "parent_device": 63,
+              "parent_inode": 339656
+            },
+            "source_path": "/probe/workspace/.forge/artifacts/probe-original/transcripts/source.jsonl",
+            "source_sha256": "1d78189acbc978ac2e09ba1eaa2c79e745d39396cd55ae81f8314fd6b496fca5"
+          }
+        ],
+        "refusals": [],
+        "outside_scope": [
+          "Provider-side request copies",
+          "Project memory documents and Git history",
+          "Global Forge telemetry",
+          "Claude history.jsonl, file-history, and other uncharacterized runtime state",
+          "Codex indexes, archived stores, and other uncharacterized runtime state",
+          "Native copies outside the recorded runtime store"
+        ]
+      },
+      "removed": true,
+      "source_preserved": true
+    },
+    "rewind": {
+      "preview": {
+        "files": [
+          {
+            "path": "/probe/home/.claude/projects/-probe-rewind/8b9e7b7a-e538-4a0a-9295-fb261ef0d13c.jsonl",
+            "store_root": "/probe/home/.claude",
+            "runtime": "claude",
+            "provenance": "rewind",
+            "native_id": "8b9e7b7a-e538-4a0a-9295-fb261ef0d13c",
+            "expected_cwd": "/probe/rewind",
+            "created_outside_forge": false,
+            "fingerprint": {
+              "device": 63,
+              "inode": 339659,
+              "size": 1209,
+              "mtime_ns": 1792515357232835879,
+              "sha256": "46efd2520c5a1665304ce8cb0629b1ee1a5d9c4f39773916c3e9e493890dfa59",
+              "parent_device": 63,
+              "parent_inode": 339658
+            },
+            "source_path": "/probe/workspace/.forge/artifacts/probe-original/transcripts/source.jsonl",
+            "source_sha256": "1d78189acbc978ac2e09ba1eaa2c79e745d39396cd55ae81f8314fd6b496fca5"
+          }
+        ],
+        "refusals": [],
+        "outside_scope": [
+          "Provider-side request copies",
+          "Project memory documents and Git history",
+          "Global Forge telemetry",
+          "Claude history.jsonl, file-history, and other uncharacterized runtime state",
+          "Codex indexes, archived stores, and other uncharacterized runtime state",
+          "Native copies outside the recorded runtime store"
+        ]
+      },
+      "removed": true,
+      "source_preserved": true
+    }
+  },
+  "mode": "offline_replay_of_captured_native_bytes",
+  "native_invocations": 0,
+  "captured_export_inventory_sha256": "ad09ca78799acbbc8d13b2d7469f85a53b2e48fae7766d0b1fca48e99bbf9196"
+}

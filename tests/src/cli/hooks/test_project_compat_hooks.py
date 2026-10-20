@@ -17,7 +17,9 @@ from forge.install.project_compat import diagnose_project_compatibility_for_hook
 from forge.policy.semantic.plan_check import PlanCheckVerdict
 from forge.session import SessionStore, create_session_state
 from forge.session.codex_handoff import observation_receipt_path, stage_pending_context
+from forge.session.index import IndexStore
 from forge.session.models import PolicyIntent, SupervisorConfig
+from tests.fixtures.session_state import publish_session
 
 
 def _write_pin(root: Path, state: str) -> None:
@@ -49,7 +51,7 @@ def _make_session(root: Path, monkeypatch: pytest.MonkeyPatch, *, name: str = "s
     store = SessionStore(str(root), name)
     manifest = create_session_state(name, worktree_path=str(root))
     manifest.forge_root = str(root)
-    store.write(manifest)
+    publish_session(IndexStore(), manifest, root, forge_root=root)
     return store
 
 
@@ -309,7 +311,7 @@ def test_policy_hook_aggregates_store_and_shadow_roots_in_one_diagnostic(
     assert len(records) == 1
     assert str(project_root / ".forge" / "project.toml") in records[0].message
     assert str(shadow_root / ".forge" / "project.toml") in records[0].message
-    assert list((shadow_root / ".forge" / "artifacts" / "session" / "shadow").glob("*.json"))
+    assert list((project_root / ".forge" / "artifacts" / "session" / "shadow").glob("*.json"))
 
 
 @pytest.mark.parametrize("state", ["incompatible", "malformed"])

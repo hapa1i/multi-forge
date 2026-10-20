@@ -12,9 +12,10 @@ from forge.core.ops import session_fork_execution as fork_execution_ops
 from forge.core.ops.claude_session import SupervisorWiring, launch_claude_session
 from forge.core.ops.session import ForgeOpError
 from forge.core.runtime.launch_args import RuntimeLaunchArgs
-from forge.session import SessionState, SessionStore, create_session_state
+from forge.session import IndexStore, SessionState, SessionStore, create_session_state
 from forge.session.authority import read_authority_events
 from forge.session.models import AuthorityIntent
+from tests.fixtures.session_state import publish_session
 
 
 def _resolve(state: SessionState, *, cwd: Path) -> claude_session_ops.ClaudeSessionStateContext:
@@ -248,7 +249,7 @@ def test_prelaunch_payload_callback_precedes_commit_and_child_with_same_object(
 ) -> None:
     state = create_session_state("routed", worktree_path=str(tmp_path))
     state.forge_root = str(tmp_path)
-    SessionStore(str(tmp_path), state.name).write(state)
+    publish_session(IndexStore(), state, tmp_path)
     payload = {"sentinel": "exact-route-object"}
     observed: list[tuple[str, object]] = []
 
@@ -303,7 +304,7 @@ def test_host_launch_projects_launch_args_and_opts_in_only_when_proxied(
         worktree_path=str(tmp_path),
     )
     state.forge_root = str(tmp_path)
-    SessionStore(str(tmp_path), state.name).write(state)
+    publish_session(IndexStore(), state, tmp_path)
     monkeypatch.setattr(claude_session_ops, "build_claude_routing_payload", lambda *_a, **_k: {})
     monkeypatch.setattr(claude_session_ops, "commit_launch_routing", lambda **_k: None)
     monkeypatch.setattr(claude_session_ops, "read_proxy_cost_baseline", lambda _base_url: None)
@@ -333,7 +334,7 @@ def test_host_launch_projects_launch_args_and_opts_in_only_when_proxied(
 def test_launch_refuses_advisory_passthrough_before_authority_attempt(tmp_path: Path) -> None:
     state = create_session_state("planner", worktree_path=str(tmp_path), authority=AuthorityIntent("advisory"))
     state.forge_root = str(tmp_path)
-    SessionStore(str(tmp_path), state.name).write(state)
+    publish_session(IndexStore(), state, tmp_path)
 
     with pytest.raises(ForgeOpError, match="not accepted for advisory-authority launches"):
         launch_claude_session(

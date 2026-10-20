@@ -119,8 +119,12 @@ def _write_transcript(path: Path) -> None:
 
 
 def _planner_state(tmp_path: Path, transcript: Path) -> SessionState:
+    from forge.session import IndexStore
+    from tests.fixtures.session_state import publish_session
+
     state = create_session_state(name="planner", worktree_path=str(tmp_path))
     state.confirmed.transcript_path = str(transcript)
+    publish_session(IndexStore(), state, tmp_path, forge_root=tmp_path)
     return state
 
 

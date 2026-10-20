@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import subprocess
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -180,6 +182,56 @@ class ActiveSessionStore:
             self.write(index)
             return entry
 
+    def register_session(
+        self,
+        session_name: str,
+        *,
+        worktree_path: str,
+        launch_mode: str,
+        launcher_pid: int | None = None,
+        claude_session_id: str | None = None,
+        container_name: str | None = None,
+        forge_root: str | None = None,
+        authority_run_id: str | None = None,
+        authority_config_sha256: str | None = None,
+        authority_hook_registration_sha256: str | None = None,
+        expected_instance_id: str | None = None,
+    ) -> ActiveSessionEntry:
+        """Admit a managed launch under publication authority before starting it.
+
+        Registration follows index -> active lock order. Destructive cleanup
+        sees either this live entry or an already-deleted instance that cannot
+        launch. Callers must propagate admission failure instead of launching
+        without registry coverage.
+        """
+        from .exceptions import SessionNotFoundError
+        from .index import IndexStore
+
+        root = forge_root or worktree_path
+        index = IndexStore()
+        token = expected_instance_id or index.migrate_session_identity(session_name, root)
+        result: list[ActiveSessionEntry] = []
+
+        def register() -> None:
+            result.append(
+                self.upsert_session(
+                    session_name,
+                    worktree_path=worktree_path,
+                    launch_mode=launch_mode,
+                    launcher_pid=launcher_pid,
+                    claude_session_id=claude_session_id,
+                    container_name=container_name,
+                    forge_root=root,
+                    authority_run_id=authority_run_id,
+                    authority_config_sha256=authority_config_sha256,
+                    authority_hook_registration_sha256=authority_hook_registration_sha256,
+                )
+            )
+
+        if not index.run_session_instance_txn(session_name, root, expected_instance_id=token, callback=register):
+            raise SessionNotFoundError(session_name)
+        return result[0]
+
     def update_uuid(self, session_name: str, claude_session_id: str, forge_root: str | None = None) -> bool:
         """Update the Claude UUID for an active session if it exists.
 
@@ -320,6 +372,21 @@ class ActiveSessionStore:
             key=lambda item: item[0],
         )
 
+    def peek_sessions_strict(self) -> list[tuple[str, ActiveSessionEntry]]:
+        """Return live launches without repairing state or hiding unreadable activity."""
+        from forge.session.identity import session_name_from_key
+
+        # Index publication is atomic. A snapshot needs no lock file or repair writes.
+        index = self._read_validated() if self.exists() else ActiveSessionIndex()
+        return sorted(
+            [
+                (session_name_from_key(key), entry)
+                for key, entry in index.sessions.items()
+                if self._entry_is_live(entry, strict=True)
+            ],
+            key=lambda item: item[0],
+        )
+
     def is_session_active(self, session_name: str, forge_root: str | None = None) -> bool:
         """Return True when the session still appears to be live.
 
@@ -331,16 +398,30 @@ class ActiveSessionStore:
         """Return True when a runtime entry still points at a live launch."""
         return self._entry_is_live(entry)
 
-    def _entry_is_live(self, entry: ActiveSessionEntry) -> bool:
+    def _entry_is_live(self, entry: ActiveSessionEntry, *, strict: bool = False) -> bool:
         """Return True when the runtime entry still points at a live launch."""
         if entry.launch_mode == LAUNCH_MODE_SIDECAR and entry.container_name:
-            try:
-                from forge.sidecar.docker import is_container_running
-
-                if is_container_running(entry.container_name):
+            if strict:
+                try:
+                    result = subprocess.run(
+                        ["docker", "ps", "--quiet", "--filter", f"name=^{re.escape(entry.container_name)}$"],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                        timeout=5,
+                    )
+                except (OSError, subprocess.SubprocessError) as error:
+                    raise ValueError(f"Cannot verify sidecar '{entry.container_name}' activity: {error}") from error
+                if result.stdout.strip():
                     return True
-            except Exception:
-                logger.debug("Failed to probe sidecar container liveness", exc_info=True)
+            else:
+                try:
+                    from forge.sidecar.docker import is_container_running
+
+                    if is_container_running(entry.container_name):
+                        return True
+                except Exception:
+                    logger.debug("Failed to probe sidecar container liveness", exc_info=True)
 
         if entry.launcher_pid is not None and is_pid_alive(entry.launcher_pid):
             return True
@@ -363,18 +444,15 @@ def track_active_session(
     store = ActiveSessionStore()
     effective_forge_root = forge_root or worktree_path
 
-    try:
-        store.upsert_session(
-            session_name,
-            worktree_path=worktree_path,
-            launch_mode=launch_mode,
-            launcher_pid=launcher_pid,
-            claude_session_id=claude_session_id,
-            container_name=container_name,
-            forge_root=effective_forge_root,
-        )
-    except Exception:
-        logger.debug("Failed to register active session '%s'", session_name, exc_info=True)
+    store.register_session(
+        session_name,
+        worktree_path=worktree_path,
+        launch_mode=launch_mode,
+        launcher_pid=launcher_pid,
+        claude_session_id=claude_session_id,
+        container_name=container_name,
+        forge_root=effective_forge_root,
+    )
 
     try:
         yield

@@ -126,6 +126,7 @@ def enqueue(
     kind: str,
     marker_id: str,
     payload: dict[str, Any],
+    admission_forge_root: str | None = None,
 ) -> Path | None:
     """Enqueue a work marker for deferred processing.
 
@@ -159,10 +160,31 @@ def enqueue(
     }
 
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
 
-        with file_lock_for_target(target_path=path, timeout_s=MARKER_LOCK_TIMEOUT_S):
-            atomic_write_json(path, marker_data)
+        def persist() -> None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with file_lock_for_target(target_path=path, timeout_s=MARKER_LOCK_TIMEOUT_S):
+                atomic_write_json(path, marker_data)
+
+        session_name = payload.get("session_name")
+        root = payload.get("forge_root") or payload.get("worktree_path")
+        if isinstance(session_name, str) and isinstance(root, str):
+            from forge.session.workers import (
+                capture_session_instance,
+                run_session_producer_txn,
+            )
+
+            admission_root = admission_forge_root or root
+            token = payload.get("instance_id") or capture_session_instance(admission_root, session_name)
+            if not isinstance(token, str):
+                raise ValueError("Session work marker has no instance identity")
+            payload["instance_id"] = token
+            payload["forge_root"] = str(Path(root).resolve())
+            if not run_session_producer_txn(admission_root, session_name, expected_instance_id=token, callback=persist):
+                logger.info("Not enqueuing work for deleted or replaced session '%s'", session_name)
+                return None
+        else:
+            persist()
 
         logger.debug("Enqueued %s marker: %s", kind, path)
         return path
@@ -182,6 +204,8 @@ def enqueue_stop_marker(
     session_name: str,
     transcript_snapshot_rel: str,
     forge_root: str | None = None,
+    expected_instance_id: str | None = None,
+    admission_forge_root: str | None = None,
 ) -> Path | None:
     """Enqueue a Stop marker for deferred processing.
 
@@ -204,9 +228,11 @@ def enqueue_stop_marker(
         "session_name": session_name,
         "transcript_snapshot_rel": transcript_snapshot_rel,
     }
+    if expected_instance_id is not None:
+        payload["instance_id"] = expected_instance_id
     if forge_root:
         payload["forge_root"] = forge_root
-    return enqueue(kind="stop", marker_id=session_id, payload=payload)
+    return enqueue(kind="stop", marker_id=session_id, payload=payload, admission_forge_root=admission_forge_root)
 
 
 def enqueue_index_marker(
@@ -216,6 +242,8 @@ def enqueue_index_marker(
     session_name: str,
     transcript_snapshot_rel: str,
     forge_root: str | None = None,
+    expected_instance_id: str | None = None,
+    admission_forge_root: str | None = None,
 ) -> Path | None:
     """Enqueue an Index marker for deferred search indexing.
 
@@ -239,9 +267,13 @@ def enqueue_index_marker(
         "session_name": session_name,
         "transcript_snapshot_rel": transcript_snapshot_rel,
     }
+    if expected_instance_id is not None:
+        payload["instance_id"] = expected_instance_id
     if forge_root:
         payload["forge_root"] = forge_root
-    return enqueue(kind="index", marker_id=f"idx-{session_id}", payload=payload)
+    return enqueue(
+        kind="index", marker_id=f"idx-{session_id}", payload=payload, admission_forge_root=admission_forge_root
+    )
 
 
 def enqueue_handoff_marker(
@@ -252,6 +284,8 @@ def enqueue_handoff_marker(
     transcript_snapshot_rel: str,
     subprocess_proxy: str | None = None,
     forge_root: str | None = None,
+    expected_instance_id: str | None = None,
+    admission_forge_root: str | None = None,
 ) -> Path | None:
     """Enqueue a Handoff marker for background memory doc update.
 
@@ -277,6 +311,8 @@ def enqueue_handoff_marker(
     }
     if subprocess_proxy:
         payload["subprocess_proxy"] = subprocess_proxy
+    if expected_instance_id is not None:
+        payload["instance_id"] = expected_instance_id
     if forge_root:
         payload["forge_root"] = forge_root
 
@@ -296,6 +332,7 @@ def enqueue_handoff_marker(
         kind="handoff",
         marker_id=f"handoff-{session_id}",
         payload=payload,
+        admission_forge_root=admission_forge_root,
     )
 
 
@@ -305,6 +342,8 @@ def enqueue_shadow_marker(
     session_name: str,
     worktree_path: Path,
     forge_root: str | None = None,
+    expected_instance_id: str | None = None,
+    admission_forge_root: str | None = None,
 ) -> Path | None:
     """Enqueue a Shadow marker so a later CLI startup drains the session's shadow candidates.
 
@@ -328,6 +367,8 @@ def enqueue_shadow_marker(
         "session_name": session_name,
         "worktree_path": str(worktree_path),
     }
+    if expected_instance_id is not None:
+        payload["instance_id"] = expected_instance_id
     if forge_root:
         payload["forge_root"] = forge_root
 
@@ -347,6 +388,7 @@ def enqueue_shadow_marker(
         kind="shadow",
         marker_id=f"shadow-{session_id}",
         payload=payload,
+        admission_forge_root=admission_forge_root,
     )
 
 
@@ -475,6 +517,47 @@ def _process_single_marker(
     timeout_s: float,
     handlers: dict[str, WorkHandler],
 ) -> str | _DeferredMarker | None:
+    """Admit owned session work before acquiring its marker lock."""
+    try:
+        data = read_json(marker_file)
+    except (StateCorruptedError, StateNotFoundError, StateUnreadableError):
+        return _process_locked_marker(marker_file, timeout_s=timeout_s, handlers=handlers)
+    payload = data.get("payload")
+    if isinstance(payload, dict):
+        session_name = payload.get("session_name")
+        root = payload.get("forge_root") or payload.get("worktree_path")
+        if isinstance(session_name, str) and isinstance(root, str):
+            token = payload.get("instance_id")
+            if not isinstance(token, str):
+                return _DeferredMarker(
+                    f"Pending-work marker {marker_file.name} predates session ownership; "
+                    "leave it for cleanup or generate fresh work from the current session."
+                )
+            from forge.session.exceptions import ForgeSessionError
+            from forge.session.workers import session_worker_lease
+
+            try:
+                with session_worker_lease(
+                    root, session_name, expected_instance_id=token, label="queued " + str(data.get("kind"))
+                ):
+                    return _process_locked_marker(
+                        marker_file,
+                        timeout_s=timeout_s,
+                        handlers=handlers,
+                        expected_owner=(str(Path(root).resolve()), session_name, token),
+                    )
+            except (ForgeSessionError, ValueError, OSError) as exc:
+                return _DeferredMarker(f"Pending-work marker {marker_file.name} was not admitted: {exc}")
+    return _process_locked_marker(marker_file, timeout_s=timeout_s, handlers=handlers)
+
+
+def _process_locked_marker(
+    marker_file: Path,
+    *,
+    timeout_s: float,
+    handlers: dict[str, WorkHandler],
+    expected_owner: tuple[str, str, str] | None = None,
+) -> str | _DeferredMarker | None:
     """Process a single marker file.
 
     Args:
@@ -505,6 +588,17 @@ def _process_single_marker(
                 # Unrecoverable content: retrying the same malformed bytes cannot help.
                 _move_corrupted_to_failed(marker_file, f"read error: {e}")
                 return "failed"
+
+            if expected_owner is not None:
+                payload = data.get("payload") or {}
+                current_root = payload.get("forge_root") or payload.get("worktree_path")
+                current_owner = (
+                    str(Path(current_root).resolve()) if isinstance(current_root, str) else None,
+                    payload.get("session_name"),
+                    payload.get("instance_id"),
+                )
+                if current_owner != expected_owner:
+                    return _DeferredMarker(f"Pending-work marker {marker_file.name} changed before admission")
 
             schema_version = data.get("schema_version")
             if (

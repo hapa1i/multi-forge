@@ -418,18 +418,24 @@ def _generate_parent_transfer_context(
         except ForgeSessionError:
             return None
 
-    transfer_result = assemble_transfer_context(
-        parent_name=manifest.parent_session,
-        parent_state=parent_state,
-        forge_root=project_root,
-        parent_worktree_root=parent_worktree,
-        output_root=(fork_artifact_root if fork_artifact_root.resolve() != project_root.resolve() else None),
-        strategy=resume_strategy,
-        depth=1,
-        get_session=_get_session_safe,
-        inline_plan=inline_plan,
-        child_name=manifest.name,
-    )
+    from forge.core.ops.transfer import transfer_writer_lease
+
+    with transfer_writer_lease(
+        project_root, manifest.parent_session, child=manifest.name, output_root=fork_artifact_root
+    ):
+        parent_state = manager.get_session(manifest.parent_session, forge_root=str(project_root))
+        transfer_result = assemble_transfer_context(
+            parent_name=manifest.parent_session,
+            parent_state=parent_state,
+            forge_root=project_root,
+            parent_worktree_root=parent_worktree,
+            output_root=(fork_artifact_root if fork_artifact_root.resolve() != project_root.resolve() else None),
+            strategy=resume_strategy,
+            depth=1,
+            get_session=_get_session_safe,
+            inline_plan=inline_plan,
+            child_name=manifest.name,
+        )
     if transfer_result.context_file is None:
         return None, transfer_result.warnings
     return transfer_result.context_file.resolve(), transfer_result.warnings

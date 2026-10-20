@@ -273,12 +273,10 @@ class TestStartCodexSession:
         proj, ctx = _make_project(tmp_path, monkeypatch)
 
         def _delete_during_codex() -> None:
-            SessionManager().delete_session(
-                "impl",
-                delete_transcripts=False,
-                delete_worktree=False,
-                forge_root=str(proj),
-            )
+            from tests.fixtures.session_state import delete_published_session
+
+            # Simulate external removal, bypassing the supported live-worker refusal.
+            delete_published_session(IndexStore(), "impl", proj)
 
         forbid_codex_thread_index_sync("codex_session")
         with _codex_mocks(on_codex_spawn=_delete_during_codex):
@@ -939,12 +937,10 @@ class TestContinueCodexSession:
         _seed_codex_session(proj)
 
         def _delete_during_codex() -> None:
-            SessionManager().delete_session(
-                "impl",
-                delete_transcripts=False,
-                delete_worktree=False,
-                forge_root=str(proj),
-            )
+            from tests.fixtures.session_state import delete_published_session
+
+            # Simulate external removal, bypassing the supported live-worker refusal.
+            delete_published_session(IndexStore(), "impl", proj)
 
         forbid_codex_thread_index_sync("codex_session")
         with _codex_mocks(on_codex_spawn=_delete_during_codex):

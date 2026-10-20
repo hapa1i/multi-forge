@@ -210,6 +210,9 @@ def _configure_mock_fork_manager(mock_manager: Any, parent: Any, project_root: P
                 forge_root=forge_root,
                 relative_path=relative_path,
             )
+        sink = _kwargs.get("instance_sink")
+        if sink is not None:
+            sink(store.review_identity())
         return result
 
     mock_manager.fork_session.side_effect = publish_mocked_fork
@@ -352,4 +355,7 @@ def _seed_duplicate_list_sessions(project: Path) -> tuple[Path, Path]:
 
 class _BrokenActiveSessionStore:
     def list_sessions(self):
+        raise RuntimeError("registry unreadable")
+
+    def peek_sessions_strict(self):
         raise RuntimeError("registry unreadable")

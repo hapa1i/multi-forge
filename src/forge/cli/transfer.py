@@ -30,6 +30,7 @@ from forge.core.ops.transfer import (
     resolve_notes_target,
     resolve_single_child,
     show_transfer,
+    transfer_writer_lease,
 )
 from forge.core.paths import display_path
 from forge.session.transfer import (
@@ -172,7 +173,15 @@ def edit_cmd(parent: str, child: str | None) -> None:
     ctx = ExecutionContext.from_cwd()
     try:
         resolved_child = resolve_single_child(ctx=ctx, parent=parent, child=child)
-        notes_path = resolve_notes_target(ctx=ctx, parent=parent, child=resolved_child)
+        if ctx.forge_root is None:
+            raise ForgeOpError("Not inside a Forge project (no .forge/ directory found).")
+        with transfer_writer_lease(ctx.forge_root, parent, child=resolved_child):
+            notes_path = resolve_notes_target(ctx=ctx, parent=parent, child=resolved_child)
+            open_in_editor(
+                notes_path,
+                console=console,
+                abort_tip=f"Your notes at {display_path(notes_path)} are preserved.",
+            )
     except ForgeOpError as e:
         print_error_with_tip(
             str(e),
@@ -180,11 +189,6 @@ def edit_cmd(parent: str, child: str | None) -> None:
         )
         raise SystemExit(1) from e
 
-    open_in_editor(
-        notes_path,
-        console=console,
-        abort_tip=f"Your notes at {display_path(notes_path)} are preserved.",
-    )
     console.print(f"Saved notes for [cyan]{parent}[/cyan] → [green]{resolved_child}[/green].")
     print_tip(
         "Notes are merged into the child's launch context on the next resume/relaunch.",

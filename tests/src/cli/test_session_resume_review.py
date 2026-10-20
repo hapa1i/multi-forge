@@ -13,11 +13,28 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from forge.session import IndexStore
+from forge.session.workers import capture_session_instance
+from tests.fixtures.session_state import publish_session
 
 
 @pytest.fixture
 def runner() -> CliRunner:
     return CliRunner()
+
+
+def _prepare_mock_resume(manager, parent, child, result) -> None:
+    """Publish the same coherent births that the mocked manager returns."""
+    root = Path(parent.worktree.path)
+    for state in (parent, child):
+        publish_session(IndexStore(), state, root, forge_root=root)
+    manager.get_session.return_value = parent
+
+    def resume(*args, instance_sink, **kwargs):
+        instance_sink(capture_session_instance(root, child.name))
+        return child, result
+
+    manager.resume_session.side_effect = resume
 
 
 class TestReviewFlagValidation:
@@ -103,8 +120,7 @@ class TestReviewFlagEditorInvocation:
             patch("forge.cli.editor.subprocess.run", side_effect=fake_subprocess_run),
         ):
             mgr = mock_mgr_cls.return_value
-            mgr.get_session.return_value = parent
-            mgr.resume_session.return_value = (child_manifest, handoff_result)
+            _prepare_mock_resume(mgr, parent, child_manifest, handoff_result)
 
             result = runner.invoke(
                 main,
@@ -188,8 +204,7 @@ class TestReviewFlagEditorInvocation:
             ),
         ):
             mgr = mock_mgr_cls.return_value
-            mgr.get_session.return_value = parent
-            mgr.resume_session.return_value = (child_manifest, handoff_result)
+            _prepare_mock_resume(mgr, parent, child_manifest, handoff_result)
 
             result = runner.invoke(
                 main,
@@ -267,8 +282,7 @@ class TestReviewFlagEditorInvocation:
             patch("forge.cli.editor.subprocess.run", side_effect=fake_subprocess_run),
         ):
             mgr = mock_mgr_cls.return_value
-            mgr.get_session.return_value = parent
-            mgr.resume_session.return_value = (child_manifest, handoff_result)
+            _prepare_mock_resume(mgr, parent, child_manifest, handoff_result)
 
             result = runner.invoke(
                 main,
@@ -335,8 +349,7 @@ class TestReviewFlagEditorInvocation:
             ) as launch_mock,
         ):
             mgr = mock_mgr_cls.return_value
-            mgr.get_session.return_value = parent
-            mgr.resume_session.return_value = (child_manifest, handoff_result)
+            _prepare_mock_resume(mgr, parent, child_manifest, handoff_result)
 
             result = runner.invoke(
                 main,
@@ -403,8 +416,7 @@ class TestReviewFlagEditorInvocation:
             ),
         ):
             mgr = mock_mgr_cls.return_value
-            mgr.get_session.return_value = parent
-            mgr.resume_session.return_value = (child_manifest, handoff_result)
+            _prepare_mock_resume(mgr, parent, child_manifest, handoff_result)
 
             result = runner.invoke(
                 main,

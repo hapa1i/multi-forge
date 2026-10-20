@@ -49,6 +49,16 @@ DEFAULT_PROXY_TEMPLATE = "test-family"
 DEFAULT_PROXY_URL = "http://localhost:8080"
 
 
+def _isolated_env(values, *, clear=False):
+    """Reset hook routing while retaining the test's isolated filesystem homes."""
+    homes = {
+        key: value
+        for key, value in os.environ.items()
+        if key in {"HOME", "FORGE_HOME", "CLAUDE_HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME"}
+    }
+    return patch.dict(os.environ, {**homes, **values}, clear=clear)
+
+
 @pytest.fixture
 def temp_worktree(tmp_path: Path) -> Path:
     """Create a temporary worktree directory with .claude folder."""
@@ -65,7 +75,7 @@ def temp_index(tmp_path: Path) -> IndexStore:
 
 
 @pytest.fixture
-def sample_manifest(temp_worktree: Path) -> None:
+def sample_manifest(temp_worktree: Path, temp_index: IndexStore) -> None:
     """Create a sample manifest in the temp worktree."""
     manifest = create_session_state(
         "test-session",
@@ -73,8 +83,7 @@ def sample_manifest(temp_worktree: Path) -> None:
         proxy_base_url=DEFAULT_PROXY_URL,
     )
     manifest.confirmed.claude_session_id = "original-uuid-123"
-    store = SessionStore(str(temp_worktree), "test-session")
-    store.write(manifest)
+    publish_session(temp_index, manifest, temp_worktree, forge_root=temp_worktree)
 
 
 class TestResolveSessionName:
@@ -82,7 +91,7 @@ class TestResolveSessionName:
 
     def test_resolve_priority_1_fork_env(self, temp_worktree: Path, temp_index: IndexStore) -> None:
         """FORGE_FORK_NAME env var should have highest priority."""
-        with patch.dict(os.environ, {ENV_FORK_NAME: "fork-name", ENV_SESSION: "session-name"}):
+        with _isolated_env({ENV_FORK_NAME: "fork-name", ENV_SESSION: "session-name"}):
             ctx = resolve_session_name("startup", "uuid-123", temp_worktree, temp_index)
 
         assert ctx.resolved
@@ -91,12 +100,12 @@ class TestResolveSessionName:
 
     def test_resolve_priority_2_session_env(self, temp_worktree: Path, temp_index: IndexStore) -> None:
         """FORGE_SESSION env var should be second priority."""
-        with patch.dict(os.environ, {ENV_SESSION: "session-name"}, clear=False):
+        with _isolated_env({ENV_SESSION: "session-name"}, clear=False):
             # Ensure FORGE_FORK_NAME is not set
             env = os.environ.copy()
             env.pop(ENV_FORK_NAME, None)
-            with patch.dict(os.environ, env, clear=True):
-                with patch.dict(os.environ, {ENV_SESSION: "session-name"}):
+            with _isolated_env(env, clear=True):
+                with _isolated_env({ENV_SESSION: "session-name"}):
                     ctx = resolve_session_name("startup", "uuid-123", temp_worktree, temp_index)
 
         assert ctx.resolved
@@ -115,7 +124,7 @@ class TestResolveSessionName:
         )
 
         # Clear env vars
-        with patch.dict(os.environ, {}, clear=True):
+        with _isolated_env({}, clear=True):
             ctx = resolve_session_name("compact", "uuid-123", temp_worktree, temp_index)
 
         assert ctx.resolved
@@ -135,7 +144,7 @@ class TestResolveSessionName:
         store.write(manifest)
 
         # Clear env vars, don't add to index — no CWD scan means this won't resolve
-        with patch.dict(os.environ, {}, clear=True):
+        with _isolated_env({}, clear=True):
             ctx = resolve_session_name("compact", "uuid-scan-456", temp_worktree, temp_index)
 
         assert not ctx.resolved
@@ -144,7 +153,7 @@ class TestResolveSessionName:
 
     def test_resolve_fails_when_not_found(self, temp_worktree: Path, temp_index: IndexStore) -> None:
         """Resolution should fail gracefully when session not found."""
-        with patch.dict(os.environ, {}, clear=True):
+        with _isolated_env({}, clear=True):
             ctx = resolve_session_name("compact", "unknown-uuid", temp_worktree, temp_index)
 
         assert not ctx.resolved
@@ -165,7 +174,7 @@ class TestHandleSessionStart:
             source="startup",
         )
 
-        with patch.dict(os.environ, {"FORGE_SESSION": "test-session"}, clear=True):
+        with _isolated_env({"FORGE_SESSION": "test-session"}, clear=True):
             result = handle_session_start(hook_input, temp_worktree, temp_index)
 
         assert result.success
@@ -188,8 +197,7 @@ class TestHandleSessionStart:
             source="startup",
         )
 
-        with patch.dict(
-            os.environ,
+        with _isolated_env(
             {
                 "FORGE_SESSION": "test-session",
                 "ANTHROPIC_BASE_URL": "https://api.anthropic.com",
@@ -223,7 +231,7 @@ class TestHandleSessionStart:
             source="startup",
         )
 
-        with patch.dict(os.environ, {"FORGE_SESSION": "test-session"}, clear=True):
+        with _isolated_env({"FORGE_SESSION": "test-session"}, clear=True):
             with patch("forge.session.active.get_active_index_path", return_value=tmp_path / "active.json"):
                 result = handle_session_start(hook_input, temp_worktree, temp_index)
 
@@ -257,7 +265,7 @@ class TestHandleSessionStart:
                 source="startup",
             )
 
-            with patch.dict(os.environ, {"FORGE_SESSION": "test-session"}, clear=True):
+            with _isolated_env({"FORGE_SESSION": "test-session"}, clear=True):
                 result = handle_session_start(hook_input, temp_worktree, temp_index)
 
             assert result.success
@@ -292,8 +300,7 @@ class TestHandleSessionStart:
         )()
 
         with (
-            patch.dict(
-                os.environ,
+            _isolated_env(
                 {
                     "FORGE_SESSION": "test-session",
                     "ANTHROPIC_BASE_URL": "http://localhost:8084",
@@ -330,7 +337,7 @@ class TestHandleSessionStart:
             source="startup",
         )
 
-        with patch.dict(os.environ, {}, clear=True):
+        with _isolated_env({}, clear=True):
             result = handle_session_start(hook_input, temp_worktree, temp_index)
 
         assert not result.success
@@ -344,7 +351,7 @@ class TestHandleSessionStart:
             source="startup",
         )
 
-        with patch.dict(os.environ, {"FORGE_SESSION": "nonexistent-session"}, clear=True):
+        with _isolated_env({"FORGE_SESSION": "nonexistent-session"}, clear=True):
             result = handle_session_start(hook_input, temp_worktree, temp_index)
 
         assert not result.success
@@ -363,7 +370,7 @@ class TestHandleSessionStart:
             source="startup",
         )
 
-        with patch.dict(os.environ, {"FORGE_SESSION": "different-session"}, clear=True):
+        with _isolated_env({"FORGE_SESSION": "different-session"}, clear=True):
             result = handle_session_start(hook_input, temp_worktree, temp_index)
 
         assert not result.success
@@ -379,7 +386,7 @@ class TestHandleSessionStart:
             source="resume",
         )
 
-        with patch.dict(os.environ, {"FORGE_SESSION": "test-session"}, clear=True):
+        with _isolated_env({"FORGE_SESSION": "test-session"}, clear=True):
             result = handle_session_start(hook_input, temp_worktree, temp_index)
 
         assert result.received_session_id == "uuid-123"
@@ -406,7 +413,7 @@ class TestHandleSessionStart:
             source="compact",
         )
 
-        with patch.dict(os.environ, {"FORGE_SESSION": "test-session"}, clear=True):
+        with _isolated_env({"FORGE_SESSION": "test-session"}, clear=True):
             result = handle_session_start(hook_input, temp_worktree, temp_index)
 
         assert result.success
@@ -426,7 +433,7 @@ class TestHandleSessionStart:
         assert rollover_copy.exists()
 
     def test_repeated_rollover_reuses_identity_without_replacing_successful_provenance(
-        self, temp_worktree: Path, sample_manifest: None
+        self, temp_worktree: Path, temp_index: IndexStore, sample_manifest: None
     ) -> None:
         previous_transcript = temp_worktree / "previous.jsonl"
         previous_transcript.write_text("first\n", encoding="utf-8")
@@ -437,6 +444,8 @@ class TestHandleSessionStart:
             forge_root=str(temp_worktree),
             previous_session_id="original-uuid-123",
             previous_transcript_path=str(previous_transcript),
+            expected_instance_id=temp_index.migrate_session_identity("test-session", str(temp_worktree)),
+            index_store=temp_index,
         )
         previous_transcript.write_text("second\n", encoding="utf-8")
         _capture_transcript_rollover(
@@ -445,6 +454,8 @@ class TestHandleSessionStart:
             forge_root=str(temp_worktree),
             previous_session_id="original-uuid-123",
             previous_transcript_path=str(previous_transcript),
+            expected_instance_id=temp_index.migrate_session_identity("test-session", str(temp_worktree)),
+            index_store=temp_index,
         )
 
         entries = SessionStore(str(temp_worktree), "test-session").read().confirmed.artifacts["transcripts"]
@@ -482,7 +493,7 @@ class TestHandleSessionStart:
             transcript_path="/path/to/transcript.jsonl",
             source="resume",
         )
-        with patch.dict(os.environ, {"FORGE_SESSION": "test-session"}, clear=True):
+        with _isolated_env({"FORGE_SESSION": "test-session"}, clear=True):
             result = handle_session_start(hook_input, temp_worktree, temp_index)
 
         assert result.success
@@ -503,7 +514,7 @@ class TestHandleSessionStart:
             transcript_path="/path/to/new-transcript.jsonl",
             source="compact",
         )
-        with patch.dict(os.environ, {"FORGE_SESSION": "test-session"}, clear=True):
+        with _isolated_env({"FORGE_SESSION": "test-session"}, clear=True):
             result = handle_session_start(hook_input, temp_worktree, temp_index)
 
         assert result.success
@@ -547,8 +558,7 @@ class TestHandleSessionStart:
         off_root_cwd = tmp_path / "outside"
         off_root_cwd.mkdir()
 
-        with patch.dict(
-            os.environ,
+        with _isolated_env(
             {ENV_SESSION: "test-session", "FORGE_FORGE_ROOT": str(nested_forge_root)},
             clear=True,
         ):

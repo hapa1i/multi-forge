@@ -22,6 +22,11 @@ from forge.session.authority import (
 from forge.session.hooks import resolve_session_store
 from forge.session.models import SessionState
 from forge.session.store import SessionStore
+from forge.session.workers import (
+    SESSION_INSTANCE_ENV,
+    capture_session_instance,
+    session_worker_lease,
+)
 
 
 @dataclass(frozen=True)
@@ -35,6 +40,7 @@ class AuthorityGuardResult:
     state: SessionState | None = None
     store: SessionStore | None = None
     marker: AuthorityMarker | None = None
+    instance_id: str | None = None
 
 
 def evaluate_authority_guard(data: dict[str, Any] | None, *, runtime: str) -> AuthorityGuardResult:
@@ -47,6 +53,7 @@ def evaluate_authority_guard(data: dict[str, Any] | None, *, runtime: str) -> Au
 
     state: SessionState | None = None
     store: SessionStore | None = None
+    instance_id: str | None = None
     covered_tool = sanitize_covered_tool_name(data.get("tool_name") if isinstance(data.get("tool_name"), str) else None)
     try:
         payload_cwd = data.get("cwd")
@@ -54,6 +61,9 @@ def evaluate_authority_guard(data: dict[str, Any] | None, *, runtime: str) -> Au
         store = resolve_session_store(cwd, session_id=data.get("session_id") if runtime == "claude_code" else None)
         if store is None:
             raise ValueError("managed session could not be resolved")
+        instance_id = os.environ.get(SESSION_INSTANCE_ENV) or capture_session_instance(
+            store.forge_root, store.session_name
+        )
         state = store.read()
         marker = parse_authority_marker(raw_marker, state)
         authority = state.intent.authority
@@ -72,6 +82,7 @@ def evaluate_authority_guard(data: dict[str, Any] | None, *, runtime: str) -> Au
             state=state,
             store=store,
             marker=marker,
+            instance_id=instance_id,
         )
     except Exception:
         return AuthorityGuardResult(
@@ -82,6 +93,7 @@ def evaluate_authority_guard(data: dict[str, Any] | None, *, runtime: str) -> Au
             state=state,
             store=store,
             marker=None,
+            instance_id=instance_id,
         )
 
 
@@ -89,6 +101,8 @@ def journal_authority_denial(result: AuthorityGuardResult, *, runtime: str) -> b
     """Best-effort denial journal; return False without weakening the deny."""
     if not result.deny or result.state is None or result.store is None:
         return True
+    if result.instance_id is None:
+        return False
     try:
         run_id = result.marker.run_id if result.marker is not None else _recover_valid_marker_run_id()
         hook_digest = (
@@ -107,7 +121,13 @@ def journal_authority_denial(result: AuthorityGuardResult, *, runtime: str) -> b
             hook_registration_sha256=hook_digest,
             covered_tool=result.covered_tool or "unknown",
         )
-        append_authority_event(str(result.store.forge_root), event)
+        with session_worker_lease(
+            result.store.forge_root,
+            result.store.session_name,
+            expected_instance_id=result.instance_id,
+            label="authority denial",
+        ):
+            append_authority_event(str(result.store.forge_root), event)
     except Exception:
         return False
     return True

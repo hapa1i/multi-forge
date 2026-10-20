@@ -13,6 +13,7 @@ non-exempt commands on startup.
 from __future__ import annotations
 
 import json
+import shlex
 
 import pytest
 
@@ -48,31 +49,29 @@ def _create_stop_marker(
 
 
 def _create_index_marker(workspace: ContainerLike, session_id: str = "compat-index") -> str:
-    """Create a current-schema index marker targeting /workspace."""
-    marker_id = f"idx-{session_id}"
-    marker_path = f"$HOME/.forge/pending-work/{marker_id}.json"
-    workspace.mkdir("$HOME/.forge/pending-work", parents=True)
-    workspace.write_json(
-        marker_path,
-        {
-            "schema_version": 1,
-            "kind": "index",
-            "marker_id": marker_id,
-            "forge_version": "0.0.0",
-            "created_at": "2025-01-01T00:00:00Z",
-            "payload": {
-                "session_id": session_id,
-                "session_name": "compat-session",
-                "worktree_path": "/workspace",
-                "forge_root": "/workspace",
-                "transcript_snapshot_rel": f".forge/artifacts/compat-session/transcripts/{session_id}.jsonl",
-            },
-            "attempt_count": 0,
-            "last_attempt_at": None,
-            "last_error": None,
-        },
-    )
-    return marker_path
+    """Enqueue current producer output bound to a coherently published session."""
+    result = workspace.exec("cd /forge && /forge/.venv/bin/python - " + shlex.quote(session_id) + """ <<'PY'
+import sys
+from pathlib import Path
+from forge.core.workqueue import enqueue_index_marker
+from forge.session import IndexStore, create_session_state
+from tests.fixtures.session_state import publish_session
+
+root = Path("/workspace")
+state = create_session_state("compat-session", worktree_path=str(root))
+publish_session(IndexStore(), state, root, forge_root=root)
+marker = enqueue_index_marker(
+    session_id=sys.argv[1],
+    session_name=state.name,
+    worktree_path=root,
+    forge_root=str(root),
+    transcript_snapshot_rel=f".forge/artifacts/compat-session/transcripts/{sys.argv[1]}.jsonl",
+)
+assert marker is not None
+print(marker)
+PY""")
+    assert result.returncode == 0, result.stdout + result.stderr
+    return result.stdout.strip()
 
 
 def _create_newer_marker(workspace: ContainerLike, marker_id: str = "a-future") -> tuple[str, str]:

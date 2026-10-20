@@ -988,136 +988,131 @@ print(json.dumps({'error': error}))
         assert result.data is not None
         assert result.data["error"] == "SessionNotFoundError"
 
-    def test_delete_can_skip_transcripts(self, manager_workspace: "WorktreeWorkspace") -> None:
-        """delete_session with delete_transcripts=False should skip cleanup."""
+    def test_delete_preserves_native_transcript(self, manager_workspace: "WorktreeWorkspace") -> None:
+        """Ordinary deletion preserves native bytes without an opt-out flag."""
         result = manager_workspace.run_python(
             """
 import json
+from forge.session.claude.paths import get_transcript_path
 from forge.session.index import IndexStore
 from forge.session.manager import SessionManager
 
 manager = SessionManager(index_store=IndexStore())
-manager.start_session(
-    name='no-cleanup-test',
-    worktree_path='/workspace',
-)
+conversation = 'aaaaaaaa-1111-4111-8111-111111111111'
+manager.start_session(name='preserve-native', worktree_path='/workspace', claude_session_id=conversation)
+transcript = get_transcript_path('/workspace', conversation)
+transcript.parent.mkdir(parents=True, exist_ok=True)
+transcript.write_bytes(b'native conversation remains byte-identical')
+before = transcript.read_bytes()
 
-# This should complete without error even though transcripts may not exist
-manager.delete_session('no-cleanup-test', delete_transcripts=False, force=True)
-
-exists = manager.session_exists('no-cleanup-test')
-print(json.dumps({'exists': exists}))
+manager.delete_session('preserve-native', force=True)
+print(json.dumps({
+    'exists': manager.session_exists('preserve-native'),
+    'native_unchanged': transcript.read_bytes() == before,
+}))
 """,
             home=HOME,
         )
         assert result.ok, f"Failed: {result.stderr}"
         assert result.data is not None
         assert result.data["exists"] is False
+        assert result.data["native_unchanged"] is True
 
-    def test_delete_passes_rollover_session_ids_to_cleanup(self, manager_workspace: "WorktreeWorkspace") -> None:
-        """delete_session should include rollover transcript UUIDs in cleanup."""
+    def test_delete_preserves_rollovers_and_removes_forge_copies(self, manager_workspace: "WorktreeWorkspace") -> None:
+        """Rollover references retain native transcripts while owned copies are removed."""
         result = manager_workspace.run_python(
             """
 import json
-import forge.session.claude.cleanup as cleanup_mod
+from pathlib import Path
+from forge.session.claude.paths import get_transcript_path
 from forge.session.index import IndexStore
 from forge.session.manager import SessionManager
 from forge.session.store import SessionStore
 
-captured = {}
-
-def fake_cleanup_session(project_root, claude_session_id, artifact_session_ids=None):
-    captured['project_root'] = project_root
-    captured['claude_session_id'] = claude_session_id
-    captured['artifact_session_ids'] = artifact_session_ids
-    return cleanup_mod.CleanupResult()
-
-cleanup_mod.cleanup_session = fake_cleanup_session
-
 manager = SessionManager(index_store=IndexStore())
-manager.start_session(
-    name='cleanup-test',
-    worktree_path='/workspace',
-)
+current = 'aaaaaaaa-1111-4111-8111-111111111111'
+rollover = 'bbbbbbbb-2222-4222-8222-222222222222'
+manager.start_session(name='rollover-cleanup', worktree_path='/workspace', claude_session_id=current)
+store = SessionStore('/workspace', 'rollover-cleanup')
+artifacts = Path('/workspace/.forge/artifacts/rollover-cleanup')
+copy_root = artifacts / 'transcripts'
+copy_root.mkdir(parents=True)
+paths = []
+for native_id in (current, rollover):
+    path = get_transcript_path('/workspace', native_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(native_id)
+    paths.append(path)
+    (copy_root / f'{native_id}.jsonl').write_bytes(path.read_bytes())
 
-store = SessionStore('/workspace', 'cleanup-test')
+def record_copies(manifest):
+    manifest.confirmed.artifacts = {'transcripts': [
+        {'session_id': native_id,
+         'copied_path': f'.forge/artifacts/rollover-cleanup/transcripts/{native_id}.jsonl'}
+        for native_id in (rollover, current, rollover)
+    ]}
 
-def _set_manifest_state(manifest):
-    manifest.confirmed.claude_session_id = 'current-id'
-    manifest.confirmed.artifacts = {
-        'transcripts': [
-            {'session_id': 'rollover-id', 'copied_path': '.forge/artifacts/cleanup-test/transcripts/rollover-id.jsonl'},
-            {'session_id': 'current-id', 'copied_path': '.forge/artifacts/cleanup-test/transcripts/current-id.jsonl'},
-            {'session_id': 'rollover-id', 'copied_path': '.forge/artifacts/cleanup-test/transcripts/rollover-id.jsonl'},
-        ]
-    }
-
-store.update(timeout_s=5.0, mutate=_set_manifest_state)
-
-manager.delete_session('cleanup-test', force=True)
-
-print(json.dumps(captured))
+store.update(timeout_s=5.0, mutate=record_copies)
+manager.delete_session('rollover-cleanup', force=True)
+print(json.dumps({
+    'native_contents': [path.read_text() for path in paths],
+    'artifacts_exist': artifacts.exists(),
+    'manifest_exists': store.exists(),
+}))
 """,
             home=HOME,
         )
         assert result.ok, f"Failed: {result.stderr}"
         assert result.data is not None
-        assert result.data["claude_session_id"] == "current-id"
-        assert result.data["artifact_session_ids"] == ["rollover-id", "current-id"]
+        assert result.data["native_contents"] == [
+            "aaaaaaaa-1111-4111-8111-111111111111",
+            "bbbbbbbb-2222-4222-8222-222222222222",
+        ]
+        assert result.data["artifacts_exist"] is False
+        assert result.data["manifest_exists"] is False
 
-    def test_delete_checks_dirty_worktree_before_transcript_cleanup(
+    def test_delete_refuses_dirty_worktree_before_removing_content(
         self, manager_workspace: "WorktreeWorkspace"
     ) -> None:
-        """Dirty-worktree preflight should happen before transcript cleanup."""
+        """Dirty-worktree refusal preserves the checkout, manifest and owned artifacts."""
         result = manager_workspace.run_python(
             """
 import json
-import forge.session.claude.cleanup as cleanup_mod
-import forge.session.worktree as worktree_mod
-from forge.session.exceptions import DirtyWorktreeError
+import os
+from pathlib import Path
+from forge.session.exceptions import ForgeSessionError
 from forge.session.index import IndexStore
 from forge.session.manager import SessionManager
 from forge.session.store import SessionStore
 
-captured = {"cleanup_called": False, "dirty_checked": False, "error": None}
-
-def fake_cleanup_session(project_root, claude_session_id, artifact_session_ids=None):
-    captured["cleanup_called"] = True
-    return cleanup_mod.CleanupResult()
-
-def fake_is_worktree_dirty(worktree_path):
-    captured["dirty_checked"] = True
-    return True
-
-cleanup_mod.cleanup_session = fake_cleanup_session
-worktree_mod.is_worktree_dirty = fake_is_worktree_dirty
-
 manager = SessionManager(index_store=IndexStore())
-manager.start_session(
-    name='dirty-delete-test',
-    worktree_path='/workspace',
-)
-
-store = SessionStore('/workspace', 'dirty-delete-test')
-
-def _mark_worktree(manifest):
-    assert manifest.worktree is not None
-    manifest.worktree.is_worktree = True
-    manifest.confirmed.claude_session_id = 'uuid-dirty'
-
-store.update(timeout_s=5.0, mutate=_mark_worktree)
-
+os.chdir('/workspace')
+state = manager.start_session(name='dirty-delete-test', create_worktree=True)
+store = SessionStore(state.forge_root, state.name)
+checkout = Path(state.worktree.path)
+(checkout / 'uncommitted.txt').write_text('keep dirty work')
+artifact = Path(state.forge_root) / '.forge/artifacts/dirty-delete-test/keep.md'
+artifact.parent.mkdir(parents=True, exist_ok=True)
+artifact.write_text('owned content must survive refusal')
+error = None
 try:
-    manager.delete_session('dirty-delete-test', force=False)
-except DirtyWorktreeError as e:
-    captured["error"] = e.path
+    manager.delete_session(state.name, force=False, forge_root=state.forge_root)
+except ForgeSessionError as exc:
+    error = str(exc)
 
-print(json.dumps(captured))
+print(json.dumps({
+    'error': error,
+    'checkout_exists': checkout.exists(),
+    'manifest_exists': store.exists(),
+    'artifact': artifact.read_text(),
+}))
 """,
             home=HOME,
         )
         assert result.ok, f"Failed: {result.stderr}"
         assert result.data is not None
-        assert result.data["dirty_checked"] is True
-        assert result.data["cleanup_called"] is False
-        assert result.data["error"] == "/workspace"
+        assert result.data["error"] is not None
+        assert "dirty" in result.data["error"].lower()
+        assert result.data["checkout_exists"] is True
+        assert result.data["manifest_exists"] is True
+        assert result.data["artifact"] == "owned content must survive refusal"

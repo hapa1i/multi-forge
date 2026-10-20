@@ -21,7 +21,7 @@ from .config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 
 # Schema version for session state files.
 SCHEMA_VERSION = 5
-INDEX_VERSION = 1
+INDEX_VERSION = 2
 
 # Mirror of forge.core.llm.types.ReasoningEffort. Kept inline so this foundational
 # module's import chain stays free of the heavy core.llm package (litellm clients);
@@ -858,6 +858,8 @@ class SessionIndexEntry:
     forge_root: str = ""  # Forge project root (where .forge/ lives)
     checkout_root: str = ""  # Git checkout root (--show-toplevel)
     relative_path: str = "."  # forge_root relative to checkout_root
+    # Mirrored from review-identity. None marks a legacy row awaiting explicit migration.
+    instance_id: str | None = None
 
     @property
     def root(self) -> str:

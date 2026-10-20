@@ -49,7 +49,7 @@ from .workspace import workspace  # noqa: E402
 # Subcommands that should NOT trigger pending-work processing or auto file logging.
 # Hooks and status-line are latency-sensitive; logs is exempt so it can inspect/clean
 # log files without creating a fresh "logs.*.log" file as a side effect.
-_EXEMPT_SUBCOMMANDS = frozenset({"hook", "status-line", "logs", "clean"})
+_EXEMPT_SUBCOMMANDS = frozenset({"hook", "status-line", "logs", "clean", "session"})
 
 # Session auto-cleanup is also exempt for session and workspace subcommands so
 # inspection commands do not delete the state they are about to report.
@@ -149,6 +149,7 @@ def _memory_writer_env(payload: dict[str, object]) -> dict[str, str]:
         ENV_PARENT_SESSION,
         ENV_SESSION,
     )
+    from forge.session.workers import SESSION_INSTANCE_ENV
 
     env = os.environ.copy()
     # Scrub the drainer's run-tree AND session identity (see docstring): inheriting either
@@ -161,6 +162,7 @@ def _memory_writer_env(payload: dict[str, object]) -> dict[str, str]:
         ENV_SESSION,
         ENV_FORK_NAME,
         ENV_PARENT_SESSION,
+        SESSION_INSTANCE_ENV,
     ):
         env.pop(var, None)
 
@@ -172,6 +174,9 @@ def _memory_writer_env(payload: dict[str, object]) -> dict[str, str]:
         env[FORGE_ROOT_RUN_ID_VAR] = str(origin_root)
         env[FORGE_PARENT_RUN_ID_VAR] = str(payload.get("origin_run_id") or origin_root)
         env[FORGE_RUN_ID_VAR] = mint_run_id()
+    instance_id = payload.get("instance_id")
+    if isinstance(instance_id, str):
+        env[SESSION_INSTANCE_ENV] = instance_id
     return env
 
 

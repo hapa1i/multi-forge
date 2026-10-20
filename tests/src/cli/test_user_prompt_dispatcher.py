@@ -1639,8 +1639,8 @@ def _make_bare_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Sessi
     monkeypatch.setenv("FORGE_FORGE_ROOT", str(tmp_path))
 
     store = SessionStore(str(tmp_path), "test-session")
-    manifest = create_session_state("test-session")
-    store.write(manifest)
+    manifest = create_session_state("test-session", worktree_path=str(tmp_path))
+    publish_session(IndexStore(), manifest, tmp_path, forge_root=tmp_path)
     return store
 
 
@@ -1648,13 +1648,10 @@ class TestGuardSupervisorToggle:
     """Test %policy supervisor off/on/remove/reload toggle commands."""
 
     def test_bare_target_sets_supervisor(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from types import SimpleNamespace
-
         store = _make_bare_session(tmp_path, monkeypatch)
-        source_state = SimpleNamespace(
-            forge_root=str(tmp_path),
-            confirmed=SimpleNamespace(started_with_proxy=None),
-        )
+        source_state = create_session_state("planner", worktree_path=str(tmp_path))
+        source_state.forge_root = str(tmp_path)
+        publish_session(IndexStore(), source_state, tmp_path, forge_root=tmp_path)
         monkeypatch.setattr(
             "forge.policy.semantic.supervisor.validate_supervisor_target",
             lambda _target, forge_root=None: source_state,

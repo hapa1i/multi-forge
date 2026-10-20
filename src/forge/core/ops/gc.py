@@ -3,6 +3,7 @@
 Detects and removes orphaned Forge state:
 - Session directories not in the global index
 - Transfer files for sessions not in the index
+- Unreferenced artifact trees left by deleted sessions
 - Stale active-session entries (dead PIDs)
 - Stale work-queue markers (session gone or worktree gone)
 - Stale proxy entries (dead PIDs, orphaned "starting" state)
@@ -41,6 +42,7 @@ from forge.install.unmanaged import (
     runtime_skill_scan_roots,
     scan_unmanaged_skill_packages,
 )
+from forge.session.cleanup_content import ForgeContentPlan
 
 from .context import ExecutionContext
 
@@ -77,6 +79,7 @@ class CleanReport:
     _unmanaged_roots: tuple[SkillScanRoot, ...] = field(default=(), repr=False, compare=False)
     _unmanaged_skill_names: tuple[str, ...] = field(default=(), repr=False, compare=False)
     _unmanaged_proof_tokens: tuple[tuple[str, str], ...] = field(default=(), repr=False, compare=False)
+    _orphan_artifact_plans: tuple[ForgeContentPlan, ...] = field(default=(), repr=False, compare=False)
 
     @property
     def total_count(self) -> int:
@@ -220,7 +223,10 @@ def _scan_unmanaged_skill_packages_for_clean(
     try:
         current_names = discover_skill_source_names(get_extensions_root() / InstallModule.SKILLS.value)
     except (OSError, ValueError) as exc:
-        _log.warning("forge clean: current skill names unavailable; using historical names only: %s", exc)
+        _log.warning(
+            "forge clean: current skill names unavailable; using historical names only: %s",
+            exc,
+        )
         current_names = ()
 
     selected: list[tuple[InstallScope, Path | None]] = []
@@ -400,6 +406,73 @@ def _detect_orphan_session_dirs(ref_set: set[tuple[str, str]], forge_roots: set[
         description="Session directories not in the index",
         count=len(orphans),
         items=sorted(orphans),
+    )
+
+
+def _detect_orphan_artifacts(
+    forge_roots: set[Path],
+) -> tuple[OrphanCategory, OrphanCategory, tuple[ForgeContentPlan, ...]]:
+    """Keep orphan artifact cleanup fail-closed across roots and unreadable manifests."""
+    from forge.core.runtime.codex_review_source import directory_fd
+    from forge.session.cleanup_content import plan_orphan_artifacts
+    from forge.session.cleanup_dependencies import (
+        find_cleanup_dependencies,
+        session_entries,
+    )
+    from forge.session.index import IndexStore
+    from forge.session.models import create_session_state
+
+    plans: list[ForgeContentPlan] = []
+    refused: list[str] = []
+    index = IndexStore()
+    entries = {(name, str(Path(entry.root).resolve())) for name, entry in session_entries(index)}
+    for root in sorted(forge_roots):
+        root = root.resolve()
+        directory = root / ".forge" / "artifacts"
+        try:
+            with directory_fd(directory) as descriptor:
+                names = sorted(os.listdir(descriptor))
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            refused.append(f"{directory}: {error}")
+            continue
+        for name in names:
+            target = directory / name
+            session_dir = root / ".forge" / "sessions" / name
+            if (name, str(root)) in entries or session_dir.exists() or session_dir.is_symlink():
+                continue
+            if not target.is_dir() and not target.is_symlink():
+                refused.append(f"{target}: unrecognized artifact entry")
+                continue
+            try:
+                state = create_session_state(name, worktree_path=str(root))
+                dependencies = find_cleanup_dependencies(index, state, forge_root=str(root))
+                if dependencies:
+                    refused.append(f"{target}: referenced by {'; '.join(dependencies)}")
+                    continue
+                plan = plan_orphan_artifacts(root, name)
+                if plan.refusals:
+                    refused.append(f"{target}: {'; '.join(plan.refusals)}")
+                    continue
+                plans.append(plan)
+            except Exception as error:
+                refused.append(f"{target}: cannot verify ownership or dependencies: {error}")
+    return (
+        OrphanCategory(
+            category="orphan_artifacts",
+            description="Unreferenced artifact trees left by deleted sessions (including journals and transcript copies)",
+            count=len(plans),
+            items=[str(Path(plan.forge_root) / ".forge" / "artifacts" / plan.session_name) for plan in plans],
+        ),
+        OrphanCategory(
+            category="orphan_artifacts_refused",
+            description="Artifact trees retained because ownership or references could not be verified",
+            count=len(refused),
+            items=refused,
+            report_only=True,
+        ),
+        tuple(plans),
     )
 
 
@@ -845,6 +918,7 @@ def _path_in_roots(candidate: Path, roots: set[Path]) -> bool:
 
 _PROJECT_OWNED_CATEGORIES = {
     "session_dirs",
+    "orphan_artifacts",
     "transfer_files",
     "active_entries",
     "work_queue",
@@ -1024,6 +1098,7 @@ def _build_clean_report(
     unmanaged_roots: tuple[SkillScanRoot, ...] = (),
     unmanaged_skill_names: tuple[str, ...] = (),
     unmanaged_proof_tokens: tuple[tuple[str, str], ...] = (),
+    orphan_artifact_plans: tuple[ForgeContentPlan, ...] = (),
 ) -> CleanReport:
     """Build a report with compatibility refusals for preview and apply."""
 
@@ -1052,6 +1127,7 @@ def _build_clean_report(
         _unmanaged_roots=unmanaged_roots,
         _unmanaged_skill_names=unmanaged_skill_names,
         _unmanaged_proof_tokens=unmanaged_proof_tokens,
+        _orphan_artifact_plans=orphan_artifact_plans,
     )
 
 
@@ -1098,8 +1174,11 @@ def collect_clean_report(*, ctx: ExecutionContext, scope: str = "workspace") -> 
         )
 
     search_doc_owners: list[tuple[str, str]] = []
+    artifact_category, artifact_refusals, artifact_plans = _detect_orphan_artifacts(scope_roots)
     categories = [
         _detect_orphan_session_dirs(ref_set, scope_roots),
+        artifact_category,
+        artifact_refusals,
         _detect_missing_worktree_sessions(ctx, scope, scope_roots),
         _detect_orphan_transfer_files(ref_set, scope_roots),
         _detect_stale_active_entries(scope_roots),
@@ -1125,6 +1204,7 @@ def collect_clean_report(*, ctx: ExecutionContext, scope: str = "workspace") -> 
         unmanaged_roots=unmanaged_roots,
         unmanaged_skill_names=unmanaged_skill_names,
         unmanaged_proof_tokens=unmanaged_proof_tokens,
+        orphan_artifact_plans=artifact_plans,
     )
 
 
@@ -1169,6 +1249,8 @@ def run_clean(*, ctx: ExecutionContext, scope: str = "workspace") -> CleanResult
         cleaned = 0
         if category.category == "session_dirs":
             cleaned = _clean_session_dirs(category.items, result)
+        elif category.category == "orphan_artifacts":
+            cleaned = _clean_orphan_artifacts(category.items, eligible_report, result)
         elif category.category == "transfer_files":
             cleaned = _clean_transfer_files(category.items, result)
         elif category.category == "active_entries":
@@ -1238,7 +1320,12 @@ def _clean_unmanaged_skill_packages(
                     root,
                     current_skill_names=report._unmanaged_skill_names,
                 )
-            except (StateCorruptedError, StateUnreadableError, OSError, ValueError) as exc:
+            except (
+                StateCorruptedError,
+                StateUnreadableError,
+                OSError,
+                ValueError,
+            ) as exc:
                 result.failed.append((path_str, f"cleanup proof could not be rebuilt: {exc}"))
                 continue
             if revalidated is None:
@@ -1251,7 +1338,12 @@ def _clean_unmanaged_skill_packages(
                 continue
             current_token = cleanup_proof_fingerprint(path)
             if current_token is None or current_token != proof_token:
-                result.failed.append((path_str, "marker, contents, or path identity changed before deletion"))
+                result.failed.append(
+                    (
+                        path_str,
+                        "marker, contents, or path identity changed before deletion",
+                    )
+                )
                 continue
             if not _open_directory_matches_path(root_fd, root.path):
                 result.failed.append((path_str, "runtime skill root changed before deletion"))
@@ -1292,6 +1384,51 @@ def _clean_session_dirs(items: list[str], result: CleanResult) -> int:
             cleaned += 1
         except OSError as e:
             result.failed.append((path_str, str(e)))
+    return cleaned
+
+
+def _clean_orphan_artifacts(items: list[str], report: CleanReport, result: CleanResult) -> int:
+    """Recheck absence and references under publication authority before deleting exact files."""
+    from forge.session.cleanup_content import apply_forge_content
+    from forge.session.cleanup_dependencies import find_cleanup_dependencies
+    from forge.session.index import IndexStore
+    from forge.session.models import SessionIndexEntry, create_session_state
+
+    cleaned = 0
+    plans = {
+        str(Path(plan.forge_root) / ".forge" / "artifacts" / plan.session_name): plan
+        for plan in report._orphan_artifact_plans
+    }
+    index = IndexStore()
+    for item in items:
+        try:
+            plan = plans.get(item)
+            if plan is None:
+                raise ValueError("Missing exact artifact cleanup inventory; run forge clean again")
+
+            def remove_if_unclaimed(
+                entries: list[tuple[str, SessionIndexEntry]],
+            ) -> None:
+                assert plan is not None
+                root = Path(plan.forge_root)
+                enforce_project_compatibility(root)
+                session_dir = root / ".forge" / "sessions" / plan.session_name
+                if (
+                    any(name == plan.session_name and Path(entry.root).resolve() == root for name, entry in entries)
+                    or session_dir.exists()
+                    or session_dir.is_symlink()
+                ):
+                    raise ValueError("Session appeared after artifact preview; artifacts retained")
+                state = create_session_state(plan.session_name, worktree_path=str(root))
+                dependencies = find_cleanup_dependencies(index, state, forge_root=str(root))
+                if dependencies:
+                    raise ValueError(f"Artifact tree is referenced by {'; '.join(dependencies)}")
+                apply_forge_content(plan)
+
+            index.run_session_entries_txn(remove_if_unclaimed)
+            cleaned += 1
+        except Exception as error:
+            result.failed.append((item, str(error)))
     return cleaned
 
 

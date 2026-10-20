@@ -661,6 +661,7 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
     # Scan and commit under one lock, for the reason given on conversation_lock:
     # a crashed adopt's orphan manifest owns the conversation without an index row,
     # so the index write lock alone cannot see it.
+    published_instances: list[str] = []
     with conversation_lock(plan.session_uuid):
         summary = _check_still_adoptable(
             plan.session_uuid, plan.transcript_path, plan.claude_project_root, str(ctx.forge_root)
@@ -680,9 +681,8 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
         # cwd. create_worktree stays False -- adoption binds an existing conversation
         # in place, and a True here would arm _rollback_worktree against a checkout
         # Forge did not create. Adoption provenance rides this same write, not the
-        # artifact update below: a kill in between must not leave a bound session
-        # that _adopted_source_uuids cannot recognize, or the retention sweep
-        # would delete the user's native transcript.
+        # artifact update below: a kill in between must retain the source identity
+        # needed by later explicit purge previews.
         try:
             state = SessionManager().start_session(
                 name,
@@ -698,6 +698,7 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
                 ),
                 confirmed_by="cli:adopt",
                 require_uuid_unbound=True,
+                instance_sink=published_instances.append,
             )
         except SessionExistsError:
             # A same-UUID adopt that got here first owns the derived name too, so
@@ -712,48 +713,65 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
                 raise UuidAlreadyBoundError(plan.session_uuid, owner) from None
             raise
 
+    instance_id = published_instances[0] if published_instances else None
+    if instance_id is None:
+        raise AdoptError("newly published session has no instance identity")
     artifact_created = False
     try:
-        # Revalidate after publishing the binding: another process could replace
-        # an artifact parent with a symlink between preflight and this copy.
-        _validate_adoption_artifact_destination(
-            forge_root=ctx.forge_root,
-            source=plan.transcript_path,
-            destination=dst_abs,
-        )
-        destination_existed = dst_abs.exists() or dst_abs.is_symlink()
-        copied = safe_copy_file(plan.transcript_path, dst_abs, overwrite=True)
-        artifact_created = copied and not destination_existed
 
-        def _mutate(m: object) -> None:
-            from forge.session.models import SessionState
-
-            if not isinstance(m, SessionState):
-                raise TypeError(f"Expected SessionState, got {type(m)}")
-            reconcile_transcript_artifact(
-                m,
-                {
-                    "captured_at": now_iso(),
-                    "reason": ADOPT_ARTIFACT_REASON,
-                    "source_path": str(plan.transcript_path),
-                    "session_id": plan.session_uuid,
-                    "copied_path": str(dst_rel),
-                    "copied": True,
-                },
+        def capture() -> None:
+            nonlocal artifact_created
+            assert ctx.forge_root is not None
+            # Revalidate after publishing the binding: another process could replace
+            # an artifact parent with a symlink between preflight and this copy.
+            _validate_adoption_artifact_destination(
+                forge_root=ctx.forge_root,
+                source=plan.transcript_path,
+                destination=dst_abs,
             )
-            m.confirmed.claude_project_root = plan.claude_project_root
-            # confirmed.adoption was pre-seeded by start_session (write-once);
-            # only the copy-dependent facts land here.
-            m.confirmed.confirmed_by = "cli:adopt"
-            m.confirmed.confirmed_at = now_iso()
+            destination_existed = dst_abs.exists() or dst_abs.is_symlink()
+            copied = safe_copy_file(plan.transcript_path, dst_abs, overwrite=True)
+            artifact_created = copied and not destination_existed
 
-        store.update(timeout_s=CLI_LOCK_TIMEOUT_S, mutate=_mutate)
+            def _mutate(m: object) -> None:
+                from forge.session.models import SessionState
+
+                if not isinstance(m, SessionState):
+                    raise TypeError(f"Expected SessionState, got {type(m)}")
+                reconcile_transcript_artifact(
+                    m,
+                    {
+                        "captured_at": now_iso(),
+                        "reason": ADOPT_ARTIFACT_REASON,
+                        "source_path": str(plan.transcript_path),
+                        "session_id": plan.session_uuid,
+                        "copied_path": str(dst_rel),
+                        "copied": True,
+                    },
+                )
+                m.confirmed.claude_project_root = plan.claude_project_root
+                # confirmed.adoption was pre-seeded by start_session (write-once);
+                # only the copy-dependent facts land here.
+                m.confirmed.confirmed_by = "cli:adopt"
+                m.confirmed.confirmed_at = now_iso()
+
+            store.update(timeout_s=CLI_LOCK_TIMEOUT_S, mutate=_mutate)
+
+        admitted = IndexStore().run_session_instance_txn(
+            name,
+            str(ctx.forge_root),
+            expected_instance_id=instance_id,
+            callback=capture,
+        )
+        if not admitted:
+            raise AdoptError("session changed before adoption capture")
     except Exception as e:
         _rollback_adoption(
             name,
             ctx=ctx,
             store=store,
             artifact_abs=dst_abs if artifact_created else None,
+            expected_instance_id=instance_id,
         )
         raise AdoptError(f"could not capture the transcript for '{plan.session_uuid}': {e}") from e
 
@@ -766,6 +784,7 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
         session_name=name,
         transcript_snapshot_rel=str(dst_rel),
         forge_root=str(ctx.forge_root),
+        expected_instance_id=instance_id,
     )
 
     return AdoptResult(
@@ -784,44 +803,23 @@ def _rollback_adoption(
     ctx: ExecutionContext,
     store: SessionStore,
     artifact_abs: Path | None,
+    expected_instance_id: str,
 ) -> None:
-    """Undo adoption's own writes, and only those.
-
-    Deliberately does NOT call ``SessionManager.delete_session``: its default
-    ``delete_transcripts=True`` reaches ``delete_session_data``, which unlinks
-    ``get_transcript_path(...)`` and its agent logs under ``~/.claude/projects``.
-    For an adopted session that path is the **user's** native conversation, so
-    the convenient rollback would delete what they asked Forge to adopt.
-
-    Takes no index marker: enqueueing happens after the guarded block, so a
-    marker only ever exists on a path that already succeeded.
-
-    Best-effort throughout: a failed unwind must not mask the original error.
-    """
-    if artifact_abs is not None:
-        try:
-            artifact_abs.unlink(missing_ok=True)
-        except OSError as e:
-            _log.warning("Adopt rollback failed (artifact copy): %s", e)
+    """Undo only the captured instance's publication and artifact copy."""
 
     def _delete_manifest() -> None:
-        # Removes .forge/sessions/<name>/ only -- not the artifact copy, which
-        # lives under .forge/artifacts/<name>/ and is unlinked above.
-        store.delete()
+        if artifact_abs is not None:
+            artifact_abs.unlink(missing_ok=True)
+        store.delete_locked()
 
     try:
-        # Keep the row and manifest removal under the same index lock as ordinary
-        # deletion. Otherwise a same-name creator can publish between the two and
-        # lose its manifest to this rollback.
         removed = IndexStore().delete_session_txn(
             name,
             forge_root=str(ctx.forge_root),
-            expect_manifest_absent=False,
+            expected_instance_id=expected_instance_id,
             delete_manifest=_delete_manifest,
         )
         if not removed:
-            # Defensive today: False requires expect_manifest_absent=True. Keep
-            # the replacement-owner outcome visible if that coupling changes.
-            _log.warning("Adopt rollback skipped session state for '%s': name is now owned by a replacement", name)
+            _log.warning("Adopt rollback skipped '%s': a replacement owns the name", name)
     except Exception as e:
         _log.warning("Adopt rollback failed (session state): %s", e)

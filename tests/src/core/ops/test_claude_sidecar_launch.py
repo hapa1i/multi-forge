@@ -26,9 +26,19 @@ from forge.core.reactive.env import (
 )
 from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR
 from forge.core.runtime.launch_args import RuntimeLaunchArgs
-from forge.session import LAUNCH_MODE_SIDECAR, SessionStore, create_session_state
+from forge.session import (
+    LAUNCH_MODE_SIDECAR,
+    IndexStore,
+    SessionStore,
+    create_session_state,
+)
 from forge.session.models import SessionState
 from forge.session.routing import derive_routing_history
+from forge.session.workers import (
+    SESSION_INSTANCE_ENV,
+    SIDECAR_LEASE_ENV,
+    SIDECAR_LEASE_MOUNT,
+)
 
 
 class _Presenter:
@@ -154,7 +164,9 @@ def _launch_split_root_sidecar(
     state.forge_root = str(forge_root)
 
     store = SessionStore(str(forge_root), state.name)
-    store.write(state)
+    from tests.fixtures.session_state import publish_session
+
+    publish_session(IndexStore(), state, forge_root, forge_root=forge_root)
 
     def run_active(**kwargs: Any) -> int:
         return kwargs["runner"]()
@@ -170,6 +182,7 @@ def _launch_split_root_sidecar(
     with ExitStack() as stack:
         stack.enter_context(patch("forge.sidecar.docker.is_docker_available", return_value=True))
         stack.enter_context(patch("forge.sidecar.docker.require_sidecar_contract"))
+        stack.enter_context(patch("forge.session.workers._sidecar_exit_confirmed", return_value=True))
         stack.enter_context(patch("forge.sidecar.get_secrets_for_template", return_value={}))
         run_sidecar = stack.enter_context(patch("forge.sidecar.run_sidecar_session", return_value=0))
         build_routing_payload = stack.enter_context(
@@ -252,6 +265,15 @@ def test_sidecar_launch_mounts_session_forge_root_when_worktree_differs(
         "/root/.claude",
         "rw",
     ) in kwargs["extra_mounts"]
+    token = fixture.store.review_identity()
+    assert kwargs["env_vars"][SESSION_INSTANCE_ENV] == token
+    delegated = Path(kwargs["env_vars"][SIDECAR_LEASE_ENV])
+    assert delegated.parent == Path(SIDECAR_LEASE_MOUNT)
+    lease_mounts = [mount for mount in kwargs["extra_mounts"] if mount[1] == SIDECAR_LEASE_MOUNT]
+    assert len(lease_mounts) == 1
+    assert lease_mounts[0][2] == "ro"
+    assert Path(lease_mounts[0][0]).name == token
+    assert not (Path(lease_mounts[0][0]) / delegated.name).exists()
     assert not (fixture.worktree / ".forge").exists()
 
 
