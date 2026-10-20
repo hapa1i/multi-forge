@@ -465,14 +465,16 @@ class TestBuildEngine:
         engine = build_engine(["tdd", "coding_standards"])
         assert len(engine.policies) == 5
 
-    def test_build_unknown_bundle(self) -> None:
+    @pytest.mark.parametrize("bundle", ["unknown", "jev_rule_pack"])
+    def test_build_unknown_bundle(self, bundle: str) -> None:
         """Unknown bundles fail before an apparently valid empty engine is returned."""
-        with pytest.raises(ValueError, match="unknown policy bundle 'unknown'"):
-            build_engine(["unknown"])
+        with pytest.raises(ValueError, match=f"unknown policy bundle {bundle!r}"):
+            build_engine([bundle])
 
-    def test_build_rejects_unknown_bundle_config_owner(self) -> None:
-        with pytest.raises(ValueError, match="unknown policy bundle 'typo'"):
-            build_engine(["tdd"], bundle_config={"typo": {}})
+    @pytest.mark.parametrize("bundle", ["typo", "jev_rule_pack"])
+    def test_build_rejects_unknown_bundle_config_owner(self, bundle: str) -> None:
+        with pytest.raises(ValueError, match=f"unknown policy bundle {bundle!r}"):
+            build_engine(["tdd"], bundle_config={bundle: {}})
 
     def test_build_rejects_removed_workflow_config_before_registration(self, monkeypatch: pytest.MonkeyPatch) -> None:
         registered: list[str] = []

@@ -68,7 +68,6 @@ Route architecture changes to the narrowest authority:
 | `docs/design_telemetry.md`         | Status, spend, audit, usage, and provider lifecycle                 |
 | `docs/design_installation.md`      | Configuration, credentials, extensions, registration, test setup    |
 | `docs/design_workflows.md`         | Policy, skills, and workflow runners                                |
-| `docs/design_rule_packs.md`        | Rule definitions, offline evaluation, and session consent           |
 | `docs/design_memory.md`            | Designated memory, passports, writers, and activation               |
 | `docs/cli_reference.md`            | Terminal and direct-command inventory                               |
 

@@ -138,6 +138,11 @@ cannot be attributed. The removed `workflow` bundle diagnostic must name both `p
 `policy.bundle_config.workflow`. Claude and Codex hooks report that build error and allow the action before the
 configured fail mode applies.
 
+For Jev client changes, follow `scripts/experiments/jev/README.md`.
+`PYTHON_DOTENV_DISABLED=1 uv run python scripts/experiments/jev/probe.py [--stage measurement]` prints a synthetic
+manifest without dispatch; `--live` requires explicit approval of that manifest. A2/A3 consumer experiments are retired;
+see `docs/design_history.md` for the preserved evidence and source revision.
+
 For CLI surface changes, check `docs/developer/cli_style_guidelines.md`: use explicit leaf verbs, keep read-command
 results on stdout, route diagnostics/errors/prompts to stderr, expose stable `--json` on scriptable list/show/status
 surfaces, and send recovery output through `forge.cli.output` helpers. Conflict-bearing dry-run previews remain on

@@ -1,5 +1,8 @@
 # Jev support: coordination checklist
 
+The subsequent code cleanup removed A2/A3 implementation and dedicated tests. The [source archive](source-archive.md)
+identifies the revision for historical commands and verification below; A1 and retained evidence remain.
+
 ## Final disposition
 
 **Retired — cancelled by owner decision on 2026-10-19. No replacement.** A1 remains done; A2 and A3 are retired. The

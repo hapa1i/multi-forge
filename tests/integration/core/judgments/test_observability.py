@@ -45,7 +45,7 @@ def test_evaluations_count_separately_and_retries_retain_ancestry(monkeypatch):
         )
 
     identities = [derive_child_run_identity(), derive_child_run_identity()]
-    client = OpenRouterJudgmentClient(transport=httpx.MockTransport(handler), command="jev-rule-pack")
+    client = OpenRouterJudgmentClient(transport=httpx.MockTransport(handler), command="judgment-evaluation")
     for identity in identities:
         result = asyncio.run(
             client.judge(
@@ -72,7 +72,7 @@ def test_evaluations_count_separately_and_retries_retain_ancestry(monkeypatch):
     assert response.exit_code == 0, response.output
     costs = json.loads(response.output)
     assert costs["total_requests"] == 4
-    assert costs["by_verb"]["jev-rule-pack"]["invocations"] == 2
+    assert costs["by_verb"]["judgment-evaluation"]["invocations"] == 2
 
 
 @pytest.mark.parametrize("managed", [False, True])

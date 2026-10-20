@@ -304,6 +304,10 @@ class TestPolicyEnable:
             bundle_config={"tdd": {"strict": False}},
             supervisor=SupervisorConfig(resume_id="planner", direct=True),
         )
+        state.overrides = {
+            "policy": {"enabled": True, "fail_mode": "open"},
+            "memory": {"auto_recall": False},
+        }
         store.write(state)
         builder = Mock(wraps=policy_ops.build_policy_activation)
         monkeypatch.setattr(policy_ops, "build_policy_activation", builder)
@@ -312,10 +316,18 @@ class TestPolicyEnable:
 
         assert result.exit_code == 0, result.output
         builder.assert_called_once_with(enabled=False)
-        policy = store.read().intent.policy
+        disabled = store.read()
+        policy = disabled.intent.policy
         assert policy is not None
         assert policy.enabled is False
         assert policy.fail_mode == "closed"
         assert policy.bundles == ["tdd"]
         assert policy.bundle_config == {"tdd": {"strict": False}}
         assert policy.supervisor == SupervisorConfig(resume_id="planner", direct=True)
+        effective_policy = compute_effective_intent(disabled).policy
+        assert effective_policy is not None
+        assert effective_policy.enabled is False
+        assert disabled.overrides == {
+            "policy": {"fail_mode": "open"},
+            "memory": {"auto_recall": False},
+        }

@@ -831,7 +831,6 @@ def _handle_policy_disable() -> None:
     Uses overrides (not intent mutation) to preserve the original session baseline.
     Resolves session via CWD-based hook resolution (not SessionManager/index).
     """
-    from forge.policy.rule_pack.consent import revoke_acknowledgment
     from forge.session.models import SessionState
 
     activation = policy_ops.build_policy_activation(enabled=False)
@@ -852,7 +851,6 @@ def _handle_policy_disable() -> None:
         if not isinstance(m, SessionState):
             raise TypeError(f"Expected SessionState, got {type(m)}")
         set_override(m.overrides, "policy.enabled", activation.enabled)
-        revoke_acknowledgment(m)
 
     try:
         store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)

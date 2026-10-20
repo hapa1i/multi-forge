@@ -1,5 +1,9 @@
 # A2: Jev rule pack execution checklist
 
+The subsequent code cleanup removed A2/A3 implementation and dedicated tests. The
+[source archive](../epic_jev_support/source-archive.md) identifies the revision for historical commands and verification
+below; A1 and retained evidence remain.
+
 ## Current focus
 
 **Retired — cancelled by owner decision, 2026-10-19.** No replacement exists. The
@@ -9,8 +13,8 @@
 The [bounded study](evidence/bounded-diagnostic-2026-10-18/README.md) failed its frozen screen for both models. The
 [offline review](evidence/offline-retention-admission.md) separates structural candidates, evidence admission and
 semantic judgment without rescoring those results. The [continuation](evidence/feasibility-continuation-2026-10-19.md)
-found no viable tested model/runtime pairing; native evidence coverage and warning usefulness remain unmeasured.
-Settings stay unset, `jev_rule_pack` stays reserved, and the
+found no viable tested model/runtime pairing; native evidence coverage and warning usefulness remain unmeasured. No
+settings were selected, no bundle was activated, and the
 [runtime evidence proposal](evidence/runtime-evidence-contract.md) remains unimplemented.
 
 The foundations and their prior merge evidence remain below. Unchecked items are unmet requirements of the cancelled
@@ -30,11 +34,12 @@ the critical missing-replacement retention answer. The later offline analysis ex
 without changing those labels or turning the failed capture into a pass. Native action coverage and warning usefulness
 remain unmeasured. These results stop the tested path; they do not prove every possible rule pack infeasible.
 
-Keep the shipped consent foundations, rule definitions, offline evaluation tools, human adjudications and capture
-evidence. `jev_rule_pack` stays reserved, settings remain unset, and no runtime dispatch, activation or native warning
-delivery is accepted. The quality, representative-evidence, runtime and release gates below remain unfulfilled and are
-cancelled with this card. Historical status and next-step statements in dated merge records describe those earlier
-checkpoints only.
+The subsequent cleanup removed the unused consent foundations, rule definitions, offline evaluation tools and their
+dedicated tests; the [source archive](../epic_jev_support/source-archive.md) preserves their final complete revision.
+Human adjudications and capture evidence remain unchanged. No runtime dispatch, activation or native warning delivery
+was accepted. The quality, representative-evidence, runtime and release gates below remain unfulfilled and are cancelled
+with this card. Historical status and next-step statements in dated merge records describe those earlier checkpoints
+only.
 
 A future proposal must name a concrete use case, supply representative evidence and human-reviewed warning usefulness,
 and explain how a bounded comparison addresses the observed quality and latency failures. It must define its own data
@@ -141,8 +146,9 @@ The 2026-10-15 review follow-up passed 148 focused outcome, harness, regression 
 includes distinct per-question bands, shared host diagnostics, held-out edits preserving calibration captures,
 model-snapshot mismatches, host-label conflicts and misses, malformed JSON, transport admission, missing latency,
 source-family counts and exact interval endpoints. The original preparation report still reproduces byte-for-byte. These
-are implementation fixtures, not calibration results. See [rule-pack design](../../../design_rule_packs.md) for
-implemented ownership.
+are implementation fixtures, not calibration results. See
+[rule-pack design](https://github.com/hapa1i/multi-forge/blob/39ba8cbb49d2ca3906f196edae2b139705a51bf1/docs/design_rule_packs.md)
+for implemented ownership.
 
 Saved-prediction schema 2 requires the expected resolved model plus original HTTP status and response byte size. Reports
 retain bounded failure text, reason counts, separate host-label comparisons and pipeline misses, and evaluator source
@@ -210,7 +216,7 @@ identities. No model answer sheet supplies human labels. These constructed judgm
 accuracy nor model quality, and do not satisfy runtime admission.
 
 Pre-merge verification: 239 focused tests pass, including
-[`test_bug_272_jev_review_relocation.py`](../../../../tests/regression/test_bug_272_jev_review_relocation.py).
+[`test_bug_272_jev_review_relocation.py`](https://github.com/hapa1i/multi-forge/blob/39ba8cbb49d2ca3906f196edae2b139705a51bf1/tests/regression/test_bug_272_jev_review_relocation.py).
 Corpus-relative ledger references survive a card move with replayed labels and adjudication identity unchanged. The
 [review guide](evidence/human-review.md) records the reference migration and remaining provenance limits.
 
@@ -538,10 +544,10 @@ rerun passed unchanged. The schema-2 CLI fixture smoke retained three host decis
 observation and eight missing observations without claiming accuracy. Offline preparation reproduced byte-for-byte.
 
 Shared rule definitions, host applicability, fixed diagnostics and saved-response evaluation are shipped. The
-[rule-pack design](../../../design_rule_packs.md) records ownership, and the
-[evaluation plan](evidence/evaluation-plan.md) records identity, metric denominators and limitations. This slice adds no
-activation command or hook dispatch and changes no A1 API or telemetry schema. No paid A2 evaluation or native trial
-ran.
+[rule-pack design](https://github.com/hapa1i/multi-forge/blob/39ba8cbb49d2ca3906f196edae2b139705a51bf1/docs/design_rule_packs.md)
+records ownership, and the [evaluation plan](evidence/evaluation-plan.md) records identity, metric denominators and
+limitations. This slice adds no activation command or hook dispatch and changes no A1 API or telemetry schema. No paid
+A2 evaluation or native trial ran.
 
 A2 and the epic remain `doing/`; A3 remains proposed. The 2026-10-16 continuation completes constructed human review and
 the runtime evidence proposal. The next [feasibility gate](#slice-2-feasibility-before-runtime-work) measures

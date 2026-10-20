@@ -36,10 +36,11 @@ The complete-clean-break branch is separate: complete attributed before/after ev
 interface is removed within the supplied change. It does not require a proposed definition of the removed interface. An
 empty definition lookup, an unrecognized AST shape or a missing before-image does not establish that branch.
 
-This preserves the active rule's [coverage requirement](../../../../../src/forge/policy/rule_pack/definitions.py) and
-its broader wrapper scope. It proposes separating observations from admission, not narrowing the rule to local helpers
-or permitting warnings on partial snippets. A future diagnostic revision must name the exact prerequisites of each
-question and receive review before its answers are used; draft-3 answers are not migrated or rescored here.
+This preserves the active rule's
+[coverage requirement](https://github.com/hapa1i/multi-forge/blob/39ba8cbb49d2ca3906f196edae2b139705a51bf1/src/forge/policy/rule_pack/definitions.py)
+and its broader wrapper scope. It proposes separating observations from admission, not narrowing the rule to local
+helpers or permitting warnings on partial snippets. A future diagnostic revision must name the exact prerequisites of
+each question and receive review before its answers are used; draft-3 answers are not migrated or rescored here.
 
 ## Why the captured failures differ
 

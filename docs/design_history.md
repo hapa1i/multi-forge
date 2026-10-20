@@ -1,7 +1,6 @@
 # Forge Architecture History
 
-Retired architecture retained verbatim so removal rationale and non-goals remain reviewable without occupying the
-shipped design contracts.
+Retired architecture and removal decisions remain reviewable without occupying the shipped design contracts.
 
 [Current architecture map](design.md)
 
@@ -21,3 +20,17 @@ diagnostic. The Claude and Codex policy hooks report that construction failure a
 `forge policy disable`.
 
 ---
+
+## G. Removed Jev Rule-pack and Cascade Experiments
+
+The Jev consumer epic and A2/A3 were retired on 2026-10-19. A2's tested rule failed its bounded model screen; A3's first
+synthetic packet offered no human-positive cases beyond deterministic controls. Neither consumer was activated. Their
+experiment runners, provisional rule definitions and outcome combiner, session-consent helpers and dedicated evaluation
+tests were subsequently removed. Ordinary policy and session paths no longer carry the unused consent checks; the policy
+registry rejects the unsupported bundle through its existing unknown-bundle validation.
+
+A1's typed judgment client, ZDR enforcement, attempt accounting, explicit run identity and transport probes remain
+shipped. The independent Claude permission-feedback fix and supervisor behavior are unchanged. Human adjudications,
+corpora, manifests, captures and source hashes remain historical evidence, without a model-quality or runtime claim. The
+[source archive](board/retired/epic_jev_support/source-archive.md) identifies the final complete experiment revision and
+the removed design contract. Reconsideration requires a new proposed card and its own bounded evidence plan.

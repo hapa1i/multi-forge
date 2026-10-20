@@ -5,7 +5,7 @@ import os
 import httpx
 import pytest
 
-from tests.integration.proxy.conftest import FakeAnthropicUpstream
+from tests.integration.proxy.conftest import FakeAnthropicUpstream, FakeOpenAIUpstream
 
 pytestmark = pytest.mark.integration
 
@@ -145,14 +145,20 @@ def test_passthrough_preserves_sonnet55_signed_tool_history(
     assert response.content == upstream.response_body
 
 
-@pytest.mark.parametrize("fixture", ["proxy_server_local_anthropic", "proxy_server_openrouter"])
+@pytest.mark.parametrize("fixture", ["proxy_server_local_anthropic_offline", "proxy_server_openrouter_offline"])
 @pytest.mark.parametrize("model", ["claude-sonnet", "claude-opus"])
 @pytest.mark.parametrize("choice", [{"type": "any"}, {"type": "tool", "name": "ping"}])
 @pytest.mark.parametrize("stream", [False, True])
 def test_translated_claude55_forced_tools_return_clear_client_error(
-    request: pytest.FixtureRequest, fixture: str, model: str, choice: dict, stream: bool
+    request: pytest.FixtureRequest,
+    fixture: str,
+    model: str,
+    choice: dict,
+    stream: bool,
+    fake_litellm_openai: FakeOpenAIUpstream,
 ) -> None:
     proxy_url = request.getfixturevalue(fixture)
+    fake_litellm_openai.requests.clear()
     response = httpx.post(
         f"{proxy_url}/v1/messages",
         headers={"x-api-key": "test"},
@@ -171,6 +177,7 @@ def test_translated_claude55_forced_tools_return_clear_client_error(
     assert response.json()["detail"]["type"] == "invalid_request_error"
     assert "tool_choice" in response.json()["detail"]["message"]
     assert "auto" in response.json()["detail"]["message"]
+    assert fake_litellm_openai.requests == []
 
 
 @pytest.mark.parametrize(
