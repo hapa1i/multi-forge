@@ -1,7 +1,8 @@
 # Split session delete from purge
 
-**Status**: Implementation and final verification, 2026-10-20, on `codex/session-delete-and-purge` from `a33c4d24`.
-Proposed 2026-10-19 from an owner decision: normal delete removes Forge data only; a separate purge removes the
+**Status**: [PR #278](https://github.com/hapa1i/multi-forge/pull/278) in review, 2026-10-20, on
+`codex/session-delete-and-purge` from `a33c4d24`. Implementation and local verification are complete; merge and closeout
+remain. Proposed 2026-10-19 from an owner decision: normal delete removes Forge data only; a separate purge removes the
 session's identified local content within its declared scope. The [checklist](checklist.md) orders the implementation
 gates. Related: [`session_delete_generation_token`](../../proposed/session_delete_generation_token/card.md), the
 proposed instance-identity prerequisite. The [source audit](evidence/ownership-audit.md) records the earlier behavior;

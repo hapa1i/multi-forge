@@ -139,5 +139,6 @@ Existing suites are named below; new tests are explicitly marked.
   substitute synthetic fixture success for the native-layout gate.
 - [x] Run `make test`, `make test-regression`, `make pre-commit`, Markdown links and file limits before final review.
   Record commands, failures/skips and native evidence separately.
-- [ ] Commit reviewable changes, open/attach a PR, and keep the checklist aligned with remaining gates.
+- [x] Commit reviewable changes, open/attach [PR #278](https://github.com/hapa1i/multi-forge/pull/278), and keep the
+  checklist aligned with remaining gates.
 - [ ] After merge, record verification and closeout, move to `done/`, update incoming links and the change log.
