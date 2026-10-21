@@ -1,15 +1,25 @@
 # Give a session row an identity a deleter can carry into the lock
 
-**Status**: Proposed. Split out of [`session_create_crash_atomicity`](../../done/session_create_crash_atomicity/card.md)
-on 2026-08-01, during that card's third review round. That card made deletion decline once a replacement owns the name;
-this one closes the residual case its ownership signal cannot express.
+**Status**: Retired. **Outcome**: folded into
+[session delete and purge](../../done/session_delete_and_purge/checklist.md#merged-closeout) on 2026-10-22, after
+[PR #278](https://github.com/hapa1i/multi-forge/pull/278) merged as `c1afa9cd`. This proposal did not ship independently
+and receives no separate completion credit.
+
+The implementation carries session instance identity through index v2, stale-deleter checks, force-fork cleanup and
+writer admission. Legacy v1 reads remain non-mutating; confirmed operations explicitly bind legacy ownership.
+[Verification](../../done/session_delete_and_purge/evidence/verification.md) records the regression and integration
+coverage. The remaining proposal is a historical record, superseded by that shipped contract.
+
+Split out of [`session_create_crash_atomicity`](../../done/session_create_crash_atomicity/card.md) on 2026-08-01, during
+that card's third review round. That card made deletion decline once a replacement owns the name; this proposal recorded
+the residual case its ownership signal could not express.
 
 ## Integration ownership (2026-10-20)
 
-The active [session delete and purge card](../../doing/session_delete_and_purge/card.md) absorbs this prerequisite on
-`codex/session-delete-and-purge`, based on `a33c4d24`. Its shared PR must verify both stale-deleter protection and
-writer exclusion before exposing content removal. This proposal stays open until that implementation ships, then retires
-as absorbed rather than receiving a separate shipped closeout.
+The [session delete and purge card](../../done/session_delete_and_purge/card.md) absorbed this prerequisite on
+`codex/session-delete-and-purge`, based on `a33c4d24`. Its shared PR verified both stale-deleter protection and writer
+exclusion before exposing content removal. This proposal remained open until that implementation shipped and retired as
+folded at its closeout.
 
 ## Problem
 

@@ -1,12 +1,15 @@
 # Split session delete from purge
 
-**Status**: [PR #278](https://github.com/hapa1i/multi-forge/pull/278) in review, 2026-10-20, on
-`codex/session-delete-and-purge` from `a33c4d24`. Implementation and local verification are complete; merge and closeout
-remain. Proposed 2026-10-19 from an owner decision: normal delete removes Forge data only; a separate purge removes the
-session's identified local content within its declared scope. The [checklist](checklist.md) orders the implementation
-gates. Related: [`session_delete_generation_token`](../../proposed/session_delete_generation_token/card.md), the
-proposed instance-identity prerequisite. The [source audit](evidence/ownership-audit.md) records the earlier behavior;
+**Status**: Done. [PR #278](https://github.com/hapa1i/multi-forge/pull/278) merged as `c1afa9cd` on 2026-10-22; closeout
+recorded on 2026-10-22. The [merged closeout](checklist.md#merged-closeout) records verification and scope. Proposed
+2026-10-19 from an owner decision: normal delete removes Forge data only; a separate purge removes the session's
+identified local content within its declared scope. The instance-identity prerequisite
+[`session_delete_generation_token`](../../retired/session_delete_generation_token/card.md) retired as folded into this
+implementation. The [source audit](evidence/ownership-audit.md) records the earlier behavior;
 [verification](evidence/verification.md) and [native evidence](evidence/README.md) record the implementation checks.
+
+The proposal below preserves the agreed scope; current behavior is documented in the
+[session guide](../../../end-user/session.md).
 
 ## Problem
 
@@ -145,12 +148,12 @@ recreate content after a successful delete.
    option is outside the first version.
 2. Both verbs refuse dependencies; there is no implicit cascade or acknowledged partial purge.
 3. Instance identity is a prerequisite, not an optional cleanup improvement. The
-   [generation-token proposal](../../proposed/session_delete_generation_token/card.md) is folded into this card's
-   implementation and PR: its row guard alone cannot authorize content removal without the same writer and retry fences.
-   The branch starts at `a33c4d24`; identity lands before cleanup integration, and this card owns the combined tests,
-   review and closeout. The proposal will retire as absorbed when this implementation ships, with no separate shipped
-   credit. The existing per-creation review owner becomes the session instance; index v1 is read without mutation and
-   confirmed operations explicitly bind legacy rows before destructive work.
+   [retired generation-token proposal](../../retired/session_delete_generation_token/card.md) was folded into this
+   card's implementation and PR: its row guard alone cannot authorize content removal without the same writer and retry
+   fences. The branch starts at `a33c4d24`; identity lands before cleanup integration, and this card owns the combined
+   tests, review and closeout. The proposal retired as folded at closeout, with no separate shipped credit. The existing
+   per-creation review owner becomes the session instance; index v1 is read without mutation and confirmed operations
+   explicitly bind legacy rows before destructive work.
 4. Native inactivity, relocated/rewind identity, corrupt or missing inventories, and recovery when the Forge root itself
    is removed remain gated by the checklist. Do not present current adoption lookup or the Forge active registry alone
    as proof of safe native deletion.

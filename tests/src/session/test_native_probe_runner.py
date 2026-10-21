@@ -10,7 +10,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts/experiments/session-purge/run_native_probe.py"
-MANIFEST = ROOT / "docs/board/doing/session_delete_and_purge/evidence/native-probe-manifest.json"
+MANIFEST = ROOT / "docs/board/done/session_delete_and_purge/evidence/native-probe-manifest.json"
 spec = importlib.util.spec_from_file_location("run_native_probe", SCRIPT)
 assert spec is not None and spec.loader is not None
 runner = importlib.util.module_from_spec(spec)

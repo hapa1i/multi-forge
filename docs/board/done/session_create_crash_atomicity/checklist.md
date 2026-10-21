@@ -164,9 +164,9 @@ recorded below are what shipped.
   replacement destroyed. Not fixed here: closing it needs a per-session identity the deleter can carry into the lock,
   which is a durable-state schema change, and a partial discriminator (conversation ids are `None` for a fresh
   replacement) would leave the residual harder to reason about rather than smaller. Named in `delete_session_txn`'s
-  docstring and filed as
-  [`proposed/session_delete_generation_token`](../../proposed/session_delete_generation_token/card.md) with the
-  mechanisms and their trade-offs.
+  docstring and filed as [`session_delete_generation_token`](../../retired/session_delete_generation_token/card.md) with
+  the mechanisms and their trade-offs. Follow-up, 2026-10-22: that proposal retired as folded into
+  [session delete and purge](../session_delete_and_purge/checklist.md#merged-closeout), shipped in PR #278.
 - **One-sided resolve in the containment fact -- premise checked, does not hold.** The concern was that
   `store.manifest_path.is_relative_to(worktree_path.resolve())` resolves only the worktree side, so a symlinked spelling
   would read as not-contained and silently disable the ownership check. `SessionStore.__init__` resolves its

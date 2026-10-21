@@ -1,8 +1,9 @@
 # Session delete and purge checklist
 
-**Branch**: `codex/session-delete-and-purge`, based on `a33c4d24`. **Current focus**: final verification and PR review.
-The [card](card.md) owns the intended behavior; the [audit](evidence/ownership-audit.md) records current code and gaps.
-Implementation is in progress; checked acceptance items require the verification recorded below.
+**Status**: Complete. [PR #278](https://github.com/hapa1i/multi-forge/pull/278) merged on 2026-10-22. **Branch**:
+`codex/session-delete-and-purge`, based on `a33c4d24`. The [card](card.md) records the agreed scope; the
+[audit](evidence/ownership-audit.md) records the pre-implementation code and gaps. The
+[merged closeout](#merged-closeout) records the shipped result and verification.
 
 Planning verification (2026-10-20): targeted `pre-commit run --files` passed for the three card documents, including
 formatting and size limits; the full Markdown link audit passed for 737 sources, and `git diff --check` passed. The two
@@ -28,9 +29,9 @@ isolated reproductions are recorded in the audit. Implementation and native veri
 
 ## 2. Instance identity and destructive-operation admission
 
-This precedes content removal. The [generation-token proposal](../../proposed/session_delete_generation_token/card.md)
-already records a stale-deleter race. Its terminal index guard is necessary but does not cover artifact or worker
-writes.
+This precedes content removal. The
+[retired generation-token proposal](../../retired/session_delete_generation_token/card.md) already records a
+stale-deleter race. Its terminal index guard is necessary but does not cover artifact or worker writes.
 
 - [x] Explicitly fold the identity prerequisite into this card's branch/PR; the card records ordering and integration
   ownership. Read index v1 without writes; confirmed operations bind its existing review owner, or create an owner only
@@ -141,4 +142,31 @@ Existing suites are named below; new tests are explicitly marked.
   Record commands, failures/skips and native evidence separately.
 - [x] Commit reviewable changes, open/attach [PR #278](https://github.com/hapa1i/multi-forge/pull/278), and keep the
   checklist aligned with remaining gates.
-- [ ] After merge, record verification and closeout, move to `done/`, update incoming links and the change log.
+- [x] After merge, record verification and closeout, move to `done/`, update incoming links and the change log.
+
+## Merged closeout
+
+[PR #278](https://github.com/hapa1i/multi-forge/pull/278) merged as `c1afa9cd` on 2026-10-22 (Europe/Berlin). Its tree
+is identical to reviewed head `538a7a4f`; all five GitHub checks passed. Closeout on 2026-10-22 moves this card to
+`done/` and retires the [instance-identity proposal](../../retired/session_delete_generation_token/card.md) as folded,
+with no separate shipped credit. Incoming links and the two executable manifest paths follow the moved evidence
+directory.
+
+Delete and clean preserve native conversations while removing proven, unreferenced Forge content. Purge adds verified
+native paths, previews by default and supports project-scoped `--all`. Both refuse active work and dependents; retry
+inventories and writer fences bind removal to the captured session instance. The merged PR synchronized design, CLI and
+end-user documentation.
+
+Final local checks on the reviewed tree passed: `make test` (11,138 unit and 523 Docker integration tests),
+`make test-regression` (2,084 tests), full pre-commit and the 741-source Markdown link audit. Provider credentials and
+`.env` loading were disabled; slow provider trials were excluded. The [verification record](evidence/verification.md)
+separates those checks from two previously approved synthetic Claude captures costing $0.03399135 in total.
+
+Native removal is limited to characterized Claude 2.1.245 and Codex 0.162.1 layouts. Unknown layouts refuse; provider
+copies, native global indexes/history, project memory documents, Git history and telemetry remain outside scope. No new
+native invocation or provider call was needed for closeout. Historical capture files and approved manifests remain
+unchanged.
+
+Closeout verification passed all eight `test_native_probe_runner.py` tests, the manifest generator's offline dry run,
+full `make pre-commit`, the 741-source Markdown link audit and `git diff --check`. All 33 non-Markdown evidence files
+are byte-identical to the merged tree. The generator's proposal differs only in its source digest after the path update.

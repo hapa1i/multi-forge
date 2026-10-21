@@ -14,7 +14,7 @@ SCRIPT = Path(__file__).resolve()
 def manifest() -> dict[str, Any]:
     """Keep the first approved workload fixed and add bounded metadata export."""
     value = json.loads(
-        (ROOT / "docs/board/doing/session_delete_and_purge/evidence/native-probe-manifest.json").read_text()
+        (ROOT / "docs/board/done/session_delete_and_purge/evidence/native-probe-manifest.json").read_text()
     )
     value.update(
         status="proposal_only_not_authorized_or_executed",

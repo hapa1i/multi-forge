@@ -112,7 +112,7 @@ bindings, shared native identities, and containing worktrees. Native Codex
 adds references outside Forge derivation records. Whether unmanaged native descendants can be completely inventoried
 remains a native-probe question; do not silently claim they are covered.
 
-The [generation-token proposal](../../../proposed/session_delete_generation_token/card.md) documents the existing
+The [retired generation-token proposal](../../../retired/session_delete_generation_token/card.md) documents the existing
 two-deleter/recreate race. Extending removal to name-scoped content requires ownership protection before each mutation,
 not only the final index transaction.
 

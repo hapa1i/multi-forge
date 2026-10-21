@@ -8,6 +8,29 @@ Older entries are retained verbatim in [2026-08-20](archive/change_log_2026-08-2
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-22
+
+### Separate session deletion from native purge
+
+**Goal**: Separate Forge-owned session cleanup from explicitly requested removal of native conversation files.
+
+**Key changes**:
+
+- Delete and clean preserve native conversations; purge previews additional verified paths and supports project-scoped
+  `--all`.
+- Dependency and activity checks, instance ownership and writer fences protect replacement sessions and cleanup retries.
+- Native removal admits characterized Claude 2.1.245 and Codex 0.162.1 layouts; unverified layouts refuse, and global
+  runtime state remains outside scope. Design and end-user documentation reflect the shipped contract.
+
+The [card is done](done/session_delete_and_purge/checklist.md#merged-closeout); the
+[generation-token proposal](retired/session_delete_generation_token/card.md) retires as folded into it.
+
+**Verification**: [PR #278](https://github.com/hapa1i/multi-forge/pull/278) merged as `c1afa9cd`, matching reviewed head
+`538a7a4f`, with all five CI checks passing. Local `make test` passed 11,138 unit and 523 Docker integration tests;
+2,084 regressions and full pre-commit passed. Slow provider trials were excluded. The
+[verification record](done/session_delete_and_purge/evidence/verification.md) separates those checks from the two
+approved synthetic Claude captures. No new paid capture ran during closeout.
+
 ## 2026-10-20
 
 ### Remove retired Jev consumer experiments
