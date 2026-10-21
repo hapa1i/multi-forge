@@ -138,6 +138,13 @@ cannot be attributed. The removed `workflow` bundle diagnostic must name both `p
 `policy.bundle_config.workflow`. Claude and Codex hooks report that build error and allow the action before the
 configured fail mode applies.
 
+For Claude policy-feedback changes, run `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py`.
+Allowed-action context must use `hookSpecificOutput.additionalContext` without `permissionDecision`; disabling
+`policy_summary_feedback` must retain blocks and operator warnings.
+`uv run python scripts/experiments/claude-hooks/policy-feedback.py` prints a synthetic native-trial manifest; actual
+native receipt and permission checks require a separately approved `--run <manifest> --output <new-absolute-directory>`
+trial.
+
 For Jev client changes, follow `scripts/experiments/jev/README.md`.
 `PYTHON_DOTENV_DISABLED=1 uv run python scripts/experiments/jev/probe.py [--stage measurement]` prints a synthetic
 manifest without dispatch; `--live` requires explicit approval of that manifest. A2/A3 consumer experiments are retired;
@@ -166,10 +173,11 @@ targets runtime instance ids from `list`, not source ids or adapter names.
 For resume, transfer, memory-writer, and activity changes, verify the user-facing surfaces:
 `forge session resume <name> --fresh --review`, `forge session transfer show|regenerate|edit|diff`,
 `forge session memory report [session] [--latest|--all|--json]`, and `forge telemetry activity [session]`; `forge usage`
-is removed, and `forge telemetry costs show` remains the authoritative proxy-scoped spend view. For fresh-transfer
-ancestry changes, verify `forge session resume <parent> --fresh --depth <N|all>`; explicit uses of `--strategy` or
-`--depth` require `--fresh`, `N` must be positive, and `all` follows lineage to the terminal ancestor. For rewind
-launch-strategy changes, verify `forge session resume <parent> --fresh --strategy rewind --drop-last N` and
+is removed, and `forge telemetry costs show` is the authoritative reported spend view, including direct Jev requests
+when no proxy ID is supplied. For fresh-transfer ancestry changes, verify
+`forge session resume <parent> --fresh --depth <N|all>`; explicit uses of `--strategy` or `--depth` require `--fresh`,
+`N` must be positive, and `all` follows lineage to the terminal ancestor. For rewind launch-strategy changes, verify
+`forge session resume <parent> --fresh --strategy rewind --drop-last N` and
 `forge session fork <parent> --worktree|--into <path> --strategy rewind --drop-last N`; `rewind` is not a
 `forge session transfer regenerate` strategy.
 
