@@ -1,8 +1,8 @@
 # Patch the October dependency alerts
 
-**Status**: Doing, 2026-10-22. Owner requested one PR for all open
-[Dependabot alerts](https://github.com/hapa1i/multi-forge/security/dependabot). Branch: `codex/dependabot-october-2026`,
-based on `9e42e15d`.
+**Status**: Done, 2026-10-22. [PR #279](https://github.com/hapa1i/multi-forge/pull/279) merged as `93b558d2`, with the
+same tree as reviewed head `c33c3529`. The [merged closeout](checklist.md#merged-closeout) records verification and zero
+remaining open Dependabot alerts. Execution branch: `codex/dependabot-october-2026`, based on `9e42e15d`.
 
 ## Scope
 

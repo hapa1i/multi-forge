@@ -10,6 +10,23 @@ Older entries are retained verbatim in [2026-08-20](archive/change_log_2026-08-2
 
 ## 2026-10-22
 
+### Patch runtime and tooling security dependencies
+
+**Goal**: Resolve all 27 open Dependabot alerts and six additional advisories found in the complete dependency audit.
+
+**Key changes**:
+
+- Enforced six runtime security floors in wheel metadata and updated development-only virtualenv, with two required
+  transitive updates. LiteLLM and FastAPI/Starlette compatibility bounds remain unchanged.
+- Preserved advisory inventories, metadata regression coverage and existing-environment migration limits in the
+  [completed card](done/dependabot_october_2026/checklist.md#merged-closeout).
+
+**Verification**: [PR #279](https://github.com/hapa1i/multi-forge/pull/279) merged as `93b558d2`, matching reviewed head
+`c33c3529`, with all five CI checks passing. Local `make test` passed 11,138 unit and 523 integration tests; 2,091
+regressions, pre-commit, build and Python 3.11 clean-wheel checks passed. The lock audit found zero known
+vulnerabilities across 126 packages. GitHub's dependency graph contains the patched versions and reports zero open
+Dependabot alerts. No alert was dismissed during this work.
+
 ### Separate session deletion from native purge
 
 **Goal**: Separate Forge-owned session cleanup from explicitly requested removal of native conversation files.

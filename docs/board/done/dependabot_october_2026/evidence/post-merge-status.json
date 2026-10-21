@@ -1,0 +1,125 @@
+{
+  "observed_at_utc": "2026-10-21T23:55:44.525124+00:00",
+  "merge_commit": "93b558d29437bfea45fde625bbd490658c338f4f",
+  "merged_at_utc": "2026-10-21T23:53:54Z",
+  "dependency_graph_versions": {
+    "aiohttp": "3.14.5",
+    "certifi": "2026.10.19",
+    "oauthlib": "4.0.0",
+    "pyjwt": "2.15.1",
+    "urllib3": "2.8.0",
+    "virtualenv": "21.14.12",
+    "multidict": "6.9.1"
+  },
+  "open_alerts": [],
+  "fixed_original_alerts": [
+    {
+      "number": 34,
+      "fixed_at": "2026-10-21T23:54:58Z"
+    },
+    {
+      "number": 35,
+      "fixed_at": "2026-10-21T23:54:59Z"
+    },
+    {
+      "number": 36,
+      "fixed_at": "2026-10-21T23:54:59Z"
+    },
+    {
+      "number": 37,
+      "fixed_at": "2026-10-21T23:54:59Z"
+    },
+    {
+      "number": 38,
+      "fixed_at": "2026-10-21T23:54:59Z"
+    },
+    {
+      "number": 39,
+      "fixed_at": "2026-10-21T23:54:59Z"
+    },
+    {
+      "number": 40,
+      "fixed_at": "2026-10-21T23:54:59Z"
+    },
+    {
+      "number": 41,
+      "fixed_at": "2026-10-21T23:55:00Z"
+    },
+    {
+      "number": 42,
+      "fixed_at": "2026-10-21T23:55:00Z"
+    },
+    {
+      "number": 43,
+      "fixed_at": "2026-10-21T23:55:00Z"
+    },
+    {
+      "number": 44,
+      "fixed_at": "2026-10-21T23:55:00Z"
+    },
+    {
+      "number": 45,
+      "fixed_at": "2026-10-21T23:55:00Z"
+    },
+    {
+      "number": 46,
+      "fixed_at": "2026-10-21T23:55:01Z"
+    },
+    {
+      "number": 47,
+      "fixed_at": "2026-10-21T23:55:01Z"
+    },
+    {
+      "number": 48,
+      "fixed_at": "2026-10-21T23:55:01Z"
+    },
+    {
+      "number": 49,
+      "fixed_at": "2026-10-21T23:55:01Z"
+    },
+    {
+      "number": 50,
+      "fixed_at": "2026-10-21T23:55:01Z"
+    },
+    {
+      "number": 51,
+      "fixed_at": "2026-10-21T23:55:02Z"
+    },
+    {
+      "number": 52,
+      "fixed_at": "2026-10-21T23:55:02Z"
+    },
+    {
+      "number": 53,
+      "fixed_at": "2026-10-21T23:55:02Z"
+    },
+    {
+      "number": 54,
+      "fixed_at": "2026-10-21T23:55:02Z"
+    },
+    {
+      "number": 55,
+      "fixed_at": "2026-10-21T23:55:02Z"
+    },
+    {
+      "number": 56,
+      "fixed_at": "2026-10-21T23:55:02Z"
+    },
+    {
+      "number": 57,
+      "fixed_at": "2026-10-21T23:55:03Z"
+    },
+    {
+      "number": 58,
+      "fixed_at": "2026-10-21T23:55:03Z"
+    },
+    {
+      "number": 59,
+      "fixed_at": "2026-10-21T23:55:03Z"
+    },
+    {
+      "number": 60,
+      "fixed_at": "2026-10-21T23:55:03Z"
+    }
+  ]
+}
