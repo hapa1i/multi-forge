@@ -43,7 +43,7 @@ writes.
   reviewer leases. A concurrent launch, new dependent, stale worker or same-name creation must not cross deletion's
   admission boundary unnoticed. Do not hold a global lock across model calls.
 - [x] Prevent queue drain and automatic retention from mutating the target before delete/purge preview or confirmation.
-  Root CLI startup currently drains session commands before their leaf handlers.
+  Only the `session delete|purge|clean` leaves skip the startup drain; other session commands still drain.
 - [x] Define behavior for malformed manifests, absent worktrees, legacy artifacts without ownership evidence, symlinks
   and path replacements. Neither `--force` nor raw path strings may supply missing native deletion authority.
 

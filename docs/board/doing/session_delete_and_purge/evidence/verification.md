@@ -106,6 +106,47 @@ cleanup. Replacement cleanup checks the originally captured owner before removal
 post-turn publication also checks the captured instance after the runtime lease ends. The user guide now distinguishes a
 refusal before removal from a creation failure after removal.
 
+## Second PR review corrections
+
+The second review added coverage for symlinked Forge homes, native process classification, unrelated Codex rollouts,
+session-store residue and startup queue exemptions:
+
+- `test_bug_session_cleanup_symlinked_forge_home.py`: the retry inventory resolves FORGE_HOME once, so delete and
+  interrupted-delete retry complete when the home is a symlink. Components beneath it still refuse symlinks. Worktree
+  removal protects both the selected home path and its resolved target, including a link inside the checkout.
+- `test_bug_native_census_claude_desktop.py`: the Desktop chat app, its helpers and MCP launchers no longer count as
+  Claude Code. The prior classifier also missed version-path and Desktop-bundled Claude Code CLIs; both now refuse.
+- `test_bug_codex_purge_unrelated_rollouts.py`: supported unrelated rollouts do not block purge, but an older filename
+  cannot hide a dependent child. Unknown layouts, malformed entries and uncharacterized archives remain refusals.
+- `test_bug_session_cleanup_store_shells.py`: `.DS_Store` and unindexed lock-only shells no longer block cleanup.
+  Unmanifested content, symlinked entries and indexed rows without manifests still refuse.
+- `tests/src/cli/test_startup_queue.py`: only `session delete|purge|clean`, including through the `sess` alias, skip the
+  startup drain; `session list` drains again.
+
+The stale design wording about preserved review artifacts now says delete removes them and that trees retained by older
+deletes cannot become a recreated session's live state.
+
+Follow-up review rejected the filename-age exemption because a valid child header can contradict its filename's clock.
+It also found that a second directory enumeration could delete a replacement session after a shell check. Post-turn
+publication already holds the index lock and checks the captured owner, so the obsolete destructive shell sweep was
+removed. `test_bug_codex_absence_cleanup_publication.py` verifies that a replacement published before or during the
+former sweep keeps its manifest, owner and index bytes. Unindexed empty or lock-only shells remain harmless to
+dependency discovery.
+
+Initial checks before those follow-up corrections:
+
+| Command                                                                    | Result                                           |
+| -------------------------------------------------------------------------- | ------------------------------------------------ |
+| `make test-unit`                                                           | 11,139 passed; 1 failed on the stale token cache |
+| `make test-regression`                                                     | 2,066 tests passed                               |
+| `SKIP=file-size-limits uv run pre-commit run --all-files`                  | All other hooks passed                           |
+| `./scripts/check-file-limits.py --skip-tokens --all-files`                 | Passed                                           |
+| `./scripts/test-integration.sh` (delete/purge and session lifecycle files) | 33 tests passed                                  |
+
+The initial unit failure was `test_shipped_provider_cache_matches_exact_file_bytes`. Both edited documents now have
+current, explicitly approved provider counts: 23,207 tokens for `docs/design_telemetry.md` and 26,013 for
+`docs/end-user/session.md`. The session guide remains above its 25,000 target and below its 30,000 ceiling.
+
 ## Native evidence
 
 The first separately approved synthetic Claude 2.1.245 invocation reported $0.01699045 and completed one subagent. Purge
@@ -123,18 +164,18 @@ had networking disabled, no credentials and no native invocation.
 
 ## Aggregate checks
 
-Final checks after the PR review corrections on 2026-10-21:
+Final checks after all PR review corrections on 2026-10-21:
 
 | Command                                         | Result                                       |
 | ----------------------------------------------- | -------------------------------------------- |
-| `make test`                                     | 11,134 unit and 523 integration tests passed |
-| `make test-regression`                          | 2,040 tests passed                           |
+| `make test`                                     | 11,138 unit and 523 integration tests passed |
+| `make test-regression`                          | 2,084 tests passed                           |
 | `make pre-commit`                               | All hooks passed                             |
 | `uv run python scripts/check-markdown-links.py` | 741 Markdown sources passed                  |
 | `git diff --cached --check`                     | Passed                                       |
 
 Tests ran with provider credentials unset, `PYTHON_DOTENV_DISABLED=1` and an offline dependency cache. Unit selection
-deselected 117 integration-marked cases; integration selection deselected 13,330 nonselected cases, including slow
+deselected 117 integration-marked cases; integration selection deselected 13,378 nonselected cases, including slow
 provider trials. All selected tests passed without retries. The integration run includes the exact-wheel release-image
 check and the new cleanup lifecycle tests. Native-layout evidence remains the separately approved captures above.
 

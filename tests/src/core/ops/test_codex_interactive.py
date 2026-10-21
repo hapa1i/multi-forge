@@ -26,10 +26,7 @@ from forge.core.ops.codex_interactive import (
     reattach_codex_session,
     start_interactive_codex_session,
 )
-from forge.core.ops.codex_session import (
-    _remove_lock_only_session_dir,
-    _update_manifest_if_present,
-)
+from forge.core.ops.codex_session import _update_manifest_if_present
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
 from forge.core.runtime.codex_preflight import CodexPreflight
@@ -726,7 +723,11 @@ class TestInteractiveLaunchArgs:
                 launch_args=RuntimeLaunchArgs(effort="high", passthrough=("--search",)),
             )
 
-        assert invoke.kwargs["extra_args"] == ["-c", 'model_reasoning_effort="high"', "--search"]
+        assert invoke.kwargs["extra_args"] == [
+            "-c",
+            'model_reasoning_effort="high"',
+            "--search",
+        ]
 
     def test_child_of_advisory_parent_refuses_passthrough_before_creation(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -754,7 +755,7 @@ class TestInteractiveLaunchArgs:
 
 
 class TestUpdateManifestIfPresent:
-    """The exists()->publication race and the legacy lock-only-shell sweep.
+    """The exists()->publication race.
 
     The ops-level deleted-during-TUI tests land in the exists() preflight branch;
     these pin the narrower race where the delete lands AFTER the preflight, so
@@ -781,7 +782,11 @@ class TestUpdateManifestIfPresent:
 
         with patch.object(SessionStore, "exists", self._exists_true_once()):
             updated = _update_manifest_if_present(
-                store, mutate=lambda m: None, warnings=warnings, session="ghost", expected_instance_id="a" * 32
+                store,
+                mutate=lambda m: None,
+                warnings=warnings,
+                session="ghost",
+                expected_instance_id="a" * 32,
             )
 
         assert updated is False
@@ -797,7 +802,11 @@ class TestUpdateManifestIfPresent:
 
         with patch.object(SessionStore, "exists", self._exists_true_once()):
             updated = _update_manifest_if_present(
-                store, mutate=lambda m: None, warnings=warnings, session="ghost", expected_instance_id="a" * 32
+                store,
+                mutate=lambda m: None,
+                warnings=warnings,
+                session="ghost",
+                expected_instance_id="a" * 32,
             )
 
         assert updated is False
@@ -817,7 +826,9 @@ class TestUpdateManifestIfPresent:
     def test_non_absence_update_errors_remain_strict(self, tmp_path: Path, error: Exception) -> None:
         store = SessionStore(str(tmp_path), "live")
         published = publish_session(
-            IndexStore(), create_session_state(name="live", worktree_path=str(tmp_path)), tmp_path
+            IndexStore(),
+            create_session_state(name="live", worktree_path=str(tmp_path)),
+            tmp_path,
         )
         assert published.instance_id is not None
         warnings: list[str] = []
@@ -833,13 +844,3 @@ class TestUpdateManifestIfPresent:
                 )
 
         assert warnings == []
-
-    def test_sweep_removes_empty_dir_shell(self, tmp_path: Path) -> None:
-        # Another actor already unlinked the lock; the bare shell still goes.
-        empty = tmp_path / "ghost-session"
-        empty.mkdir()
-        _remove_lock_only_session_dir(empty)
-        assert not empty.exists()
-
-    def test_sweep_missing_dir_is_noop(self, tmp_path: Path) -> None:
-        _remove_lock_only_session_dir(tmp_path / "never-existed")

@@ -19,7 +19,7 @@ from .exceptions import ForgeSessionError
 from .identity import session_name_from_key
 from .index import IndexStore
 from .models import SessionIndexEntry, SessionState
-from .store import SessionStore
+from .store import SessionStore, is_session_shell
 
 
 def session_entries(index: IndexStore) -> list[tuple[str, SessionIndexEntry]]:
@@ -42,19 +42,17 @@ def discover_session_states(
         for installation in TrackingStore().read().installations.values()
         if installation.project_path
     )
-    identities = {(str(Path(entry.root).resolve()), name) for name, entry in entries}
+    indexed = {(str(Path(entry.root).resolve()), name) for name, entry in entries}
+    identities = set(indexed)
     for project in roots:
         directory = Path(project) / ".forge" / "sessions"
         try:
             with directory_fd(directory) as descriptor:
                 for name in os.listdir(descriptor):
                     metadata = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
-                    if (
-                        name.startswith(".")
-                        and name.endswith(".authority.lock")
-                        and stat.S_ISREG(metadata.st_mode)
-                        and metadata.st_nlink == 1
-                    ):
+                    # Sessions are directories. Authority locks and OS metadata such as
+                    # .DS_Store are regular files that cannot hold a manifest.
+                    if stat.S_ISREG(metadata.st_mode):
                         continue
                     if not stat.S_ISDIR(metadata.st_mode):
                         raise ForgeSessionError(f"Cannot verify unexpected session-store entry: {directory / name}")
@@ -74,6 +72,16 @@ def discover_session_states(
         except FileNotFoundError as error:
             if (project, name) == allow_missing:
                 continue
+            # An unindexed shell left by a lock racing deletion reserves nothing. Apply
+            # repeats this scan under the index lock, where creation cannot be
+            # mid-publication. Indexed rows without manifests still need repair.
+            try:
+                if (project, name) not in indexed and is_session_shell(store.session_dir):
+                    continue
+            except OSError as shell_error:
+                raise ForgeSessionError(
+                    f"Cannot verify dependencies for '{name}' ({project}): {shell_error}"
+                ) from shell_error
             raise ForgeSessionError(
                 f"Cannot verify dependencies for '{name}' ({project}): missing manifest; "
                 "inspect 'forge session repair' and 'forge session list --scope all' first"

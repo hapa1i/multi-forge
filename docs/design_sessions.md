@@ -241,11 +241,13 @@ report-only.
 
 Purge adds `purge_native.py`'s exact native-file inventory. It admits verified Claude 2.1.245 and Codex 0.162.1 layouts;
 other layouts refuse. Native identity checks include original and rollover IDs, adopted CWD, source-byte evidence for
-relocation/rewind, agent-log ancestry and Codex parent references. The process census conservatively refuses any
-observed client of the selected runtime, including unmanaged clients. It repeats before unlink; unknown visibility
-refuses. It observes inactivity and cannot prevent an external client from starting afterward. Native indexes,
-unrecorded external copies, provider data, Git history, global telemetry and project memory documents are outside the
-removal guarantee.
+relocation/rewind, agent-log ancestry and Codex parent references. The Codex parent scan checks supported active rollout
+headers regardless of filename age; filenames cannot establish ancestry. Unknown active layouts and uncharacterized
+archived entries refuse purge. The process census conservatively refuses any observed client of the selected runtime,
+including unmanaged clients and Claude Desktop's bundled Claude Code; the Desktop chat app and its helpers are not
+Claude Code clients. It repeats before unlink; unknown visibility refuses. It observes inactivity and cannot prevent an
+external client from starting afterward. Native indexes, unrecorded external copies, provider data, Git history, global
+telemetry and project memory documents are outside the removal guarantee.
 
 The existing per-creation `review-identity` token is the session instance. Index schema v2 mirrors it in `instance_id`;
 v1 reads project `null` without writes. Confirmed cleanup and content-producing operations explicitly migrate validated
@@ -259,9 +261,10 @@ launch registration and event writers carry the admitted instance. Worker leases
 index lock; cleanup refuses live or abandoned leases. An abandoned lease requires explicit inspection/recovery, not
 inference from its parent process having exited.
 
-Worktree removal refuses containment overlap with configured native homes or recorded native sources, including those of
-other discovered sessions. Admission checks lexical and resolved paths again before apply; `--keep-worktree` preserves
-the checkout and prevents removal of native state outside the file inventory.
+Worktree removal refuses containment overlap with the selected Forge home, configured native homes or recorded native
+sources, including those of other discovered sessions. Admission checks lexical and resolved paths again before apply,
+so removing a checkout cannot destroy a Forge-home symlink even when its target is elsewhere. `--keep-worktree`
+preserves the checkout and its retained storage.
 
 Before its first removal, apply saves a private retry inventory under `$FORGE_HOME/session-cleanup/`, outside the
 checkout. The inventory reserves the name, stops new producers and survives worktree removal. Failures leave the index

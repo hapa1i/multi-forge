@@ -146,6 +146,37 @@ class TestExemptSubcommands:
 
         assert marker.is_file(), "Exempt command (status-line) should NOT process pending-work queue"
 
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["session", "delete", "test-session"],
+            ["session", "purge", "test-session", "--json"],
+            ["session", "clean", "--older-than", "1"],
+            ["sess", "delete", "test-session"],
+        ],
+    )
+    def test_session_cleanup_leaves_skip_queue(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+    ) -> None:
+        """Cleanup previews must not drain work for the sessions they inspect."""
+        marker = _create_test_marker(tmp_path)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(main, argv, input="n\n")
+
+        assert marker.is_file()
+
+    @pytest.mark.parametrize("argv", [["session", "list", "--json"], ["sess", "list", "--json"]])
+    def test_other_session_commands_process_queue(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+    ) -> None:
+        marker = _create_test_marker(tmp_path)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(main, argv)
+
+        assert not marker.is_file()
+
 
 class TestStartupQueueRobustness:
     """Tests for startup queue robustness (error handling)."""

@@ -223,6 +223,21 @@ def get_manifest_path(forge_root: str | Path, session_name: str) -> Path:
     return Path(forge_root) / MANIFEST_DIR / SESSIONS_DIR / session_name / MANIFEST_FILENAME
 
 
+def is_session_shell(session_dir: Path) -> bool:
+    """Return True for an absent, empty or manifest-lock-only session directory.
+
+    Acquiring a manifest lock creates its parent, so an update racing deletion can
+    leave this shell behind. It holds no manifest and therefore reserves nothing.
+    Read failures propagate: an uninspectable directory is not proven empty.
+    """
+    try:
+        entries = list(os.scandir(session_dir))
+    except FileNotFoundError:
+        return True
+    lock_name = f"{MANIFEST_FILENAME}.lock"
+    return all(entry.name == lock_name and entry.is_file(follow_symlinks=False) for entry in entries)
+
+
 class SessionStore:
     """Read/write session state to per-session manifest directory.
 

@@ -36,6 +36,14 @@ MAX_STORE_FILES = 10000
 MAX_HEADER_BYTES = 1024 * 1024
 CLAUDE_VERSIONS = frozenset({"2.1.245"})
 CODEX_VERSIONS = frozenset({"0.162.1"})
+# `ps` prints argv unquoted and truncates a non-final comm, so a bundled executable
+# such as ".../Application Support/.../MacOS/claude" cannot be tokenized reliably.
+# Match a case-sensitive `claude` word or path component instead; a bare `claude`
+# argument over-matches toward refusal. Claude Code runs as `claude` or a
+# script/version path; the Electron chat app and helpers (`Claude`,
+# `Claude Helper ...`) are not same-runtime clients.
+_CLAUDE_CODE_EXECUTABLE = re.compile(r"(?:^|[\s/])claude(?=\s|$)")
+_CLAUDE_CODE_MARKERS = ("@anthropic-ai/claude-code/", "/claude/cli.js", "/claude/versions/")
 OUTSIDE_SCOPE = (
     "Provider-side request copies",
     "Project memory documents and Git history",
@@ -228,19 +236,17 @@ def check_native_inactivity(runtime: NativeRuntime) -> tuple[str, ...]:
             pid = int(fields[0])
             if pid == os.getpid():
                 continue
+            if runtime == "claude":
+                if _is_claude_code_process(line.strip().split(None, 1)[1]):
+                    pids.append(pid)
+                continue
             executable = Path(fields[1]).name.lower()
-            args = fields[2]
             try:
-                argv = shlex.split(args)
+                argv = shlex.split(fields[2])
             except ValueError:
                 argv = []
             first = Path(argv[0]).name.lower() if argv else executable
-            native = runtime in (executable, first)
-            if runtime == "codex":
-                native = native or executable in {"codex-app", "codex.app"} or first == "codex-app"
-            elif executable.startswith("node") or first.startswith("node"):
-                native = any("@anthropic-ai/claude-code/" in arg or arg.endswith("/claude/cli.js") for arg in argv[:3])
-            if native:
+            if runtime in (executable, first) or executable in {"codex-app", "codex.app"} or first == "codex-app":
                 pids.append(pid)
         if pids:
             return (
@@ -250,6 +256,11 @@ def check_native_inactivity(runtime: NativeRuntime) -> tuple[str, ...]:
         return ()
     except (OSError, UnicodeError, subprocess.SubprocessError):
         return (f"Cannot establish native {runtime} inactivity: process census unavailable",)
+
+
+def _is_claude_code_process(command: str) -> bool:
+    """Classify one census line's comm/argv text; unrelated `claude` paths over-match safely."""
+    return bool(_CLAUDE_CODE_EXECUTABLE.search(command)) or any(marker in command for marker in _CLAUDE_CODE_MARKERS)
 
 
 def revalidate_native_file(file: NativePurgeFile, *, allow_missing: bool = False) -> None:
@@ -705,7 +716,11 @@ def _codex_header(row: dict[str, Any], native_id: str, *, expected_cwd: str | No
 
 
 def _codex_dependents(home: Path, native_id: str) -> list[str]:
-    """Inspect bounded supported headers; unreadable ancestry cannot prove safety."""
+    """Inspect bounded supported headers; unreadable ancestry cannot prove safety.
+
+    Filename timestamps do not establish ancestry: a restored or clock-shifted
+    child still depends on the parent named by its history header.
+    """
     if _entries(home / "archived_sessions"):
         raise NativePurgeError("Codex archived-session ancestry is uncharacterized; cannot exclude native dependents")
     base = home / "sessions"

@@ -267,8 +267,10 @@ ambiguous files refuse removal.
 
 Both verbs refuse existing dependent sessions, including inactive children, borrowed plans and supervisor bindings. They
 also refuse active sessions or workers; `--force` bypasses dirty-worktree protection only. Purge additionally requires a
-successful native process census and refuses while any client of the selected runtime is observed. This check cannot
-prevent an external client from starting afterward. Exit native clients before applying purge.
+successful native process census and refuses while any client of the selected runtime is observed. Claude Code CLIs,
+including Desktop's bundled copy, count; the Desktop chat app does not. This check cannot prevent an external client
+from starting afterward. Exit native clients before applying purge. Codex purge checks supported rollout headers for
+descendants regardless of filename age; unknown layouts and uncharacterized archived entries refuse removal.
 
 `delete --all` and `purge --all` select only the current Forge project, including incognito sessions. They cannot be
 combined with names or `--forge-root`. Every target is admitted before deletion starts; dependent targets stay refused
@@ -276,10 +278,11 @@ for that batch even if another selected session is removed. Eligible targets are
 produces a nonzero exit. An empty project succeeds.
 
 Worktrees are removed by default for explicit delete/purge when owned and unshared; `--keep-worktree` preserves them,
-and `--delete-branch` additionally removes their branch. Cleanup refuses worktree removal when it overlaps configured
-native storage or contains recorded native sources; use `--keep-worktree`. Retaining a native conversation does not
-retain its original working directory. For an explicit name, `--forge-root /absolute/project` selects its owner without
-requiring that checkout to exist.
+and `--delete-branch` additionally removes their branch. Cleanup refuses worktree removal when it overlaps the selected
+Forge home or configured native storage, or contains recorded native sources; use `--keep-worktree`. This also protects
+a Forge-home symlink inside the checkout whose target is elsewhere. Retaining a native conversation does not retain its
+original working directory. For an explicit name, `--forge-root /absolute/project` selects its owner without requiring
+that checkout to exist.
 
 An interrupted cleanup exits nonzero and retains its private inventory under `$FORGE_HOME/session-cleanup/`. Retry the
 printed command with its original options; it names `--forge-root` so it still works after checkout removal. The name

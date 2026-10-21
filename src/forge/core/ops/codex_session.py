@@ -74,7 +74,7 @@ from forge.session.models import (
     session_runtime,
 )
 from forge.session.prev_sessions import child_notes_path, child_path
-from forge.session.store import MANIFEST_FILENAME, SessionStore
+from forge.session.store import SessionStore
 from forge.session.transfer import parse_transfer_context_strategy
 
 from .session_authority_launch import authority_launch_transaction, require_launch_args
@@ -253,7 +253,7 @@ def start_codex_session(
     launch_args = require_launch_args(
         launch_args,
         runtime="codex",
-        authority=authority if authority_explicit else inherited_authority(parent_state.intent.authority),
+        authority=(authority if authority_explicit else inherited_authority(parent_state.intent.authority)),
     )
 
     # Fail closed before any state exists (runs `codex doctor` ~20s, once).
@@ -474,7 +474,10 @@ def _run_first_codex_turn(
             )
 
         manager.index_store.run_session_instance_txn(
-            name, str(store.forge_root), expected_instance_id=expected_instance_id, callback=reconcile_receipt
+            name,
+            str(store.forge_root),
+            expected_instance_id=expected_instance_id,
+            callback=reconcile_receipt,
         )
 
     if hook_rollout is not None:
@@ -516,7 +519,11 @@ def _run_first_codex_turn(
         m.confirmed.confirmed_by = "cli:codex-start"
 
     if _update_manifest_if_present(
-        store, mutate=_mutate, warnings=warnings, session=name, expected_instance_id=expected_instance_id
+        store,
+        mutate=_mutate,
+        warnings=warnings,
+        session=name,
+        expected_instance_id=expected_instance_id,
     ):
         sync_codex_thread_to_index(
             name,
@@ -703,10 +710,18 @@ def continue_codex_session(
         m.confirmed.codex = codex
 
     if _update_manifest_if_present(
-        store, mutate=_mutate, warnings=warnings, session=name, expected_instance_id=instance_id
+        store,
+        mutate=_mutate,
+        warnings=warnings,
+        session=name,
+        expected_instance_id=instance_id,
     ):
         sync_codex_thread_to_index(
-            name, effective_thread_id, str(store.forge_root), expected_instance_id=instance_id, warnings=warnings
+            name,
+            effective_thread_id,
+            str(store.forge_root),
+            expected_instance_id=instance_id,
+            warnings=warnings,
         )
 
     return CodexSessionResumeResult(
@@ -771,10 +786,8 @@ def _update_manifest_if_present(
     except ManifestChangedError:
         updated = False
     except SessionFileNotFoundError:
-        # A concurrent delete can land after exists() but before update() reads. The
-        # lock layer creates the session dir to hold forge.session.json.lock; remove
-        # that lock-only shell so delete remains delete.
-        _remove_lock_only_session_dir(store.session_dir)
+        # The publication guard prevents supported deletion from racing persist().
+        # If files disappeared independently, this handler no longer owns their path.
         warnings.append(f"Session '{session}' was deleted while Codex was running; skipped post-exit manifest update.")
         return False
     if not updated:
@@ -783,32 +796,6 @@ def _update_manifest_if_present(
             "skipped post-exit manifest update."
         )
     return updated
-
-
-def _remove_lock_only_session_dir(session_dir: Path) -> None:
-    """Remove only the empty or lock-only shell created by a raced update."""
-    lock_name = f"{MANIFEST_FILENAME}.lock"
-    try:
-        entries = list(session_dir.iterdir())
-    except FileNotFoundError:
-        return
-    except OSError:
-        logger.debug("Could not inspect deleted session directory %s", session_dir, exc_info=True)
-        return
-    if any(entry.name != lock_name or not entry.is_file() for entry in entries):
-        return
-    # Empty entries means another actor already unlinked the lock; the bare shell is
-    # still a partial resurrection, so it is removed the same way.
-    try:
-        for entry in entries:
-            entry.unlink()
-        session_dir.rmdir()
-    except OSError:
-        logger.debug(
-            "Could not remove lock-only deleted session directory %s",
-            session_dir,
-            exc_info=True,
-        )
 
 
 def _rollback_created_session(
@@ -823,7 +810,10 @@ def _rollback_created_session(
 ) -> None:
     """Compensate only this birth, retaining shared cleanup refusals and retry state."""
     if expected_instance_id is None:
-        logger.warning("Codex start rollback: missing creation identity for %s; retained session", name)
+        logger.warning(
+            "Codex start rollback: missing creation identity for %s; retained session",
+            name,
+        )
         return
     try:
         if snapshot is not None:
@@ -846,10 +836,17 @@ def _rollback_created_session(
                     derivation.context_file = str(snapshot.relative_to(forge_root))
                     state.confirmed.derivation = derivation
 
-                store.update(timeout_s=5.0, mutate=mutate, expected_instance_id=expected_instance_id)
+                store.update(
+                    timeout_s=5.0,
+                    mutate=mutate,
+                    expected_instance_id=expected_instance_id,
+                )
 
             if not manager.index_store.run_session_instance_txn(
-                name, forge_root, expected_instance_id=expected_instance_id, callback=bind_owned_snapshot
+                name,
+                forge_root,
+                expected_instance_id=expected_instance_id,
+                callback=bind_owned_snapshot,
             ):
                 raise ValueError("Created session was deleted or replaced before rollback")
         manager.delete_session(
@@ -861,5 +858,7 @@ def _rollback_created_session(
         )
     except Exception:
         logger.warning(
-            "Codex start rollback: cleanup incomplete for %s; inspect and retry deletion", name, exc_info=True
+            "Codex start rollback: cleanup incomplete for %s; inspect and retry deletion",
+            name,
+            exc_info=True,
         )

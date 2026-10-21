@@ -41,10 +41,12 @@ Session stops
   → Stop hook enqueues "index" work marker
   → (session ends)
 
-Later queue-processing forge command (hook, status-line, logs, session, and clean are exempt)
+Later queue-processing forge command (hook, status-line, logs, and clean are exempt)
   → Work queue processes pending markers
   → Transcript is extracted, tokenized, and added to the BM25 index
 ```
+
+`forge session delete`, `purge`, and `clean` also skip the drain; other `forge session` commands drain normally.
 
 Indexing is **incremental** — only new or modified transcripts are processed. The index is per-project, stored at
 `<forge_root>/.forge/search-index/`.

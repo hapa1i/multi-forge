@@ -396,17 +396,18 @@ stops with `carry_limit`, preserving a valid checkpoint. The operator can previe
 unreviewed, and takes a fresh baseline only on a later explicit prompt. Reset exclusions remain visible in status.
 
 Session creation writes a random owner to `.forge/sessions/<name>/review-identity`; the `review` event domain stores
-complete private checkpoints under `.forge/artifacts/<name>/review/<owner>/`, with its own lock. Deletion preserves
-historical artifacts; recreating the same name gets a fresh owner, even in the same second or a different checkout.
-Existing sessions with no review history acquire an owner on first use. Missing owners with history and older checkpoint
-schemas fail closed: restore the owner/history or start a new session. Old hooks cannot write to a replacement session.
-Reservation writes the attempt ID, config/lane/plan/evidence identities and spent bit before releasing the lock and
-calling B1. Inference never holds a session or review lock. A crash after reservation remains spent even if dispatch
-never began. Atomic compaction retains the full latest watermark. Initial publication writes the journal before its
-marker; a crash leaves a complete checkpoint, and a later writer can complete marker creation without losing spending. A
-marker with missing journal still refuses review. Other event domains and telemetry have independent lifetimes;
-resetting diagnostic attempts never resets this allowance. Snapshots use immutable content-addressed private blobs with
-bounded storage and checkpoint-owned pruning.
+complete private checkpoints under `.forge/artifacts/<name>/review/<owner>/`, with its own lock. Delete and purge remove
+these checkpoints with the session's artifact tree. A tree retained by an older delete stays inert: recreating the same
+name gets a fresh owner, even in the same second or a different checkout. Existing sessions with no review history
+acquire an owner on first use. Missing owners with history and older checkpoint schemas fail closed: restore the
+owner/history or start a new session. Old hooks cannot write to a replacement session. Reservation writes the attempt
+ID, config/lane/plan/evidence identities and spent bit before releasing the lock and calling B1. Inference never holds a
+session or review lock. A crash after reservation remains spent even if dispatch never began. Atomic compaction retains
+the full latest watermark. Initial publication writes the journal before its marker; a crash leaves a complete
+checkpoint, and a later writer can complete marker creation without losing spending. A marker with missing journal still
+refuses review. Other event domains and telemetry have independent lifetimes; resetting diagnostic attempts never resets
+this allowance. Snapshots use immutable content-addressed private blobs with bounded storage and checkpoint-owned
+pruning.
 
 Completion first saves the returned verdict, then rechecks checkout evidence, plan and effective configuration. A failed
 freshness check leaves that verdict as audit evidence. Stale results remain historical evidence and cannot request a

@@ -101,10 +101,17 @@ def test_stale_preview_cannot_delete_replacement_instance(tmp_path: Path) -> Non
     assert delete_published_session(index, "subject", root)
     _publish(root)
     replacement = _write(root / ".forge/artifacts/subject/new.md")
-    with pytest.raises(ForgeSessionError, match="instance changed"):
+    store = SessionStore(str(root), "subject")
+    before = {path: path.read_bytes() for path in (replacement, store.manifest_path, index.index_path)}
+    owner = store.review_identity()
+    assert owner != stale.instance_id
+    # Distinct creation timestamps can trigger the manifest guard before the
+    # instance guard. Both refusals must leave the replacement byte-identical.
+    with pytest.raises(ForgeSessionError, match="instance changed|manifest changed"):
         apply_session_deletion(index, stale)
-    assert replacement.exists()
-    assert SessionStore(str(root), "subject").exists()
+    assert all(path.read_bytes() == data for path, data in before.items())
+    assert store.review_identity() == owner
+    assert not cleanup_state_path(root, "subject").exists()
 
 
 def test_failure_keeps_inventory_and_retry_reuses_original_paths(
@@ -409,8 +416,8 @@ def test_retry_inventory_cannot_be_inside_removed_worktree(
     index = IndexStore()
     monkeypatch.setenv("FORGE_HOME", str(checkout / "forge-home"))
     plan = plan_session_deletion(index, "subject", forge_root=str(checkout), force=True)
-    assert any("outside the removed worktree" in refusal for refusal in plan.refusals)
-    with pytest.raises(ForgeSessionError, match="outside the removed worktree"):
+    assert any("Forge home" in refusal and "--keep-worktree" in refusal for refusal in plan.refusals)
+    with pytest.raises(ForgeSessionError, match="Forge home"):
         apply_session_deletion(index, plan)
     assert checkout.exists()
 

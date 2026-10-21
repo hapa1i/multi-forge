@@ -254,7 +254,7 @@ Session stops
   → Stop hook enqueues "handoff" work marker
   → (session ends)
 
-Later queue-processing CLI startup (hook, status-line, logs, session, and clean are exempt)
+Later queue-processing CLI startup (hook, status-line, logs, and clean are exempt)
   → Work queue processes pending markers
   → Memory-writer handler spawns detached background process:
       forge memory-writer run --session-name <name> --worktree-path <path> --transcript-rel <rel>
@@ -267,6 +267,9 @@ Background process:
   → Builds multi-doc prompt with per-doc strategy instructions
   → Runs the bound runtime: claude -p (default) or codex exec (codex lane) -- stdin=prompt, cwd=forge_root, timeout=5min
 ```
+
+`forge session delete`, `purge`, and `clean` also skip the drain, so a preview cannot start a writer for a session it is
+inspecting. Other `forge session` commands drain normally.
 
 If the project pin is incompatible, malformed, unreadable, or uses an unsupported schema, the detached process records
 an upstream `skipped` outcome with reason `project_compatibility_refused` and the actual pin state, then exits 0. It

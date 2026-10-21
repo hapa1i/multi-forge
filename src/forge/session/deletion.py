@@ -15,6 +15,7 @@ from uuid import uuid4
 
 import dacite
 
+from forge.core.paths import get_forge_home
 from forge.core.runtime.codex_review_source import directory_fd, read_regular
 from forge.install.project_compat import enforce_project_compatibility
 from forge.search.cleanup import indexed_transcript_paths
@@ -443,8 +444,16 @@ def _admission_refusals(
         from .claude.paths import get_claude_home
 
         worktree = Path(plan.worktree_path).resolve()
-        if cleanup_state_path(plan.forge_root, plan.name).resolve().is_relative_to(worktree):
-            reasons.append("Cleanup inventory must be outside the removed worktree; move FORGE_HOME before cleanup")
+        forge_home = get_forge_home()
+        # Keeping the canonical inventory outside is insufficient when the
+        # selected home is a symlink inside the checkout: later index writes
+        # would recreate that spelling as a different, empty Forge home.
+        forge_home_locations = {Path(os.path.abspath(forge_home)), forge_home.resolve()}
+        if any(
+            location.is_relative_to(worktree) or worktree.is_relative_to(location) for location in forge_home_locations
+        ):
+            recovery = "restore the original FORGE_HOME path before retrying" if plan.retry else "use --keep-worktree"
+            reasons.append(f"Worktree overlaps Forge home: {forge_home}; {recovery}")
         native_locations = [
             ("Claude home", get_claude_home(), True),
             ("Codex home", codex_home(), True),
