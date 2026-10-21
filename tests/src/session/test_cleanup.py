@@ -33,224 +33,159 @@ def _iso_days_ago(days: int) -> str:
     return (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
 
+@pytest.fixture
+def cleanup_project(tmp_path, monkeypatch):
+    from forge.session import IndexStore, create_session_state
+    from tests.fixtures.session_state import publish_session
+
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / ".forge").mkdir()
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path / "forge-home"))
+    monkeypatch.chdir(root)
+
+    def seed(name, age=60, *, parent=None, project=None):
+        project = project or root
+        project.mkdir(parents=True, exist_ok=True)
+        state = create_session_state(name, worktree_path=str(project), parent_session=parent)
+        state.forge_root = str(project)
+        state.last_accessed_at = _iso_days_ago(age) if isinstance(age, int) else age
+        publish_session(IndexStore(), state, project, forge_root=str(project))
+        IndexStore().update_session(name, last_accessed_at=state.last_accessed_at, forge_root=str(project))
+        return state
+
+    return root, seed
+
+
 class TestCleanOldSessions:
-    @patch("forge.session.cleanup.ActiveSessionStore", autospec=True)
-    @patch("forge.session.cleanup.SessionManager", autospec=True)
-    def test_empty_sessions(self, mock_manager_cls, mock_active_cls):
-        mock_manager_cls.return_value.list_sessions.return_value = []
-        mock_active_cls.return_value.list_sessions.return_value = []
+    def test_empty_sessions(self, cleanup_project):
+        assert clean_old_sessions(30).is_empty
 
-        result = clean_old_sessions(30)
-        assert result.deleted == []
-        assert result.skipped_active == []
-        assert result.failed == []
+    def test_selects_old_sessions_and_keeps_recent(self, cleanup_project):
+        from forge.session import SessionStore
 
-    @patch("forge.session.cleanup.ActiveSessionStore", autospec=True)
-    @patch("forge.session.cleanup.SessionManager", autospec=True)
-    def test_keeps_recent_sessions(self, mock_manager_cls, mock_active_cls):
-        manager = mock_manager_cls.return_value
-        manager.list_sessions.return_value = [
-            ("recent", _make_entry(_iso_days_ago(5))),
-        ]
-        mock_active_cls.return_value.list_sessions.return_value = []
-
-        result = clean_old_sessions(30)
-        assert result.deleted == []
-        manager.delete_session.assert_not_called()
-
-    @patch("forge.session.cleanup.ActiveSessionStore", autospec=True)
-    @patch("forge.session.cleanup.SessionManager", autospec=True)
-    def test_deletes_old_sessions(self, mock_manager_cls, mock_active_cls):
-        manager = mock_manager_cls.return_value
-        manager.list_sessions.return_value = [
-            ("old-one", _make_entry(_iso_days_ago(60))),
-            ("old-two", _make_entry(_iso_days_ago(45))),
-            ("recent", _make_entry(_iso_days_ago(5))),
-        ]
-        mock_active_cls.return_value.list_sessions.return_value = []
-
+        root, seed = cleanup_project
+        seed("old-one", 60)
+        seed("old-two", 45)
+        seed("recent", 5)
         result = clean_old_sessions(30)
         assert sorted(result.deleted) == ["old-one", "old-two"]
-        assert manager.delete_session.call_count == 2
+        assert SessionStore(str(root), "recent").exists()
 
-    @patch("forge.session.cleanup.ActiveSessionStore", autospec=True)
-    @patch("forge.session.cleanup.SessionManager", autospec=True)
-    def test_skips_active_sessions(self, mock_manager_cls, mock_active_cls):
-        manager = mock_manager_cls.return_value
-        manager.list_sessions.return_value = [
-            (
-                "active-old",
-                _make_entry(_iso_days_ago(60), forge_root="/project", worktree_path="/project"),
-            ),
-            (
-                "dead-old",
-                _make_entry(_iso_days_ago(60), forge_root="/project", worktree_path="/project"),
-            ),
-        ]
-        active_entry = MagicMock()
-        active_entry.forge_root = "/project"
-        active_entry.worktree_path = "/project"
-        mock_active_cls.return_value.list_sessions.return_value = [
-            ("active-old", active_entry),
-        ]
+    def test_preview_uses_same_selection_without_writing(self, cleanup_project):
+        from forge.session import IndexStore, SessionStore
 
-        result = clean_old_sessions(30)
+        root, seed = cleanup_project
+        seed("old")
+        index = IndexStore().index_path
+        before = index.read_bytes(), index.stat().st_mtime_ns
+        result = clean_old_sessions(30, apply=False)
+        assert [plan.name for plan in result.plans] == ["old"]
+        assert result.deleted == []
+        assert SessionStore(str(root), "old").exists()
+        assert (index.read_bytes(), index.stat().st_mtime_ns) == before
+
+    def test_skips_active_sessions_even_with_force(self, cleanup_project):
+        import os
+
+        from forge.session.active import ActiveSessionStore
+
+        root, seed = cleanup_project
+        seed("active-old")
+        seed("dead-old")
+        ActiveSessionStore().upsert_session(
+            "active-old",
+            forge_root=str(root),
+            worktree_path=str(root),
+            launch_mode="host",
+            launcher_pid=os.getpid(),
+        )
+        result = clean_old_sessions(30, force=True)
         assert result.deleted == ["dead-old"]
         assert result.skipped_active == ["active-old"]
 
-    @patch("forge.session.cleanup.ActiveSessionStore", autospec=True)
-    @patch("forge.session.cleanup.SessionManager", autospec=True)
-    def test_skips_unparseable_timestamps(self, mock_manager_cls, mock_active_cls):
-        manager = mock_manager_cls.return_value
-        manager.list_sessions.return_value = [
-            ("bad-ts", _make_entry("not-a-date")),
-            ("good-old", _make_entry(_iso_days_ago(60))),
-        ]
-        mock_active_cls.return_value.list_sessions.return_value = []
-
+    def test_skips_unparseable_timestamps(self, cleanup_project):
+        _, seed = cleanup_project
+        seed("bad-ts", "not-a-date")
+        seed("old")
         result = clean_old_sessions(30)
-        assert result.deleted == ["good-old"]
+        assert result.deleted == ["old"]
         assert result.skipped_unparseable == ["bad-ts"]
 
-    @patch("forge.session.cleanup.ActiveSessionStore", autospec=True)
-    @patch("forge.session.cleanup.SessionManager", autospec=True)
-    def test_continues_after_delete_failure(self, mock_manager_cls, mock_active_cls):
-        manager = mock_manager_cls.return_value
-        manager.list_sessions.return_value = [
-            ("fail", _make_entry(_iso_days_ago(60))),
-            ("succeed", _make_entry(_iso_days_ago(60))),
-        ]
-        mock_active_cls.return_value.list_sessions.return_value = []
+    def test_continues_after_apply_failure(self, cleanup_project, monkeypatch):
+        from forge.session.deletion import apply_session_deletion
 
-        manager.delete_session.side_effect = [RuntimeError("disk full"), None]
+        _, seed = cleanup_project
+        seed("fail")
+        seed("succeed")
 
+        def apply(index, plan):
+            if plan.name == "fail":
+                raise OSError("disk full")
+            return apply_session_deletion(index, plan)
+
+        monkeypatch.setattr("forge.session.cleanup.apply_session_deletion", apply)
         result = clean_old_sessions(30)
         assert result.deleted == ["succeed"]
-        assert len(result.failed) == 1
-        assert result.failed[0][0] == "fail"
-        assert "disk full" in result.failed[0][1]
+        assert result.failed == [("fail", "disk full")]
 
-    @patch("forge.session.cleanup.ActiveSessionStore", autospec=True)
-    @patch("forge.session.cleanup.SessionManager", autospec=True)
-    def test_passes_force_flag(self, mock_manager_cls, mock_active_cls):
-        """force=True is passed through to delete_session."""
-        manager = mock_manager_cls.return_value
-        manager.list_sessions.return_value = [
-            ("old", _make_entry(_iso_days_ago(60))),
-        ]
-        mock_active_cls.return_value.list_sessions.return_value = []
+    @pytest.mark.parametrize("force", [False, True])
+    def test_planning_keeps_requested_worktree_policy(self, cleanup_project, force):
+        _, seed = cleanup_project
+        seed("old")
+        result = clean_old_sessions(30, force=force, delete_worktree=True, apply=False)
+        assert result.plans[0].force is force
+        assert result.plans[0].delete_worktree
+        assert result.plans[0].native is None
 
-        clean_old_sessions(30, force=True, delete_worktree=True)
-        manager.delete_session.assert_called_once()
-        call_kwargs = manager.delete_session.call_args
-        assert call_kwargs[0][0] == "old"
-        assert call_kwargs[1]["force"] is True
-        assert call_kwargs[1]["delete_worktree"] is True
+    def test_active_store_failure_aborts_cleanup(self, cleanup_project, monkeypatch):
+        _, seed = cleanup_project
+        seed("old")
 
-    @patch("forge.session.cleanup.ActiveSessionStore", autospec=True)
-    @patch("forge.session.cleanup.SessionManager", autospec=True)
-    def test_default_force_is_false(self, mock_manager_cls, mock_active_cls):
-        """Manual cleanup defaults to force=False (respects dirty worktrees)."""
-        manager = mock_manager_cls.return_value
-        manager.list_sessions.return_value = [
-            ("old", _make_entry(_iso_days_ago(60))),
-        ]
-        mock_active_cls.return_value.list_sessions.return_value = []
+        def fail(self):
+            raise RuntimeError("corrupt")
 
-        clean_old_sessions(30)
-        call_kwargs = manager.delete_session.call_args[1]
-        assert call_kwargs["force"] is False
-
-    @patch("forge.session.cleanup.ActiveSessionStore", autospec=True)
-    @patch("forge.session.cleanup.SessionManager", autospec=True)
-    def test_active_store_failure_aborts_cleanup(self, mock_manager_cls, mock_active_cls):
-        """If active store fails, cleanup aborts entirely (fail-closed)."""
-        manager = mock_manager_cls.return_value
-        manager.list_sessions.return_value = [
-            ("old", _make_entry(_iso_days_ago(60))),
-        ]
-        mock_active_cls.return_value.list_sessions.side_effect = RuntimeError("corrupt")
-
+        monkeypatch.setattr("forge.session.cleanup.ActiveSessionStore.peek_sessions_strict", fail)
         result = clean_old_sessions(30)
         assert result.deleted == []
-        assert result.failed == []
-        assert result.aborted is True
         assert result.aborted_error == "corrupt"
-        assert result.should_exit_nonzero is True
-        assert result.failure_items() == [("active session registry", "corrupt")]
-        manager.delete_session.assert_not_called()
+        assert result.should_exit_nonzero
 
-    @pytest.mark.parametrize(
-        "state",
-        ["incompatible", "malformed", "unsupported_schema", "unreadable"],
-    )
-    @patch("forge.session.cleanup.ActiveSessionStore", autospec=True)
-    @patch("forge.session.cleanup.SessionManager", autospec=True)
-    def test_project_compatibility_skip_is_typed_and_other_roots_continue(
-        self,
-        mock_manager_cls,
-        mock_active_cls,
-        state,
-    ):
-        manager = mock_manager_cls.return_value
-        manager.list_sessions.return_value = [
-            (
-                "refused",
-                _make_entry(
-                    _iso_days_ago(60),
-                    forge_root="/refused",
-                    worktree_path="/refused",
-                ),
-            ),
-            (
-                "compatible",
-                _make_entry(
-                    _iso_days_ago(60),
-                    forge_root="/compatible",
-                    worktree_path="/compatible",
-                ),
-            ),
-        ]
-        mock_active_cls.return_value.list_sessions.return_value = []
-        refusal = ProjectCompatibilityError(
-            "/refused/.forge/project.toml",
-            f"{state} pin",
-            state=state,
-        )
+    def test_dependency_refusal_is_identical_before_and_after_apply(self, cleanup_project):
+        from forge.session import SessionStore
 
+        root, seed = cleanup_project
+        seed("parent")
+        seed("child", parent="parent")
+        preview = clean_old_sessions(30, apply=False)
+        result = clean_old_sessions(30)
+        assert preview.failed == result.failed
+        assert result.deleted == ["child"]
+        assert SessionStore(str(root), "parent").exists()
+
+    @pytest.mark.parametrize("state", ["incompatible", "malformed", "unsupported_schema", "unreadable"])
+    def test_project_compatibility_skip_is_typed_and_other_roots_continue(self, cleanup_project, state):
+        root, seed = cleanup_project
+        seed("refused")
+        seed("compatible", project=root.parent / "compatible")
+        refusal = ProjectCompatibilityError(str(root / ".forge/project.toml"), f"{state} pin", state=state)
         with patch(
             "forge.session.cleanup.enforce_project_compatibility",
             side_effect=[refusal, None],
         ):
             result = clean_old_sessions(30, force=True)
-
         assert result.deleted == ["compatible"]
-        assert result.failed == []
-        assert result.should_exit_nonzero is True
+        assert result.should_exit_nonzero
         assert result.skipped_project_compatibility == [
             ProjectCompatibilitySkip(
                 target="refused",
-                forge_root="/refused",
+                forge_root=str(root),
                 state=state,
                 reason=f"{state} pin",
                 recovery=refusal.recovery,
             )
         ]
-        assert result.skipped_project_compatibility[0].to_dict() == {
-            "target": "refused",
-            "root": "/refused",
-            "state": state,
-            "reason": f"{state} pin",
-            "recovery": refusal.recovery,
-        }
-        manager.delete_session.assert_called_once_with(
-            "compatible",
-            delete_transcripts=True,
-            delete_worktree=False,
-            delete_branch=False,
-            force=True,
-            forge_root="/compatible",
-        )
 
 
 class TestAutoCleanOldSessions:
@@ -268,7 +203,6 @@ class TestAutoCleanOldSessions:
         auto_clean_old_sessions()
         mock_clean.assert_called_once_with(
             older_than_days=90,
-            delete_transcripts=True,
             delete_worktree=False,
             delete_branch=False,
             force=True,

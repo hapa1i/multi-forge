@@ -176,23 +176,25 @@ def test_snapshot_cleanup_failure_names_retained_path(
     repo, forge_root, manager, transcript = transfer_fork_repo
     snapshot = child_path(Path(forge_root), "parent", "child")
     _write_turn(transcript, "CURRENT TRANSCRIPT VALUE")
-    real_unlink = Path.unlink
+    import os
 
-    def _fail_snapshot_unlink(path: Path, missing_ok: bool = False) -> None:
-        if path == snapshot:
+    real_unlink = os.unlink
+
+    def _fail_snapshot_unlink(path, *, dir_fd=None) -> None:
+        if path == snapshot.name and dir_fd is not None:
             raise PermissionError("snapshot busy")
-        real_unlink(path, missing_ok=missing_ok)
+        real_unlink(path, dir_fd=dir_fd)
 
-    monkeypatch.setattr(Path, "unlink", _fail_snapshot_unlink)
+    monkeypatch.setattr(os, "unlink", _fail_snapshot_unlink)
     with (
         patch("forge.core.ops.session_fork_execution._combine_prompt_files", side_effect=OSError("combine denied")),
-        pytest.raises(ForkExecutionError, match="Session cleanup succeeded") as raised,
+        pytest.raises(ForkExecutionError, match="Cleanup also failed") as raised,
     ):
         _execute_transfer(repo=repo, forge_root=forge_root, manager=manager)
 
     assert str(snapshot) in str(raised.value)
     assert raised.value.tip is not None
-    assert f"Remove '{snapshot}' before retrying" in raised.value.tip
+    assert str(snapshot) in raised.value.tip
     assert snapshot.is_file()
-    assert not SessionStore(forge_root, "child").exists()
-    assert manager.index_store.peek_session("child", forge_root=forge_root) is None
+    assert SessionStore(forge_root, "child").exists()
+    assert manager.index_store.peek_session("child", forge_root=forge_root) is not None

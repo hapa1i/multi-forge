@@ -60,6 +60,7 @@ def _run_freeze_mutate(state: SessionState, supervisor_lane: LaneRecord | None) 
     with patch("forge.policy.store.build_policy_state_update", return_value=_BUILD_RETURN):
         _persist_policy_state(
             store=store,
+            expected_instance_id="a" * 32,
             engine=engine,
             result=MagicMock(),
             effective=_effective_supervisor(),

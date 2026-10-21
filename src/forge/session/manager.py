@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import logging
 import os
-import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from contextlib import nullcontext
 from copy import deepcopy
 from dataclasses import dataclass
+from functools import wraps
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar, cast
 
 from forge.core.naming import generate_unique_name
 from forge.core.state import now_iso
@@ -27,13 +27,7 @@ from forge.install.project_compat import (
 )
 
 from .artifacts import (
-    ADOPT_ARTIFACT_REASON,
     latest_transcript_artifact_path,
-)
-from .claude.paths import (
-    find_agent_logs,
-    get_transcript_path,
-    resolve_claude_project_root,
 )
 from .config import (
     DEFAULT_PROXY_BASE_URL,
@@ -45,7 +39,6 @@ from .exceptions import (
     CannotForkCodexParentError,
     CannotForkIncognitoError,
     ContextBudgetExceededError,
-    DirtyWorktreeError,
     ForgeSessionError,
     ManifestCorruptedError,
     ManifestValidationError,
@@ -80,8 +73,6 @@ from .transfer import (
 from .validation import validate_name
 
 logger = logging.getLogger(__name__)
-
-_UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 
 @dataclass(frozen=True)
@@ -127,14 +118,40 @@ def fork_target_matches_replacement(
     return True
 
 
-def _append_unique_string(values: list[str], value: Any) -> None:
-    if isinstance(value, str) and value and value not in values:
-        values.append(value)
-
-
 def _delete_session_manifest(store: SessionStore) -> None:
     """Delete one session manifest while discarding the store's bool result."""
-    store.delete()
+    store.delete_locked()
+
+
+def _cleanup_unclaimed_worktree(
+    index: IndexStore, path: Path, *, branch: str | None, repository: Path | None
+) -> list[str]:
+    """Compensate creation only while no published or orphan session owns the checkout."""
+    from .cleanup_dependencies import discover_session_states
+    from .worktree import cleanup_worktree
+
+    checkout = path.resolve()
+
+    def cleanup(entries: list[tuple[str, SessionIndexEntry]]) -> list[str]:
+        for name, entry in entries:
+            if Path(entry.worktree_path).resolve().is_relative_to(checkout) or Path(
+                entry.root
+            ).resolve().is_relative_to(checkout):
+                return [f"Worktree {checkout} is now referenced by session {name}; inspect it before cleanup"]
+        for root, name, state in discover_session_states(index, str(checkout)):
+            location = Path(state.worktree.path if state.worktree else root).resolve()
+            if location.is_relative_to(checkout) or Path(root).resolve().is_relative_to(checkout):
+                return [f"Worktree {checkout} is now referenced by session {name}; inspect it before cleanup"]
+        result = cleanup_worktree(
+            worktree_path=checkout,
+            branch=branch,
+            delete_branch_flag=True,
+            force=True,
+            repo_root=repository,
+        )
+        return list(result.errors)
+
+    return index.run_session_entries_txn(cleanup)
 
 
 def _inherited_launch_intent(parent_state: SessionState) -> LaunchIntent | None:
@@ -214,11 +231,18 @@ def _publish_created_session(
     operation: str,
     authority_explicit: bool,
     require_uuid_unbound: bool = False,
-) -> None:
-    """Publish a session and its required first authority record atomically to launchers."""
+) -> str:
+    """Publish a session and return its instance identity for subsequent guarded work."""
     from .authority import authority_session_lock
 
     creation_lock = authority_session_lock(store.session_dir) if state.intent.authority is not None else nullcontext()
+    instance_id: str | None = None
+
+    def publish_manifest() -> None:
+        nonlocal instance_id
+        store.create_exclusive(state)
+        instance_id = store.review_identity()
+
     with creation_lock:
         index_store.create_session_txn(
             state,
@@ -227,225 +251,70 @@ def _publish_created_session(
             forge_root=forge_root,
             relative_path=relative_path,
             require_uuid_unbound=require_uuid_unbound,
-            write_manifest=lambda: store.create_exclusive(state),
+            write_manifest=publish_manifest,
         )
         try:
-            _append_created_authority_event(
-                state,
-                store,
-                operation=operation,
-                explicit=authority_explicit,
-                lock_held=True,
-            )
+            assert instance_id is not None
+            if not index_store.run_session_instance_txn(
+                state.name,
+                str(store.forge_root),
+                expected_instance_id=instance_id,
+                callback=lambda: _append_created_authority_event(
+                    state, store, operation=operation, explicit=authority_explicit, lock_held=True
+                ),
+            ):
+                raise ForgeSessionError(f"Session '{state.name}' changed before its creation record was written")
         except Exception:
+            assert instance_id is not None
             index_store.delete_session_txn(
                 state.name,
                 forge_root=str(store.forge_root),
-                expect_manifest_absent=False,
+                expected_instance_id=instance_id,
                 delete_manifest=lambda: _delete_session_manifest(store),
             )
             raise
+    return instance_id
 
 
-def _tracked_transcript_session_ids(state: SessionState) -> list[str]:
-    """Return distinct Claude session IDs referenced by transcript artifacts."""
-    return _tracked_transcript_session_ids_from_artifacts(state.confirmed.artifacts)
+_SessionOperation = TypeVar("_SessionOperation", bound=Callable[..., Any])
 
 
-def _tracked_transcript_session_ids_from_artifacts(artifacts: Any) -> list[str]:
-    """Return distinct Claude session IDs referenced by transcript artifact metadata."""
-    if not isinstance(artifacts, dict):
-        return []
+def _with_parent_lease(parent_field: str = "parent_name") -> Callable[[_SessionOperation], _SessionOperation]:
+    """Keep a derivation source alive through context preparation and child publication."""
 
-    transcripts = artifacts.get("transcripts")
-    if not isinstance(transcripts, list):
-        return []
+    def decorate(operation: _SessionOperation) -> _SessionOperation:
+        @wraps(operation)
+        def guarded(manager: SessionManager, *args: Any, **kwargs: Any) -> Any:
+            parent_name = kwargs.get(parent_field)
+            if parent_name is None and parent_field == "parent_name" and args:
+                parent_name = args[0]
+            if parent_name is None:
+                return operation(manager, *args, **kwargs)
+            root = kwargs.get("forge_root")
+            if parent_field == "parent_session":
+                from forge.core.ops.context import find_forge_root
 
-    session_ids: list[str] = []
-    for artifact in transcripts:
-        if not isinstance(artifact, dict):
-            continue
-        _append_unique_string(session_ids, artifact.get("session_id"))
-    return session_ids
+                worktree = kwargs.get("worktree_path")
+                search = Path(worktree) if worktree and not kwargs.get("create_worktree") else Path.cwd()
+                discovered = find_forge_root(search)
+                root = str(discovered) if discovered is not None else None
+            entry = manager.index_store.get_session(parent_name, forge_root=root)
+            parent_root = entry.forge_root or entry.worktree_path
+            instance_id = manager.index_store.migrate_session_identity(parent_name, parent_root)
+            from .workers import session_worker_lease
 
+            with session_worker_lease(
+                parent_root,
+                parent_name,
+                expected_instance_id=instance_id,
+                label="derive-session",
+                index_store=manager.index_store,
+            ):
+                return operation(manager, *args, **kwargs)
 
-def _tracked_derivation_transcript_session_ids(
-    derivation: object,
-) -> list[str]:
-    """Extract transcript UUIDs a derivation points at, when present.
+        return cast(_SessionOperation, guarded)
 
-    Yields UUIDs from ``parent_transcript`` (archived-artifact pointer),
-    ``relocated_parent_session_id`` (native-relocate's shared parent UUID), and
-    ``rewind_relocated_session_id`` (rewind's fresh truncated-copy UUID). The
-    native-relocate UUID is load-bearing for cleanup: a native-relocate fork
-    copies the parent UUID's transcript into the child's dir, so a co-resident
-    sibling that relocated the same parent UUID must mark that copy as shared --
-    otherwise deleting one alias destroys the other's baseline. (The parent's
-    own claude_session_id == the relocated UUID, so this also protects the
-    parent's original when the child/parent dirs collide.)
-
-    Accepts ``object``: force-delete and shared-transcript scans pass the raw JSON
-    value of ``confirmed.derivation`` from manifests that failed strict validation,
-    so a corrupted ``"derivation": "oops"`` must degrade to no tracked UUIDs rather
-    than raise (AttributeError) and abort cleanup.
-    """
-    if isinstance(derivation, Derivation):
-        parent_transcript = derivation.parent_transcript
-        relocated = derivation.relocated_parent_session_id
-        rewind_relocated = derivation.rewind_relocated_session_id
-    elif isinstance(derivation, dict):
-        parent_transcript = derivation.get("parent_transcript")
-        relocated = derivation.get("relocated_parent_session_id")
-        rewind_relocated = derivation.get("rewind_relocated_session_id")
-    else:
-        # None, or a malformed raw derivation from a corrupted manifest -> nothing tracked.
-        return []
-
-    session_ids: list[str] = []
-    if isinstance(parent_transcript, str):
-        # Conservative by design: derivation points at archived artifacts, but a
-        # live raw transcript with the same UUID is still treated as shared.
-        for match in _UUID_RE.findall(parent_transcript):
-            _append_unique_string(session_ids, match)
-    if isinstance(relocated, str):
-        _append_unique_string(session_ids, relocated)
-    if isinstance(rewind_relocated, str):
-        _append_unique_string(session_ids, rewind_relocated)
-    return session_ids
-
-
-def _referenced_transcript_session_ids(
-    state: SessionState | None,
-    raw_data: dict[str, Any] | None = None,
-    *,
-    index_session_id: str | None = None,
-) -> list[str]:
-    """Return all transcript UUIDs a session manifest or index entry references."""
-    session_ids: list[str] = []
-    _append_unique_string(session_ids, index_session_id)
-
-    if state is not None:
-        _append_unique_string(session_ids, state.confirmed.claude_session_id)
-        for session_id in _tracked_transcript_session_ids(state):
-            _append_unique_string(session_ids, session_id)
-        for session_id in _tracked_derivation_transcript_session_ids(state.confirmed.derivation):
-            _append_unique_string(session_ids, session_id)
-        return session_ids
-
-    if not isinstance(raw_data, dict):
-        return session_ids
-
-    confirmed = raw_data.get("confirmed")
-    if not isinstance(confirmed, dict):
-        return session_ids
-
-    _append_unique_string(session_ids, confirmed.get("claude_session_id"))
-    for session_id in _tracked_transcript_session_ids_from_artifacts(confirmed.get("artifacts")):
-        _append_unique_string(session_ids, session_id)
-    for session_id in _tracked_derivation_transcript_session_ids(confirmed.get("derivation")):
-        _append_unique_string(session_ids, session_id)
-    return session_ids
-
-
-def _add_unique_project_root(roots: list[str], value: Any) -> None:
-    if not isinstance(value, str) or not value:
-        return
-    normalized = str(Path(value).expanduser().resolve())
-    if normalized not in roots:
-        roots.append(normalized)
-
-
-def _raw_confirmed_value(raw_data: dict[str, Any] | None, key: str) -> Any:
-    if not isinstance(raw_data, dict):
-        return None
-    confirmed = raw_data.get("confirmed")
-    if not isinstance(confirmed, dict):
-        return None
-    return confirmed.get(key)
-
-
-def _adopted_source_uuids(state: SessionState | None, raw_data: dict[str, Any] | None) -> list[str]:
-    """Return the native conversation UUIDs this session adopted rather than created.
-
-    Adoption is the one origination path where the transcript under
-    ``~/.claude/projects`` predates the Forge session and outlives it: the user
-    created that conversation and may still resume it natively. Deleting a
-    session must not delete it, including via automatic retention cleanup
-    (``auto_clean_old_sessions`` passes ``delete_transcripts=True``).
-
-    Only the adopted source is protected, not every transcript the session went
-    on to reference -- provenance names it exactly, so the transcripts Forge
-    itself created for an adopted session are still cleaned up normally. Two
-    independent records identify it: ``confirmed.adoption.source_path``, whose
-    stem is the UUID, and the ``reason="adopt"`` transcript artifact.
-
-    Reads the raw manifest when the typed read failed, matching
-    ``_transcript_cleanup_project_root``: a session too corrupt to parse must
-    still not cost the user their conversation.
-    """
-    if state is not None:
-        adoption = state.confirmed.adoption
-        source_path = adoption.source_path if adoption is not None else None
-        artifacts: Any = state.confirmed.artifacts
-    else:
-        raw_adoption = _raw_confirmed_value(raw_data, "adoption")
-        if not isinstance(raw_adoption, dict):
-            return []
-        source_path = raw_adoption.get("source_path")
-        artifacts = _raw_confirmed_value(raw_data, "artifacts")
-
-    if state is not None and state.confirmed.adoption is None:
-        return []
-
-    sources: list[str] = []
-    if isinstance(source_path, str) and source_path:
-        _append_unique_string(sources, Path(source_path).stem)
-
-    if isinstance(artifacts, dict):
-        transcripts = artifacts.get("transcripts")
-        if isinstance(transcripts, list):
-            for artifact in transcripts:
-                if isinstance(artifact, dict) and artifact.get("reason") == ADOPT_ARTIFACT_REASON:
-                    _append_unique_string(sources, artifact.get("session_id"))
-
-    return sources
-
-
-def _transcript_cleanup_project_root(
-    state: SessionState | None,
-    fallback_root: str,
-    raw_data: dict[str, Any] | None = None,
-) -> str:
-    """Return the Claude project root whose raw transcript files should be cleaned."""
-    if state is not None:
-        if state.confirmed.claude_project_root:
-            return str(Path(state.confirmed.claude_project_root).expanduser().resolve())
-        if state.worktree or state.forge_root:
-            return str(Path(resolve_claude_project_root(state)).expanduser().resolve())
-
-    raw_claude_project_root = _raw_confirmed_value(raw_data, "claude_project_root")
-    if isinstance(raw_claude_project_root, str) and raw_claude_project_root:
-        return str(Path(raw_claude_project_root).expanduser().resolve())
-
-    return str(Path(fallback_root).expanduser().resolve())
-
-
-def _candidate_transcript_project_roots(
-    state: SessionState | None,
-    entry: SessionIndexEntry,
-    raw_data: dict[str, Any] | None = None,
-) -> list[str]:
-    """Return possible Claude project roots for a session, newest source first."""
-    roots: list[str] = []
-    if state is not None:
-        _add_unique_project_root(roots, state.confirmed.claude_project_root)
-        if state.worktree or state.forge_root:
-            _add_unique_project_root(roots, resolve_claude_project_root(state))
-    else:
-        _add_unique_project_root(roots, _raw_confirmed_value(raw_data, "claude_project_root"))
-    _add_unique_project_root(roots, entry.forge_root or entry.worktree_path)
-    _add_unique_project_root(roots, entry.worktree_path)
-    return roots
+    return decorate
 
 
 class SessionManager:
@@ -596,6 +465,7 @@ class SessionManager:
     # Lifecycle Operations
     # -------------------------------------------------------------------------
 
+    @_with_parent_lease("parent_session")
     def start_session(
         self,
         name: str,
@@ -621,6 +491,7 @@ class SessionManager:
         require_uuid_unbound: bool = False,
         authority: AuthorityIntent | None = None,
         authority_explicit: bool = False,
+        instance_sink: Callable[[str], None] | None = None,
     ) -> SessionState:
         """Create and register a new session.
 
@@ -660,6 +531,7 @@ class SessionManager:
                 cannot collide.
             authority: Optional authority to apply before the first launch.
             authority_explicit: Whether authority came from an external creation flag.
+            instance_sink: Receives the created instance identity for guarded follow-up writes.
 
         Returns:
             The created session state with candidate UUID.
@@ -703,22 +575,20 @@ class SessionManager:
         worktree_branch: str | None = branch
         main_repo_root: Path | None = None
 
-        def _rollback_worktree(*, resolved_worktree_path: str | None) -> None:
+        def _rollback_worktree(*, resolved_worktree_path: str | None) -> list[str]:
             if not created_worktree or resolved_worktree_path is None:
-                return
+                return []
 
             try:
-                from .worktree import cleanup_worktree
-
-                cleanup_worktree(
-                    worktree_path=Path(resolved_worktree_path),
+                return _cleanup_unclaimed_worktree(
+                    self.index_store,
+                    Path(resolved_worktree_path),
                     branch=worktree_branch,
-                    delete_branch_flag=True,
-                    force=True,
-                    repo_root=main_repo_root,
+                    repository=main_repo_root,
                 )
             except Exception as e:
                 logger.debug("Worktree rollback cleanup failed (non-critical): %s", e)
+                return [str(e)]
 
         if create_worktree:
             from .worktree import copy_runtime_config
@@ -885,7 +755,7 @@ class SessionManager:
             # concurrent creates of one name both reach here; the transaction
             # picks the winner and the loser gets SessionExistsError without
             # touching the winner's state.
-            _publish_created_session(
+            instance_id = _publish_created_session(
                 self.index_store,
                 state,
                 store,
@@ -898,15 +768,19 @@ class SessionManager:
                 authority_explicit=authority_explicit,
             )
 
+            if instance_sink is not None:
+                instance_sink(instance_id)
             return state
 
-        except Exception:
+        except Exception as error:
             # Forge state publication rolls itself back. Only an externally created
-            # worktree remains for this outer operation to unwind.
-            _rollback_worktree(resolved_worktree_path=worktree_path)
-
+            # and still-unclaimed worktree may be unwound.
+            cleanup_errors = _rollback_worktree(resolved_worktree_path=worktree_path)
+            if cleanup_errors:
+                raise ForgeSessionError(f"{error}. Cleanup refused: {'; '.join(cleanup_errors)}") from error
             raise
 
+    @_with_parent_lease()
     def resume_session(
         self,
         parent_name: str,
@@ -921,6 +795,7 @@ class SessionManager:
         memory_flag: bool | None = None,
         authority: AuthorityIntent | None = None,
         authority_explicit: bool = False,
+        instance_sink: Callable[[str], None] | None = None,
     ) -> tuple[SessionState, TransferResult]:
         """Create a new session derived from a parent with context assembly.
 
@@ -1054,6 +929,7 @@ class SessionManager:
                 project_root=project_root,
                 name_was_auto=name_was_auto,
                 authority_explicit=authority_explicit,
+                instance_sink=instance_sink,
             )
             return child_state, transfer_result
 
@@ -1127,6 +1003,7 @@ class SessionManager:
             project_root=project_root,
             name_was_auto=name_was_auto,
             authority_explicit=authority_explicit,
+            instance_sink=instance_sink,
         )
         if final_child_name != child_name:
             transfer_result.context_file = child_path(parent_artifact_root, parent_name, final_child_name)
@@ -1189,6 +1066,7 @@ class SessionManager:
         project_root: Path,
         name_was_auto: bool,
         authority_explicit: bool,
+        instance_sink: Callable[[str], None] | None = None,
     ) -> str:
         """Write child session to disk and index (shared by native and transfer).
 
@@ -1209,7 +1087,7 @@ class SessionManager:
                 # loser it never owned the name. Both claims can still report the collision
                 # -- the index row check and create_exclusive -- and both surface as
                 # SessionExistsError, so both feed the one retry below.
-                _publish_created_session(
+                instance_id = _publish_created_session(
                     self.index_store,
                     child_state,
                     child_store,
@@ -1258,6 +1136,8 @@ class SessionManager:
                     derivation.context_file = child_path_rel(parent_name, child_name)
                 continue
 
+            if instance_sink is not None:
+                instance_sink(instance_id)
             break
 
         return child_name
@@ -1267,7 +1147,7 @@ class SessionManager:
         *,
         fork_name: str,
         target_forge_root: str,
-    ) -> tuple[SessionStore, SessionIndexEntry | None, SessionState | None]:
+    ) -> tuple[SessionStore, SessionIndexEntry | None, SessionState | None, str | None]:
         """Return the existing manifest/index state for a fork target.
 
         Uses the index self-healing path so stale index-only entries do not
@@ -1281,13 +1161,21 @@ class SessionManager:
             target_entry = None
 
         target_state: SessionState | None = None
+        target_instance_id: str | None = None
         if target_store.exists():
+            target_instance_id = target_store.review_identity()
             try:
                 target_state = target_store.read()
             except (ManifestCorruptedError, ManifestValidationError):
                 target_state = None
+            if target_store.review_identity() != target_instance_id or (
+                target_entry is not None
+                and target_entry.instance_id is not None
+                and target_entry.instance_id != target_instance_id
+            ):
+                raise ForgeSessionError(f"Session '{fork_name}' changed before replacement; retained its new owner")
 
-        return target_store, target_entry, target_state
+        return target_store, target_entry, target_state, target_instance_id
 
     def _can_force_replace_fork_target(
         self,
@@ -1329,6 +1217,7 @@ class SessionManager:
 
         return True
 
+    @_with_parent_lease()
     def fork_session(
         self,
         parent_name: str,
@@ -1346,6 +1235,7 @@ class SessionManager:
         warnings_sink: list[str] | None = None,
         authority: AuthorityIntent | None = None,
         authority_explicit: bool = False,
+        instance_sink: Callable[[str], None] | None = None,
     ) -> tuple[SessionState, SessionState]:
         """Fork an existing session.
 
@@ -1421,33 +1311,32 @@ class SessionManager:
         target_store: SessionStore | None = None
         target_entry: SessionIndexEntry | None = None
         target_state: SessionState | None = None
+        target_instance_id: str | None = None
         replace_stale_target_state = False
         created_worktree = False
         rollback_worktree_path: str | None = None
         rollback_worktree_branch: str | None = None
         rollback_repo_root: Path | None = None
         replacement_start_point: str | None = None
+        removed_target_root: str | None = None
 
         def _rollback_created_worktree() -> list[str]:
             if not created_worktree or rollback_worktree_path is None:
                 return []
             try:
-                from .worktree import cleanup_worktree
-
-                cleanup_result = cleanup_worktree(
-                    worktree_path=Path(rollback_worktree_path),
+                cleanup_errors = _cleanup_unclaimed_worktree(
+                    self.index_store,
+                    Path(rollback_worktree_path),
                     branch=rollback_worktree_branch,
-                    delete_branch_flag=True,
-                    force=True,
-                    repo_root=rollback_repo_root,
+                    repository=rollback_repo_root,
                 )
-                if cleanup_result.errors:
+                if cleanup_errors:
                     logger.warning(
                         "Fork rollback cleanup incomplete for '%s': %s",
                         rollback_worktree_path,
-                        "; ".join(cleanup_result.errors),
+                        "; ".join(cleanup_errors),
                     )
-                return list(cleanup_result.errors)
+                return cleanup_errors
             except Exception as e:
                 logger.warning(
                     "Fork rollback cleanup failed for '%s': %s",
@@ -1456,381 +1345,335 @@ class SessionManager:
                 )
                 return [str(e)]
 
-        if into_path is not None:
-            # Fork into an existing worktree (--into): land at the equivalent
-            # forge_root position in the target checkout.
-            from .worktree import get_main_repo_root
-
-            target_checkout_root = into_path  # Already normalized to checkout root by CLI
-            target_forge_root = str(Path(target_checkout_root) / parent_relative)
-
-            # Validate: target must have Forge enabled at that position
-            if not (Path(target_forge_root) / ".forge").is_dir():
-                raise ForgeSessionError(
-                    f"No Forge project at {target_forge_root}. "
-                    f"Run 'forge extension enable' in {target_forge_root} first, "
-                    "or use --worktree to create a new checkout with auto-enable."
-                )
-
-            enforce_project_compatibility(target_forge_root)
-
-            fork_worktree_path = target_checkout_root
-            fork_branch: str | None = branch  # CLI resolves branch from git
-            project_root = str(get_main_repo_root(Path(into_path)))
-            is_into = True
-
-            assert target_forge_root is not None
-            target_store, target_entry, target_state = self._load_existing_fork_target(
-                fork_name=fork_name,
-                target_forge_root=target_forge_root,
-            )
-            target_conflict_exists = target_store.exists() or target_entry is not None
-            if target_conflict_exists:
-                if not force:
-                    raise SessionExistsError(fork_name)
-
-                replace_stale_target_state = self._can_force_replace_fork_target(
-                    fork_name=fork_name,
-                    parent_name=parent_name,
-                    target_forge_root=target_forge_root,
-                    existing_state=target_state,
-                    expected_worktree_path=fork_worktree_path,
-                    expected_branch=fork_branch or fork_name,
-                    expected_is_worktree=True,
-                    expected_owns_worktree=False,
-                )
-                if not replace_stale_target_state:
-                    raise SessionExistsError(fork_name)
-        elif create_worktree:
-            from .worktree import (
-                copy_runtime_config,
-            )
-            from .worktree import create_worktree as git_create_worktree
-            from .worktree import (
-                get_main_repo_root,
-                read_file_at_revision,
-                resolve_commit,
-                resolve_worktree_path,
-                sanitize_branch_name,
-            )
-
-            repo_root = get_main_repo_root(parent_worktree_path)
-            target_worktree_path = resolve_worktree_path(repo_root, fork_name)
-            target_forge_root = str(target_worktree_path / parent_relative)
-            target_branch = branch or sanitize_branch_name(fork_name)
-            target_store, target_entry, target_state = self._load_existing_fork_target(
-                fork_name=fork_name,
-                target_forge_root=target_forge_root,
-            )
-            target_conflict_exists = target_store.exists() or target_entry is not None
-            if target_conflict_exists:
-                if not force:
-                    raise SessionExistsError(fork_name)
-
-                replace_stale_target_state = self._can_force_replace_fork_target(
-                    fork_name=fork_name,
-                    parent_name=parent_name,
-                    target_forge_root=target_forge_root,
-                    existing_state=target_state,
-                    expected_worktree_path=str(target_worktree_path),
-                    expected_branch=target_branch,
-                    expected_is_worktree=True,
-                    expected_owns_worktree=True,
-                )
-                if not replace_stale_target_state:
-                    raise SessionExistsError(fork_name)
-
-                # Force replacement destroys the existing checkout and its
-                # auto-derived branch. Refuse against both that checkout's pin
-                # and the exact HEAD commit that will seed its replacement
-                # before authorizing the destructive Git step.
-                enforce_project_compatibility(target_forge_root)
-                replacement_start_point = resolve_commit(repo_root)
-                prospective_pin = read_file_at_revision(
-                    Path(parent_relative) / ".forge" / "project.toml",
-                    revision=replacement_start_point,
-                    cwd=repo_root,
-                )
-                if prospective_pin is not None:
-                    enforce_project_compatibility_toml(
-                        prospective_pin,
-                        path=Path(target_forge_root) / ".forge" / "project.toml",
-                    )
-            wt_result = git_create_worktree(
-                session_name=fork_name,
-                branch=branch,
-                cwd=repo_root,
-                force=force,
-                replace_owned_stale_state=replace_stale_target_state,
-                start_point=replacement_start_point,
-            )
-            created_worktree = True
-            rollback_worktree_path = wt_result.worktree_path
-            rollback_worktree_branch = wt_result.branch
-            rollback_repo_root = repo_root
-            target_forge_root = str(Path(wt_result.worktree_path) / parent_relative)
-            try:
-                enforce_project_compatibility(target_forge_root)
-            except ProjectCompatibilityError as compatibility_error:
-                rollback_errors = _rollback_created_worktree()
-                if rollback_errors:
-                    raise ForgeSessionError(
-                        f"{compatibility_error} Rollback incomplete: {'; '.join(rollback_errors)}"
-                    ) from compatibility_error
-                raise
-            copy_runtime_config(repo_root, Path(wt_result.worktree_path))
-
-            fork_worktree_path = wt_result.worktree_path
-            fork_branch = wt_result.branch
-            project_root = str(repo_root)
-            is_into = False
-        else:
-            target_forge_root = parent_forge_root
-            fork_worktree_path = str(parent_worktree_path)
-            fork_branch = parent.worktree.branch if parent.worktree else None
-            # Workspace anchor: git-common-dir root (groups sibling worktrees),
-            # not the per-worktree root find_project_root() would return.
-            project_root = self.resolve_project_root(fork_worktree_path)
-            is_into = False
-            assert target_forge_root is not None
-            target_store, target_entry, target_state = self._load_existing_fork_target(
-                fork_name=fork_name,
-                target_forge_root=target_forge_root,
-            )
-            target_conflict_exists = target_store.exists() or target_entry is not None
-            if target_conflict_exists:
-                if not force:
-                    raise SessionExistsError(fork_name)
-
-                replace_stale_target_state = self._can_force_replace_fork_target(
-                    fork_name=fork_name,
-                    parent_name=parent_name,
-                    target_forge_root=target_forge_root,
-                    existing_state=target_state,
-                    expected_worktree_path=fork_worktree_path,
-                    expected_branch=fork_branch or fork_name,
-                    expected_is_worktree=False,
-                    expected_owns_worktree=False,
-                )
-                if not replace_stale_target_state:
-                    raise SessionExistsError(fork_name)
-
-        if direct:
-            fork_proxy_template = None
-            fork_proxy_base_url = None
-        else:
-            fork_proxy_template = parent.intent.proxy.template if parent.intent.proxy else None
-            fork_proxy_base_url = parent.intent.proxy.base_url if parent.intent.proxy else None
-
-        fork_state = create_session_state(
-            name=fork_name,
-            proxy_template=fork_proxy_template,
-            proxy_base_url=fork_proxy_base_url,
-            parent_session=parent_name,
-            is_fork=True,
-            is_incognito=is_incognito,
-            worktree_path=fork_worktree_path,
-            worktree_branch=fork_branch,
-        )
-
-        _inherit_intent_fields(fork_state, parent)
-        if authority_explicit:
-            fork_state.intent.authority = deepcopy(authority)
-        # Direct mode: force host launch (sidecar requires a proxy)
-        if direct and fork_state.intent.launch and fork_state.intent.launch.mode != LAUNCH_MODE_HOST:
-            fork_state.intent.launch.mode = LAUNCH_MODE_HOST
-            fork_state.intent.launch.sidecar = None
-
-        if (create_worktree or is_into) and fork_state.worktree:
-            fork_state.worktree.is_worktree = True
-        if is_into and fork_state.worktree:
-            fork_state.worktree.owns_worktree = False
-
-        # Compute identity fields for the fork target.
-        fork_forge_root: str | None
-        fork_relative_path: str | None
-        if is_into:
-            assert target_forge_root is not None
-            fork_forge_root = target_forge_root
-            fork_checkout_root = fork_worktree_path
-            fork_relative_path = parent_entry.relative_path or "."
-        elif create_worktree:
-            # Fresh worktree has no .forge/; propagate parent's relative position.
-            parent_relative = parent_entry.relative_path or "."
-            fork_forge_root = str(Path(fork_worktree_path) / parent_relative)
-            fork_checkout_root = fork_worktree_path
-            fork_relative_path = parent_relative
-        else:
-            # Same-worktree fork: auto-detect
-            from forge.core.ops.context import find_forge_root
-
-            fork_forge_root_path = find_forge_root(Path(fork_worktree_path))
-            fork_forge_root = str(fork_forge_root_path) if fork_forge_root_path else None
-            fork_checkout_root = fork_worktree_path
-            fork_relative_path = None
-            if fork_forge_root and fork_checkout_root:
-                try:
-                    fork_relative_path = str(Path(fork_forge_root).relative_to(fork_checkout_root))
-                except ValueError:
-                    fork_relative_path = "."
-
-        fork_state.forge_root = fork_forge_root
-
-        from .memory_inheritance import apply_memory_inheritance
-
-        inh_warnings = apply_memory_inheritance(
-            parent_state=parent,
-            child_state=fork_state,
-            memory_flag=memory_flag,
-        )
-
-        # Opt-in native-relocate (worktree/--into only) overrides the transfer default. Cross-CWD
-        # forks default to transfer; same-directory forks default to native UNLESS the caller asks
-        # for transfer (resume_mode == "transfer", auto-switched or explicit), which opts them into
-        # a same-directory transfer fork. Recording the baseline here keeps derivation correct even
-        # if command core's best-effort _persist_fork_transfer_derivation refinement later fails.
-        if resume_mode == "native-relocate" and (create_worktree or is_into):
-            fork_resume_mode = "native-relocate"
-        elif create_worktree or is_into or resume_mode == "transfer":
-            fork_resume_mode = "transfer"
-        else:
-            fork_resume_mode = "native"
-        # For transfer-mode forks the per-child file is created lazily at launch
-        # (see _generate_parent_transfer_context). We pre-record the reference
-        # here so GC knows the fork's child file belongs to this session, even
-        # if launch happens later.
-        fork_context_file_rel = child_path_rel(parent_name, fork_name) if fork_resume_mode == "transfer" else None
-        # native-relocate copies the parent transcript into the child's encoded dir; record the
-        # parent UUID so cleanup can remove that copy (dir-scoped to the child, never the parent's).
-        fork_relocated_parent = parent.confirmed.claude_session_id if fork_resume_mode == "native-relocate" else None
-        fork_state.confirmed.derivation = Derivation(
-            parent_session=parent_name,
-            parent_transcript=parent_transcript_artifact_path,
-            inherited_proxy=fork_proxy_template,
-            resume_mode=fork_resume_mode,
-            strategy=None,
-            depth=1,
-            resumed_at=now_iso(),
-            lineage=[parent_name],
-            context_file=fork_context_file_rel,
-            relocated_parent_session_id=fork_relocated_parent,
-            parent_forge_root=parent_entry.forge_root or parent_entry.worktree_path,
-            parent_project_root=parent_entry.project_root,
-        )
-
-        fork_store = SessionStore(fork_forge_root or fork_worktree_path, fork_name)
-        restore_target_state = replace_stale_target_state and not create_worktree
-        replaced_target_state = False
-
-        def _restore_previous_target_state() -> None:
-            if not restore_target_state or not replaced_target_state or target_store is None or target_state is None:
-                return
-
-            # Bound before the closure below: narrowing from the guard above does
-            # not reach into a lambda over enclosing-scope names.
-            restore_store, restore_state = target_store, target_state
-
-            # create_exclusive, not write: a manifest sitting at this path is not
-            # the one this fork deleted -- it belongs to whoever claimed the name
-            # in the window -- and putting the stale target back over it is the bug
-            # test_bug_fork_restore_clobbers_winner guards. The old code spelled
-            # this as an unlocked `target_store.exists()` probe guarding a `write`,
-            # which meant the write never actually overwrote anything;
-            # create_exclusive makes that same decision under the manifest lock.
-            def _restore_manifest() -> None:
-                restore_store.create_exclusive(restore_state)
-
-            def _log_declined() -> None:
-                logger.info(
-                    "Not restoring the previous fork target '%s': another session owns that name now",
-                    fork_name,
-                )
-
-            if target_entry is None:
-                # The replaced target was itself a manifest with no index row. Put
-                # it back as it was: a failed fork must not double as a cleanup of
-                # state the user never asked us to touch.
-                try:
-                    _restore_manifest()
-                except SessionExistsError:
-                    _log_declined()
-                except Exception as e:
-                    logger.warning("Failed to restore fork target manifest '%s': %s", fork_name, e)
-                return
-
-            # Restore through the transaction, so its uniqueness check is what
-            # decides whether another creator won the name while this fork held it.
-            # Before the two writes shared a lock this was a `wrote_manifest` token;
-            # that no longer distinguishes "someone else owns the name" from "the
-            # index write failed", because the manifest is now written second.
-            try:
-                self.index_store.create_session_txn(
-                    restore_state,
-                    target_entry.project_root,
-                    checkout_root=target_entry.checkout_root,
-                    forge_root=target_entry.forge_root,
-                    relative_path=target_entry.relative_path,
-                    write_manifest=_restore_manifest,
-                )
-            except SessionExistsError:
-                _log_declined()
-            except Exception as e:
-                logger.warning("Failed to restore fork target '%s': %s", fork_name, e)
-
         try:
-            # Stale session cleanup: only clear the actual target namespace after
-            # all validation succeeds. Git worktree replacement (if any) has
-            # already happened, so this only swaps the session metadata layer.
+            if into_path is not None:
+                # Fork into an existing worktree (--into): land at the equivalent
+                # forge_root position in the target checkout.
+                from .worktree import get_main_repo_root
+
+                target_checkout_root = into_path  # Already normalized to checkout root by CLI
+                target_forge_root = str(Path(target_checkout_root) / parent_relative)
+
+                # Validate: target must have Forge enabled at that position
+                if not (Path(target_forge_root) / ".forge").is_dir():
+                    raise ForgeSessionError(
+                        f"No Forge project at {target_forge_root}. "
+                        f"Run 'forge extension enable' in {target_forge_root} first, "
+                        "or use --worktree to create a new checkout with auto-enable."
+                    )
+
+                enforce_project_compatibility(target_forge_root)
+
+                fork_worktree_path = target_checkout_root
+                fork_branch: str | None = branch  # CLI resolves branch from git
+                project_root = str(get_main_repo_root(Path(into_path)))
+                is_into = True
+
+                assert target_forge_root is not None
+                target_store, target_entry, target_state, target_instance_id = self._load_existing_fork_target(
+                    fork_name=fork_name,
+                    target_forge_root=target_forge_root,
+                )
+                target_conflict_exists = target_store.exists() or target_entry is not None
+                if target_conflict_exists:
+                    if not force:
+                        raise SessionExistsError(fork_name)
+
+                    replace_stale_target_state = self._can_force_replace_fork_target(
+                        fork_name=fork_name,
+                        parent_name=parent_name,
+                        target_forge_root=target_forge_root,
+                        existing_state=target_state,
+                        expected_worktree_path=fork_worktree_path,
+                        expected_branch=fork_branch or fork_name,
+                        expected_is_worktree=True,
+                        expected_owns_worktree=False,
+                    )
+                    if not replace_stale_target_state:
+                        raise SessionExistsError(fork_name)
+            elif create_worktree:
+                from .worktree import (
+                    copy_runtime_config,
+                )
+                from .worktree import create_worktree as git_create_worktree
+                from .worktree import (
+                    get_main_repo_root,
+                    preflight_create_worktree,
+                    read_file_at_revision,
+                    resolve_commit,
+                    resolve_worktree_path,
+                    sanitize_branch_name,
+                )
+
+                repo_root = get_main_repo_root(parent_worktree_path)
+                target_worktree_path = resolve_worktree_path(repo_root, fork_name)
+                target_forge_root = str(target_worktree_path / parent_relative)
+                target_branch = branch or sanitize_branch_name(fork_name)
+                target_store, target_entry, target_state, target_instance_id = self._load_existing_fork_target(
+                    fork_name=fork_name,
+                    target_forge_root=target_forge_root,
+                )
+                target_conflict_exists = target_store.exists() or target_entry is not None
+                if target_conflict_exists:
+                    if not force:
+                        raise SessionExistsError(fork_name)
+
+                    replace_stale_target_state = self._can_force_replace_fork_target(
+                        fork_name=fork_name,
+                        parent_name=parent_name,
+                        target_forge_root=target_forge_root,
+                        existing_state=target_state,
+                        expected_worktree_path=str(target_worktree_path),
+                        expected_branch=target_branch,
+                        expected_is_worktree=True,
+                        expected_owns_worktree=True,
+                    )
+                    if not replace_stale_target_state:
+                        raise SessionExistsError(fork_name)
+
+                    # Force replacement destroys the existing checkout and its
+                    # auto-derived branch. Refuse against both that checkout's pin
+                    # and the exact HEAD commit that will seed its replacement
+                    # before authorizing the destructive Git step.
+                    enforce_project_compatibility(target_forge_root)
+                    replacement_start_point = resolve_commit(repo_root)
+                    prospective_pin = read_file_at_revision(
+                        Path(parent_relative) / ".forge" / "project.toml",
+                        revision=replacement_start_point,
+                        cwd=repo_root,
+                    )
+                    if prospective_pin is not None:
+                        enforce_project_compatibility_toml(
+                            prospective_pin,
+                            path=Path(target_forge_root) / ".forge" / "project.toml",
+                        )
+                    from .deletion import apply_session_deletion, plan_session_deletion
+
+                    replacement = plan_session_deletion(
+                        self.index_store,
+                        fork_name,
+                        forge_root=target_forge_root,
+                        delete_worktree=True,
+                        delete_branch=True,
+                        force=True,
+                    )
+                    if replacement.state != target_state or replacement.instance_id != target_instance_id:
+                        raise ForgeSessionError(
+                            f"Session '{fork_name}' changed before replacement; retained its new owner"
+                        )
+                    if replacement.worktree_path != str(target_worktree_path):
+                        raise ForgeSessionError(
+                            f"Cannot replace fork '{fork_name}': its worktree is shared or no longer owned"
+                        )
+                    preflight_create_worktree(
+                        fork_name,
+                        branch,
+                        repo_root,
+                        force=True,
+                        replace_owned_stale_state=True,
+                    )
+                    # Delete while the original manifest can still authorize the
+                    # content and checkout. A later creator must face a fresh,
+                    # non-forcing Git create instead of another destructive retry.
+                    apply_session_deletion(self.index_store, replacement)
+                    removed_target_root = target_forge_root
+                    replace_stale_target_state = False
+                wt_result = git_create_worktree(
+                    session_name=fork_name,
+                    branch=branch,
+                    cwd=repo_root,
+                    start_point=replacement_start_point,
+                )
+                created_worktree = True
+                rollback_worktree_path = wt_result.worktree_path
+                rollback_worktree_branch = wt_result.branch
+                rollback_repo_root = repo_root
+                target_forge_root = str(Path(wt_result.worktree_path) / parent_relative)
+                enforce_project_compatibility(target_forge_root)
+                copy_runtime_config(repo_root, Path(wt_result.worktree_path))
+
+                fork_worktree_path = wt_result.worktree_path
+                fork_branch = wt_result.branch
+                project_root = str(repo_root)
+                is_into = False
+            else:
+                target_forge_root = parent_forge_root
+                fork_worktree_path = str(parent_worktree_path)
+                fork_branch = parent.worktree.branch if parent.worktree else None
+                # Workspace anchor: git-common-dir root (groups sibling worktrees),
+                # not the per-worktree root find_project_root() would return.
+                project_root = self.resolve_project_root(fork_worktree_path)
+                is_into = False
+                assert target_forge_root is not None
+                target_store, target_entry, target_state, target_instance_id = self._load_existing_fork_target(
+                    fork_name=fork_name,
+                    target_forge_root=target_forge_root,
+                )
+                target_conflict_exists = target_store.exists() or target_entry is not None
+                if target_conflict_exists:
+                    if not force:
+                        raise SessionExistsError(fork_name)
+
+                    replace_stale_target_state = self._can_force_replace_fork_target(
+                        fork_name=fork_name,
+                        parent_name=parent_name,
+                        target_forge_root=target_forge_root,
+                        existing_state=target_state,
+                        expected_worktree_path=fork_worktree_path,
+                        expected_branch=fork_branch or fork_name,
+                        expected_is_worktree=False,
+                        expected_owns_worktree=False,
+                    )
+                    if not replace_stale_target_state:
+                        raise SessionExistsError(fork_name)
+
+            if direct:
+                fork_proxy_template = None
+                fork_proxy_base_url = None
+            else:
+                fork_proxy_template = parent.intent.proxy.template if parent.intent.proxy else None
+                fork_proxy_base_url = parent.intent.proxy.base_url if parent.intent.proxy else None
+
+            fork_state = create_session_state(
+                name=fork_name,
+                proxy_template=fork_proxy_template,
+                proxy_base_url=fork_proxy_base_url,
+                parent_session=parent_name,
+                is_fork=True,
+                is_incognito=is_incognito,
+                worktree_path=fork_worktree_path,
+                worktree_branch=fork_branch,
+            )
+
+            _inherit_intent_fields(fork_state, parent)
+            if authority_explicit:
+                fork_state.intent.authority = deepcopy(authority)
+            # Direct mode: force host launch (sidecar requires a proxy)
+            if direct and fork_state.intent.launch and fork_state.intent.launch.mode != LAUNCH_MODE_HOST:
+                fork_state.intent.launch.mode = LAUNCH_MODE_HOST
+                fork_state.intent.launch.sidecar = None
+
+            if (create_worktree or is_into) and fork_state.worktree:
+                fork_state.worktree.is_worktree = True
+            if is_into and fork_state.worktree:
+                fork_state.worktree.owns_worktree = False
+
+            # Compute identity fields for the fork target.
+            fork_forge_root: str | None
+            fork_relative_path: str | None
+            if is_into:
+                assert target_forge_root is not None
+                fork_forge_root = target_forge_root
+                fork_checkout_root = fork_worktree_path
+                fork_relative_path = parent_entry.relative_path or "."
+            elif create_worktree:
+                # Fresh worktree has no .forge/; propagate parent's relative position.
+                parent_relative = parent_entry.relative_path or "."
+                fork_forge_root = str(Path(fork_worktree_path) / parent_relative)
+                fork_checkout_root = fork_worktree_path
+                fork_relative_path = parent_relative
+            else:
+                # Same-worktree fork: auto-detect
+                from forge.core.ops.context import find_forge_root
+
+                fork_forge_root_path = find_forge_root(Path(fork_worktree_path))
+                fork_forge_root = str(fork_forge_root_path) if fork_forge_root_path else None
+                fork_checkout_root = fork_worktree_path
+                fork_relative_path = None
+                if fork_forge_root and fork_checkout_root:
+                    try:
+                        fork_relative_path = str(Path(fork_forge_root).relative_to(fork_checkout_root))
+                    except ValueError:
+                        fork_relative_path = "."
+
+            fork_state.forge_root = fork_forge_root
+
+            from .memory_inheritance import apply_memory_inheritance
+
+            inh_warnings = apply_memory_inheritance(
+                parent_state=parent,
+                child_state=fork_state,
+                memory_flag=memory_flag,
+            )
+
+            # Opt-in native-relocate (worktree/--into only) overrides the transfer default. Cross-CWD
+            # forks default to transfer; same-directory forks default to native UNLESS the caller asks
+            # for transfer (resume_mode == "transfer", auto-switched or explicit), which opts them into
+            # a same-directory transfer fork. Recording the baseline here keeps derivation correct even
+            # if command core's best-effort _persist_fork_transfer_derivation refinement later fails.
+            if resume_mode == "native-relocate" and (create_worktree or is_into):
+                fork_resume_mode = "native-relocate"
+            elif create_worktree or is_into or resume_mode == "transfer":
+                fork_resume_mode = "transfer"
+            else:
+                fork_resume_mode = "native"
+            # For transfer-mode forks the per-child file is created lazily at launch
+            # (see _generate_parent_transfer_context). We pre-record the reference
+            # here so GC knows the fork's child file belongs to this session, even
+            # if launch happens later.
+            fork_context_file_rel = child_path_rel(parent_name, fork_name) if fork_resume_mode == "transfer" else None
+            # native-relocate copies the parent transcript into the child's encoded dir; record the
+            # parent UUID so cleanup can remove that copy (dir-scoped to the child, never the parent's).
+            fork_relocated_parent = (
+                parent.confirmed.claude_session_id if fork_resume_mode == "native-relocate" else None
+            )
+            fork_state.confirmed.derivation = Derivation(
+                parent_session=parent_name,
+                parent_transcript=parent_transcript_artifact_path,
+                inherited_proxy=fork_proxy_template,
+                resume_mode=fork_resume_mode,
+                strategy=None,
+                depth=1,
+                resumed_at=now_iso(),
+                lineage=[parent_name],
+                context_file=fork_context_file_rel,
+                relocated_parent_session_id=fork_relocated_parent,
+                parent_forge_root=parent_entry.forge_root or parent_entry.worktree_path,
+                parent_project_root=parent_entry.project_root,
+            )
+
+            fork_store = SessionStore(fork_forge_root or fork_worktree_path, fork_name)
+            # Same-checkout forks retain the checkout while replacing their
+            # stale state. Worktree forks already completed shared cleanup.
             if replace_stale_target_state:
                 effective_fork_root = fork_forge_root or fork_worktree_path
                 try:
-                    self.delete_session(
-                        fork_name,
-                        delete_worktree=False,
-                        delete_branch=False,
-                        force=True,
-                        forge_root=effective_fork_root,
-                    )
+                    if target_instance_id is not None:
+                        self.delete_session(
+                            fork_name,
+                            delete_worktree=False,
+                            delete_branch=False,
+                            force=True,
+                            forge_root=effective_fork_root,
+                            expected_instance_id=target_instance_id,
+                        )
+                    else:
+                        from .deletion import (
+                            apply_session_deletion,
+                            plan_session_deletion,
+                        )
+
+                        replacement = plan_session_deletion(
+                            self.index_store,
+                            fork_name,
+                            forge_root=effective_fork_root,
+                            delete_worktree=False,
+                            force=True,
+                        )
+                        if replacement.state != target_state or replacement.instance_id != target_instance_id:
+                            raise ForgeSessionError(
+                                f"Session '{fork_name}' changed before replacement; retained its new owner"
+                            )
+                        apply_session_deletion(self.index_store, replacement)
                 except SessionNotFoundError:
                     pass
+                else:
+                    removed_target_root = effective_fork_root
 
-                # delete_session has already removed the stale target's row and
-                # manifest, so anything still here is either a pre-existing orphan
-                # (no row) or a session that claimed the freed name in the
-                # meantime. Deleting unconditionally destroys the latter, which is
-                # the F9 failure via fork: expect_manifest_absent=True makes a
-                # rowed manifest foreign, and the delete happens under the index
-                # lock rather than after an exists() probe.
-                stale_store = SessionStore(effective_fork_root, fork_name)
-
-                def _delete_stale_manifest() -> None:
-                    stale_store.delete()
-
-                reclaimed = not self.index_store.delete_session_txn(
-                    fork_name,
-                    forge_root=effective_fork_root,
-                    expect_manifest_absent=True,
-                    delete_manifest=_delete_stale_manifest,
-                )
-                if reclaimed:
-                    logger.info(
-                        "Not replacing fork target '%s': another session claimed the name during cleanup",
-                        fork_name,
-                    )
+                # Publication below is exclusive. A replacement that claimed the
+                # freed name must survive; do not perform a second name-only delete.
+                if SessionStore(effective_fork_root, fork_name).exists():
                     raise SessionExistsError(fork_name)
-
-                try:
-                    from .active import ActiveSessionStore
-
-                    ActiveSessionStore().clear_session(fork_name, forge_root=effective_fork_root)
-                except Exception as e:
-                    logger.debug(
-                        "Failed to clear active session '%s' (non-critical): %s",
-                        fork_name,
-                        e,
-                    )
-
-                replaced_target_state = True
 
             if warnings_sink is not None:
                 warnings_sink.extend(inh_warnings)
@@ -1839,7 +1682,7 @@ class SessionManager:
             # deleted above, and a fresh fork_name has none. create_exclusive keeps
             # that true under concurrency, and the transaction's row check makes
             # the loser fail before it can touch the winner's manifest.
-            _publish_created_session(
+            instance_id = _publish_created_session(
                 self.index_store,
                 fork_state,
                 fork_store,
@@ -1851,19 +1694,30 @@ class SessionManager:
                 authority_explicit=authority_explicit,
             )
 
+            if instance_sink is not None:
+                instance_sink(instance_id)
             return parent, fork_state
 
-        except Exception:
-            # No index or manifest cleanup: the transaction removes its own row and
-            # the manifest write is its last durable action, so a failure here means
-            # neither survived.
-            if create_worktree:
-                _rollback_created_worktree()
-            else:
-                _restore_previous_target_state()
-
+        except Exception as error:
+            # Only compensate this invocation's new worktree, and only while no
+            # newer session owns it. Completed deletion has no content backup.
+            cleanup_errors = _rollback_created_worktree() if create_worktree else []
+            if removed_target_root is not None:
+                message = (
+                    f"{error}. Previous fork '{fork_name}' at {removed_target_root} and its Forge content "
+                    "were already removed before replacement failed. "
+                    "Inspect 'forge session list --scope all' before retrying the fork. "
+                    "Recover previous Forge content from a backup if needed."
+                )
+                if cleanup_errors:
+                    message += f" Cleanup refused: {'; '.join(cleanup_errors)}"
+                raise ForgeSessionError(message) from error
+            if cleanup_errors:
+                status = "Rollback incomplete" if isinstance(error, ProjectCompatibilityError) else "Cleanup refused"
+                raise ForgeSessionError(f"{error}. {status}: {'; '.join(cleanup_errors)}") from error
             raise
 
+    @_with_parent_lease()
     def relaunch_session(
         self,
         parent_name: str,
@@ -2048,450 +1902,53 @@ class SessionManager:
             return WorktreeCleanupPlan(remove=False, reason="not_owned")
         return WorktreeCleanupPlan(remove=True, reason="owned")
 
-    def _find_shared_transcript_sessions(
-        self,
-        project_root: str,
-        session_ids: list[str],
-        *,
-        exclude_name: str,
-        exclude_forge_root: str,
-        sessions: Iterable[tuple[str, SessionIndexEntry]] | None = None,
-    ) -> dict[str, list[str]]:
-        """Find other sessions that still reference the raw transcript UUIDs.
-
-        Same-directory native forks can temporarily share a Claude conversation
-        UUID until the fork receives a real turn. Treat raw transcripts like
-        worktrees: shared resources must survive deleting one alias.
-        """
-        target_paths = {
-            session_id: str(get_transcript_path(project_root, session_id).resolve()) for session_id in session_ids
-        }
-        if not target_paths:
-            return {}
-
-        normalized_exclude_root = str(Path(exclude_forge_root).resolve())
-        shared: dict[str, list[str]] = {session_id: [] for session_id in target_paths}
-
-        session_entries = sessions if sessions is not None else self.index_store.list_sessions()
-        for other_name, other_entry in session_entries:
-            other_forge_root = other_entry.forge_root or other_entry.worktree_path
-            if other_name == exclude_name and str(Path(other_forge_root).resolve()) == normalized_exclude_root:
-                continue
-
-            other_state: SessionState | None = None
-            other_raw: dict[str, Any] | None = None
-            other_store = SessionStore(other_forge_root, other_name)
-            if other_store.exists():
-                try:
-                    other_state = other_store.read()
-                except (ManifestCorruptedError, ManifestValidationError):
-                    other_raw = other_store.read_raw()
-
-            other_ids = _referenced_transcript_session_ids(
-                other_state,
-                other_raw,
-                index_session_id=other_entry.claude_session_id,
-            )
-            if not other_ids:
-                continue
-
-            candidate_roots = _candidate_transcript_project_roots(other_state, other_entry, other_raw)
-            for session_id in target_paths:
-                if session_id not in other_ids:
-                    continue
-                for root in candidate_roots:
-                    other_path = str(get_transcript_path(root, session_id).resolve())
-                    if other_path == target_paths[session_id]:
-                        shared[session_id].append(other_name)
-                        break
-
-        return {session_id: names for session_id, names in shared.items() if names}
-
-    def repair_stale_session_record(self, name: str, *, forge_root: str) -> bool:
-        """Atomically remove a row-only residue without deleting a replacement.
-
-        Return False when a manifest-backed replacement now owns the scoped name.
-        """
-        return self.index_store.delete_session_txn(
-            name,
-            forge_root=forge_root,
-            expect_manifest_absent=True,
-            delete_manifest=lambda: None,
-        )
-
     def delete_session(
         self,
         name: str,
         *,
-        delete_transcripts: bool = True,
         delete_worktree: bool = True,
         delete_branch: bool = False,
         force: bool = False,
         forge_root: str | None = None,
+        expected_instance_id: str | None = None,
     ) -> None:
-        """Delete a session and optionally its worktree and transcripts.
+        """Remove the session and its unreferenced Forge content, preserving native files."""
+        from .deletion import apply_session_deletion, plan_session_deletion
 
-        Removes the session from the index, deletes the manifest, and
-        optionally cleans up the git worktree and transcript files.
-
-        Args:
-            name: Session name to delete.
-            delete_transcripts: Whether to delete transcript files (default True).
-            delete_worktree: Whether to remove the git worktree (default True).
-            delete_branch: Whether to delete the git branch (default False).
-            force: Force removal even with uncommitted changes (default False).
-
-        Raises:
-            SessionNotFoundError: If session doesn't exist.
-            InvalidSessionNameError: If name is invalid.
-            DirtyWorktreeError: If worktree has uncommitted changes and force=False.
-        """
-        from .claude.cleanup import cleanup_session
-
-        entry = self.index_store.get_session(name, forge_root=forge_root)
-        entry_forge_root = entry.forge_root or entry.worktree_path
-        store = SessionStore(entry_forge_root, name)
-
-        state = None
-        _raw_data: dict[str, Any] | None = None
-        if store.exists():
-            try:
-                state = store.read()
-            except (ManifestCorruptedError, ManifestValidationError):
-                if not force:
-                    raise
-                # Best-effort: read raw JSON for cleanup-relevant fields
-                # even though full deserialization failed.
-                _raw_data = store.read_raw()
-                logger.warning(
-                    "Manifest corrupted; force-deleting with best-effort cleanup "
-                    "(transcript/worktree cleanup may be incomplete)"
-                )
-
-        # Fall back to raw manifest fields when full deserialization fails.
-        _claude_session_id: str | None = None
-        _worktree_info: dict[str, Any] | None = None
-        if state:
-            _claude_session_id = state.confirmed.claude_session_id
-            if state.worktree:
-                _worktree_info = {
-                    "path": state.worktree.path,
-                    "is_worktree": state.worktree.is_worktree,
-                    "owns_worktree": getattr(state.worktree, "owns_worktree", True),
-                    "branch": state.worktree.branch,
-                }
-        elif _raw_data:
-            confirmed = _raw_data.get("confirmed", {})
-            if isinstance(confirmed, dict):
-                _claude_session_id = confirmed.get("claude_session_id")
-            wt = _raw_data.get("worktree")
-            if isinstance(wt, dict) and wt.get("path"):
-                _worktree_info = {
-                    "path": wt["path"],
-                    "is_worktree": wt.get("is_worktree", False),
-                    "owns_worktree": wt.get("owns_worktree", True),
-                    "branch": wt.get("branch"),
-                }
-
-        # Sampled before any destructive work, while a manifest at this path can
-        # still only be this session's own. Once cleanup starts, the name reads as
-        # crash residue and any later probe may be looking at a replacement.
-        _manifest_absent_at_start = not store.exists()
-        _manifest_destroyed_by_cleanup = False
-
-        # Worktree cleanup decision: determine BEFORE any destructive work whether
-        # we'll remove the worktree. This lets the dirty preflight block everything
-        # (transcripts + worktree + index removal) atomically.
-        _should_cleanup_worktree = False
-        if _worktree_info:
-            cleanup_plan = self._plan_worktree_cleanup_fields(
-                name,
-                delete_worktree=delete_worktree,
-                path=_worktree_info["path"],
-                is_worktree=_worktree_info["is_worktree"],
-                owns_worktree=_worktree_info["owns_worktree"],
-                forge_root=entry_forge_root,
-            )
-            _should_cleanup_worktree = cleanup_plan.remove
-            if cleanup_plan.reason == "shared":
-                logger.info(
-                    "Skipping worktree removal: %d other session(s) present (%s)",
-                    len(cleanup_plan.co_residents),
-                    ", ".join(cleanup_plan.co_residents[:3]),
-                )
-            elif cleanup_plan.reason == "not_owned":
-                logger.info("Skipping worktree removal: session does not own worktree (--into)")
-
-        # Dirty-worktree preflight: only check if we'll actually remove the worktree.
-        # Runs before transcript cleanup so DirtyWorktreeError blocks all destructive work.
-        # Shared worktrees (co-residents or --into) skip this entirely.
-        if _should_cleanup_worktree and _worktree_info:
-            from .worktree import is_worktree_dirty
-
-            worktree_path = Path(_worktree_info["path"])
-            if not force and worktree_path.exists() and is_worktree_dirty(worktree_path):
-                raise DirtyWorktreeError(str(worktree_path))
-
-        if _should_cleanup_worktree and _worktree_info:
-            from .worktree import cleanup_worktree
-
-            worktree_path = Path(_worktree_info["path"])
-            branch = _worktree_info["branch"] if delete_branch else None
-
-            # Pure path logic, evaluated before the removal: for a nested project
-            # the manifest lives inside the worktree, so cleanup takes it too. This
-            # is a fact about what this delete does, which is why it is safe where
-            # a later store.exists() probe is not.
-            #
-            # is_relative_to is lexical, so both sides must be resolved or a
-            # symlinked spelling of either root reads as "not contained" and
-            # silently disables the ownership check below. The left side is
-            # resolved by SessionStore, which resolves its forge_root (store.py);
-            # the right side is resolved here. Do not drop either.
-            _manifest_destroyed_by_cleanup = store.manifest_path.is_relative_to(worktree_path.resolve())
-
-            cleanup_result = cleanup_worktree(
-                worktree_path=worktree_path,
-                branch=branch,
-                delete_branch_flag=delete_branch,
-                force=force,
-            )
-
-            if cleanup_result.errors:
-                raise ForgeSessionError(cleanup_result.errors[0])
-
-        _deriv = state.confirmed.derivation if delete_transcripts and state is not None else None
-        _raw_aliased_relocated_session_id: str | None = None
-        if delete_transcripts and state is None:
-            _raw_deriv = _raw_confirmed_value(_raw_data, "derivation")
-            _raw_current_session_id = _raw_confirmed_value(_raw_data, "claude_session_id")
-            if isinstance(_raw_deriv, dict):
-                _raw_relocated_session_id = _raw_deriv.get("relocated_parent_session_id")
-                # Exact ownership scans cannot authorize raw case variants on case-insensitive storage.
-                if (
-                    _raw_deriv.get("resume_mode") == "native-relocate"
-                    and isinstance(_raw_current_session_id, str)
-                    and isinstance(_raw_relocated_session_id, str)
-                    and _raw_current_session_id == _raw_relocated_session_id
-                    and _UUID_RE.fullmatch(_raw_relocated_session_id) is not None
-                    and _raw_relocated_session_id == _raw_relocated_session_id.lower()
-                ):
-                    _raw_aliased_relocated_session_id = _raw_relocated_session_id
-        _relocated_parent_session_id = (
-            _deriv.relocated_parent_session_id
-            if _deriv is not None and _deriv.resume_mode == "native-relocate"
-            else _raw_aliased_relocated_session_id
-        )
-        _artifact_ids: list[str] = []
-        _cleanup_ids: list[str] = []
-        if delete_transcripts and _claude_session_id:
-            if state:
-                _artifact_ids = _tracked_transcript_session_ids(state)
-            else:
-                raw_confirmed = (_raw_data or {}).get("confirmed")
-                if isinstance(raw_confirmed, dict):
-                    _artifact_ids = _tracked_transcript_session_ids_from_artifacts(raw_confirmed.get("artifacts"))
-
-            for _session_id in [_claude_session_id, *_artifact_ids]:
-                _append_unique_string(_cleanup_ids, _session_id)
-
-        _transcript_project_root: str | None = None
-        _shared_transcript_ids: dict[str, list[str]] = {}
-        if delete_transcripts and (_cleanup_ids or _relocated_parent_session_id):
-            _transcript_project_root = _transcript_cleanup_project_root(
-                state,
-                entry.forge_root or entry.worktree_path,
-                _raw_data,
-            )
-            if _cleanup_ids:
-                _reference_scan_ids = list(_cleanup_ids)
-                _append_unique_string(_reference_scan_ids, _relocated_parent_session_id)
-                _shared_transcript_ids = self._find_shared_transcript_sessions(
-                    _transcript_project_root,
-                    _reference_scan_ids,
-                    exclude_name=name,
-                    exclude_forge_root=entry_forge_root,
-                )
-
-        if delete_transcripts and _claude_session_id:
-            assert _transcript_project_root is not None
-            shared_ids = {
-                session_id: _shared_transcript_ids[session_id]
-                for session_id in _cleanup_ids
-                if session_id in _shared_transcript_ids
-            }
-
-            # An adopted session's native transcript is user-owned, so it is
-            # protected the same way a transcript shared with another session is.
-            # Keyed on provenance rather than on the bound id: `claude_session_id`
-            # can drift off the adoption source once hooks reconcile it, and the
-            # session's other transcripts are Forge's to clean up.
-            _protected_ids = dict(shared_ids)
-            if state is None:
-                # Raw IDs bypass schema validation; exact scans cannot authorize noncanonical spellings.
-                for _session_id in _cleanup_ids:
-                    if _UUID_RE.fullmatch(_session_id) is None or _session_id != _session_id.lower():
-                        _protected_ids[_session_id] = ["untrusted noncanonical raw transcript id"]
-            _adopted_ids = _adopted_source_uuids(state, _raw_data)
-            if _adopted_ids:
-                for _adopted_id in _adopted_ids:
-                    _protected_ids.setdefault(_adopted_id, ["adopted native conversation"])
-                logger.info(
-                    "Preserving adopted native transcript(s) %s while deleting session '%s'",
-                    ", ".join(_adopted_ids),
-                    name,
-                )
-
-            # native-relocate reuses the parent's UUID, so the current and relocated
-            # transcript can be the same path. That UUID must not pass through this
-            # unlocked bulk cleanup: the relocated branch below owns the transcript
-            # and agent logs after its final publication-locked ownership scan.
-            _filtered_claude_session_id = (
-                None
-                if _claude_session_id in _protected_ids or _claude_session_id == _relocated_parent_session_id
-                else _claude_session_id
-            )
-            _filtered_artifact_ids = [
-                session_id
-                for session_id in _artifact_ids
-                if session_id not in _protected_ids and session_id != _relocated_parent_session_id
-            ]
-
-            if shared_ids:
-                logger.info(
-                    "Skipping transcript cleanup for shared Claude session id(s): %s",
-                    ", ".join(
-                        f"{session_id} ({', '.join(referencing[:3])})" for session_id, referencing in shared_ids.items()
-                    ),
-                )
-
-            if _filtered_claude_session_id or _filtered_artifact_ids:
-                cleanup_session(
-                    project_root=_transcript_project_root,
-                    claude_session_id=_filtered_claude_session_id,
-                    artifact_session_ids=_filtered_artifact_ids,
-                )
-
-        # native-relocate forks copy the parent transcript into the child's encoded dir.
-        # Remove that copy independently of the child's own UUID (which may be unset on a
-        # failed/partial launch) -- but never when another session still needs it.
-        if delete_transcripts:
-            if _relocated_parent_session_id:
-                assert _transcript_project_root is not None
-                _reloc_path = get_transcript_path(_transcript_project_root, _relocated_parent_session_id)
-                # The relocated UUID IS the parent's claude_session_id, so the shared-transcript
-                # scan (path-resolved, not encoded-dir-guessed) protects two cases at once:
-                #   (1) the parent's ORIGINAL -- the parent references the same UUID, and in a dir
-                #       collision its transcript resolves to this same path;
-                #   (2) a co-resident native-relocate SIBLING that relocated the same parent UUID
-                #       into the same checkout (idempotent relocate -> one shared copy; the
-                #       sibling's derivation now yields relocated_parent_session_id).
-                # Replaces an earlier guard that compared index identity (parent_forge_root/
-                # project_root) instead of the parent's resolved Claude CWD, and so missed
-                # root-level-worktree parents and had no sibling awareness.
-                if _relocated_parent_session_id in _shared_transcript_ids:
-                    # A cached positive can only make cleanup conservative if its owner disappears.
-                    _reloc_shared = {_relocated_parent_session_id: _shared_transcript_ids[_relocated_parent_session_id]}
-                    logger.info(
-                        "Skipping relocated-transcript cleanup: %s still referenced by %s",
-                        _reloc_path,
-                        ", ".join(f"{sid} ({', '.join(refs[:3])})" for sid, refs in _reloc_shared.items()),
-                    )
-                else:
-                    # Content discovery can stay outside the publication lock. The
-                    # preidentified sidechain paths share the transcript's final owner
-                    # decision below, so a late sibling protects the complete UUID data.
-                    _reloc_agent_logs = find_agent_logs(
-                        _transcript_project_root,
-                        _relocated_parent_session_id,
-                    )
-
-                    # A cached absence is not destruction authority. Hold the same
-                    # publication lock used by every session creator across the final
-                    # owner scan and unlink, so a sibling can land entirely before the
-                    # decision or only after the old copy is gone (and then recreate it
-                    # during native-relocate preparation). Unlike list_sessions, this
-                    # narrow destructive path intentionally performs manifest reads
-                    # under the lock because an unlocked probe would reopen the race.
-                    def _unlink_if_unreferenced(
-                        sessions: list[tuple[str, SessionIndexEntry]],
-                    ) -> None:
-                        _reloc_shared = self._find_shared_transcript_sessions(
-                            _transcript_project_root,
-                            [_relocated_parent_session_id],
-                            exclude_name=name,
-                            exclude_forge_root=entry_forge_root,
-                            sessions=sessions,
-                        )
-                        if _reloc_shared:
-                            logger.info(
-                                "Skipping relocated-transcript cleanup: %s still referenced by %s",
-                                _reloc_path,
-                                ", ".join(f"{sid} ({', '.join(refs[:3])})" for sid, refs in _reloc_shared.items()),
-                            )
-                            return
-                        try:
-                            _reloc_path.unlink(missing_ok=True)
-                        except OSError as exc:
-                            logger.warning(
-                                "Failed to remove relocated parent transcript %s: %s",
-                                _reloc_path,
-                                exc,
-                            )
-                        for _reloc_agent_log in _reloc_agent_logs:
-                            try:
-                                _reloc_agent_log.unlink(missing_ok=True)
-                            except OSError as exc:
-                                logger.warning(
-                                    "Failed to remove relocated parent agent log %s: %s",
-                                    _reloc_agent_log,
-                                    exc,
-                                )
-
-                    self.index_store.run_session_entries_txn(_unlink_if_unreferenced)
-
-            if state is not None and _deriv is not None and _deriv.rewind_relocated_session_id:
-                _rewind_root = _transcript_cleanup_project_root(
-                    state,
-                    entry.forge_root or entry.worktree_path,
-                    _raw_data,
-                )
-                _rewind_path = get_transcript_path(_rewind_root, _deriv.rewind_relocated_session_id)
-                try:
-                    _rewind_path.unlink(missing_ok=True)
-                except OSError as exc:
-                    logger.warning("Failed to remove rewind transcript %s: %s", _rewind_path, exc)
-
-        # Everything above may have removed the manifest -- worktree cleanup takes
-        # it with the worktree for a nested project -- while this row still stands.
-        # That state is indistinguishable from crash residue, so a concurrent
-        # create_session_txn may have reclaimed the name and published a whole new
-        # session. Removing the row and manifest unconditionally would then delete
-        # that session instead of this one.
-        def _delete_manifest() -> None:
-            # Runs inside the index lock, before the row is removed. Outside it,
-            # a replacement could publish between the ownership check and this
-            # delete and lose its manifest to it.
-            if store.exists():
-                store.delete()
-
-        still_ours = self.index_store.delete_session_txn(
+        plan = plan_session_deletion(
+            self.index_store,
             name,
-            forge_root=entry_forge_root,
-            expect_manifest_absent=_manifest_absent_at_start or _manifest_destroyed_by_cleanup,
-            delete_manifest=_delete_manifest,
+            forge_root=forge_root,
+            delete_worktree=delete_worktree,
+            delete_branch=delete_branch,
+            force=force,
         )
-        if not still_ours:
-            logger.info(
-                "Session '%s' was recreated while this delete was cleaning up; "
-                "leaving the new session's index entry and manifest in place",
-                name,
-            )
-            return
+        if expected_instance_id is not None and plan.instance_id != expected_instance_id:
+            raise ForgeSessionError(f"Session '{name}' changed before cleanup; retained its replacement")
+        apply_session_deletion(self.index_store, plan)
 
-        try:
-            from .active import ActiveSessionStore
+    def purge_session(
+        self,
+        name: str,
+        *,
+        delete_worktree: bool = True,
+        delete_branch: bool = False,
+        force: bool = False,
+        forge_root: str | None = None,
+        expected_instance_id: str | None = None,
+    ) -> None:
+        """Remove admitted Forge content and verified native files for an inactive session."""
+        from .deletion import apply_session_deletion, plan_session_deletion
 
-            ActiveSessionStore().clear_session(name, forge_root=entry_forge_root)
-        except Exception as e:
-            logger.debug("Failed to clear active session '%s' (non-critical): %s", name, e)
+        plan = plan_session_deletion(
+            self.index_store,
+            name,
+            forge_root=forge_root,
+            purge=True,
+            delete_worktree=delete_worktree,
+            delete_branch=delete_branch,
+            force=force,
+        )
+        if expected_instance_id is not None and plan.instance_id != expected_instance_id:
+            raise ForgeSessionError(f"Session '{name}' changed before cleanup; retained its replacement")
+        apply_session_deletion(self.index_store, plan)

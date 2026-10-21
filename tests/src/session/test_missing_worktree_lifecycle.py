@@ -114,7 +114,6 @@ def test_explicit_delete_removes_degraded_reservation_without_requiring_checkout
     manager.delete_session(
         "degraded",
         forge_root=str(forge_root),
-        delete_transcripts=False,
         delete_worktree=True,
     )
 

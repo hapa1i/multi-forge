@@ -275,6 +275,7 @@ def _emit_lane_degraded(payload: dict[str, Any]) -> None:
 def _persist_policy_decisions(
     *,
     store: SessionStore,
+    expected_instance_id: str,
     engine: Any,
     engine_state: dict[str, dict[str, Any]],
     entries: list[tuple[Any, str]],
@@ -421,7 +422,7 @@ def _persist_policy_decisions(
                         "root_run_id": getattr(exhausted, "telemetry_root_run_id", None),
                     }
 
-    store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
+    store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate, expected_instance_id=expected_instance_id)
     if degrade_emit is not None:
         _emit_lane_degraded(degrade_emit)
 
@@ -429,6 +430,7 @@ def _persist_policy_decisions(
 def _persist_policy_state(
     *,
     store: SessionStore,
+    expected_instance_id: str,
     engine: Any,
     result: Any,
     effective: Any,
@@ -445,6 +447,7 @@ def _persist_policy_state(
     blocked = result.final_decision in ("deny", "needs_review")
     _persist_policy_decisions(
         store=store,
+        expected_instance_id=expected_instance_id,
         engine=engine,
         engine_state={} if blocked else engine.get_collected_state(),
         entries=[(result, context_summary)],

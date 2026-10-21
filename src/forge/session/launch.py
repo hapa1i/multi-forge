@@ -74,6 +74,15 @@ def _build_session_env(
     if forge_root:
         env_vars["FORGE_FORGE_ROOT"] = forge_root
     unset_env_vars: list[str] = []
+    from forge.session.store import SessionStore
+    from forge.session.workers import SESSION_INSTANCE_ENV
+
+    store = SessionStore(forge_root or str(Path.cwd()), session_name)
+    instance_id = store.review_identity() if store.exists() else None
+    if instance_id is not None:
+        env_vars[SESSION_INSTANCE_ENV] = instance_id
+    else:
+        unset_env_vars.append(SESSION_INSTANCE_ENV)
 
     if base_url is None:
         # Direct mode: don't touch CLAUDE_CODE_AUTO_COMPACT_WINDOW -- it's a

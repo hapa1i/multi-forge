@@ -81,6 +81,7 @@ def isolate_forge_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     isolated_home = tmp_path / "forge_home"
     isolated_home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("FORGE_HOME", str(isolated_home))
+    monkeypatch.delenv("FORGE_SESSION_INSTANCE", raising=False)
     monkeypatch.delenv("FORGE_DEV", raising=False)
     monkeypatch.delenv("FORGE_CODEX_EXECUTOR_IDENTITY", raising=False)
     monkeypatch.delenv("FORGE_SESSION", raising=False)

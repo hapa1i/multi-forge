@@ -13,8 +13,9 @@ from unittest.mock import patch
 
 import pytest
 
-from forge.session import SessionStore, create_session_state
+from forge.session import IndexStore, create_session_state
 from forge.session.hooks import HookInput, handle_session_start
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -40,8 +41,7 @@ def test_compact_copies_previous_transcript_to_project_artifacts(
     old_transcript.write_text("{}\n", encoding="utf-8")
     manifest.confirmed.transcript_path = str(old_transcript)
 
-    store = SessionStore(str(temp_worktree), "test-session")
-    store.write(manifest)
+    publish_session(IndexStore(), manifest, temp_worktree)
 
     hook_input = HookInput(
         session_id="new-uuid",
@@ -51,7 +51,7 @@ def test_compact_copies_previous_transcript_to_project_artifacts(
 
     # Store the captured artifact under the isolated project root.
     with patch("forge.session.artifacts.resolve_forge_root", return_value=tmp_path):
-        with patch.dict(os.environ, {"FORGE_SESSION": "test-session"}, clear=True):
+        with patch.dict(os.environ, {"FORGE_SESSION": "test-session"}):
             result = handle_session_start(hook_input, temp_worktree)
 
     assert result.success

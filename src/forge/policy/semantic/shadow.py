@@ -233,6 +233,7 @@ def capture_candidate(
     checker_prompt_version: int,
     lane_record: LaneRecord | None = None,
     snapshot: PlanSnapshot | None = None,
+    artifact_forge_root: str | None = None,
 ) -> Path | None:
     """Freeze a sampled tier-1 allow as a pending shadow candidate.
 
@@ -245,7 +246,12 @@ def capture_candidate(
     if max_n <= 0:  # defensive: validation rejects < 1, but never trust a hand-edited manifest
         return None
 
-    directory = shadow_dir(config, context.session_name)
+    # The executor owns the candidate; config.forge_root still scopes its source.
+    directory = (
+        get_artifact_paths(Path(artifact_forge_root), context.session_name).shadow_abs
+        if artifact_forge_root
+        else shadow_dir(config, context.session_name)
+    )
     if directory is None:
         return None
 

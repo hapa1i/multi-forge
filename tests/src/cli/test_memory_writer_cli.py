@@ -11,6 +11,7 @@ from click.testing import CliRunner
 
 from forge.cli.memory_writer import memory_writer
 from forge.session.consumer_lanes import set_intent_lane
+from forge.session.index import IndexStore
 from forge.session.memory_writer import MEMORY_WRITER_CONSUMER
 from forge.session.models import (
     LaneRecord,
@@ -20,6 +21,8 @@ from forge.session.models import (
 )
 from forge.session.passport import synthesize_passport, write_passport
 from forge.session.store import SessionStore
+from forge.session.workers import capture_session_instance
+from tests.fixtures.session_state import delete_published_session, publish_session
 
 _CLAUDE_MAX = LaneRecord("claude_code", "claude-max", "opus")
 _CODEX = LaneRecord("codex", "chatgpt", "gpt-5-codex")
@@ -29,7 +32,35 @@ def _write_handoff_session(worktree: Path, *, subprocess_proxy: str | None = Non
     manifest = create_session_state("session")
     manifest.intent.subprocess_proxy = subprocess_proxy
     manifest.intent.memory = MemoryIntent(auto_update=MemoryWriterConfig(enabled=True))
-    SessionStore(str(worktree), "session").write(manifest)
+    publish_session(IndexStore(), manifest, worktree)
+
+
+@pytest.mark.parametrize("replaced", [False, True])
+def test_handoff_removed_instance_skips_without_inference(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replaced: bool
+) -> None:
+    if replaced:
+        _write_handoff_session(tmp_path)
+        monkeypatch.setenv("FORGE_SESSION_INSTANCE", capture_session_instance(tmp_path, "session"))
+        delete_published_session(IndexStore(), "session", tmp_path)
+        _write_handoff_session(tmp_path)
+    before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    with patch("forge.session.memory_writer.run_memory_writer") as writer:
+        result = CliRunner().invoke(
+            memory_writer,
+            [
+                "run",
+                "--session-name",
+                "session",
+                "--worktree-path",
+                str(tmp_path),
+                "--transcript-rel",
+                "transcript.jsonl",
+            ],
+        )
+    assert result.exit_code == 0, result.output
+    writer.assert_not_called()
+    assert {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()} == before
 
 
 def test_handoff_run_uses_manifest_subprocess_proxy(tmp_path: Path) -> None:
@@ -85,7 +116,7 @@ def test_handoff_run_prefers_marker_subprocess_proxy_snapshot(tmp_path: Path) ->
 
 
 def _write_plain_session(root: Path, name: str = "session") -> None:
-    SessionStore(str(root), name).write(create_session_state(name))
+    publish_session(IndexStore(), create_session_state(name), root)
 
 
 def _write_passport_doc(
@@ -221,7 +252,7 @@ def _declared_handoff_store(root: Path, lane: LaneRecord = _CLAUDE_MAX) -> Sessi
     manifest.intent.memory = MemoryIntent(auto_update=MemoryWriterConfig(enabled=True))
     set_intent_lane(manifest, MEMORY_WRITER_CONSUMER, lane)
     store = SessionStore(str(root), "session")
-    store.write(manifest)
+    publish_session(IndexStore(), manifest, root)
     return store
 
 

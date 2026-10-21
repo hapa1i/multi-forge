@@ -1,0 +1,17 @@
+{
+  "approved_manifest_sha256": "c56029340ddcdf37ef9ef414b10bcf22a91cedef05d5a9a2f9f2b8ee876c4dde",
+  "runner_sha256": "39268de8f279de4a6080266cd3f5129f908e1bdc59ec0316924edfbbcdfac7a5",
+  "payload_sha256": "22118166bd9e94c92fa736e7b9c9a8350dc88c39e2f7331b90cbd1d96c53653c",
+  "generator_sha256": "ef5ae9492875ac86ffdb6e0d8af939d81f2f4fb2ece6285976028e71a36b6586",
+  "status": "failed_no_retry",
+  "native_invocations_dispatched": 1,
+  "host_mounts": [],
+  "auth_forwarded_by_name": [
+    "ANTHROPIC_API_KEY"
+  ],
+  "image_id": "sha256:0f10421cb0a9f19844549f272592f80e08884dfb735496b03d35a219b5b5d1e0",
+  "container_id": "cf52e66c86e1cb39edc0ce263a8964d9188f098efb04a77c9d0fd4ee3cd5c056",
+  "error": "Command failed (1): ['docker', 'exec', '--env', 'ANTHROPIC_API_KEY', 'forge-native-purge-20261020', '/forge/.venv/bin/python', '/probe/native_probe_payload.py', 'run']\nTraceback (most recent call last):\n  File \"/probe/native_probe_payload.py\", line 249, in <module>\n    run_native()\n  File \"/probe/native_probe_payload.py\", line 100, in run_native\n    result[\"lifecycle\"] = verify_lifecycle(files)\n                          ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/probe/native_probe_payload.py\", line 125, in verify_lifecycle\n    raise ValueError(\"; \".join(inventory.refusals))\nValueError: Uncharacterized Claude subagent companion: /probe/home/.claude/projects/-probe-workspace/0e64d383-0c20-456b-93e4-70affb1778b3/subagents/agent-aeca28e6110ff07ca.meta.json\n",
+  "evidence_exported": true,
+  "container_removed": true
+}

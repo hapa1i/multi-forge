@@ -1,23 +1,7 @@
-"""Regression: a kill between publish and provenance left the native transcript deletable.
+"""Adoption publishes source provenance atomically and preserves it through interrupted capture.
 
-Bug: PR #114 review round 4, MEDIUM.
-Root cause: the Claude adoption arm pre-seeded only the binding
-(`claude_session_id`) through `start_session` and wrote `confirmed.adoption`
-plus the `reason="adopt"` artifact in a second `store.update` after the
-transcript copy. A process killed in that window -- which includes copying an
-arbitrarily large transcript -- left a published, bound session with no
-adoption provenance. `_adopted_source_uuids` then had nothing to protect, so a
-later `session delete` or the automatic retention sweep
-(`auto_clean_old_sessions`, `delete_transcripts=True`) unlinked the user's
-native conversation under `~/.claude/projects` -- exactly the loss the
-exemption exists to prevent.
-
-Fix: pass `adoption=` / `confirmed_by=` into `start_session` (the parameters
-the Codex arm already used), so the ownership-inversion fact is committed by
-the same `create_exclusive` write that publishes the binding. Only the artifact
-entry and `claude_project_root` remain in the post-copy update.
-
-Affected: src/forge/core/ops/session_adopt.py
+Ordinary deletion now preserves all native conversations. Explicit purge still
+needs provenance recorded before a possible crash in artifact copying.
 """
 
 from __future__ import annotations
@@ -93,12 +77,6 @@ def test_adoption_provenance_survives_a_kill_before_the_artifact_update(
 def test_deleting_a_kill_window_session_spares_the_native_transcript(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The consequence that makes the window matter: deletion reaches user state.
-
-    `delete_session` defaults to `delete_transcripts=True` -- the same call the
-    automatic retention sweep makes -- so without provenance this unlinks the
-    user's conversation.
-    """
     project, native = _kill_window_state(tmp_path, monkeypatch)
     original = native.read_bytes()
 

@@ -15,8 +15,9 @@ from forge.session.authority import (
     build_authority_marker,
     read_authority_events,
 )
+from forge.session.index import IndexStore
 from forge.session.models import AuthorityIntent, PolicyIntent, create_session_state
-from forge.session.store import SessionStore
+from tests.fixtures.session_state import publish_session
 
 
 def _managed_marker(
@@ -36,7 +37,7 @@ def _managed_marker(
     state.forge_root = str(tmp_path)
     # Authority must run before this disabled ordinary-policy posture.
     state.intent.policy = PolicyIntent(enabled=False)
-    SessionStore(str(tmp_path), name).write(state)
+    publish_session(IndexStore(), state, tmp_path, forge_root=tmp_path)
     marker = build_authority_marker(state, "run_0123456789ab", authority_hook_contract_sha256(runtime))
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("FORGE_SESSION", name)

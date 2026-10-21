@@ -96,7 +96,10 @@ def test_non_claude_alternative_survives_launcher_to_proxy_dispatch(
     )
     state.forge_root = str(worktree)
     store = SessionStore(str(worktree), state.name)
-    store.write(state)
+    from forge.session import IndexStore
+    from tests.fixtures.session_state import publish_session
+
+    publish_session(IndexStore(), state, worktree)
 
     captured: dict[str, Any] = {}
     child_env: dict[str, str] = {}

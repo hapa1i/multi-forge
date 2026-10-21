@@ -25,20 +25,25 @@ from forge.session.authority import (
     read_authority_events,
 )
 from forge.session.events import SessionEvent
+from forge.session.index import IndexStore
 from forge.session.models import AuthorityIntent, create_session_state
 from forge.session.routing import derive_routing_history, read_routing_events
 from forge.session.store import SessionStore
+from tests.fixtures.session_state import publish_session
 
 
 def _store(tmp_path: Path, *, role: str | None = "producer", runtime: str = "claude_code") -> SessionStore:
     store = SessionStore(str(tmp_path), "planner")
-    store.write(
+    publish_session(
+        IndexStore(),
         create_session_state(
             "planner",
             worktree_path=str(tmp_path),
             runtime=runtime,
             authority=AuthorityIntent(role) if role is not None else None,
-        )
+        ),
+        tmp_path,
+        forge_root=tmp_path,
     )
     return store
 
@@ -888,7 +893,7 @@ def test_claude_launcher_reuses_preflight_root_in_marker_and_invoker(
         authority=AuthorityIntent("advisory"),
     )
     state.forge_root = str(project)
-    SessionStore(str(project), "planner").write(state)
+    publish_session(IndexStore(), state, project, forge_root=project)
     digest = authority_hook_contract_sha256("claude_code")
     monkeypatch.setattr(launch, "_preflight_authority_seam", lambda *_args, **_kwargs: digest)
     observed: dict[str, object] = {}

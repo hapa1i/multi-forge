@@ -92,6 +92,21 @@ def test_json_payload_on_stdout_with_clean_stderr(args: list[str]) -> None:
     assert result.stderr == ""
 
 
+def test_purge_preview_payload_on_stdout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An empty project produces one scriptable preview without diagnostics."""
+    (tmp_path / ".forge").mkdir()
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(main, ["session", "purge", "--all", "--json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout) == {
+        "schema_version": 1,
+        "mode": "purge",
+        "targets": [],
+        "refused": [],
+    }
+    assert result.stderr == ""
+
+
 def test_model_route_line_owns_stderr_and_preserves_payload_values() -> None:
     result = CliRunner().invoke(_model_route_line)
 

@@ -16,6 +16,8 @@ from forge.search.content_store import (
     ContentStore,
 )
 from forge.search.index_state import IndexStateStore
+from forge.session.index import IndexStore
+from tests.fixtures.session_state import publish_session_from_fields
 
 pytestmark = pytest.mark.regression
 
@@ -50,6 +52,7 @@ def test_incremental_index_retains_marker_when_transcript_changes_during_store_w
 ) -> None:
     project_root, transcript, session_id = _project_with_transcript(tmp_path)
     fingerprint_b = transcript.stat()
+    publish_session_from_fields(IndexStore(), "planner", project_root, project_root)
     marker = enqueue_index_marker(
         session_id=session_id,
         worktree_path=project_root,

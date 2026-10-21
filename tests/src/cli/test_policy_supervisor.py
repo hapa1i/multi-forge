@@ -128,13 +128,23 @@ def _apply_supervisor_to_intent(manifest, supervisor, **kwargs) -> None:
     manifest.intent.policy.supervisor = supervisor
 
 
-def _validate_supervisor_target(target: str, forge_root: str | None = None):
-    from unittest.mock import MagicMock
+def _publish_or_update(store: SessionStore, state) -> None:
+    index = IndexStore()
+    root = store.forge_root
+    if index.peek_session(state.name, str(root)) is None:
+        publish_session(index, state, root, forge_root=root)
+    else:
+        store.write(state)
 
-    state = MagicMock()
-    state.confirmed.started_with_proxy = None  # direct-mode planner
-    state.forge_root = forge_root  # used by SupervisorConfig to scope runtime lookups
-    return state
+
+def _validate_supervisor_target(target: str, forge_root: str | None = None):
+    assert forge_root is not None
+    store = SessionStore(forge_root, target)
+    if not store.exists():
+        state = create_session_state(target, worktree_path=forge_root)
+        state.forge_root = forge_root
+        publish_session(IndexStore(), state, forge_root, forge_root=forge_root)
+    return store.read()
 
 
 def _auto_seed_supervisor_proxy(*args, **kwargs):
@@ -696,7 +706,7 @@ def _make_supervised_project(project: Path, monkeypatch, *, suspended: bool = Fa
         SupervisorConfig(resume_id="planner", proxy="litellm-openai", suspended=suspended),
     )
     store = SessionStore(str(project), "worker")
-    store.write(manifest)
+    _publish_or_update(store, manifest)
     return store
 
 
@@ -726,7 +736,7 @@ class TestSupervisorStatus:
             manifest,
             SupervisorConfig(resume_id="planner", proxy="litellm-gemini"),
         )
-        SessionStore(str(temp_guard_env), "worker").write(manifest)
+        _publish_or_update(SessionStore(str(temp_guard_env), "worker"), manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "status"])
         assert result.exit_code == 0
@@ -742,7 +752,7 @@ class TestSupervisorStatus:
             manifest,
             SupervisorConfig(resume_id="planner", direct=True),
         )
-        SessionStore(str(temp_guard_env), "worker").write(manifest)
+        _publish_or_update(SessionStore(str(temp_guard_env), "worker"), manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "status"])
         assert result.exit_code == 0
@@ -794,7 +804,7 @@ class TestSupervisorStatus:
         monkeypatch.setenv("FORGE_SESSION", "worker")
         manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
         manifest.forge_root = str(temp_guard_env)
-        SessionStore(str(temp_guard_env), "worker").write(manifest)
+        _publish_or_update(SessionStore(str(temp_guard_env), "worker"), manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "status", "--json"])
         assert result.exit_code == 0, result.output
@@ -829,7 +839,7 @@ class TestSupervisorStatus:
             reason="subscription_exhausted",
             at=now_iso(),
         )
-        SessionStore(str(temp_guard_env), "worker").write(manifest)
+        _publish_or_update(SessionStore(str(temp_guard_env), "worker"), manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "status", "--json"])
         assert result.exit_code == 0, result.output
@@ -864,7 +874,7 @@ class TestSupervisorStatus:
             reason="subscription_exhausted",
             at=now_iso(),
         )
-        SessionStore(str(temp_guard_env), "worker").write(manifest)
+        _publish_or_update(SessionStore(str(temp_guard_env), "worker"), manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "status"])
         assert result.exit_code == 0, result.output
@@ -896,7 +906,7 @@ class TestSupervisorStatus:
         manifest.forge_root = str(temp_guard_env)
         _apply_supervisor_to_intent(manifest, SupervisorConfig(resume_id="planner", direct=True))
         manifest.intent.consumer_lanes = ConsumerLaneIntent(supervisor=LaneRecord("codex", "chatgpt", "gpt-5-codex"))
-        SessionStore(str(temp_guard_env), "worker").write(manifest)
+        _publish_or_update(SessionStore(str(temp_guard_env), "worker"), manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "status", "--json"])
         assert result.exit_code == 0, result.output
@@ -920,7 +930,7 @@ class TestSupervisorStatus:
         manifest.forge_root = str(temp_guard_env)
         _apply_supervisor_to_intent(manifest, SupervisorConfig(resume_id="planner", direct=True))
         manifest.intent.consumer_lanes = ConsumerLaneIntent(supervisor=LaneRecord("codex", "chatgpt", "gpt-5-codex"))
-        SessionStore(str(temp_guard_env), "worker").write(manifest)
+        _publish_or_update(SessionStore(str(temp_guard_env), "worker"), manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "status"])
         assert result.exit_code == 0, result.output
@@ -949,7 +959,7 @@ class TestSupervisorStatus:
                 resolved_at=now_iso(),
             )
         )
-        SessionStore(str(temp_guard_env), "worker").write(manifest)
+        _publish_or_update(SessionStore(str(temp_guard_env), "worker"), manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "status"])
         assert result.exit_code == 0, result.output
@@ -989,7 +999,7 @@ class TestSupervisorStatus:
             manifest,
             SupervisorConfig(resume_id="planner", direct=True),
         )
-        SessionStore(str(temp_guard_env), "worker").write(manifest)
+        _publish_or_update(SessionStore(str(temp_guard_env), "worker"), manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "status"])
         assert result.exit_code == 0, result.output
@@ -1066,7 +1076,7 @@ class TestSupervisorToggle:
             )
         )
         store = SessionStore(str(temp_guard_env), "worker")
-        store.write(manifest)
+        _publish_or_update(store, manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "remove"])
         assert result.exit_code == 0
@@ -1094,7 +1104,7 @@ class TestSupervisorToggle:
             at=now_iso(),
         )
         store = SessionStore(str(temp_guard_env), "worker")
-        store.write(manifest)
+        _publish_or_update(store, manifest)
         assert is_supervisor_degraded(store.read()) is True  # precondition
 
         result = runner.invoke(main, ["policy", "supervisor", "remove"])
@@ -1108,7 +1118,7 @@ class TestSupervisorToggle:
         monkeypatch.setenv("FORGE_SESSION", "worker")
         manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
         manifest.forge_root = str(temp_guard_env)
-        SessionStore(str(temp_guard_env), "worker").write(manifest)
+        _publish_or_update(SessionStore(str(temp_guard_env), "worker"), manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "off"])
         assert result.exit_code == 0
@@ -1180,7 +1190,7 @@ class TestSupervisorSetProxyFlags:
         store = SessionStore(str(project), "test-session")
         state = create_session_state("test-session", worktree_path=str(project))
         state.forge_root = str(project)
-        store.write(state)
+        _publish_or_update(store, state)
 
         runner = CliRunner()
         monkeypatch_env = {"FORGE_SESSION": "test-session"}
@@ -1211,7 +1221,7 @@ class TestSupervisorSetTimeoutFlag:
         store = SessionStore(str(project), "test-session")
         state = create_session_state("test-session", worktree_path=str(project))
         state.forge_root = str(project)
-        store.write(state)
+        _publish_or_update(store, state)
 
         runner = CliRunner()
         with (
@@ -1259,7 +1269,7 @@ class TestSupervisorSetRuntimeFlag:
         store = SessionStore(str(project), "test-session")
         state = create_session_state("test-session", worktree_path=str(project))
         state.forge_root = str(project)
-        store.write(state)
+        _publish_or_update(store, state)
 
         runner = CliRunner()
         with (
@@ -1297,7 +1307,7 @@ class TestSupervisorSetRuntimeFlag:
         store = SessionStore(str(temp_guard_env), "test-session")
         state = create_session_state("test-session", worktree_path=str(temp_guard_env))
         state.forge_root = str(temp_guard_env)
-        store.write(state)
+        _publish_or_update(store, state)
 
         runner = CliRunner()
         with (
@@ -1326,7 +1336,7 @@ class TestSupervisorSetRuntimeFlag:
         state.confirmed.consumer_lanes = ConsumerLaneConfirmed(
             supervisor=ConsumerLaneBinding(lane=self._CODEX, source="intent", resolved_at=now_iso())
         )
-        store.write(state)
+        _publish_or_update(store, state)
 
         runner = CliRunner()
         with (
@@ -1361,7 +1371,7 @@ class TestSupervisorSetRuntimeFlag:
         store = SessionStore(str(temp_guard_env), "test-session")
         state = create_session_state("test-session", worktree_path=str(temp_guard_env))
         state.forge_root = str(temp_guard_env)
-        store.write(state)
+        _publish_or_update(store, state)
 
         calls = {"n": 0}
         hook_frozen = LaneRecord("claude_code", "anthropic-direct", "opus")  # != the requested codex lane
@@ -1400,7 +1410,7 @@ class TestSupervisorSetRuntimeFlag:
         store = SessionStore(str(temp_guard_env), "test-session")
         state = create_session_state("test-session", worktree_path=str(temp_guard_env))
         state.forge_root = str(temp_guard_env)
-        store.write(state)
+        _publish_or_update(store, state)
 
         runner = CliRunner()
         with (
@@ -1435,7 +1445,7 @@ class TestSupervisorSetRuntimeFlag:
         state.confirmed.consumer_lanes = ConsumerLaneConfirmed(
             supervisor=ConsumerLaneBinding(lane=self._CODEX, source="intent", resolved_at=now_iso())
         )
-        store.write(state)
+        _publish_or_update(store, state)
 
         runner = CliRunner()
         with (
@@ -1554,7 +1564,7 @@ class TestSupervisorCascade:
         monkeypatch.setenv("FORGE_SESSION", "worker")
         manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
         manifest.forge_root = str(temp_guard_env)
-        SessionStore(str(temp_guard_env), "worker").write(manifest)
+        _publish_or_update(SessionStore(str(temp_guard_env), "worker"), manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "cascade", "on"])
         assert result.exit_code == 1
@@ -1683,7 +1693,7 @@ class TestSupervisorCascade:
         manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
         manifest.forge_root = str(temp_guard_env)
         store = SessionStore(str(temp_guard_env), "worker")
-        store.write(manifest)
+        _publish_or_update(store, manifest)
         plan = temp_guard_env / "approved.md"
         plan.write_text("# Plan")
 
@@ -1722,7 +1732,7 @@ class TestSupervisorCascade:
         manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
         manifest.forge_root = str(temp_guard_env)
         store = SessionStore(str(temp_guard_env), "worker")
-        store.write(manifest)
+        _publish_or_update(store, manifest)
 
         with patch(
             "forge.policy.semantic.supervisor.resolve_supervisor_reload_plan_path",
@@ -1838,3 +1848,29 @@ class TestEvaluateEffort:
         )
         assert result.exit_code == 2
         assert "no such option" in result.output.lower()
+
+
+def test_supervisor_setup_does_not_bind_replaced_source(temp_guard_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.fixtures.session_state import delete_published_session
+
+    root = temp_guard_env
+    executor = create_session_state("executor", worktree_path=str(root))
+    executor.forge_root = str(root)
+    publish_session(IndexStore(), executor, root, forge_root=root)
+    monkeypatch.setenv("FORGE_SESSION", executor.name)
+    monkeypatch.setattr("forge.policy.semantic.supervisor.validate_supervisor_target", _validate_supervisor_target)
+    monkeypatch.setattr("forge.policy.semantic.supervisor.apply_supervisor_routing", lambda *_args, **_kwargs: None)
+
+    def replace_source(_template: str) -> tuple[str, bool]:
+        source = SessionStore(str(root), "planner").read()
+        delete_published_session(IndexStore(), source.name, root)
+        publish_session(IndexStore(), source, root, forge_root=root)
+        return "selected-proxy", False
+
+    monkeypatch.setattr("forge.policy.semantic.supervisor.ensure_supervisor_proxy", replace_source)
+    result = CliRunner().invoke(main, ["policy", "supervisor", "set", "planner", "--supervisor-proxy", "proxy"])
+
+    assert result.exit_code == 1
+    assert "source or executor changed during setup" in result.output
+    assert SessionStore(str(root), executor.name).read().intent.policy is None
+    assert SessionStore(str(root), "planner").exists()

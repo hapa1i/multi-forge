@@ -34,7 +34,9 @@ from ..exceptions import SessionFileNotFoundError
 from ..index import IndexStore
 from ..models import SessionState, StartedWithProxy
 from ..store import HOOK_LOCK_TIMEOUT_S, SessionStore
+from ..workers import session_worker_lease
 from .models import HookInput, HookResult, HookSource, ResolutionContext
+from .producers import capture_hook_instance
 
 logger = logging.getLogger(__name__)
 
@@ -287,6 +289,33 @@ def handle_session_start(
         operation="session-start",
     )
 
+    try:
+        instance_id = capture_hook_instance(manifest_store, index_store=index_store)
+        with session_worker_lease(
+            manifest_store.forge_root,
+            session_name,
+            expected_instance_id=instance_id,
+            label="SessionStart reconciliation",
+            index_store=index_store,
+        ):
+            return _reconcile_session_start(hook_input, cwd, index_store, result, ctx, manifest_store, instance_id)
+    except Exception as error:
+        result.error = "manifest_not_found" if not manifest_store.exists() else "manifest_update_failed"
+        result.message = f"SessionStart producer was not admitted: {error}"
+        return result
+
+
+def _reconcile_session_start(
+    hook_input: HookInput,
+    cwd: Path,
+    index_store: IndexStore | None,
+    result: HookResult,
+    ctx: ResolutionContext,
+    manifest_store: SessionStore,
+    instance_id: str,
+) -> HookResult:
+    session_name = manifest_store.session_name
+    resolved_forge_root = str(manifest_store.forge_root)
     # Collect transcript rollover capture info under lock, but copy outside lock.
     rollover: tuple[str, str | None] | None = None  # (previous_session_id, previous_transcript_path)
 
@@ -417,6 +446,8 @@ def handle_session_start(
             forge_root=resolved_forge_root,
             previous_session_id=previous_session_id,
             previous_transcript_path=previous_transcript_path,
+            expected_instance_id=instance_id,
+            index_store=index_store,
         )
 
     result.success = True
@@ -431,6 +462,8 @@ def _capture_transcript_rollover(
     forge_root: str | None,
     previous_session_id: str,
     previous_transcript_path: str | None,
+    expected_instance_id: str,
+    index_store: IndexStore | None = None,
 ) -> None:
     """Best-effort capture of a transcript before compact/clear rollover.
 
@@ -442,32 +475,39 @@ def _capture_transcript_rollover(
 
     try:
         project_root = Path(forge_root) if forge_root else resolve_forge_root(cwd)
-        paths = get_artifact_paths(project_root, session_name)
+        with session_worker_lease(
+            project_root,
+            session_name,
+            expected_instance_id=expected_instance_id,
+            label="transcript rollover",
+            index_store=index_store,
+        ):
+            paths = get_artifact_paths(project_root, session_name)
 
-        src = Path(previous_transcript_path)
-        dst_abs = paths.transcripts_abs / f"{previous_session_id}.jsonl"
-        dst_rel = paths.transcripts_rel / f"{previous_session_id}.jsonl"
+            src = Path(previous_transcript_path)
+            dst_abs = paths.transcripts_abs / f"{previous_session_id}.jsonl"
+            dst_rel = paths.transcripts_rel / f"{previous_session_id}.jsonl"
 
-        # Idempotent copy: skip if already captured.
-        copied = safe_copy_file(src, dst_abs, overwrite=False)
+            # Idempotent copy: skip if already captured.
+            copied = safe_copy_file(src, dst_abs, overwrite=False)
 
-        store = SessionStore(_resolve_store_root(session_name, cwd, forge_root), session_name)
+            store = SessionStore(_resolve_store_root(session_name, cwd, forge_root), session_name)
 
-        def _mutate(state: SessionState) -> None:
-            reconcile_transcript_artifact(
-                state,
-                {
-                    "captured_at": now_iso(),
-                    "reason": "rollover",
-                    "source_path": previous_transcript_path,
-                    "session_id": previous_session_id,
-                    "copied_path": str(dst_rel),
-                    "copied": copied,
-                },
-                refresh_existing=copied,
-            )
+            def _mutate(state: SessionState) -> None:
+                reconcile_transcript_artifact(
+                    state,
+                    {
+                        "captured_at": now_iso(),
+                        "reason": "rollover",
+                        "source_path": previous_transcript_path,
+                        "session_id": previous_session_id,
+                        "copied_path": str(dst_rel),
+                        "copied": copied,
+                    },
+                    refresh_existing=copied,
+                )
 
-        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
+            store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
     except Exception as e:
         print(f"[forge] Transcript rollover failed: {e}", file=sys.stderr)
 

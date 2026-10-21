@@ -1,0 +1,246 @@
+{
+  "native_argv": [
+    "claude",
+    "--print",
+    "--model",
+    "claude-haiku-4-5-20251001",
+    "--max-turns",
+    "2",
+    "--max-budget-usd",
+    "0.10",
+    "--output-format",
+    "json",
+    "--tools",
+    "Agent,Task",
+    "--allowedTools",
+    "Agent,Task",
+    "--agents",
+    "{\"purge-probe\":{\"description\":\"Return the fixed synthetic native-layout probe acknowledgement.\",\"prompt\":\"Reply with exactly PURGE_CHILD_OK. Do not invoke tools or delegate.\",\"tools\":[],\"model\":\"haiku\"}}",
+    "--setting-sources",
+    "",
+    "--strict-mcp-config",
+    "--mcp-config",
+    "{\"mcpServers\":{}}",
+    "--disable-slash-commands",
+    "Invoke the purge-probe subagent exactly once with this prompt: Reply with exactly PURGE_CHILD_OK. After it returns, reply with exactly PURGE_PARENT_OK. Do not inspect files, run shell commands, use another agent, or retry a failed operation."
+  ],
+  "status": "captured_for_review",
+  "live_pid": 76,
+  "live_census_refusals": [
+    "Native claude process(es) may write conversations: PIDs 76; exit those clients before purging"
+  ],
+  "live_census": "      1 sleep           sleep infinity\n     70 python          /forge/.venv/bin/python /probe/native_probe_payload.py run\n     76 claude          claude --print --model claude-haiku-4-5-20251001 --max-turns 2 --max-budget-usd 0.10 --output-format json --tools Agent,Task --allowedTools Agent,Task --agents {\"purge-probe\":{\"description\":\"Return the fixed synthetic native-layout probe acknowledgement.\",\"prompt\":\"Reply with exactly PURGE_CHILD_OK. Do not invoke tools or delegate.\",\"tools\":[],\"model\":\"haiku\"}} --setting-sources  --strict-mcp-config --mcp-config {\"mcpServers\":{}} --disable-slash-commands Invoke the purge-probe subagent exactly once with this prompt: Reply with exactly PURGE_CHILD_OK. After it returns, reply with exactly PURGE_PARENT_OK. Do not inspect files, run shell commands, use another agent, or retry a failed operation.\n     79 ps              ps -axo pid=,comm=,args=\n",
+  "returncode": 0,
+  "elapsed_seconds": 4.091,
+  "stdout": "{\"is_error\":false,\"duration_api_ms\":4191,\"num_turns\":1,\"stop_reason\":\"end_turn\",\"session_id\":\"3da5a2ec-3a40-49a9-94a3-5c871964cca5\",\"total_cost_usd\":0.0170009,\"usage\":{\"input_tokens\":3,\"cache_creation_input_tokens\":459,\"cache_read_input_tokens\":9765,\"output_tokens\":11,\"output_tokens_details\":{\"thinking_tokens\":0},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":459},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":3,\"output_tokens\":11,\"cache_read_input_tokens\":9765,\"cache_creation_input_tokens\":459,\"cache_creation\":{\"ephemeral_5m_input_tokens\":459,\"ephemeral_1h_input_tokens\":0},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5-20251001\":{\"inputTokens\":1491,\"outputTokens\":163,\"cacheReadInputTokens\":19149,\"cacheCreationInputTokens\":10224,\"webSearchRequests\":0,\"costUSD\":0.0170009,\"contextWindow\":200000,\"maxOutputTokens\":32000,\"canonicalModel\":\"claude-haiku-4-5\",\"provider\":\"firstParty\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"origin\":{\"kind\":\"task-notification\"},\"subagent_stats\":{\"spawned\":1,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":1},\"started_in_background\":1,\"max_depth\":1,\"spawned_by_subagents\":0,\"completed\":1,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{\"purge-probe\":1}},\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"PURGE_PARENT_OK\",\"ttft_ms\":565,\"ttft_stream_ms\":518,\"time_to_request_ms\":12,\"type\":\"result\",\"duration_ms\":575,\"uuid\":\"f9b5594a-4bfe-4dc1-8fff-6b40fa87cefb\",\"queued_turn_count\":0}\n",
+  "stderr": "",
+  "exited_census_refusals": [],
+  "exited_census": "      1 sleep           sleep infinity\n     70 python          /forge/.venv/bin/python /probe/native_probe_payload.py run\n    110 ps              ps -axo pid=,comm=,args=\n",
+  "native_files": [
+    {
+      "path": "/probe/home/.claude/.claude.json",
+      "size": 52367,
+      "sha256": "bfee108ac2fc01d8809d96bc374975e06c59e1d672feafd217e462c856255673"
+    },
+    {
+      "path": "/probe/home/.claude/backups/.claude.json.backup.1792514807259",
+      "size": 84,
+      "sha256": "17b57a101203b7ac4d1a7481457162fdca1d3cffea9447d1df4502013c7393e9"
+    },
+    {
+      "path": "/probe/home/.claude/policy-limits.json",
+      "size": 643,
+      "sha256": "ff5bf34b466a165e1be9d033307883a2e563324ebaf4c4f40ffdcc1b2755c0d8"
+    },
+    {
+      "path": "/probe/home/.claude/projects/-probe-workspace/3da5a2ec-3a40-49a9-94a3-5c871964cca5/subagents/agent-aa65db83b311cbc1b.jsonl",
+      "size": 1781,
+      "sha256": "91a6bb09ff31e9453f42bc70d371ea2ea6ffb0e16bfd060ea44d6fb701326226",
+      "records": [
+        {
+          "type": "user",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "agentId": "aa65db83b311cbc1b",
+          "isSidechain": true,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": null,
+          "uuid": "f8f1bb0d-52ec-41c4-b883-0fb6e388eeff"
+        },
+        {
+          "type": "assistant",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "agentId": "aa65db83b311cbc1b",
+          "isSidechain": true,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": "f8f1bb0d-52ec-41c4-b883-0fb6e388eeff",
+          "uuid": "a73de4bb-9857-4190-9072-6d2fd923a5d4"
+        }
+      ]
+    },
+    {
+      "path": "/probe/home/.claude/projects/-probe-workspace/3da5a2ec-3a40-49a9-94a3-5c871964cca5/subagents/agent-aa65db83b311cbc1b.meta.json",
+      "size": 131,
+      "sha256": "8ffdcd83334a91c8cc2e005211c5f72a8e2416fee94b850663c8f29f6594124b",
+      "metadata_exported": true
+    },
+    {
+      "path": "/probe/home/.claude/projects/-probe-workspace/3da5a2ec-3a40-49a9-94a3-5c871964cca5.jsonl",
+      "size": 14540,
+      "sha256": "1d78189acbc978ac2e09ba1eaa2c79e745d39396cd55ae81f8314fd6b496fca5",
+      "records": [
+        {
+          "type": "queue-operation",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5"
+        },
+        {
+          "type": "queue-operation",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5"
+        },
+        {
+          "type": "user",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "isSidechain": false,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": null,
+          "uuid": "60838e43-1398-4d96-af78-d8c5271a7cc4"
+        },
+        {
+          "type": "attachment",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "isSidechain": false,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": "60838e43-1398-4d96-af78-d8c5271a7cc4",
+          "uuid": "2bb2c79a-e0ec-4973-bc24-8b98f6e3c227"
+        },
+        {
+          "type": "attachment",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "isSidechain": false,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": "2bb2c79a-e0ec-4973-bc24-8b98f6e3c227",
+          "uuid": "53b6cc16-21c6-49f8-ac6e-96a19402f1de"
+        },
+        {
+          "type": "attachment",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "isSidechain": false,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": "53b6cc16-21c6-49f8-ac6e-96a19402f1de",
+          "uuid": "a49d5ac3-610c-4db6-9074-9a9295ae2344"
+        },
+        {
+          "type": "ai-title",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5"
+        },
+        {
+          "type": "atis-latch",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5"
+        },
+        {
+          "type": "assistant",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "isSidechain": false,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": "a49d5ac3-610c-4db6-9074-9a9295ae2344",
+          "uuid": "71ae49d3-af64-4d95-97c6-611c679a9f8e"
+        },
+        {
+          "type": "user",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "isSidechain": false,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": "71ae49d3-af64-4d95-97c6-611c679a9f8e",
+          "uuid": "3114d80d-b89b-4d69-b3dc-09a6f1b74f84"
+        },
+        {
+          "type": "attachment",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "isSidechain": false,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": "3114d80d-b89b-4d69-b3dc-09a6f1b74f84",
+          "uuid": "27d9abb1-78f5-425c-95c3-0f624f8d5cf2"
+        },
+        {
+          "type": "attachment",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "isSidechain": false,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": "27d9abb1-78f5-425c-95c3-0f624f8d5cf2",
+          "uuid": "29220514-2fc6-4316-abcd-33c2ed3f73d2"
+        },
+        {
+          "type": "queue-operation",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5"
+        },
+        {
+          "type": "assistant",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "isSidechain": false,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": "29220514-2fc6-4316-abcd-33c2ed3f73d2",
+          "uuid": "363a2ad3-a880-4f2e-817d-05082adf03dc"
+        },
+        {
+          "type": "queue-operation",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5"
+        },
+        {
+          "type": "user",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "isSidechain": false,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": "363a2ad3-a880-4f2e-817d-05082adf03dc",
+          "uuid": "5e57840d-e1e3-4349-8344-fecfac6030a5"
+        },
+        {
+          "type": "attachment",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "isSidechain": false,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": "5e57840d-e1e3-4349-8344-fecfac6030a5",
+          "uuid": "0860661a-891d-4e97-9fc1-c154aad68dff"
+        },
+        {
+          "type": "attachment",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "isSidechain": false,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": "0860661a-891d-4e97-9fc1-c154aad68dff",
+          "uuid": "6e3ff1f9-a2a4-4cd6-a8d3-54d70da1efb7"
+        },
+        {
+          "type": "assistant",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5",
+          "isSidechain": false,
+          "cwd": "/probe/workspace",
+          "version": "2.1.245",
+          "parentUuid": "6e3ff1f9-a2a4-4cd6-a8d3-54d70da1efb7",
+          "uuid": "09c9f743-103e-4576-b961-ee82af714dee"
+        },
+        {
+          "type": "last-prompt",
+          "sessionId": "3da5a2ec-3a40-49a9-94a3-5c871964cca5"
+        }
+      ]
+    },
+    {
+      "path": "/probe/home/.claude/remote-settings.json",
+      "size": 2,
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+    }
+  ]
+}

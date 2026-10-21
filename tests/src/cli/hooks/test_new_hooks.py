@@ -6,16 +6,20 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from click.testing import CliRunner
 
 from forge.cli.hooks._group import hooks
 from forge.install.project_compat import enforce_project_compatibility
+from forge.session.index import IndexStore
 from forge.session.models import (
     CompactionConfirmed,
     SessionState,
     SubagentConfirmed,
+    create_session_state,
 )
 from forge.session.worktree.config_copy import copy_runtime_config
+from tests.fixtures.session_state import publish_session
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -38,14 +42,7 @@ def _invoke(command_name: str, payload: dict) -> tuple[int, str, str]:
 
 
 def _make_state(name: str = "test-session") -> SessionState:
-    from forge.core.state import now_iso
-
-    return SessionState(
-        schema_version=7,
-        name=name,
-        created_at=now_iso(),
-        last_accessed_at=now_iso(),
-    )
+    return create_session_state(name)
 
 
 # ---------------------------------------------------------------------------
@@ -96,6 +93,8 @@ class TestPreCompactTranscriptCapture:
         store.exists.return_value = True
         store.read.return_value = state
         store.forge_root = tmp_path
+        store.session_name = state.name
+        publish_session(IndexStore(), state, tmp_path, forge_root=tmp_path)
         mock_store.return_value = store
         mock_copy.return_value = True
 
@@ -134,6 +133,8 @@ class TestPreCompactTranscriptCapture:
         store.exists.return_value = True
         store.read.return_value = state
         store.forge_root = tmp_path
+        store.session_name = state.name
+        publish_session(IndexStore(), state, tmp_path, forge_root=tmp_path)
         mock_store.return_value = store
         mock_copy.return_value = True
 
@@ -174,6 +175,10 @@ class TestPreCompactTranscriptCapture:
 
 
 class TestPostCompact:
+
+    @pytest.fixture(autouse=True)
+    def captured_instance(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("forge.cli.hooks.commands.capture_hook_instance", lambda store: "test-instance")
 
     def test_exits_0_on_empty_stdin(self) -> None:
         runner = CliRunner()
@@ -672,6 +677,10 @@ class TestWorktreeCreate:
 
 
 class TestSubagentStop:
+
+    @pytest.fixture(autouse=True)
+    def captured_instance(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("forge.cli.hooks.commands.capture_hook_instance", lambda store: "test-instance")
 
     def test_exits_0_on_empty_stdin(self) -> None:
         runner = CliRunner()

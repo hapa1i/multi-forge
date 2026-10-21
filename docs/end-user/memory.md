@@ -268,6 +268,9 @@ Background process:
   → Runs the bound runtime: claude -p (default) or codex exec (codex lane) -- stdin=prompt, cwd=forge_root, timeout=5min
 ```
 
+`forge session delete`, `purge`, and `clean` also skip the drain, so a preview cannot start a writer for a session it is
+inspecting. Other `forge session` commands drain normally.
+
 If the project pin is incompatible, malformed, unreadable, or uses an unsupported schema, the detached process records
 an upstream `skipped` outcome with reason `project_compatibility_refused` and the actual pin state, then exits 0. It
 does not invoke Claude/Codex, freeze a lane, create a review report, or edit a memory document. This refusal does not

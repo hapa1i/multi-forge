@@ -159,7 +159,9 @@ def test_start_no_launch_manifest_shape(runner: CliRunner, temp_env: Path) -> No
 }"""
 
 
-def test_incognito_start_manifest_shape_and_cleanup(runner: CliRunner, temp_env: Path) -> None:
+def test_incognito_start_manifest_shape_and_cleanup(
+    runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Pin the incognito manifest shape mid-launch and the op-owned delete-on-exit.
 
     Incognito rejects ``--no-launch`` (auto-delete-on-exit is its contract), so the
@@ -170,6 +172,9 @@ def test_incognito_start_manifest_shape_and_cleanup(runner: CliRunner, temp_env:
     the manifest, guarding the incognito cleanup ownership that moved into
     ``start_claude_session``.
     """
+    # Native subprocesses are mocked; no native client exists in this fixture.
+    monkeypatch.setattr("forge.session.purge_native.check_native_inactivity", lambda _runtime: ())
+    monkeypatch.setattr("forge.session.deletion.check_native_inactivity", lambda _runtime: ())
     captured: dict[str, str] = {}
 
     def _capture_manifest(*_args: object, **_kwargs: object) -> int:
@@ -251,7 +256,7 @@ def test_incognito_start_manifest_shape_and_cleanup(runner: CliRunner, temp_env:
 }"""
 
     manifest_path = temp_env / ".forge" / "sessions" / "char-incognito" / "forge.session.json"
-    assert not manifest_path.exists(), "incognito finally should delete the manifest on exit"
+    assert not manifest_path.exists(), result.output
 
 
 def test_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -> None:

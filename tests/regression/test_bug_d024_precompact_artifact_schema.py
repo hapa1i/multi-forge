@@ -18,13 +18,14 @@ from click.testing import CliRunner
 
 from forge.cli.hooks import hooks
 from forge.cli.main import main
-from forge.session import SessionManager, SessionStore, create_session_state
+from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
 from forge.session.exceptions import (
     ContextBudgetExceededError,
     TranscriptArtifactStateError,
 )
 from forge.session.models import CompactionConfirmed
 from forge.session.transfer import ResumeStrategy, assemble_transfer_context
+from tests.fixtures.session_state import publish_session
 from tests.src.cli.session_command_support import _configure_mock_fork_manager
 
 pytestmark = pytest.mark.regression
@@ -100,7 +101,7 @@ def test_precompact_migrates_legacy_tail_and_writes_only_the_dedicated_snapshot_
     state.confirmed.claude_session_id = "parent-uuid"
     state.confirmed.artifacts["transcripts"] = [canonical, legacy]
     state.confirmed.compaction = CompactionConfirmed(transcript_snapshots=[dict(legacy)])
-    store.write(state)
+    publish_session(IndexStore(), state, project)
     transcript = project / "parent.jsonl"
     transcript.write_text("{}\n", encoding="utf-8")
 
@@ -151,7 +152,7 @@ def test_precompact_preserves_malformed_dedicated_snapshot_state(
         compact_count=3,
         transcript_snapshots=malformed_snapshots,
     )
-    store.write(state)
+    publish_session(IndexStore(), state, project)
     transcript = project / "parent.jsonl"
     transcript.write_text("{}\n", encoding="utf-8")
 

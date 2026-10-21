@@ -304,10 +304,10 @@ class TestSessionList:
             result = runner.invoke(main, ["session", "clean", "--older-than", "30", "--yes"])
 
         assert result.exit_code == 1
-        assert "Session cleanup aborted before evaluation completed" in result.output
+        assert "Refused active session registry" in result.output
         assert "registry unreadable" in result.output
         assert "No sessions older than 30 days found." not in result.output
-        assert "Encountered 1 cleanup failure" in result.output
+        assert "Session cleanup refused or failed" in result.output
         assert "active session registry" in result.output
         assert SessionStore(str(temp_env), "old-session").exists()
 
@@ -316,16 +316,14 @@ class TestSessionList:
         _seed_cleanup_session(temp_env, temp_env)
 
         with patch(
-            "forge.session.active.ActiveSessionStore",
+            "forge.session.cleanup.ActiveSessionStore",
             return_value=_BrokenActiveSessionStore(),
         ):
             result = runner.invoke(main, ["session", "clean", "--older-than", "30"])
 
-        assert result.exit_code == 0
-        assert "Could not read active session registry" in result.output
-        assert "Actual cleanup would abort" in result.output
-        assert "old-session" in result.output
-        assert "unreadable" not in result.output  # keep preview wording user-facing
+        assert result.exit_code == 1
+        assert "Refused active session registry" in result.output
+        assert "registry unreadable" in result.output
         assert SessionStore(str(temp_env), "old-session").exists()
 
     def test_clean_older_than_reports_nothing_when_registry_healthy_and_no_matches(
@@ -387,7 +385,7 @@ class TestSessionList:
 
         assert result.exit_code == 1
         assert "Cleaned 1 session" in result.output
-        assert "Skipped 1 session for project compatibility" in result.output
+        assert "Refused refused-old (incompatible)" in result.output
         assert "refused-old (incompatible)" in result.output
         assert not SessionStore(str(temp_env), "compatible-old").exists()
         assert SessionStore(str(refused_root), "refused-old").exists()
@@ -410,7 +408,7 @@ class TestSessionList:
                 )
 
         with patch(
-            "forge.cli.session_manage.enforce_project_compatibility",
+            "forge.session.cleanup.enforce_project_compatibility",
             side_effect=enforce,
         ):
             result = runner.invoke(
@@ -418,10 +416,10 @@ class TestSessionList:
                 ["session", "clean", "--older-than", "30"],
             )
 
-        assert result.exit_code == 0
-        assert "Apply would skip" in result.output
+        assert result.exit_code == 1
+        assert "Refused" in result.output
         assert "refused-old (malformed)" in result.output
-        assert "Would delete 1 session, skip 1" in result.output
+        assert "Would delete 1 session" in result.output
         assert SessionStore(str(temp_env), "compatible-old").exists()
         assert SessionStore(str(refused_root), "refused-old").exists()
 

@@ -37,6 +37,7 @@ from forge.core.state.lock import FileLockTimeoutError
 from forge.session import SessionManager, SessionStore, create_session_state
 from forge.session import index as index_mod
 from forge.session.exceptions import (
+    ForgeSessionError,
     SessionExistsError,
     SessionNotFoundError,
     UuidAlreadyBoundError,
@@ -629,6 +630,7 @@ class TestDeleteCreateCoordination:
         manager.start_session("victim", worktree_path=str(project), direct=True, claude_session_id="o" * 8)
 
         entry = index.get_session("victim", forge_root=str(project))
+        assert entry.instance_id is not None
         forge_root = entry.forge_root or entry.worktree_path
         store = SessionStore(forge_root, "victim")
         store.delete()  # what worktree cleanup does to a nested project
@@ -641,7 +643,7 @@ class TestDeleteCreateCoordination:
         proceeded = index.delete_session_txn(
             "victim",
             forge_root=forge_root,
-            expect_manifest_absent=True,
+            expected_instance_id=entry.instance_id,
             delete_manifest=lambda: deleted.append(1),
         )
 
@@ -660,6 +662,7 @@ class TestDeleteCreateCoordination:
         manager.start_session("solo", worktree_path=str(project), direct=True)
 
         entry = index.get_session("solo", forge_root=str(project))
+        assert entry.instance_id is not None
         forge_root = entry.forge_root or entry.worktree_path
         store = SessionStore(forge_root, "solo")
         store.delete()
@@ -668,7 +671,7 @@ class TestDeleteCreateCoordination:
             index.delete_session_txn(
                 "solo",
                 forge_root=forge_root,
-                expect_manifest_absent=True,
+                expected_instance_id=entry.instance_id,
                 delete_manifest=lambda: None,
             )
             is True
@@ -686,6 +689,7 @@ class TestDeleteCreateCoordination:
         manager = SessionManager(index_store=index)
         manager.start_session("victim", worktree_path=str(project), direct=True)
         entry = index.get_session("victim", forge_root=str(project))
+        assert entry.instance_id is not None
         forge_root = entry.forge_root or entry.worktree_path
         SessionStore(forge_root, "victim").delete()
 
@@ -712,7 +716,7 @@ class TestDeleteCreateCoordination:
             index.delete_session_txn(
                 "victim",
                 forge_root=forge_root,
-                expect_manifest_absent=True,
+                expected_instance_id=entry.instance_id,
                 delete_manifest=_try_to_publish_from_inside,
             )
             is True
@@ -786,99 +790,52 @@ class TestDeleteCreateCoordination:
         assert index.read().sessions == {}
         assert not SessionStore(str(project), "plain").exists()
 
-    def test_delete_session_spares_a_session_published_during_its_cleanup(
+    def test_cleanup_holds_publication_authority_until_all_content_is_removed(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """End-to-end through `delete_session`, with the real early-removal path.
+        """A creator waits through content cleanup, then publishes a distinct owner."""
+        from forge.session import deletion
 
-        `cleanup_worktree` is stubbed to do what it does to a nested project --
-        take the manifest with the worktree -- and then a replacement is published
-        while the delete is still in its transcript phase.
-        """
         project = _project(tmp_path)
         index = IndexStore()
         manager = SessionManager(index_store=index)
-        manager.start_session("victim", worktree_path=str(project), direct=True, claude_session_id="o" * 8)
+        manager.start_session("victim", worktree_path=str(project), direct=True)
+        original_owner = index.get_session("victim", str(project)).instance_id
+        entered = threading.Event()
+        published = threading.Event()
+        failures: list[BaseException] = []
 
-        # Mark the session as owning a worktree so delete_session takes the cleanup arm.
-        store = SessionStore(str(project), "victim")
-        state = store.read()
-        assert state.worktree is not None
-        state.worktree.is_worktree = True
-        store.write(state)
+        def publish_replacement() -> None:
+            entered.set()
+            try:
+                manager.start_session("victim", worktree_path=str(project), direct=True)
+                published.set()
+            except BaseException as error:
+                failures.append(error)
 
-        published: dict[str, str] = {}
+        publisher = threading.Thread(target=publish_replacement)
+        original_cleanup = deletion.apply_forge_content
 
-        class _Result:
-            errors: list[str] = []
+        def pause_cleanup(
+            inventory: deletion.ForgeContentPlan, *, _reviewer_leases_held: bool = False
+        ) -> tuple[str, ...]:
+            assert _reviewer_leases_held
+            publisher.start()
+            assert entered.wait(timeout=5)
+            publisher.join(timeout=0.2)
+            assert publisher.is_alive(), "publication must wait for cleanup's index lock"
+            assert not published.is_set()
+            return original_cleanup(inventory, _reviewer_leases_held=_reviewer_leases_held)
 
-        def _cleanup_takes_the_manifest(**kwargs: object) -> _Result:
-            SessionStore(str(project), "victim").delete()
-            return _Result()
+        monkeypatch.setattr(deletion, "apply_forge_content", pause_cleanup)
+        manager.delete_session("victim", forge_root=str(project), delete_worktree=False)
+        publisher.join(timeout=10)
 
-        def _publish_during_transcript_phase(*args: object, **kwargs: object) -> dict[str, list[str]]:
-            # Stands in for the slow transcript work that keeps the window open.
-            if "uuid" not in published:
-                replacement = manager.start_session(
-                    "victim", worktree_path=str(project), direct=True, claude_session_id="n" * 8
-                )
-                published["uuid"] = replacement.confirmed.claude_session_id or ""
-            return {}
-
-        monkeypatch.setattr("forge.session.worktree.cleanup_worktree", _cleanup_takes_the_manifest)
-        monkeypatch.setattr(SessionManager, "_find_shared_transcript_sessions", _publish_during_transcript_phase)
-
-        manager.delete_session("victim", forge_root=str(project), force=True)
-
-        assert published.get("uuid") == "n" * 8, "the replacement must actually have been published"
-        survivor = SessionStore(str(project), "victim")
-        assert survivor.exists(), "delete_session must not remove the replacement's manifest"
-        assert survivor.read().confirmed.claude_session_id == "n" * 8
-        assert index.live_session_exists("victim", forge_root=str(project)), "nor its row"
-
-    def test_delete_session_spares_a_session_published_inside_worktree_cleanup(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """The earliest schedule: the replacement lands before any probe could run.
-
-        Review finding: an `expect_manifest_absent` sampled by observing the
-        filesystem was already looking at the replacement's manifest here, read it
-        as this delete's own, and destroyed both halves of the new session. The
-        flag has to be derived from what the delete does, not from what it sees.
-        """
-        project = _project(tmp_path)
-        index = IndexStore()
-        manager = SessionManager(index_store=index)
-        manager.start_session("victim", worktree_path=str(project), direct=True, claude_session_id="o" * 8)
-
-        store = SessionStore(str(project), "victim")
-        state = store.read()
-        assert state.worktree is not None
-        state.worktree.is_worktree = True
-        store.write(state)
-
-        published: dict[str, str] = {}
-
-        class _Result:
-            errors: list[str] = []
-
-        def _cleanup_then_publish(**kwargs: object) -> _Result:
-            SessionStore(str(project), "victim").delete()
-            replacement = manager.start_session(
-                "victim", worktree_path=str(project), direct=True, claude_session_id="n" * 8
-            )
-            published["uuid"] = replacement.confirmed.claude_session_id or ""
-            return _Result()
-
-        monkeypatch.setattr("forge.session.worktree.cleanup_worktree", _cleanup_then_publish)
-
-        manager.delete_session("victim", forge_root=str(project), force=True)
-
-        assert published.get("uuid") == "n" * 8
-        survivor = SessionStore(str(project), "victim")
-        assert survivor.exists(), "the replacement's manifest must survive"
-        assert survivor.read().confirmed.claude_session_id == "n" * 8
-        assert index.live_session_exists("victim", forge_root=str(project)), "and its row"
+        assert not publisher.is_alive()
+        assert failures == []
+        assert published.is_set()
+        assert index.get_session("victim", str(project)).instance_id != original_owner
+        assert SessionStore(str(project), "victim").exists()
 
 
 class TestForkStaleTargetReplacement:
@@ -915,9 +872,10 @@ class TestForkStaleTargetReplacement:
 
         monkeypatch.setattr(SessionManager, "delete_session", _publish_after_the_stale_delete)
 
-        with pytest.raises(SessionExistsError):
+        with pytest.raises(ForgeSessionError, match="already removed") as failure:
             manager.fork_session("parent", "target", force=True)
 
+        assert isinstance(failure.value.__cause__, SessionExistsError)
         assert published.get("uuid") == "n" * 8, "the replacement must actually have been published"
         survivor = SessionStore(str(project), "target")
         assert survivor.exists(), "fork must not destroy the replacement's manifest"
@@ -940,8 +898,8 @@ class TestForkStaleTargetReplacement:
         assert replaced.read().confirmed.claude_session_id != "s" * 8, "the stale target must be gone"
         assert index.live_session_exists("target", forge_root=str(project))
 
-    def test_fork_force_still_clears_a_pre_existing_orphan_manifest(self, tmp_path: Path) -> None:
-        """A manifest with no row predates the window and stays fork's to clear."""
+    def test_fork_force_preserves_a_pre_existing_orphan_until_repaired(self, tmp_path: Path) -> None:
+        """Force cannot establish ownership of an unindexed manifest."""
         project = _project(tmp_path)
         index = IndexStore()
         manager = SessionManager(index_store=index)
@@ -949,15 +907,16 @@ class TestForkStaleTargetReplacement:
         manager.fork_session("parent", "target")
         _mark(SessionStore(str(project), "target"), "o" * 8)
         # Remove only the row to construct the pre-existing orphan manifest this
-        # force-fork path is required to reclaim.
+        # force-fork path must preserve until explicit repair.
         remove_index_row_only(index, "target", project)
 
-        manager.fork_session("parent", "target", force=True)
+        with pytest.raises(ForgeSessionError, match="repair"):
+            manager.fork_session("parent", "target", force=True)
 
-        replaced = SessionStore(str(project), "target")
-        assert replaced.exists()
-        assert replaced.read().confirmed.claude_session_id != "o" * 8, "the orphan must be reclaimed"
-        assert index.live_session_exists("target", forge_root=str(project))
+        orphan = SessionStore(str(project), "target")
+        assert orphan.exists()
+        assert orphan.read().confirmed.claude_session_id == "o" * 8
+        assert not index.live_session_exists("target", forge_root=str(project))
 
 
 class TestConcurrentCreate:

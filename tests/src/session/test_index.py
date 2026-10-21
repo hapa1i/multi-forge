@@ -97,7 +97,7 @@ class TestIndexStoreRead:
         assert index.sessions == {}
 
     def test_read_valid_index(self, store: IndexStore, index_path: Path) -> None:
-        """read() should parse valid v1 index with scoped keys."""
+        """read() should parse the current index schema with scoped keys."""
         from forge.session.identity import make_scoped_key
 
         scoped_key = make_scoped_key("test-session", "/path/to/worktree")
@@ -108,6 +108,7 @@ class TestIndexStoreRead:
                     "worktree_path": "/path/to/worktree",
                     "project_root": "/path/to/project",
                     "last_accessed_at": "2024-12-17T10:00:00",
+                    "instance_id": None,
                     "is_fork": False,
                     "is_incognito": False,
                     "parent_session": None,
@@ -425,10 +426,10 @@ class TestIndexStoreUuidFields:
         reloaded = store.get_session("test-session")
         assert reloaded.claude_session_id == "abc-123"
 
-    def test_v2_index_rejected(self, store: IndexStore, index_path: Path) -> None:
-        """v2 index is rejected (no migration in OSS release)."""
+    def test_future_index_rejected(self, store: IndexStore, index_path: Path) -> None:
+        """Unknown future index versions are rejected."""
         old_index = {
-            "version": 2,
+            "version": INDEX_VERSION + 1,
             "sessions": {},
         }
         index_path.write_text(json.dumps(old_index))
@@ -679,7 +680,7 @@ class TestProjectIdentityFields:
 
     def test_read_future_version_raises(self, store: IndexStore, index_path: Path) -> None:
         """Reading a future version raises IndexCorruptedError."""
-        data = {"version": 2, "sessions": {}}
+        data = {"version": INDEX_VERSION + 1, "sessions": {}}
         index_path.write_text(json.dumps(data))
 
         with pytest.raises(IndexCorruptedError) as exc_info:
@@ -899,9 +900,12 @@ class TestCodexThreadColumn:
     def test_drift_reconciliation_moves_the_guard_to_the_live_id(self, tmp_path: Path) -> None:
         """Codex can re-bind a thread across a resume; a stale column guards nothing."""
         store = IndexStore()
-        publish_session_from_fields(store, "drifter", tmp_path, tmp_path, codex_thread_id=self._THREAD)
+        published = publish_session_from_fields(store, "drifter", tmp_path, tmp_path, codex_thread_id=self._THREAD)
+        assert published.instance_id is not None
 
-        store.update_codex_thread("drifter", self._DRIFTED, str(tmp_path))
+        assert store.update_codex_thread(
+            "drifter", self._DRIFTED, str(tmp_path), expected_instance_id=published.instance_id
+        )
 
         entry = next(iter(store.read().sessions.values()))
         assert entry.codex_thread_id == self._DRIFTED
@@ -927,7 +931,9 @@ class TestCodexThreadColumn:
 
     def test_reconciling_an_unknown_session_is_a_no_op(self, tmp_path: Path) -> None:
         """Best-effort by contract: drift already happened, so this must not raise."""
-        IndexStore().update_codex_thread("never-added", self._DRIFTED, str(tmp_path))
+        assert not IndexStore().update_codex_thread(
+            "never-added", self._DRIFTED, str(tmp_path), expected_instance_id="a" * 32
+        )
 
     def test_drift_collision_is_logged_and_the_live_id_remains_guarded(
         self,
@@ -936,13 +942,16 @@ class TestCodexThreadColumn:
     ) -> None:
         store = IndexStore()
         publish_session_from_fields(store, "first", tmp_path, tmp_path, codex_thread_id=self._THREAD)
-        publish_session_from_fields(store, "drifter", tmp_path, tmp_path, codex_thread_id=self._DRIFTED)
+        published = publish_session_from_fields(store, "drifter", tmp_path, tmp_path, codex_thread_id=self._DRIFTED)
+        assert published.instance_id is not None
         first_key = make_scoped_key("first", str(tmp_path))
         drifter_key = make_scoped_key("drifter", str(tmp_path))
         first_before = store.read().sessions[first_key]
 
         with caplog.at_level(logging.WARNING, logger="forge.session.index"):
-            store.update_codex_thread("drifter", self._THREAD, str(tmp_path))
+            assert store.update_codex_thread(
+                "drifter", self._THREAD, str(tmp_path), expected_instance_id=published.instance_id
+            )
 
         sessions = store.read().sessions
         assert sessions[first_key] == first_before

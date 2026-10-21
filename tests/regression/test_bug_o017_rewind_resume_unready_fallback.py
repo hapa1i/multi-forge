@@ -113,6 +113,6 @@ def test_o017_failed_rollback_names_retained_child_and_deletion_recovery(rewind_
     output = " ".join(result.output.split())
     assert "Rewind fallback could not prepare a resumable transcript." in output
     assert f"Cleanup also failed for created session '{child_name}': cleanup denied." in output
-    assert f"forge session delete {child_name} --yes --force --keep-transcripts --keep-worktree" in output
+    assert f"forge session delete {child_name} --yes --force --keep-worktree" in output
     assert SessionStore(str(rewind_project), child_name).exists()
     assert index_store.session_exists(child_name, forge_root=str(rewind_project.resolve()))

@@ -51,6 +51,14 @@ from .workspace import workspace  # noqa: E402
 # log files without creating a fresh "logs.*.log" file as a side effect.
 _EXEMPT_SUBCOMMANDS = frozenset({"hook", "status-line", "logs", "clean"})
 
+# Session cleanup leaves skip only the queue drain: an unconfirmed preview must not
+# consume markers or spawn workers for the sessions it is about to inspect.
+_SESSION_DRAIN_EXEMPT_LEAVES = frozenset({"delete", "purge", "clean"})
+
+# The group callback runs before Click parses the leaf, so resolution records the
+# canonical top-level command and its remaining arguments here.
+_INVOCATION_META = "forge.invocation"
+
 # Session auto-cleanup is also exempt for session and workspace subcommands so
 # inspection commands do not delete the state they are about to report.
 # Auto-cleanup still fires on every other forge command.
@@ -93,6 +101,15 @@ class AliasGroup(click.Group):
             from forge.cli.output import handle_unreadable_state_error
 
             handle_unreadable_state_error(e)  # prints + sys.exit(1)
+
+    def resolve_command(
+        self, ctx: click.Context, args: list[str]
+    ) -> tuple[str | None, click.Command | None, list[str]]:
+        cmd_name, cmd, rest = super().resolve_command(ctx, args)
+        if cmd_name is not None and ctx.parent is None:
+            canonical = cmd_name if cmd_name in self.commands else _ALIASES.get(cmd_name, cmd_name)
+            ctx.meta[_INVOCATION_META] = (canonical, tuple(rest))
+        return cmd_name, cmd, rest
 
     def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         rv = super().get_command(ctx, cmd_name)
@@ -149,6 +166,7 @@ def _memory_writer_env(payload: dict[str, object]) -> dict[str, str]:
         ENV_PARENT_SESSION,
         ENV_SESSION,
     )
+    from forge.session.workers import SESSION_INSTANCE_ENV
 
     env = os.environ.copy()
     # Scrub the drainer's run-tree AND session identity (see docstring): inheriting either
@@ -161,6 +179,7 @@ def _memory_writer_env(payload: dict[str, object]) -> dict[str, str]:
         ENV_SESSION,
         ENV_FORK_NAME,
         ENV_PARENT_SESSION,
+        SESSION_INSTANCE_ENV,
     ):
         env.pop(var, None)
 
@@ -172,6 +191,9 @@ def _memory_writer_env(payload: dict[str, object]) -> dict[str, str]:
         env[FORGE_ROOT_RUN_ID_VAR] = str(origin_root)
         env[FORGE_PARENT_RUN_ID_VAR] = str(payload.get("origin_run_id") or origin_root)
         env[FORGE_RUN_ID_VAR] = mint_run_id()
+    instance_id = payload.get("instance_id")
+    if isinstance(instance_id, str):
+        env[SESSION_INSTANCE_ENV] = instance_id
     return env
 
 
@@ -449,16 +471,19 @@ def main(ctx: click.Context) -> None:
     # Configure file logging for non-exempt subcommands.
     # Hooks configure their own logging (hooks/ subdirectory).
     # Status-line is exempt to avoid log spam (runs on every poll cycle).
-    if ctx.invoked_subcommand not in _EXEMPT_SUBCOMMANDS:
+    command, arguments = ctx.meta.get(_INVOCATION_META, (ctx.invoked_subcommand, ()))
+    if command not in _EXEMPT_SUBCOMMANDS:
         from forge.core.logging import configure_debug_logging
 
-        configure_debug_logging(component=ctx.invoked_subcommand or "forge", subdirectory="cli")
+        configure_debug_logging(component=command or "forge", subdirectory="cli")
 
     # Exempt commands skip startup mutations.
-    if ctx.invoked_subcommand not in _EXEMPT_SUBCOMMANDS:
-        _process_pending_work_best_effort()
+    if command not in _EXEMPT_SUBCOMMANDS:
+        leaf = next((argument for argument in arguments if not argument.startswith("-")), None)
+        if not (command == "session" and leaf in _SESSION_DRAIN_EXEMPT_LEAVES):
+            _process_pending_work_best_effort()
         _auto_clean_logs_best_effort()
-    if ctx.invoked_subcommand not in _SESSION_CLEANUP_EXEMPT:
+    if command not in _SESSION_CLEANUP_EXEMPT:
         _auto_clean_sessions_best_effort()
 
 

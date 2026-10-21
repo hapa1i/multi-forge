@@ -1,13 +1,12 @@
-"""Artifact-authority journal lifetime follows its containing Forge root."""
+"""Session deletion removes authority and routing content in surviving roots too."""
 
 from __future__ import annotations
 
-import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 
-import forge.session.worktree as worktree_pkg
 from forge.core.models.direct_model import resolve_direct_model_pin
 from forge.core.ops.session_routing import build_claude_routing_payload
 from forge.core.reactive.env import new_root_run_identity
@@ -61,11 +60,9 @@ def _start_marked(
     return authority_journal, routing_journal
 
 
-@pytest.mark.parametrize("delete_transcripts", [False, True])
-def test_delete_preserves_authority_journal_when_forge_root_remains(
+def test_delete_removes_authority_journal_when_forge_root_remains(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    delete_transcripts: bool,
 ) -> None:
     home = tmp_path / "home"
     project = tmp_path / "project"
@@ -80,21 +77,18 @@ def test_delete_preserves_authority_journal_when_forge_root_remains(
 
     manager.delete_session(
         "retained",
-        delete_transcripts=delete_transcripts,
         delete_worktree=False,
         force=True,
     )
 
-    assert authority_journal.is_file()
-    assert routing_journal.is_file()
+    assert not authority_journal.exists()
+    assert not routing_journal.exists()
     assert not SessionStore(str(project), "retained").exists()
 
 
-@pytest.mark.parametrize("delete_transcripts", [False, True])
-def test_age_cleanup_preserves_authority_journal_with_transcript_setting(
+def test_age_cleanup_removes_authority_and_routing_journals(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    delete_transcripts: bool,
 ) -> None:
     home = tmp_path / "home"
     project = tmp_path / "project"
@@ -114,17 +108,16 @@ def test_age_cleanup_preserves_authority_journal_with_transcript_setting(
 
     result = clean_old_sessions(
         1,
-        delete_transcripts=delete_transcripts,
         delete_worktree=False,
         force=True,
     )
 
     assert result.deleted == ["old-marked"]
-    assert authority_journal.is_file()
-    assert routing_journal.is_file()
+    assert not authority_journal.exists()
+    assert not routing_journal.exists()
 
 
-def test_incognito_cleanup_preserves_journal_when_forge_root_remains(
+def test_incognito_cleanup_removes_journal_when_forge_root_remains(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     home = tmp_path / "home"
@@ -137,28 +130,31 @@ def test_incognito_cleanup_preserves_journal_when_forge_root_remains(
 
     manager = SessionManager(index_store=IndexStore())
     authority_journal, routing_journal = _start_marked(manager, project, "private", incognito=True)
-    manager.delete_session("private", delete_transcripts=True, delete_worktree=False, force=True)
+    manager.delete_session("private", delete_worktree=False, force=True)
 
-    assert authority_journal.is_file()
-    assert routing_journal.is_file()
+    assert not authority_journal.exists()
+    assert not routing_journal.exists()
 
 
-def test_root_level_worktree_delete_preserves_parent_root_journal(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("nested", [False, True])
+def test_worktree_delete_removes_journals_for_both_forge_root_topologies(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, git_repo: Path, nested: bool
 ) -> None:
-    home = tmp_path / "home"
-    project = tmp_path / "project"
-    checkout = tmp_path / "worktrees" / "producer"
-    home.mkdir()
-    _init_project(project)
-    checkout.mkdir(parents=True)
-    monkeypatch.setenv("HOME", str(home))
+    checkout = tmp_path / "worktree"
+    subprocess.run(
+        ["git", "worktree", "add", "-b", "producer", str(checkout)],
+        cwd=git_repo,
+        check=True,
+        capture_output=True,
+    )
+    root = checkout / "packages" / "app" if nested else git_repo
+    root.mkdir(parents=True, exist_ok=True)
+    (root / ".forge").mkdir()
+    (root / ".claude").mkdir()
     monkeypatch.delenv("FORGE_SESSION", raising=False)
-    monkeypatch.chdir(project)
-
+    monkeypatch.chdir(root)
     manager = SessionManager(index_store=IndexStore())
-    authority_journal, routing_journal = _start_marked(manager, project, "producer")
-    store = SessionStore(str(project), "producer")
+    authority_journal, routing_journal = _start_marked(manager, root, "producer")
 
     def mark_owned_worktree(state) -> None:
         assert state.worktree is not None
@@ -167,63 +163,10 @@ def test_root_level_worktree_delete_preserves_parent_root_journal(
         state.worktree.owns_worktree = True
         state.worktree.branch = "producer"
 
-    store.update(timeout_s=5.0, mutate=mark_owned_worktree)
-    monkeypatch.setattr(
-        SessionManager,
-        "_find_co_resident_sessions",
-        lambda self, worktree_path, exclude: [],
-    )
-
-    def remove_checkout(**kwargs):
-        shutil.rmtree(kwargs["worktree_path"])
-        return worktree_pkg.CleanupResult()
-
-    monkeypatch.setattr(worktree_pkg, "cleanup_worktree", remove_checkout)
-    manager.delete_session("producer", delete_worktree=True, force=True)
-
-    assert not checkout.exists()
-    assert authority_journal.is_file()
-    assert routing_journal.is_file()
-
-
-def test_owning_worktree_delete_removes_journal_with_nested_forge_root(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    home = tmp_path / "home"
-    checkout = tmp_path / "worktrees" / "producer"
-    nested_root = checkout / "packages" / "app"
-    home.mkdir()
-    checkout.mkdir(parents=True)
-    _init_project(nested_root)
-    monkeypatch.setenv("HOME", str(home))
-    monkeypatch.delenv("FORGE_SESSION", raising=False)
-    monkeypatch.chdir(nested_root)
-
-    manager = SessionManager(index_store=IndexStore())
-    authority_journal, routing_journal = _start_marked(manager, nested_root, "nested-producer")
-    store = SessionStore(str(nested_root), "nested-producer")
-
-    def mark_owned_worktree(state) -> None:
-        assert state.worktree is not None
-        state.worktree.path = str(checkout)
-        state.worktree.is_worktree = True
-        state.worktree.owns_worktree = True
-        state.worktree.branch = "producer"
-
-    store.update(timeout_s=5.0, mutate=mark_owned_worktree)
-    monkeypatch.setattr(
-        SessionManager,
-        "_find_co_resident_sessions",
-        lambda self, worktree_path, exclude: [],
-    )
-
-    def remove_checkout(**kwargs):
-        shutil.rmtree(kwargs["worktree_path"])
-        return worktree_pkg.CleanupResult()
-
-    monkeypatch.setattr(worktree_pkg, "cleanup_worktree", remove_checkout)
-    manager.delete_session("nested-producer", delete_worktree=True, force=True)
+    SessionStore(str(root), "producer").update(timeout_s=5.0, mutate=mark_owned_worktree)
+    manager.delete_session("producer", forge_root=str(root), delete_worktree=True, force=True)
 
     assert not checkout.exists()
     assert not authority_journal.exists()
     assert not routing_journal.exists()
+    assert git_repo.exists()

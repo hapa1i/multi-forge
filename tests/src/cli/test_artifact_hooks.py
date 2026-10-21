@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 import pytest
-from click.testing import CliRunner
+from click.testing import CliRunner, Result
 
 from forge.cli.hooks import hooks
 from forge.session import SessionStore, create_session_state
@@ -44,11 +44,32 @@ def _write_manifest(
         proxy_base_url="http://localhost:8080",
     )
     store = SessionStore(str(tmp_path), session_name)
-    store.write(manifest)
+    publish_session(IndexStore(), manifest, tmp_path, forge_root=tmp_path)
 
     monkeypatch.setenv("FORGE_SESSION", session_name)
     monkeypatch.setenv("FORGE_FORGE_ROOT", str(tmp_path))
     return store
+
+
+def _invoke_sidecar_stop(store: SessionStore, local_root: Path, monkeypatch: pytest.MonkeyPatch) -> Result:
+    from forge.session.workers import (
+        SESSION_INSTANCE_ENV,
+        SIDECAR_LEASE_ENV,
+        sidecar_session_lease,
+    )
+
+    token = store.review_identity()
+    assert token is not None
+    (local_root / ".forge").symlink_to(store.forge_root / ".forge", target_is_directory=True)
+    monkeypatch.setattr("forge.session.workers._sidecar_exit_confirmed", lambda _name: True)
+    with sidecar_session_lease(store.forge_root, store.session_name, expected_instance_id=token) as lease:
+        monkeypatch.setenv("FORGE_SIDECAR", "1")
+        monkeypatch.setenv("FORGE_FORGE_ROOT", str(local_root))
+        monkeypatch.setenv("FORGE_SIDECAR_HOST_FORGE_ROOT", str(store.forge_root))
+        monkeypatch.setenv(SESSION_INSTANCE_ENV, token)
+        monkeypatch.setenv(SIDECAR_LEASE_ENV, str(lease))
+        monkeypatch.setattr("forge.session.workers.SIDECAR_LEASE_MOUNT", str(lease.parent))
+        return CliRunner().invoke(hooks, ["stop"], input=json.dumps({"hook_event_name": "Stop"}))
 
 
 class TestPlanWriteHook:
@@ -174,7 +195,8 @@ class TestStopHook:
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("FORGE_HOME", str(tmp_path / ".forge-test"))
-        store = _write_manifest(tmp_path, monkeypatch)
+        host_root = tmp_path / "host-project"
+        store = _write_manifest(host_root, monkeypatch)
         transcript = tmp_path / "sidecar.jsonl"
         transcript.write_text("{}\n", encoding="utf-8")
         manifest = store.read()
@@ -182,11 +204,7 @@ class TestStopHook:
         manifest.confirmed.claude_session_id = "uuid-sidecar"
         store.write(manifest)
 
-        host_root = tmp_path / "host-project"
-        monkeypatch.setenv("FORGE_SIDECAR", "1")
-        monkeypatch.setenv("FORGE_SIDECAR_HOST_FORGE_ROOT", str(host_root))
-
-        result = CliRunner().invoke(hooks, ["stop"], input=json.dumps({"hook_event_name": "Stop"}))
+        result = _invoke_sidecar_stop(store, tmp_path, monkeypatch)
 
         assert result.exit_code == 0
         for marker_name in ("uuid-sidecar.json", "idx-uuid-sidecar.json"):
@@ -201,7 +219,8 @@ class TestStopHook:
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("FORGE_HOME", str(tmp_path / ".forge-test"))
-        store = _write_manifest(tmp_path, monkeypatch)
+        host_forge_root = tmp_path / "host-main"
+        store = _write_manifest(host_forge_root, monkeypatch)
         transcript = tmp_path / "sidecar-split.jsonl"
         transcript.write_text("{}\n", encoding="utf-8")
         manifest = store.read()
@@ -210,12 +229,8 @@ class TestStopHook:
         store.write(manifest)
 
         host_worktree = tmp_path / "host-checkout"
-        host_forge_root = tmp_path / "host-main"
-        monkeypatch.setenv("FORGE_SIDECAR", "1")
         monkeypatch.setenv("FORGE_SIDECAR_HOST_WORKTREE_PATH", str(host_worktree))
-        monkeypatch.setenv("FORGE_SIDECAR_HOST_FORGE_ROOT", str(host_forge_root))
-
-        result = CliRunner().invoke(hooks, ["stop"], input=json.dumps({"hook_event_name": "Stop"}))
+        result = _invoke_sidecar_stop(store, tmp_path, monkeypatch)
 
         assert result.exit_code == 0
         for marker_name in ("uuid-sidecar-split.json", "idx-uuid-sidecar-split.json"):

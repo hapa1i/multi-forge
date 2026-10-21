@@ -517,6 +517,11 @@ class TestEndToEndPipeline:
 
         monkeypatch.chdir(project_root)
 
+        from forge.session.index import IndexStore
+        from tests.fixtures.session_state import publish_session_from_fields
+
+        publish_session_from_fields(IndexStore(), "perf-fix", project_root, project_root)
+
         # Enqueue index marker (simulates what stop hook does)
         from forge.core.workqueue import enqueue_index_marker
 

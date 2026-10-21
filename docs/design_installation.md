@@ -358,9 +358,11 @@ variables must be added here and documented in the relevant end-user guide befor
 | `FORGE_ROOT_RUN_ID`                | Internal wiring   | Run-tree attribution root id                                         |
 | `FORGE_RUN_ID`                     | Internal wiring   | Run-tree attribution id                                              |
 | `FORGE_SESSION`                    | Internal wiring   | Launcher-provided session identity for hooks/status/session tooling  |
+| `FORGE_SESSION_INSTANCE`           | Internal wiring   | Opaque session instance binding for launch and producer admission    |
 | `FORGE_SIDECAR`                    | Internal wiring   | Sidecar runtime marker                                               |
 | `FORGE_SIDECAR_HOST_FORGE_ROOT`    | Internal wiring   | Host Forge root retained for sidecar deferred-work markers           |
 | `FORGE_SIDECAR_HOST_WORKTREE_PATH` | Internal wiring   | Host worktree path retained for sidecar deferred-work markers        |
+| `FORGE_SIDECAR_WORKER_LEASE`       | Internal wiring   | Mounted host lifetime lease path for exact sidecar admission         |
 | `FORGE_SKILL_RUNTIME`              | Internal wiring   | Compiled skill-to-packaged-script runtime binding                    |
 | `FORGE_SUBPROCESS_BASE_URL`        | Internal wiring   | Child-process proxy routing metadata                                 |
 | `FORGE_SUBPROCESS_PROXY`           | Internal wiring   | Child-process proxy selection                                        |

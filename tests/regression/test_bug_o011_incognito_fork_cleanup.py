@@ -43,6 +43,7 @@ def _plan(tmp_path: Path, *, use_sidecar: bool, incognito: bool = True) -> ForkL
         proxy_id=None,
         incognito=incognito,
         render_post_exit=False,
+        instance_id="a" * 32,
     )
 
 
@@ -62,7 +63,7 @@ def test_o011_typed_incognito_launch_failure_always_cleans_up(tmp_path: Path, us
         result = fork_claude_session(manager=manager, plan=plan, presenter=presenter)
 
     assert result.exit_code == 1
-    cleanup.assert_called_once_with(manager, plan.manifest, presenter)
+    cleanup.assert_called_once_with(manager, plan.manifest, presenter, expected_instance_id=plan.instance_id)
 
 
 def test_o011_non_incognito_failure_does_not_delete_session(tmp_path: Path) -> None:

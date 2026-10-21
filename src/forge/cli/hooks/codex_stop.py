@@ -31,6 +31,7 @@ from forge.session.effective import compute_effective_intent
 from forge.session.hooks.session_start import resolve_session_store
 from forge.session.models import SessionState, session_runtime
 from forge.session.store import SessionStore
+from forge.session.workers import SESSION_INSTANCE_ENV, capture_session_instance
 
 _log = logging.getLogger(__name__)
 INPUT_BYTES = 512_000
@@ -110,7 +111,7 @@ def resolve_context(data: dict[str, Any]) -> tuple[stop_review.TurnContext, Sess
         data.get("turn_id", ""),
         sup,
         read_bound_lane(state, SUPERVISOR_CONSUMER),
-        store.review_identity(create=True) or "",
+        os.environ.get(SESSION_INSTANCE_ENV) or capture_session_instance(store.forge_root, state.name),
         native_boundary=boundary_from_hook(data, admitted=True) if sup.native_source else None,
     )
     return context, store
@@ -218,6 +219,6 @@ def _freeze_lane(store: SessionStore, context: stop_review.TurnContext) -> None:
             ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, context.lane)
 
     try:
-        store.update(timeout_s=1, mutate=mutate)
+        store.update(timeout_s=1, mutate=mutate, expected_instance_id=context.session_identity)
     except Exception as exc:
         _log.warning("Stop reviewer lane could not be frozen (%s)", type(exc).__name__)

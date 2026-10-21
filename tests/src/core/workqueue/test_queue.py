@@ -145,6 +145,16 @@ class TestEnqueue:
         assert queue_dir.exists()
 
 
+@pytest.fixture
+def published_queue_sessions(tmp_path: Path) -> None:
+    from forge.session.index import IndexStore
+    from tests.fixtures.session_state import publish_session_from_fields
+
+    for name in ("my-session", "test"):
+        publish_session_from_fields(IndexStore(), name, tmp_path, tmp_path)
+
+
+@pytest.mark.usefixtures("published_queue_sessions")
 class TestEnqueueStopMarker:
     """Tests for the enqueue_stop_marker() convenience wrapper."""
 
@@ -184,6 +194,7 @@ class TestEnqueueStopMarker:
         assert result is None
 
 
+@pytest.mark.usefixtures("published_queue_sessions")
 class TestEnqueueIndexMarker:
     """Tests for the enqueue_index_marker() convenience wrapper."""
 
@@ -257,6 +268,7 @@ class TestEnqueueIndexMarker:
         assert result is None
 
 
+@pytest.mark.usefixtures("published_queue_sessions")
 class TestEnqueueHandoffMarker:
     """Tests for the enqueue_handoff_marker() convenience wrapper."""
 

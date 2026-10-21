@@ -679,11 +679,10 @@ class TestForkNativeRelocate:
         assert native_fork.confirmed.derivation.resume_mode == "native"
         assert native_fork.confirmed.derivation.context_file is None
 
-    def test_delete_removes_relocated_copy_without_child_uuid(
+    def test_delete_preserves_relocated_copy_without_child_uuid(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Deleting a native-relocate fork removes the relocated parent copy (dir-scoped),
-        preserves the parent's original, and runs even when the child never got a UUID."""
+        """Deleting an unlaunched native-relocate child preserves both native copies."""
         from forge.session.claude.paths import get_transcript_path
 
         monkeypatch.setenv("HOME", str(tmp_path / "home"))
@@ -715,15 +714,15 @@ class TestForkNativeRelocate:
         relocated.parent.mkdir(parents=True, exist_ok=True)
         relocated.write_text("PARENT\n")
 
-        manager.delete_session("child", delete_transcripts=True, delete_worktree=False, force=True)
+        manager.delete_session("child", delete_worktree=False, force=True)
 
-        assert not relocated.exists(), "relocated parent copy should be removed from the child's dir"
+        assert relocated.read_text() == "PARENT\n"
         assert parent_original.exists(), "parent's original transcript must be preserved"
 
-    def test_delete_removes_rewind_copy_by_fresh_uuid_only(
+    def test_delete_preserves_rewind_copy_by_fresh_uuid_only(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Deleting a rewind child unlinks only its fresh truncated transcript UUID."""
+        """Deleting a rewind child preserves its fresh copy and unrelated native files."""
         from forge.session.claude.paths import get_transcript_path
 
         monkeypatch.setenv("HOME", str(tmp_path / "home"))
@@ -768,8 +767,8 @@ class TestForkNativeRelocate:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text)
 
-        manager.delete_session("rewind-child", delete_transcripts=True, delete_worktree=False, force=True)
+        manager.delete_session("rewind-child", delete_worktree=False, force=True)
 
-        assert not rewind_copy.exists(), "rewind fresh transcript copy should be removed"
+        assert rewind_copy.read_text() == "TRUNCATED\n"
         assert parent_original.exists(), "parent's original transcript must be preserved"
         assert sibling_original.exists(), "sibling transcript in the same encoded dir must be preserved"

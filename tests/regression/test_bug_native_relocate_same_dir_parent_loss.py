@@ -109,7 +109,7 @@ def test_delete_preserves_parent_original_on_dir_collision(tmp_path: Path, monke
 
     parent_original = _write_transcript(str(parent_repo), "puuid")
 
-    manager.delete_session("child", delete_transcripts=True, delete_worktree=False, force=True)
+    manager.delete_session("child", delete_worktree=False, force=True)
 
     assert parent_original.exists(), "parent's original transcript must be preserved on dir collision"
     assert parent_original.read_text() == "PARENT\n"
@@ -152,14 +152,14 @@ def test_delete_sibling_preserves_shared_relocated_transcript(tmp_path: Path, mo
     shared_reloc = _write_transcript(str(target), "puuid", "RELOCATED\n")
     parent_original = _write_transcript(str(parent_repo), "puuid", "PARENT\n")
 
-    manager.delete_session("child-a", delete_transcripts=True, delete_worktree=False, force=True)
+    manager.delete_session("child-a", delete_worktree=False, force=True)
     assert shared_reloc.exists(), "shared relocated copy must survive while sibling child-b references it"
     assert shared_reloc.read_text() == "RELOCATED\n"
 
     # Once the last referencing sibling is gone, the copy is reclaimed; the parent's own original
     # (under a different checkout) is never touched by either child deletion.
-    manager.delete_session("child-b", delete_transcripts=True, delete_worktree=False, force=True)
-    assert not shared_reloc.exists(), "relocated copy reclaimed once no session references it"
+    manager.delete_session("child-b", delete_worktree=False, force=True)
+    assert shared_reloc.exists(), "ordinary delete preserves unreferenced native copies"
     assert parent_original.exists(), "parent's own original (different checkout) untouched throughout"
     assert parent_original.read_text() == "PARENT\n"
 
@@ -201,7 +201,7 @@ def test_delete_preserves_divergent_topology_parent_original(tmp_path: Path, mon
 
     parent_original = _write_transcript(str(parent_cwd), "puuid", "PARENT\n")
 
-    manager.delete_session("child", delete_transcripts=True, delete_worktree=False, force=True)
+    manager.delete_session("child", delete_worktree=False, force=True)
 
     assert parent_original.exists(), "parent's original (under its Claude CWD, != forge_root) must survive"
     assert parent_original.read_text() == "PARENT\n"

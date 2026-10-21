@@ -592,6 +592,21 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
             decision.cached = True
             return decision
 
+        shadow_instance: str | None = None
+        shadow_root = os.environ.get("FORGE_FORGE_ROOT") or config.forge_root
+        if config.shadow_sample_rate > 0 and shadow_root:
+            from forge.session.workers import (
+                SESSION_INSTANCE_ENV,
+                capture_session_instance,
+            )
+
+            try:
+                shadow_instance = os.environ.get(SESSION_INSTANCE_ENV) or capture_session_instance(
+                    shadow_root, context.session_name
+                )
+            except Exception:
+                _log.debug("Shadow capture owner unavailable", exc_info=True)
+
         verdict = run_plan_check(
             context,
             model=route.model,
@@ -616,19 +631,28 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
                 try:
                     from forge.policy.semantic import shadow
 
-                    if shadow.should_sample(config, context, cache_key):
-                        shadow.capture_candidate(
-                            config,
-                            context,
-                            cache_key=cache_key,
-                            tier1_reason=verdict.reason,
-                            checker_model=route.model,
-                            checker_provider=route.provider,
-                            checker_budget_tokens=budget_tokens,
-                            checker_prompt_version=CHECKER_PROMPT_VERSION,
-                            lane_record=self._lane_record,
-                            snapshot=snapshot,
-                        )
+                    if shadow_instance is not None and shadow.should_sample(config, context, cache_key):
+                        from forge.session.workers import session_worker_lease
+
+                        with session_worker_lease(
+                            shadow_root or "",
+                            context.session_name,
+                            expected_instance_id=shadow_instance,
+                            label="shadow candidate",
+                        ):
+                            shadow.capture_candidate(
+                                config,
+                                context,
+                                cache_key=cache_key,
+                                tier1_reason=verdict.reason,
+                                checker_model=route.model,
+                                checker_provider=route.provider,
+                                checker_budget_tokens=budget_tokens,
+                                checker_prompt_version=CHECKER_PROMPT_VERSION,
+                                lane_record=self._lane_record,
+                                snapshot=snapshot,
+                                artifact_forge_root=shadow_root,
+                            )
                 except Exception:  # best-effort audit: never block the hook
                     _log.debug("shadow capture failed", exc_info=True)
             return self._allow()

@@ -186,7 +186,7 @@ def test_deferred_same_dir_fork_session_start_reconciles_child_uuid(
         source="startup",
     )
 
-    with patch.dict("os.environ", {"FORGE_SESSION": "fork-child"}, clear=True):
+    with patch.dict("os.environ", {"FORGE_SESSION": "fork-child"}):
         result = handle_session_start(hook_input, session_project)
 
     assert result.success

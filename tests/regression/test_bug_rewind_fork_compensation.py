@@ -90,7 +90,7 @@ def _unused_transfer(**_kwargs: object) -> tuple[Path | None, list[str]]:
     raise AssertionError("transfer preparation is not expected")
 
 
-def test_ready_plain_fallback_is_removed_after_late_fork_failure(
+def test_ready_plain_fallback_is_preserved_after_late_fork_failure(
     rewind_repo: tuple[Path, SessionManager, SessionState, Path],
 ) -> None:
     repo, manager, _parent, parent_transcript = rewind_repo
@@ -124,7 +124,7 @@ def test_ready_plain_fallback_is_removed_after_late_fork_failure(
             rewind_artifact_factory=_fallback_factory,
         )
 
-    assert not copied["path"].exists()
+    assert copied["path"].exists(), "ordinary cleanup preserves prepared native copies"
     assert parent_transcript.read_bytes() == original
     assert not SessionStore(str(plan.target.forge_root), "child").exists()
     assert manager.index_store.peek_session("child", forge_root=str(plan.target.forge_root)) is None

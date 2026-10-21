@@ -23,6 +23,16 @@ from forge.core.workqueue import (
     enqueue_stop_marker,
     pending_work_dir,
 )
+from forge.session.index import IndexStore
+from tests.fixtures.session_state import publish_session_from_fields
+
+
+@pytest.fixture(autouse=True)
+def published_queue_sessions(tmp_path: Path) -> None:
+    """Session markers originate from coherent managed session instances."""
+    for name in ("test-session", "session", "session-origin", "exec"):
+        publish_session_from_fields(IndexStore(), name, tmp_path, tmp_path)
+
 
 _REPO_ROOT = Path(__file__).parents[3]
 _QUEUE_GUIDES = (
@@ -135,6 +145,37 @@ class TestExemptSubcommands:
         runner.invoke(main, ["status-line"])
 
         assert marker.is_file(), "Exempt command (status-line) should NOT process pending-work queue"
+
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["session", "delete", "test-session"],
+            ["session", "purge", "test-session", "--json"],
+            ["session", "clean", "--older-than", "1"],
+            ["sess", "delete", "test-session"],
+        ],
+    )
+    def test_session_cleanup_leaves_skip_queue(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+    ) -> None:
+        """Cleanup previews must not drain work for the sessions they inspect."""
+        marker = _create_test_marker(tmp_path)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(main, argv, input="n\n")
+
+        assert marker.is_file()
+
+    @pytest.mark.parametrize("argv", [["session", "list", "--json"], ["sess", "list", "--json"]])
+    def test_other_session_commands_process_queue(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+    ) -> None:
+        marker = _create_test_marker(tmp_path)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(main, argv)
+
+        assert not marker.is_file()
 
 
 class TestStartupQueueRobustness:
@@ -671,8 +712,8 @@ class TestMemoryWriterRunIdentity:
             marker_path = enqueue_handoff_marker(
                 session_id="sess-origin",
                 worktree_path=tmp_path,
-                session_name="s",
-                transcript_snapshot_rel=".forge/artifacts/s/transcripts/sess-origin.jsonl",
+                session_name="session-origin",
+                transcript_snapshot_rel=".forge/artifacts/session-origin/transcripts/sess-origin.jsonl",
             )
         assert marker_path is not None
         payload = json.loads(marker_path.read_text())["payload"]

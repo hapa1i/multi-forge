@@ -263,7 +263,12 @@ class TestSessionDelete:
         result = mock_claude_workspace.exec("cd /workspace && forge session delete nonexistent --yes")
 
         assert result.returncode == 1
-        assert "not found" in result.stdout or "not found" in result.stderr
+        refusal = " ".join(result.stdout.split())
+        assert "Refused nonexistent" in refusal
+        assert "has no published record" in refusal
+        assert "forge session repair" in refusal
+        assert "refused or failed delete" in result.stderr
+        assert "Traceback" not in result.stderr
 
     def test_delete_non_object_confirmed_reports_corruption_without_mutation(
         self,
@@ -288,8 +293,11 @@ class TestSessionDelete:
         result = mock_claude_workspace.exec("cd /workspace && forge session delete bad-confirmed --yes")
 
         assert result.returncode == 1
-        assert "Forge state is corrupt" in result.stderr
-        assert "confirmed must be an object" in result.stderr
+        refusal = " ".join(result.stdout.split())
+        assert "Refused bad-confirmed" in refusal
+        assert path in refusal
+        assert "confirmed must be an object" in refusal
+        assert "refused or failed delete" in result.stderr
         assert "Traceback" not in result.stderr
         assert mock_claude_workspace.read_file(path) == original
 

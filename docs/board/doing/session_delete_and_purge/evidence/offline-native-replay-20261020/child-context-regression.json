@@ -1,0 +1,28 @@
+{
+  "native_invocations": 0,
+  "network": "none",
+  "provider_auth_forwarded": false,
+  "host_mounts": [],
+  "image_id": "sha256:e5a0737a229b3a9f278b0f95385a2d36c35bbdd25d4d7b56d8c292b57bf20957",
+  "updated_source_sha256": [
+    {
+      "path": "src/forge/session/cleanup_content.py",
+      "sha256": "b273d545831ec9d6dbd216f227bcf3a51a2520baaf6e8c5795447706261a4641"
+    },
+    {
+      "path": "tests/src/session/test_cleanup_content.py",
+      "sha256": "0f7772a8f8ef0edf9825b3c0f5e23ae7d852764a02f33ddc34e5c1dbe27b2ad7"
+    }
+  ],
+  "test_argv": [
+    "/forge/.venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/src/session/test_cleanup_content.py",
+    "tests/src/session/test_deletion.py"
+  ],
+  "test_output": "...............................................                          [100%]\n47 passed in 0.50s",
+  "status": "passed",
+  "container_removed": true
+}

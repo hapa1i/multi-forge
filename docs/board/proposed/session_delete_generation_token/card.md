@@ -4,6 +4,13 @@
 on 2026-08-01, during that card's third review round. That card made deletion decline once a replacement owns the name;
 this one closes the residual case its ownership signal cannot express.
 
+## Integration ownership (2026-10-20)
+
+The active [session delete and purge card](../../doing/session_delete_and_purge/card.md) absorbs this prerequisite on
+`codex/session-delete-and-purge`, based on `a33c4d24`. Its shared PR must verify both stale-deleter protection and
+writer exclusion before exposing content removal. This proposal stays open until that implementation ships, then retires
+as absorbed rather than receiving a separate shipped closeout.
+
 ## Problem
 
 `IndexStore.delete_session_txn` takes `expect_manifest_absent`, a boolean the caller derives from what its delete did:

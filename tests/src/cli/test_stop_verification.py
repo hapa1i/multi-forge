@@ -20,7 +20,9 @@ from click.testing import CliRunner
 
 from forge.cli.hooks import hooks
 from forge.session import SessionStore, create_session_state
+from forge.session.index import IndexStore
 from forge.session.models import VerificationConfig
+from tests.fixtures.session_state import publish_session
 
 
 def _write_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SessionStore:
@@ -30,7 +32,7 @@ def _write_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SessionSt
         proxy_base_url="http://localhost:8080",
     )
     store = SessionStore(str(tmp_path), "test-session")
-    store.write(manifest)
+    publish_session(IndexStore(), manifest, tmp_path, forge_root=tmp_path)
 
     monkeypatch.setenv("FORGE_SESSION", "test-session")
     return store

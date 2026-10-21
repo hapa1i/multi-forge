@@ -112,7 +112,10 @@ def test_late_advisory_authority_refuses_passthrough(
     seam.assert_not_called()
     invoke.assert_not_called()
     name = changed[0]
-    assert [event.event_type for event in read_authority_events(str(project), name)] == ["authority_configured"]
+    # First-turn rollback removes the child and its authority journal; other
+    # entrypoints keep the configured session and its refusal evidence.
+    expected_events = [] if entrypoint == "codex_first" else ["authority_configured"]
+    assert [event.event_type for event in read_authority_events(str(project), name)] == expected_events
     assert ActiveSessionStore().peek_session(name, forge_root=str(project)) is None
     assert not (project / ".forge" / "artifacts" / name / "routing").exists()
     store = SessionStore(str(project), name)

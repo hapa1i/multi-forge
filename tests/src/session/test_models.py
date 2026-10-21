@@ -946,8 +946,8 @@ class TestConstants:
         assert SCHEMA_VERSION == 5
 
     def test_index_version(self) -> None:
-        """INDEX_VERSION should be 1."""
-        assert INDEX_VERSION == 1
+        """INDEX_VERSION includes persistent session generations."""
+        assert INDEX_VERSION == 2
 
 
 class TestConsumerLanes:

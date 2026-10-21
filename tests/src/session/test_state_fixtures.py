@@ -80,7 +80,7 @@ def test_delete_published_session_removes_manifest_before_row(tmp_path: Path, mo
     index = IndexStore(tmp_path / "index.json")
     state = create_session_state("planner", worktree_path=str(project))
     publish_session(index, state, project, forge_root=project)
-    original = SessionStore.delete
+    original = SessionStore.delete_locked
     observations: list[tuple[bool, bool]] = []
 
     def observe_then_delete(store: SessionStore) -> bool:
@@ -88,7 +88,7 @@ def test_delete_published_session_removes_manifest_before_row(tmp_path: Path, mo
         observations.append((key in index.read().sessions, store.exists()))
         return original(store)
 
-    monkeypatch.setattr(SessionStore, "delete", observe_then_delete)
+    monkeypatch.setattr(SessionStore, "delete_locked", observe_then_delete)
 
     assert delete_published_session(index, state.name, project)
 

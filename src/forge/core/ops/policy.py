@@ -285,6 +285,24 @@ def supervisor_set(
     except ValueError as e:
         raise SupervisorTargetError(str(e)) from e
 
+    from forge.session.exceptions import ForgeSessionError
+    from forge.session.workers import capture_session_instance
+
+    try:
+        executor_token = capture_session_instance(store.forge_root, manifest.name)
+        required_sources: tuple[tuple[str, str, str], ...] = ()
+        if target and not native_source:
+            source_root = str(source_state.forge_root or policy_forge_root or store.forge_root)
+            source_token = capture_session_instance(source_root, source_state.name)
+            required_sources = ((source_root, source_state.name, source_token),)
+        elif native_source and native_source.managed_session and native_source.managed_root:
+            source_root = native_source.managed_root
+            source_name = native_source.managed_session
+            source_token = capture_session_instance(source_root, source_name)
+            required_sources = ((source_root, source_name, source_token),)
+    except (OSError, ValueError, ForgeSessionError) as error:
+        raise SupervisorInputError(f"Could not bind supervisor session ownership: {error}") from error
+
     started_proxy_id: str | None = None
     started_proxy_template: str | None = None
 
@@ -441,7 +459,23 @@ def supervisor_set(
             set_intent_lane(m, SUPERVISOR_CONSUMER, lane_record)
             clear_supervisor_degrade(m)
 
-    store.update(timeout_s=lock_timeout_s, mutate=_apply)
+    from forge.session.index import IndexStore
+
+    def publish_binding() -> None:
+        store.update(timeout_s=lock_timeout_s, mutate=_apply, expected_instance_id=executor_token)
+
+    try:
+        admitted = IndexStore().run_session_instance_txn(
+            manifest.name,
+            str(store.forge_root),
+            expected_instance_id=executor_token,
+            required_instances=required_sources,
+            callback=publish_binding,
+        )
+    except (OSError, ValueError, ForgeSessionError) as error:
+        raise SupervisorInputError(f"Could not publish supervisor binding: {error}") from error
+    if not admitted:
+        raise SupervisorInputError("Supervisor source or executor changed during setup; repeat the set command")
     return SupervisorSetResult(
         config=sup_config,
         lane_record=lane_record,

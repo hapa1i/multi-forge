@@ -1,0 +1,17 @@
+{
+  "approved_manifest_sha256": "20f0af8172af71995d463ff03efa7292d0e9c0b752b379c500d750d3ebea38d1",
+  "runner_sha256": "0713adfe9842d29e85d0954a0f55b07c6469e0f9d5e92733c662c4ddc8ea00fd",
+  "payload_sha256": "dcd4815c663cd157665c296c5b919e52d788cd87d3aed754ba055304e095f055",
+  "generator_sha256": "ef5ae9492875ac86ffdb6e0d8af939d81f2f4fb2ece6285976028e71a36b6586",
+  "status": "completed",
+  "native_invocations_dispatched": 1,
+  "host_mounts": [],
+  "auth_forwarded_by_name": [
+    "ANTHROPIC_API_KEY"
+  ],
+  "image_id": "sha256:408ea45b022628e31f0704122453ddc7f0d5b4dc409614aa8dbf8ecff78a9445",
+  "container_id": "e28f6c7ff182846767b3200450bf7db472940fe22223b599e6c48364b2e5a366",
+  "evidence_exported": true,
+  "container_removed": true,
+  "cleanup_errors": []
+}

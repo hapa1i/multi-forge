@@ -14,7 +14,9 @@ from forge.cli.hooks import (
     hooks,
 )
 from forge.session import SessionStore, create_session_state
+from forge.session.index import IndexStore
 from forge.session.models import VerificationConfig
+from tests.fixtures.session_state import publish_session
 
 # Test constants
 DEFAULT_PROXY_FAMILY = "test-family"
@@ -106,8 +108,7 @@ class TestSessionStartCommand:
             proxy_base_url=DEFAULT_PROXY_URL,
         )
         manifest.confirmed.claude_session_id = "original-uuid"
-        store = SessionStore(str(tmp_path), "test-session")
-        store.write(manifest)
+        publish_session(IndexStore(), manifest, tmp_path, forge_root=tmp_path)
 
         monkeypatch.setenv("FORGE_SESSION", "test-session")
         monkeypatch.setenv("FORGE_FORGE_ROOT", str(tmp_path))
@@ -142,7 +143,7 @@ class TestSessionStartCommand:
         )
         manifest.confirmed.claude_session_id = "original-uuid"
         store = SessionStore(str(tmp_path), "test-session")
-        store.write(manifest)
+        publish_session(IndexStore(), manifest, tmp_path, forge_root=tmp_path)
 
         monkeypatch.setenv("FORGE_SESSION", "test-session")
         monkeypatch.setenv("FORGE_FORGE_ROOT", str(tmp_path))

@@ -23,7 +23,8 @@ from pathlib import Path
 import pytest
 
 from forge.session import SessionManager, SessionStore
-from forge.session import store as store_mod
+from forge.session import index as index_mod
+from forge.session.exceptions import ForgeSessionError
 from forge.session.index import IndexStore
 from forge.session.models import SessionState
 
@@ -54,7 +55,7 @@ class TestSessionDeleteManifestLock:
             index.delete_session_txn(
                 "victim",
                 forge_root=str(project),
-                expect_manifest_absent=False,
+                expected_instance_id=index.migrate_session_identity("victim", str(project)),
                 delete_manifest=_fail,
             )
 
@@ -101,7 +102,7 @@ class TestSessionDeleteManifestLock:
         updater.start()
         assert update_ready.wait(timeout=10), "the updater must hold the manifest lock"
 
-        real_manifest_lock = store_mod.file_lock_for_target
+        real_manifest_lock = index_mod.file_lock_for_target
 
         @contextmanager
         def _observed_manifest_lock(*, target_path: Path, **kwargs: object) -> Iterator[None]:
@@ -110,14 +111,13 @@ class TestSessionDeleteManifestLock:
             with real_manifest_lock(target_path=target_path, **kwargs):  # type: ignore[arg-type]
                 yield
 
-        monkeypatch.setattr(store_mod, "file_lock_for_target", _observed_manifest_lock)
+        monkeypatch.setattr(index_mod, "file_lock_for_target", _observed_manifest_lock)
 
         def _delete() -> None:
             try:
                 manager.delete_session(
                     "victim",
                     forge_root=str(project),
-                    delete_transcripts=False,
                     delete_worktree=False,
                 )
             except BaseException as e:  # noqa: BLE001 - surfaced below
@@ -133,6 +133,12 @@ class TestSessionDeleteManifestLock:
         assert observed_lock, "delete must acquire the manifest lock (mutation guard)"
         assert not updater.is_alive() and not deleter.is_alive()
         assert update_errors == []
-        assert delete_errors == []
+        assert len(delete_errors) == 1
+        assert isinstance(delete_errors[0], ForgeSessionError)
+        assert "changed" in str(delete_errors[0])
+        assert index.live_session_exists("victim", forge_root=str(project))
+        assert store.read().last_accessed_at == "updated"
+
+        manager.delete_session("victim", forge_root=str(project), delete_worktree=False)
         assert index.read().sessions == {}
-        assert not store.exists(), "the completed update must not resurrect a deleted manifest"
+        assert not store.exists(), "a fresh plan deletes the completed update without resurrection"

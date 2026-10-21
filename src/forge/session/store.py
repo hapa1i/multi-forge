@@ -36,6 +36,7 @@ from forge.core.state import atomic_write_json, atomic_write_text, now_iso
 from forge.core.state.lock import file_lock_for_target
 from forge.core.typing_helpers import unwrap_optional
 
+from .cleanup_state import cleanup_state_path
 from .exceptions import (
     ManifestChangedError,
     ManifestCorruptedError,
@@ -222,6 +223,21 @@ def get_manifest_path(forge_root: str | Path, session_name: str) -> Path:
     return Path(forge_root) / MANIFEST_DIR / SESSIONS_DIR / session_name / MANIFEST_FILENAME
 
 
+def is_session_shell(session_dir: Path) -> bool:
+    """Return True for an absent, empty or manifest-lock-only session directory.
+
+    Acquiring a manifest lock creates its parent, so an update racing deletion can
+    leave this shell behind. It holds no manifest and therefore reserves nothing.
+    Read failures propagate: an uninspectable directory is not proven empty.
+    """
+    try:
+        entries = list(os.scandir(session_dir))
+    except FileNotFoundError:
+        return True
+    lock_name = f"{MANIFEST_FILENAME}.lock"
+    return all(entry.name == lock_name and entry.is_file(follow_symlinks=False) for entry in entries)
+
+
 class SessionStore:
     """Read/write session state to per-session manifest directory.
 
@@ -267,8 +283,8 @@ class SessionStore:
     def read_raw(self) -> dict[str, Any] | None:
         """Read manifest as raw JSON dict, skipping validation/deserialization.
 
-        For best-effort field extraction when full parsing fails (e.g. force-delete
-        needs confirmed.claude_session_id from a schema-mismatched manifest).
+        For diagnostic field extraction when full parsing fails. Destructive
+        operations require validated state and must not treat raw fields as ownership.
 
         Returns None if the file doesn't exist or isn't valid JSON.
         """
@@ -396,8 +412,8 @@ class SessionStore:
         with file_lock_for_target(target_path=self._manifest_path, timeout_s=CLI_LOCK_TIMEOUT_S):
             if self._manifest_path.is_file():
                 raise SessionExistsError(self._session_name)
-            # Artifact history survives deletion; operational Stop state must
-            # belong to this creation, even when the name is reused immediately.
+            # Operational Stop state and late workers must remain bound to this
+            # creation, even when the name is reused immediately.
             atomic_write_text(
                 self.session_dir / "review-identity",
                 "review-owner-v1:" + uuid4().hex + "\n",
@@ -406,7 +422,12 @@ class SessionStore:
             self._write_unlocked(manifest)
 
     def review_identity(self, *, create: bool = False) -> str | None:
-        """Read the Stop journal owner; initialize pre-B4 sessions only before their first review."""
+        """Read the per-creation owner shared by Stop journals and session generations.
+
+        Creation always replaces this token. Legacy migration may initialize a
+        missing token only while the session still exists and no ownerless Stop
+        history would be adopted. Ordinary reads never create or repair it.
+        """
         path = self.session_dir / "review-identity"
         if create and not path.exists():
             with file_lock_for_target(target_path=self._manifest_path, timeout_s=CLI_LOCK_TIMEOUT_S):
@@ -437,6 +458,43 @@ class SessionStore:
         if not raw.startswith(prefix) or len(value) != 32 or any(c not in b"0123456789abcdef" for c in value):
             raise ValueError("Invalid Stop review owner; restore the session directory or create a new session")
         return value.decode("ascii")
+
+    def migrate_instance_identity(
+        self,
+        *,
+        expected_manifest_sha256: str | None = None,
+        expected_instance_id: str | None = None,
+        require_ownerless: bool = False,
+    ) -> str:
+        """Bind legacy ownership under the manifest lock after validating the observed state.
+
+        The caller holds publication authority. This is an explicit mutation;
+        previews use read and review_identity instead.
+        """
+        if not self.exists():
+            raise SessionFileNotFoundError(str(self._manifest_path))
+        with file_lock_for_target(target_path=self._manifest_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            self.read()
+            if expected_manifest_sha256 is not None:
+                try:
+                    digest = hashlib.sha256(self._manifest_path.read_bytes()).hexdigest()
+                except OSError as exc:
+                    raise ManifestUnreadableError(str(self._manifest_path), f"read error: {exc}") from exc
+                if digest != expected_manifest_sha256:
+                    raise ManifestChangedError(str(self._manifest_path))
+            token = self.review_identity()
+            if require_ownerless and token is not None:
+                raise ValueError("Session instance changed since preview; expected an ownerless session")
+            if expected_instance_id is not None and token != expected_instance_id:
+                raise ValueError(
+                    f"Session '{self.session_name}' has inconsistent instance ownership; restore its owner file"
+                )
+            if token is None:
+                token = uuid4().hex
+                path = self.session_dir / "review-identity"
+                atomic_write_text(path, "review-owner-v1:" + token + "\n")
+                path.chmod(0o600)
+            return token
 
     def _ensure_session_dir(self) -> None:
         """Create the session directory, but only for a name that can be one.
@@ -487,11 +545,20 @@ class SessionStore:
             return False
 
         with file_lock_for_target(target_path=self._manifest_path, timeout_s=CLI_LOCK_TIMEOUT_S):
-            if not session_dir.is_dir():
-                return False
-            self._manifest_path.unlink(missing_ok=True)
-            shutil.rmtree(session_dir, ignore_errors=True)
-            return True
+            return self.delete_locked()
+
+    def delete_locked(self) -> bool:
+        """Remove the session directory while its manifest lock is already held.
+
+        Internal transaction primitive. IndexStore.delete_session_txn holds
+        index -> manifest locks across final inventory validation and cleanup;
+        its callback must use this method rather than re-acquiring the lock.
+        """
+        if not self.session_dir.is_dir():
+            return False
+        self._manifest_path.unlink(missing_ok=True)
+        shutil.rmtree(self.session_dir)
+        return True
 
     def update_last_accessed(self) -> SessionState:
         """Update last_accessed_at timestamp and return updated manifest."""
@@ -501,7 +568,13 @@ class SessionStore:
             mutate=lambda m: setattr(m, "last_accessed_at", now_iso()),
         )
 
-    def update(self, *, timeout_s: float, mutate: Callable[[SessionState], None]) -> SessionState:
+    def update(
+        self,
+        *,
+        timeout_s: float,
+        mutate: Callable[[SessionState], None],
+        expected_instance_id: str | None = None,
+    ) -> SessionState:
         """Update a manifest via a locked read-modify-write cycle.
 
         This prevents lost updates when multiple processes (CLI + hooks) mutate
@@ -510,6 +583,8 @@ class SessionStore:
         Args:
             timeout_s: How long to wait for the manifest lock.
             mutate: Callback that mutates the loaded manifest in-place.
+            expected_instance_id: Captured generation for a detached writer.
+                A replacement refuses the mutation even if its name is unchanged.
 
         Returns:
             The updated manifest after persistence.
@@ -520,8 +595,14 @@ class SessionStore:
             InvalidSessionNameError: On write failures.
         """
 
+        if expected_instance_id is not None and not self.exists():
+            raise SessionFileNotFoundError(str(self._manifest_path))
         with file_lock_for_target(target_path=self._manifest_path, timeout_s=timeout_s):
             manifest = self.read()
+            if expected_instance_id is not None:
+                retry_path = cleanup_state_path(self.forge_root, self.session_name)
+                if self.review_identity() != expected_instance_id or retry_path.exists() or retry_path.is_symlink():
+                    raise ManifestChangedError(str(self._manifest_path))
             mutate(manifest)
             self._write_unlocked(manifest)
             return manifest

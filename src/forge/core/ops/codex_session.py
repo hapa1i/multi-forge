@@ -49,6 +49,7 @@ from forge.core.state import now_iso
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import (
     ForgeSessionError,
+    IndexStore,
     SessionManager,
     SessionNotFoundError,
     SessionState,
@@ -59,6 +60,7 @@ from forge.session.codex_handoff import (
     read_receipt,
 )
 from forge.session.exceptions import (
+    ManifestChangedError,
     SessionFileNotFoundError,
     SessionWorktreeMissingError,
 )
@@ -72,7 +74,7 @@ from forge.session.models import (
     session_runtime,
 )
 from forge.session.prev_sessions import child_notes_path, child_path
-from forge.session.store import MANIFEST_FILENAME, SessionStore
+from forge.session.store import SessionStore
 from forge.session.transfer import parse_transfer_context_strategy
 
 from .session_authority_launch import authority_launch_transaction, require_launch_args
@@ -251,7 +253,7 @@ def start_codex_session(
     launch_args = require_launch_args(
         launch_args,
         runtime="codex",
-        authority=authority if authority_explicit else inherited_authority(parent_state.intent.authority),
+        authority=(authority if authority_explicit else inherited_authority(parent_state.intent.authority)),
     )
 
     # Fail closed before any state exists (runs `codex doctor` ~20s, once).
@@ -267,6 +269,7 @@ def start_codex_session(
             f"or use the default initial-message delivery."
         )
 
+    created_instances: list[str] = []
     try:
         state = manager.start_session(
             name,
@@ -277,11 +280,15 @@ def start_codex_session(
             parent_session=parent,
             authority=authority,
             authority_explicit=authority_explicit,
+            instance_sink=created_instances.append,
         )
     except (StateCorruptedError, StateUnreadableError):
         raise  # corrupt manifest/index -> top-level reset handler
     except ForgeSessionError as e:
         raise ForgeOpError(str(e)) from e
+    if not created_instances:
+        raise ForgeOpError("Created Codex session has no captured instance identity; inspect it before cleanup.")
+    instance_id = created_instances[0]
 
     # The child session's indexed forge_root is where GC resolves its relative
     # context_file. It equals ctx.forge_root except for nested Forge projects in a
@@ -295,7 +302,16 @@ def start_codex_session(
 
     warnings: list[str] = []
     try:
-        _clear_stale_child_snapshot(transfer_root, parent, name, warnings)
+        from forge.session.workers import session_worker_lease
+
+        with session_worker_lease(
+            str(child_forge_root),
+            name,
+            expected_instance_id=instance_id,
+            label="prepare-codex-snapshot",
+            index_store=manager.index_store,
+        ):
+            _clear_stale_child_snapshot(transfer_root, parent, name, warnings)
     except Exception:
         # Nothing of ours is on disk yet: remove only the session. A referenced
         # pre-existing snapshot is another session's property -- never delete it.
@@ -304,6 +320,7 @@ def start_codex_session(
             name,
             forge_root=str(child_forge_root),
             delete_branch=create_worktree,
+            expected_instance_id=instance_id,
         )
         raise
 
@@ -334,6 +351,7 @@ def start_codex_session(
             context_delivery=context_delivery,
             on_routing_projected=_mark_routing_projected,
             launch_args=launch_args,
+            expected_instance_id=instance_id,
         )
     except Exception:
         if routing_projected:
@@ -341,7 +359,16 @@ def start_codex_session(
             # every durable launch artifact, but never let an undelivered start
             # context leak into a later resume turn.
             if context_delivery == "hook":
-                clear_pending_context(SessionStore(str(child_forge_root), name).session_dir)
+
+                def clear_staged_context() -> None:
+                    clear_pending_context(SessionStore(str(child_forge_root), name).session_dir)
+
+                manager.index_store.run_session_instance_txn(
+                    name,
+                    str(child_forge_root),
+                    expected_instance_id=instance_id,
+                    callback=clear_staged_context,
+                )
             raise
 
         # Past the guard, any snapshot at this key was written by this run.
@@ -352,6 +379,7 @@ def start_codex_session(
             snapshot=child_path(transfer_root, parent, name),
             notes=child_notes_path(transfer_root, parent, name),
             delete_branch=create_worktree,
+            expected_instance_id=instance_id,
         )
         raise
 
@@ -377,6 +405,7 @@ def _run_first_codex_turn(
     context_delivery: ContextDeliveryMode,
     on_routing_projected: Callable[[], None],
     launch_args: RuntimeLaunchArgs,
+    expected_instance_id: str,
 ) -> CodexSessionStartResult:
     """The post-creation half of ``start_codex_session`` (the caller owns rollback)."""
     store = manager.get_session_store(name, forge_root=str(child_forge_root))
@@ -392,6 +421,7 @@ def _run_first_codex_turn(
         launch_mode="host",
         worktree_path=Path(cwd),
         codex_preflight=preflight,
+        expected_instance_id=expected_instance_id,
     ) as authority_attempt:
         routing_payload = build_runtime_native_routing_payload()
 
@@ -422,6 +452,7 @@ def _run_first_codex_turn(
             staged_context_path=staged_context_path,
             run_identity=root,
             authority_marker=(authority_attempt.marker if authority_attempt is not None else None),
+            expected_instance_id=expected_instance_id,
             before_invoke=commit_routing_before_invoke,
             extra_args=launch_args.runtime_argv("codex"),
         )
@@ -432,10 +463,21 @@ def _run_first_codex_turn(
     effective_thread_id = bridge.thread_id
     hook_rollout: str | None = None
     if context_delivery == "hook":
-        delivery_fact, effective_thread_id, hook_rollout = _reconcile_hook_delivery(
-            session_dir=store.session_dir,
-            thread_id=bridge.thread_id,
-            warnings=warnings,
+        delivery_fact = CONTEXT_DELIVERY_UNDELIVERED
+
+        def reconcile_receipt() -> None:
+            nonlocal delivery_fact, effective_thread_id, hook_rollout
+            delivery_fact, effective_thread_id, hook_rollout = _reconcile_hook_delivery(
+                session_dir=store.session_dir,
+                thread_id=bridge.thread_id,
+                warnings=warnings,
+            )
+
+        manager.index_store.run_session_instance_txn(
+            name,
+            str(store.forge_root),
+            expected_instance_id=expected_instance_id,
+            callback=reconcile_receipt,
         )
 
     if hook_rollout is not None:
@@ -476,8 +518,20 @@ def _run_first_codex_turn(
         m.confirmed.confirmed_at = timestamp
         m.confirmed.confirmed_by = "cli:codex-start"
 
-    if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
-        sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
+    if _update_manifest_if_present(
+        store,
+        mutate=_mutate,
+        warnings=warnings,
+        session=name,
+        expected_instance_id=expected_instance_id,
+    ):
+        sync_codex_thread_to_index(
+            name,
+            effective_thread_id,
+            str(store.forge_root),
+            expected_instance_id=expected_instance_id,
+            warnings=warnings,
+        )
 
     if effective_thread_id is None:
         warnings.append(
@@ -564,6 +618,12 @@ def continue_codex_session(
     """
     manager = SessionManager()
     entry, state = resolve_codex_session(manager, name, forge_root=ctx.forge_root)
+    instance_id = entry.instance_id
+    if instance_id is None:
+        from forge.session.workers import capture_session_instance
+
+        instance_id = capture_session_instance(entry.root, name, index_store=manager.index_store)
+        entry, state = resolve_codex_session(manager, name, forge_root=ctx.forge_root)
     thread_id = require_codex_thread_id(state, name)
     launch_args = require_launch_args(launch_args, runtime="codex", authority=state.intent.authority)
 
@@ -574,11 +634,6 @@ def continue_codex_session(
 
     warnings: list[str] = []
     store = manager.get_session_store(name, forge_root=entry.forge_root)
-    # One-shot invariant, defensively: a staged handoff that survived the start turn
-    # (crash window) must never late-deliver into a resume turn from an enrolled home.
-    if clear_pending_context(store.session_dir):
-        warnings.append("Cleared a stale staged handoff (its start turn never delivered it).")
-
     root = new_root_run_identity()
     cwd = state.worktree.path if state.worktree else str(ctx.cwd)
     with authority_launch_transaction(
@@ -589,7 +644,11 @@ def continue_codex_session(
         launch_mode="host",
         worktree_path=Path(cwd),
         codex_preflight=preflight,
+        expected_instance_id=instance_id,
     ) as authority_attempt:
+        # A surviving staged handoff belongs to this admitted instance only.
+        if clear_pending_context(store.session_dir):
+            warnings.append("Cleared a stale staged handoff (its start turn never delivered it).")
         marker_env = (
             {FORGE_AUTHORITY_MARKER_VAR: authority_attempt.marker}
             if authority_attempt is not None and authority_attempt.marker is not None
@@ -599,6 +658,7 @@ def continue_codex_session(
             root,
             name,
             forge_root=entry.forge_root,
+            instance_id=instance_id,
             extra_vars=marker_env,
             unset_vars=(FORGE_AUTHORITY_MARKER_VAR,) if marker_env is None else (),
         ):
@@ -649,8 +709,20 @@ def continue_codex_session(
         codex.last_run_at = timestamp
         m.confirmed.codex = codex
 
-    if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
-        sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
+    if _update_manifest_if_present(
+        store,
+        mutate=_mutate,
+        warnings=warnings,
+        session=name,
+        expected_instance_id=instance_id,
+    ):
+        sync_codex_thread_to_index(
+            name,
+            effective_thread_id,
+            str(store.forge_root),
+            expected_instance_id=instance_id,
+            warnings=warnings,
+        )
 
     return CodexSessionResumeResult(
         session=name,
@@ -694,47 +766,36 @@ def _update_manifest_if_present(
     mutate: Callable[[SessionState], None],
     warnings: list[str],
     session: str,
+    expected_instance_id: str,
 ) -> bool:
-    """Best-effort post-turn update without resurrecting a deleted session."""
+    """Publish post-turn state only to the instance admitted before launch."""
     if not store.exists():
         warnings.append(f"Session '{session}' was deleted while Codex was running; skipped post-exit manifest update.")
         return False
+
+    def persist() -> None:
+        store.update(timeout_s=5.0, mutate=mutate, expected_instance_id=expected_instance_id)
+
     try:
-        store.update(timeout_s=5.0, mutate=mutate)
+        updated = IndexStore().run_session_instance_txn(
+            session,
+            str(store.forge_root),
+            expected_instance_id=expected_instance_id,
+            callback=persist,
+        )
+    except ManifestChangedError:
+        updated = False
     except SessionFileNotFoundError:
-        # A concurrent delete can land after exists() but before update() reads. The
-        # lock layer creates the session dir to hold forge.session.json.lock; remove
-        # that lock-only shell so delete remains delete.
-        _remove_lock_only_session_dir(store.session_dir)
+        # The publication guard prevents supported deletion from racing persist().
+        # If files disappeared independently, this handler no longer owns their path.
         warnings.append(f"Session '{session}' was deleted while Codex was running; skipped post-exit manifest update.")
         return False
-    return True
-
-
-def _remove_lock_only_session_dir(session_dir: Path) -> None:
-    """Remove only the empty or lock-only shell created by a raced update."""
-    lock_name = f"{MANIFEST_FILENAME}.lock"
-    try:
-        entries = list(session_dir.iterdir())
-    except FileNotFoundError:
-        return
-    except OSError:
-        logger.debug("Could not inspect deleted session directory %s", session_dir, exc_info=True)
-        return
-    if any(entry.name != lock_name or not entry.is_file() for entry in entries):
-        return
-    # Empty entries means another actor already unlinked the lock; the bare shell is
-    # still a partial resurrection, so it is removed the same way.
-    try:
-        for entry in entries:
-            entry.unlink()
-        session_dir.rmdir()
-    except OSError:
-        logger.debug(
-            "Could not remove lock-only deleted session directory %s",
-            session_dir,
-            exc_info=True,
+    if not updated:
+        warnings.append(
+            f"Session '{session}' was deleted, replaced, or entered cleanup after Codex ran; "
+            "skipped post-exit manifest update."
         )
+    return updated
 
 
 def _rollback_created_session(
@@ -745,27 +806,59 @@ def _rollback_created_session(
     snapshot: Path | None = None,
     notes: Path | None = None,
     delete_branch: bool,
+    expected_instance_id: str | None = None,
 ) -> None:
-    """Best-effort rollback of the session (and this run's snapshot) on a failed start.
-
-    GC would eventually flag the orphaned snapshot, but a retry with the same name
-    must start clean (``ensure_child`` never overwrites), so it is removed here.
-    ``snapshot``/``notes`` are passed only when this run owns them (past the
-    stale-snapshot guard) -- a referenced foreign snapshot must never be deleted.
-    ``forge_root`` scopes the delete to the session this run created: an unscoped
-    delete would raise ``AmbiguousSessionError`` when another project has the name.
-    """
+    """Compensate only this birth, retaining shared cleanup refusals and retry state."""
+    if expected_instance_id is None:
+        logger.warning(
+            "Codex start rollback: missing creation identity for %s; retained session",
+            name,
+        )
+        return
     try:
-        manager.delete_session(name, force=True, delete_branch=delete_branch, forge_root=forge_root)
+        if snapshot is not None:
+            store = SessionStore(forge_root, name)
+
+            def bind_owned_snapshot() -> None:
+                def mutate(state: SessionState) -> None:
+                    parent = state.parent_session
+                    if parent is None or snapshot != child_path(Path(forge_root), parent, name):
+                        raise ValueError("Rollback snapshot does not match the created child")
+                    if notes is not None and notes != child_notes_path(Path(forge_root), parent, name):
+                        raise ValueError("Rollback notes do not match the created child")
+                    derivation = state.confirmed.derivation or Derivation(parent_session=parent)
+                    if derivation.context_file is not None:
+                        existing = Path(derivation.context_file)
+                        if not existing.is_absolute():
+                            existing = Path(forge_root) / existing
+                        if existing != snapshot:
+                            raise ValueError("Rollback snapshot differs from the child's recorded context")
+                    derivation.context_file = str(snapshot.relative_to(forge_root))
+                    state.confirmed.derivation = derivation
+
+                store.update(
+                    timeout_s=5.0,
+                    mutate=mutate,
+                    expected_instance_id=expected_instance_id,
+                )
+
+            if not manager.index_store.run_session_instance_txn(
+                name,
+                forge_root,
+                expected_instance_id=expected_instance_id,
+                callback=bind_owned_snapshot,
+            ):
+                raise ValueError("Created session was deleted or replaced before rollback")
+        manager.delete_session(
+            name,
+            force=True,
+            delete_branch=delete_branch,
+            forge_root=forge_root,
+            expected_instance_id=expected_instance_id,
+        )
     except Exception:
-        logger.debug("Codex start rollback: delete_session failed (non-critical)", exc_info=True)
-    for leftover in (snapshot, notes):
-        if leftover is None:
-            continue
-        try:
-            leftover.unlink(missing_ok=True)
-        except OSError:
-            logger.debug(
-                "Codex start rollback: snapshot cleanup failed (non-critical)",
-                exc_info=True,
-            )
+        logger.warning(
+            "Codex start rollback: cleanup incomplete for %s; inspect and retry deletion",
+            name,
+            exc_info=True,
+        )

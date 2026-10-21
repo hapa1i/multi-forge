@@ -6,10 +6,13 @@ repos:
   hooks:
       - id: check-merge-conflict
       - id: trailing-whitespace
+        # Captured native bytes are pinned by their export SHA-256 inventory.
+        exclude: ^docs/board/[^/]+/session_delete_and_purge/evidence/native-(companion-)?probe-20261020/container-evidence/
       - id: check-yaml
       - id: check-json
       - id: detect-private-key
       - id: pretty-format-json          # Auto-format JSON files
+        exclude: ^docs/board/[^/]+/session_delete_and_purge/evidence/native-(companion-)?probe-20261020/container-evidence/
         args: [
           --autofix,
           --indent=2,
@@ -19,6 +22,7 @@ repos:
         ]
       - id: check-shebang-scripts-are-executable
       - id: end-of-file-fixer
+        exclude: ^docs/board/[^/]+/session_delete_and_purge/evidence/native-(companion-)?probe-20261020/container-evidence/
       - id: check-added-large-files
 
 - repo: https://github.com/gitleaks/gitleaks

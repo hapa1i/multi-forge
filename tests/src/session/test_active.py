@@ -248,10 +248,12 @@ class TestActiveSessionStore:
     def test_track_active_session_clears_on_exit(self, temp_forge_home: Path) -> None:
         """The launch wrapper should clean up the runtime entry on exit."""
         registry = ActiveSessionStore(temp_forge_home / "sessions" / ACTIVE_FILENAME)
+        project = temp_forge_home.parent / "project"
+        publish_session_from_fields(IndexStore(), "tracked", project, project)
 
         with track_active_session(
             session_name="tracked",
-            worktree_path="/tmp/project",
+            worktree_path=str(project),
             launch_mode=LAUNCH_MODE_HOST,
             claude_session_id="uuid-789",
             launcher_pid=os.getpid(),
@@ -261,3 +263,60 @@ class TestActiveSessionStore:
             assert entry.claude_session_id == "uuid-789"
 
         assert registry.get_session("tracked") is None
+
+    def test_strict_activity_preview_preserves_corrupt_registry(self, store: ActiveSessionStore) -> None:
+        store.index_path.parent.mkdir(parents=True, exist_ok=True)
+        store.index_path.write_text("{incomplete")
+
+        with pytest.raises(ValueError):
+            store.peek_sessions_strict()
+
+        assert store.index_path.read_text() == "{incomplete"
+
+    def test_registration_refuses_generation_that_was_deleted(self, store: ActiveSessionStore, tmp_path: Path) -> None:
+        from forge.session.exceptions import SessionNotFoundError
+        from tests.fixtures.session_state import delete_published_session
+
+        project = tmp_path / "project"
+        index = IndexStore()
+        original = publish_session_from_fields(index, "worker", project, project)
+        assert original.instance_id is not None
+        delete_published_session(index, "worker", project)
+        publish_session_from_fields(index, "worker", project, project)
+
+        with pytest.raises(SessionNotFoundError):
+            store.register_session(
+                "worker",
+                worktree_path=str(project),
+                launch_mode=LAUNCH_MODE_HOST,
+                expected_instance_id=original.instance_id,
+            )
+
+        assert store.peek_sessions_strict() == []
+
+
+def test_strict_activity_preview_does_not_create_storage(tmp_path: Path) -> None:
+    directory = tmp_path / "missing-active-store"
+    assert ActiveSessionStore(directory / "active.json").peek_sessions_strict() == []
+    assert not directory.exists()
+
+
+def test_strict_activity_preview_refuses_unavailable_container_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = ActiveSessionStore(tmp_path / "active.json")
+    store.upsert_session(
+        "sidecar",
+        worktree_path=str(tmp_path),
+        launch_mode=LAUNCH_MODE_SIDECAR,
+        container_name="forge-session-sidecar",
+    )
+    before = store.index_path.read_bytes()
+
+    def fail_probe(*_args, **_kwargs):
+        raise OSError("Docker unavailable")
+
+    monkeypatch.setattr("forge.session.active.subprocess.run", fail_probe)
+    with pytest.raises(ValueError, match="Docker unavailable"):
+        store.peek_sessions_strict()
+    assert store.index_path.read_bytes() == before

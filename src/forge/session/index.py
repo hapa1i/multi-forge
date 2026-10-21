@@ -8,7 +8,9 @@ in different Forge projects. All external APIs accept display names
 
 from __future__ import annotations
 
+import json
 import logging
+from contextlib import nullcontext
 from dataclasses import asdict
 from pathlib import Path
 from typing import Callable, TypeVar
@@ -21,9 +23,9 @@ from forge.core.state import (
     file_lock_for_target,
     iso_to_timestamp,
     now_iso,
-    read_versioned_json_object,
 )
 
+from .cleanup_state import cleanup_state_path
 from .exceptions import (
     IndexCorruptedError,
     IndexUnreadableError,
@@ -44,7 +46,7 @@ from .models import (
     SessionIndexEntry,
     SessionState,
 )
-from .store import get_manifest_path
+from .store import SessionStore, get_manifest_path
 from .validation import validate_name
 
 _log = logging.getLogger(__name__)
@@ -63,7 +65,9 @@ def get_index_path() -> Path:
     return get_forge_home() / INDEX_DIR / INDEX_FILENAME
 
 
-def _session_recency_sort_key(item: tuple[str, SessionIndexEntry]) -> tuple[int, float, str]:
+def _session_recency_sort_key(
+    item: tuple[str, SessionIndexEntry],
+) -> tuple[int, float, str]:
     """Sort valid timestamps by recency and malformed values last by name."""
     name, entry = item
     try:
@@ -112,13 +116,42 @@ class IndexStore:
         if not self.exists():
             return SessionIndex()
 
-        data = read_versioned_json_object(
-            self._index_path,
-            version_key="version",
-            expected_version=INDEX_VERSION,
-            corrupted_error=IndexCorruptedError,
-            unreadable_error=IndexUnreadableError,
-        )
+        try:
+            with open(self._index_path, encoding="utf-8") as stream:
+                data = json.load(stream)
+        except json.JSONDecodeError as exc:
+            raise IndexCorruptedError(str(self._index_path), f"invalid JSON: {exc}") from exc
+        except OSError as exc:
+            raise IndexUnreadableError(str(self._index_path), f"read error: {exc}") from exc
+        if not isinstance(data, dict):
+            raise IndexCorruptedError(str(self._index_path), "expected JSON object")
+        if "version" not in data:
+            raise IndexCorruptedError(str(self._index_path), "missing version field")
+        version = data["version"]
+        if type(version) is not int or version not in {1, INDEX_VERSION}:
+            raise IndexCorruptedError(
+                str(self._index_path),
+                f"incompatible version {version} (this Forge expects 1 or {INDEX_VERSION}). "
+                "Upgrade Forge or restore this index from a compatible backup.",
+            )
+        sessions = data.get("sessions")
+        if isinstance(sessions, dict):
+            for key, row in sessions.items():
+                if not isinstance(row, dict):
+                    continue
+                if version == 1:
+                    if "instance_id" in row:
+                        raise IndexCorruptedError(
+                            str(self._index_path),
+                            "schema v1 cannot contain instance_id",
+                        )
+                    row["instance_id"] = None
+                elif "instance_id" not in row:
+                    raise IndexCorruptedError(str(self._index_path), f"missing instance_id for '{key}'")
+                token = row.get("instance_id")
+                if token is not None and not _valid_instance_id(token):
+                    raise IndexCorruptedError(str(self._index_path), f"invalid instance_id for '{key}'")
+        data["version"] = INDEX_VERSION
         self._validate_key_shape(data)
 
         # Deserialize using dacite
@@ -206,7 +239,7 @@ class IndexStore:
             store_root = Path(entry.forge_root or entry.worktree_path)
             manifest_path = get_manifest_path(store_root, display_name)
 
-            if not manifest_path.is_file():
+            if not manifest_path.is_file() and not _cleanup_pending(entry.root, display_name):
                 stale.add(key)
 
         if stale:
@@ -222,7 +255,7 @@ class IndexStore:
                     display_name = session_name_from_key(key)
                     store_root = Path(latest_entry.forge_root or latest_entry.worktree_path)
                     manifest_path = get_manifest_path(store_root, display_name)
-                    if not manifest_path.is_file():
+                    if not manifest_path.is_file() and not _cleanup_pending(latest_entry.root, display_name):
                         del latest.sessions[key]
                         pruned_any = True
 
@@ -266,7 +299,8 @@ class IndexStore:
         sessions = [
             (session_name_from_key(key), entry)
             for key, entry in index.sessions.items()
-            if self._manifest_exists_for_row(key, entry) and (include_incognito or not entry.is_incognito)
+            if (self._manifest_exists_for_row(key, entry) or _cleanup_pending(entry.root, session_name_from_key(key)))
+            and (include_incognito or not entry.is_incognito)
         ]
         if project_root_filter is not None:
             sessions = [(name, entry) for name, entry in sessions if entry.project_root == project_root_filter]
@@ -327,7 +361,7 @@ class IndexStore:
         # Phase 2: do filesystem checks without holding the index lock.
         store_root = Path(entry.forge_root or entry.worktree_path)
         manifest_path = get_manifest_path(store_root, name)
-        if store_root.exists() and manifest_path.is_file():
+        if (store_root.exists() and manifest_path.is_file()) or _cleanup_pending(entry.root, name):
             return entry
 
         # Phase 3: re-acquire lock and prune only if still stale.
@@ -338,6 +372,8 @@ class IndexStore:
                 raise SessionNotFoundError(name)
 
             latest_entry = latest.sessions[latest_key]
+            if _cleanup_pending(latest_entry.root, name):
+                return latest_entry
             store_root = Path(latest_entry.forge_root or latest_entry.worktree_path)
             manifest_path = get_manifest_path(store_root, name)
             if not store_root.exists() or not manifest_path.is_file():
@@ -364,7 +400,9 @@ class IndexStore:
 
         store_root = Path(entry.forge_root or entry.worktree_path)
         manifest_path = get_manifest_path(store_root, name)
-        return entry if store_root.exists() and manifest_path.is_file() else None
+        return (
+            entry if (store_root.exists() and manifest_path.is_file()) or _cleanup_pending(entry.root, name) else None
+        )
 
     def create_session_txn(
         self,
@@ -426,6 +464,12 @@ class IndexStore:
         with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
             index = self.read()
             scoped_key = make_scoped_key(name, effective_forge_root)
+            retry_path = cleanup_state_path(effective_forge_root, name)
+            if retry_path.exists() or retry_path.is_symlink():
+                raise ValueError(
+                    f"Session '{name}' has unfinished cleanup; rerun its original delete or purge command "
+                    f"before reusing this name. Retry inventory: {retry_path}"
+                )
 
             existing = index.sessions.get(scoped_key)
             if existing is not None:
@@ -479,6 +523,12 @@ class IndexStore:
 
             try:
                 write_manifest()
+                # The callback owns manifest creation (or orphan repair). Reuse
+                # its durable owner so Stop reviews and detached workers share
+                # one generation. A killed callback leaves an explicit legacy
+                # row that requires migration before destructive admission.
+                entry.instance_id = SessionStore(effective_forge_root, name).review_identity()
+                self.write(index)
             except BaseException:
                 # A raised callback does not prove the manifest is absent either:
                 # once atomic_write_json reaches os.replace it is durable, and a
@@ -494,7 +544,10 @@ class IndexStore:
             return entry
 
     def update_session(
-        self, name: str, last_accessed_at: str | None = None, forge_root: str | None = None
+        self,
+        name: str,
+        last_accessed_at: str | None = None,
+        forge_root: str | None = None,
     ) -> SessionIndexEntry:
         """Update a session's last_accessed_at timestamp.
 
@@ -540,7 +593,9 @@ class IndexStore:
         except Exception as e:
             _log.debug("Index sync for '%s' failed (non-critical): %s", name, e)
 
-    def update_codex_thread(self, name: str, thread_id: str, forge_root: str | None = None) -> None:
+    def update_codex_thread(
+        self, name: str, thread_id: str, forge_root: str | None = None, *, expected_instance_id: str
+    ) -> bool:
         """Reconcile a session's ``codex_thread_id`` after the manifest changed.
 
         Codex can re-bind a thread across a resume ("drift"). The manifest records
@@ -552,13 +607,22 @@ class IndexStore:
         time this runs, so failing here must not break the resume that observed it.
         A collision is logged rather than raised for the same reason; the adoption
         guard still refuses the id, which is the outcome that matters.
+        Return False when the captured instance is no longer writable or the sync fails.
         """
+        _require_instance_id(expected_instance_id)
         try:
             with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
                 index = self.read()
                 key = resolve_key_best_effort(index.sessions, name, forge_root)
-                if key is None:
-                    return
+                if key is None or index.sessions[key].instance_id != expected_instance_id:
+                    return False
+                store = SessionStore(index.sessions[key].root, name)
+                if (
+                    _cleanup_pending(store.forge_root, name)
+                    or not store.exists()
+                    or store.review_identity() != expected_instance_id
+                ):
+                    return False
                 for other_key, other in index.sessions.items():
                     if other_key != key and other.codex_thread_id == thread_id:
                         _log.warning(
@@ -569,95 +633,144 @@ class IndexStore:
                         )
                 index.sessions[key].codex_thread_id = thread_id
                 self.write(index)
+                return True
         except Exception as e:
             _log.debug("Codex index sync for '%s' failed (non-critical): %s", name, e)
+            return False
+
+    def migrate_session_identity(
+        self,
+        name: str,
+        forge_root: str | None = None,
+        *,
+        expected_manifest_sha256: str | None = None,
+        require_ownerless: bool = False,
+    ) -> str:
+        """Explicitly bind a legacy row to its durable per-creation owner.
+
+        Reads and previews never call this method. Existing Stop ownership is
+        preserved; ownerless review history refuses migration rather than
+        assigning previous history to a new instance. The manifest is validated
+        before any write. Lock order is index -> manifest.
+        """
+        validate_name(name)
+        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            index = self.read()
+            key = resolve_key_strict(index.sessions, name, forge_root)
+            if key is None:
+                raise SessionNotFoundError(name)
+            entry = index.sessions[key]
+            if require_ownerless and entry.instance_id is not None:
+                raise ValueError("Session instance changed since preview; expected an ownerless session")
+            store = SessionStore(entry.root, name)
+            token = store.migrate_instance_identity(
+                expected_manifest_sha256=expected_manifest_sha256,
+                expected_instance_id=entry.instance_id,
+                require_ownerless=require_ownerless,
+            )
+            if entry.instance_id == token:
+                return token
+            entry.instance_id = token
+            self.write(index)
+            return token
+
+    def run_session_instance_txn(
+        self,
+        name: str,
+        forge_root: str,
+        *,
+        expected_instance_id: str,
+        callback: Callable[[], None],
+        required_instances: tuple[tuple[str, str, str], ...] = (),
+    ) -> bool:
+        """Persist bounded worker output only while its original session is live.
+
+        Capture the instance before dispatch. Run model calls outside this
+        transaction, then use this guard for each output mutation. The callback
+        holds the publication lock and may take manifest or artifact locks, but
+        must not call locking IndexStore methods or acquire an outer lock.
+        Required dependencies are (root, name, instance) tuples captured before
+        preparation; binding writes cannot publish after a source was removed.
+        """
+        validate_name(name)
+        _require_instance_id(expected_instance_id)
+        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            index = self.read()
+            key = resolve_key_strict(index.sessions, name, forge_root)
+            if key is None or index.sessions[key].instance_id != expected_instance_id:
+                return False
+            store = SessionStore(index.sessions[key].root, name)
+            retry_path = cleanup_state_path(store.forge_root, name)
+            if retry_path.exists() or retry_path.is_symlink():
+                return False
+            if not store.exists() or store.review_identity() != expected_instance_id:
+                return False
+            for source_root, source_name, source_token in required_instances:
+                _require_instance_id(source_token)
+                source_key = resolve_key_strict(index.sessions, source_name, source_root)
+                if source_key is None or index.sessions[source_key].instance_id != source_token:
+                    return False
+                source = SessionStore(index.sessions[source_key].root, source_name)
+                if (
+                    _cleanup_pending(source.forge_root, source_name)
+                    or not source.exists()
+                    or source.review_identity() != source_token
+                ):
+                    return False
+            callback()
+            return True
 
     def delete_session_txn(
         self,
         name: str,
         forge_root: str | None = None,
         *,
-        expect_manifest_absent: bool,
-        delete_manifest: Callable[[], None],
+        expected_instance_id: str,
+        delete_manifest: Callable[[], object],
     ) -> bool:
-        """Remove a session's row and manifest under one index-lock acquisition.
+        """Remove one captured instance under the publication lock.
 
-        The deletion counterpart to ``create_session_txn``, and it exists for the
-        same reason: the two removals must not be separable by a concurrent
-        creator. Deletion drops the manifest -- or the worktree containing it --
-        long before it reaches here, so for the whole cleanup the name reads as
-        crash residue to ``create_session_txn``, which prunes the row and publishes
-        a replacement. Verifying ownership and then deleting outside the lock would
-        let a replacement land in between and lose its manifest.
+        The callback performs the complete bounded cleanup, including its final
+        dependency/activity validation and manifest removal. Creation and fenced
+        worker writes cannot cross that admission boundary. Keep provider calls
+        and other unbounded work outside this transaction. Lock order is index
+        -> manifest -> artifact/conversation locks; callbacks must not call locking
+        IndexStore methods or re-acquire the manifest lock. Use
+        SessionStore.delete_locked for terminal directory removal.
 
-        ``expect_manifest_absent`` must be a fact about what the caller *did*, not
-        a probe of what it *sees*: a probe taken after the window opened may
-        already be looking at the replacement's manifest and mistake it for the
-        caller's own. Timestamps cannot substitute -- ``now_iso`` has second
-        granularity, so a replacement created in the same second is
-        indistinguishable by ``created_at``.
+        An expected instance is mandatory, including retries. Legacy rows must
+        first be explicitly migrated. Row identity remains sufficient after an
+        interrupted cleanup removed the manifest or its containing worktree;
+        any surviving owner must still match. The row is removed only after the
+        callback succeeds, retaining retry evidence on a cleanup failure.
 
-        **Known residual: a second concurrent delete of the same name.** False
-        disables the ownership check entirely, which is right for a delete whose
-        manifest is still its own -- it never opened a window, so no creator could
-        have reclaimed the name. It is wrong when *another* delete of the same name
-        opened one: the second deleter sampled its flag while the manifest was
-        still present, so it arrives with False and removes a replacement's row and
-        manifest. Closing this needs a per-session identity the deleter can carry
-        into the lock and compare, which the row does not have today -- see
-        ``docs/board/proposed/session_delete_generation_token``. Reaching it takes
-        two concurrent deletes of one name plus a recreate landing between them.
-
-        Args:
-            name: Session display name.
-            forge_root: Scope to this project. Strict resolution when None.
-            expect_manifest_absent: True when this delete has already destroyed the
-                manifest, or there never was one -- so a manifest present now can
-                only belong to a creator that reclaimed the name.
-            delete_manifest: Removes the manifest under its own lock. Runs inside
-                the index lock, before the row is removed, so a manifest-lock
-                failure leaves the complete session published rather than
-                producing an orphan manifest. Keep it to the bounded session
-                directory -- manifest, its lock, and up to three Codex handoff
-                files. Transcripts (``.forge/artifacts/``), the search index, and
-                the worktree all live outside it and must stay outside. A
-                ``SessionStore.delete`` callback may wait up to
-                ``CLI_LOCK_TIMEOUT_S`` for a live manifest lock while this global
-                index lock remains held; that matches creation's lock order and
-                prefers completing a user-requested delete over a shorter
-                contention failure.
-
-        Returns:
-            True if the caller still owned the name; the row and manifest are gone.
-            False if a replacement owns it, in which case nothing was removed.
+        Return False without invoking the callback when the row is absent or
+        belongs to a different instance.
         """
         validate_name(name)
-
+        _require_instance_id(expected_instance_id)
         with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
             index = self.read()
-
             key = resolve_key_strict(index.sessions, name, forge_root)
-            if key is not None:
-                if expect_manifest_absent and self._manifest_exists_for_row(key, index.sessions[key]):
-                    return False
-
-            # The held index lock excludes a replacement that is only partway
-            # through publication. Under the single-deleter contract above, a
-            # surviving row is still the caller's: either its manifest never went
-            # absent, or the guard ruled out a completed replacement. Without a
-            # row, row-first publication means no replacement can own the path;
-            # anything left is caller-owned residue or a pre-existing orphan that
-            # this transaction is entitled to clear.
-
-            delete_manifest()
-            if key is not None:
-                # Manifest first: its deletion takes the manifest lock and can
-                # time out. Until it succeeds, keep the row so a failed delete does
-                # not manufacture the manifest-only orphan this transaction exists
-                # to prevent. A failure after the manifest disappears leaves only a
-                # prunable row, the safe residue direction.
-                del index.sessions[key]
-                self.write(index)
+            if key is None or index.sessions[key].instance_id != expected_instance_id:
+                return False
+            entry = index.sessions[key]
+            store = SessionStore(entry.root, name)
+            # A retry after checkout removal must not recreate that checkout
+            # merely to acquire a lock. Publication authority excludes creators.
+            manifest_lock = (
+                file_lock_for_target(target_path=store.manifest_path, timeout_s=CLI_LOCK_TIMEOUT_S)
+                if store.session_dir.is_dir()
+                else nullcontext()
+            )
+            with manifest_lock:
+                owner_path = store.session_dir / "review-identity"
+                if store.exists() or owner_path.exists() or owner_path.is_symlink():
+                    if store.review_identity() != expected_instance_id:
+                        return False
+                delete_manifest()
+            del index.sessions[key]
+            self.write(index)
             return True
 
     def session_exists(self, name: str, forge_root: str | None = None) -> bool:
@@ -736,7 +849,10 @@ class IndexStore:
 
             for key, entry in index.sessions.items():
                 if entry.claude_session_id == session_uuid:
-                    return session_name_from_key(key), entry.forge_root or entry.worktree_path
+                    return (
+                        session_name_from_key(key),
+                        entry.forge_root or entry.worktree_path,
+                    )
 
             return None
 
@@ -847,3 +963,17 @@ class IndexStore:
             checkout_root=checkout_root or worktree_path,
             relative_path=relative_path or ".",
         )
+
+
+def _valid_instance_id(value: object) -> bool:
+    return isinstance(value, str) and len(value) == 32 and all(char in "0123456789abcdef" for char in value)
+
+
+def _require_instance_id(value: str) -> None:
+    if not _valid_instance_id(value):
+        raise ValueError("A valid session instance_id is required; explicitly migrate legacy session ownership first")
+
+
+def _cleanup_pending(forge_root: str | Path, name: str) -> bool:
+    path = cleanup_state_path(forge_root, name)
+    return path.exists() or path.is_symlink()

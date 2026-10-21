@@ -55,7 +55,9 @@ from forge.session.hooks import (
     parse_hook_input,
     resolve_session_store,
 )
+from forge.session.hooks.producers import capture_hook_instance, is_managed_hook
 from forge.session.store import HOOK_LOCK_TIMEOUT_S, SessionStore
+from forge.session.workers import session_worker_lease
 
 from ._group import hooks
 from ._helpers import (
@@ -107,6 +109,7 @@ class _TranscriptCaptureResult:
     dst_rel: Path
     manifest_updated: bool
     manifest_error: str | None
+    instance_id: str
 
 
 def _policy_shadow_diagnostic_root(supervisor: Any) -> str | Path | None:
@@ -147,86 +150,91 @@ def _capture_transcript_artifact(
     confirmed_by: str,
     event_label: str,
     fail_on_copy_error: bool,
+    expected_instance_id: str,
 ) -> _TranscriptCaptureResult:
     """Copy a transcript into artifacts and reconcile the manifest."""
-    project_root = store.forge_root
-    paths = get_artifact_paths(project_root, manifest.name)
+    with session_worker_lease(
+        store.forge_root, manifest.name, expected_instance_id=expected_instance_id, label=event_label
+    ):
+        project_root = store.forge_root
+        paths = get_artifact_paths(project_root, manifest.name)
 
-    src = Path(transcript_path)
-    dst_abs = paths.transcripts_abs / f"{session_id}.jsonl"
-    dst_rel = paths.transcripts_rel / f"{session_id}.jsonl"
+        src = Path(transcript_path)
+        dst_abs = paths.transcripts_abs / f"{session_id}.jsonl"
+        dst_rel = paths.transcripts_rel / f"{session_id}.jsonl"
 
-    try:
-        copied = safe_copy_file(src, dst_abs, overwrite=True)
-    except Exception:
-        if fail_on_copy_error:
-            raise
-        copied = False
-
-    if dst_abs.is_file():
-        _copy_transcript_to_pending_runs(dst_abs, session_id=session_id)
-
-    manifest_updated = True
-    manifest_error: str | None = None
-
-    try:
-
-        def _mutate(m: object) -> None:
-            from forge.session.models import SessionState
-
-            if not isinstance(m, SessionState):
-                raise TypeError(f"Expected SessionState, got {type(m)}")
-
-            reconcile_transcript_artifact(
-                m,
-                {
-                    "captured_at": now_iso(),
-                    "reason": reason,
-                    "source_path": transcript_path,
-                    "session_id": session_id,
-                    "copied_path": str(dst_rel),
-                    "copied": copied,
-                },
-                refresh_existing=copied,
-            )
-
-            m.confirmed.claude_session_id = session_id
-            m.confirmed.transcript_path = transcript_path
-
-            from forge import __version__
-            from forge.session.models import PolicyConfirmed
-
-            if m.confirmed.policy:
-                m.confirmed.policy.forge_version = __version__
-            else:
-                m.confirmed.policy = PolicyConfirmed(forge_version=__version__)
-
-            m.confirmed.confirmed_at = now_iso()
-            m.confirmed.confirmed_by = confirmed_by
-
-        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
         try:
-            from forge.session.index import IndexStore
-
-            IndexStore().update_uuid(manifest.name, session_id, forge_root=str(store.forge_root))
+            copied = safe_copy_file(src, dst_abs, overwrite=True)
         except Exception:
-            logger.debug("%s hook: index UUID sync failed", event_label, exc_info=True)
+            if fail_on_copy_error:
+                raise
+            copied = False
 
-    except FileLockTimeoutError:
-        manifest_updated = False
-        manifest_error = "lock_contended"
+        if dst_abs.is_file():
+            _copy_transcript_to_pending_runs(dst_abs, session_id=session_id)
 
-    except Exception as e:
-        manifest_updated = False
-        manifest_error = str(e)
+        manifest_updated = True
+        manifest_error: str | None = None
 
-    return _TranscriptCaptureResult(
-        copied=copied,
-        dst_abs=dst_abs,
-        dst_rel=dst_rel,
-        manifest_updated=manifest_updated,
-        manifest_error=manifest_error,
-    )
+        try:
+
+            def _mutate(m: object) -> None:
+                from forge.session.models import SessionState
+
+                if not isinstance(m, SessionState):
+                    raise TypeError(f"Expected SessionState, got {type(m)}")
+
+                reconcile_transcript_artifact(
+                    m,
+                    {
+                        "captured_at": now_iso(),
+                        "reason": reason,
+                        "source_path": transcript_path,
+                        "session_id": session_id,
+                        "copied_path": str(dst_rel),
+                        "copied": copied,
+                    },
+                    refresh_existing=copied,
+                )
+
+                m.confirmed.claude_session_id = session_id
+                m.confirmed.transcript_path = transcript_path
+
+                from forge import __version__
+                from forge.session.models import PolicyConfirmed
+
+                if m.confirmed.policy:
+                    m.confirmed.policy.forge_version = __version__
+                else:
+                    m.confirmed.policy = PolicyConfirmed(forge_version=__version__)
+
+                m.confirmed.confirmed_at = now_iso()
+                m.confirmed.confirmed_by = confirmed_by
+
+            store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
+            try:
+                from forge.session.index import IndexStore
+
+                IndexStore().update_uuid(manifest.name, session_id, forge_root=str(store.forge_root))
+            except Exception:
+                logger.debug("%s hook: index UUID sync failed", event_label, exc_info=True)
+
+        except FileLockTimeoutError:
+            manifest_updated = False
+            manifest_error = "lock_contended"
+
+        except Exception as e:
+            manifest_updated = False
+            manifest_error = str(e)
+
+        return _TranscriptCaptureResult(
+            copied=copied,
+            dst_abs=dst_abs,
+            dst_rel=dst_rel,
+            manifest_updated=manifest_updated,
+            manifest_error=manifest_error,
+            instance_id=expected_instance_id,
+        )
 
 
 @hooks.command(name="session-start")
@@ -330,6 +338,7 @@ def plan_write() -> None:
         return
     diagnose_project_compatibility_for_hook(store.forge_root, operation="plan-write")
     try:
+        instance_id = capture_hook_instance(store)
         store.read()
     except Exception as e:
         _output_json({"success": False, "error": "manifest_read_failed", "message": str(e)})
@@ -357,7 +366,7 @@ def plan_write() -> None:
             m.confirmed.confirmed_at = now_iso()
             m.confirmed.confirmed_by = "hook:plan-write"
 
-        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
+        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate, expected_instance_id=instance_id)
     except FileLockTimeoutError:
         _output_json({"success": True, "action": "skip_lock_contended"})
         return
@@ -401,91 +410,99 @@ def exit_plan_mode() -> None:
     if store is None:
         _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
-    diagnose_project_compatibility_for_hook(store.forge_root, operation="exit-plan-mode")
     try:
-        manifest = store.read()
-    except Exception as e:
-        _output_json({"success": False, "error": "manifest_read_failed", "message": str(e)})
-        return
+        instance_id = capture_hook_instance(store)
+        with session_worker_lease(
+            store.forge_root, store.session_name, expected_instance_id=instance_id, label="approved plan capture"
+        ):
+            diagnose_project_compatibility_for_hook(store.forge_root, operation="exit-plan-mode")
+            try:
+                manifest = store.read()
+            except Exception as e:
+                _output_json({"success": False, "error": "manifest_read_failed", "message": str(e)})
+                return
 
-    source_plan_path: Path | None = None
-    if manifest.confirmed.latest_plan_path:
-        source_plan_path = cwd / manifest.confirmed.latest_plan_path
+            source_plan_path: Path | None = None
+            if manifest.confirmed.latest_plan_path:
+                source_plan_path = cwd / manifest.confirmed.latest_plan_path
 
-    # Fallback: scan transcript for last plan write (streaming; no full read).
-    if source_plan_path is None or not source_plan_path.is_file():
-        transcript_path = data.get("transcript_path")
-        if isinstance(transcript_path, str) and transcript_path:
-            source_plan_path = _find_latest_plan_from_transcript(transcript_path, cwd)
+            # Fallback: scan transcript for last plan write (streaming; no full read).
+            if source_plan_path is None or not source_plan_path.is_file():
+                transcript_path = data.get("transcript_path")
+                if isinstance(transcript_path, str) and transcript_path:
+                    source_plan_path = _find_latest_plan_from_transcript(transcript_path, cwd)
 
-    if source_plan_path is None or not source_plan_path.is_file():
-        _output_json({"success": False, "error": "plan_not_found"})
-        return
+            if source_plan_path is None or not source_plan_path.is_file():
+                _output_json({"success": False, "error": "plan_not_found"})
+                return
 
-    # Compute artifact roots
-    project_root = store.forge_root
-    paths = get_artifact_paths(project_root, manifest.name)
+            # Compute artifact roots
+            project_root = store.forge_root
+            paths = get_artifact_paths(project_root, manifest.name)
 
-    try:
-        snapshot_abs, snapshot_rel = snapshot_plan_approved(
-            paths=paths,
-            source_plan_path=source_plan_path,
-        )
-    except Exception as e:
-        _output_json({"success": False, "error": "snapshot_failed", "message": str(e)})
-        return
+            try:
+                snapshot_abs, snapshot_rel = snapshot_plan_approved(
+                    paths=paths,
+                    source_plan_path=source_plan_path,
+                )
+            except Exception as e:
+                _output_json({"success": False, "error": "snapshot_failed", "message": str(e)})
+                return
 
-    source_plan_str = manifest.confirmed.latest_plan_path or str(source_plan_path)
+            source_plan_str = manifest.confirmed.latest_plan_path or str(source_plan_path)
 
-    try:
+            try:
 
-        def _mutate(m: object) -> None:
-            from forge.session.models import SessionState
+                def _mutate(m: object) -> None:
+                    from forge.session.models import SessionState
 
-            if not isinstance(m, SessionState):
-                raise TypeError(f"Expected SessionState, got {type(m)}")
+                    if not isinstance(m, SessionState):
+                        raise TypeError(f"Expected SessionState, got {type(m)}")
 
-            artifacts = m.confirmed.artifacts
+                    artifacts = m.confirmed.artifacts
 
-            # Content-addressable snapshot_path makes re-approval of identical
-            # content a no-op on disk. Dedupe the audit entry too, but keep the
-            # most recently approved unique plan at the end of the list so
-            # readers that use "last approved snapshot wins" still surface the
-            # current approval after A->B->A.
-            existing = artifacts.get("plans")
-            new_snapshot_path = str(snapshot_rel)
-            if isinstance(existing, list):
-                artifacts["plans"] = [
-                    entry
-                    for entry in existing
-                    if not (isinstance(entry, dict) and entry.get("snapshot_path") == new_snapshot_path)
-                ]
+                    # Content-addressable snapshot_path makes re-approval of identical
+                    # content a no-op on disk. Dedupe the audit entry too, but keep the
+                    # most recently approved unique plan at the end of the list so
+                    # readers that use "last approved snapshot wins" still surface the
+                    # current approval after A->B->A.
+                    existing = artifacts.get("plans")
+                    new_snapshot_path = str(snapshot_rel)
+                    if isinstance(existing, list):
+                        artifacts["plans"] = [
+                            entry
+                            for entry in existing
+                            if not (isinstance(entry, dict) and entry.get("snapshot_path") == new_snapshot_path)
+                        ]
 
-            _append_artifact_entry(
-                artifacts,
-                kind="plans",
-                entry={
-                    "kind": "approved",
-                    "captured_at": now_iso(),
-                    "source_path": source_plan_str,
-                    "snapshot_path": str(snapshot_rel),
-                },
-            )
+                    _append_artifact_entry(
+                        artifacts,
+                        kind="plans",
+                        entry={
+                            "kind": "approved",
+                            "captured_at": now_iso(),
+                            "source_path": source_plan_str,
+                            "snapshot_path": str(snapshot_rel),
+                        },
+                    )
 
-            m.confirmed.confirmed_at = now_iso()
-            m.confirmed.confirmed_by = "hook:exit-plan-mode"
+                    m.confirmed.confirmed_at = now_iso()
+                    m.confirmed.confirmed_by = "hook:exit-plan-mode"
 
-        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
+                store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
 
-    except FileLockTimeoutError:
-        _output_json({"success": True, "action": "skip_lock_contended"})
-        return
+            except FileLockTimeoutError:
+                _output_json({"success": True, "action": "skip_lock_contended"})
+                return
 
-    except Exception as e:
-        _output_json({"success": False, "error": "manifest_write_failed", "message": str(e)})
-        return
+            except Exception as e:
+                _output_json({"success": False, "error": "manifest_write_failed", "message": str(e)})
+                return
 
-    _output_json({"success": True, "action": "snapshotted", "snapshot_path": str(snapshot_rel)})
+            _output_json({"success": True, "action": "snapshotted", "snapshot_path": str(snapshot_rel)})
+
+    except Exception as error:
+        _output_json({"success": False, "error": "producer_not_admitted", "message": str(error)})
 
 
 @hooks.command(name="stop")
@@ -525,191 +542,208 @@ def stop() -> None:
 
     store = resolve_session_store(cwd, session_id=data.get("session_id"))
     if store is None:
-        if pending_transcript_path is not None:
+        if pending_transcript_path is not None and not is_managed_hook():
             _copy_transcript_to_pending_runs(pending_transcript_path, session_id=incoming_session_id)
         _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
-    diagnose_project_compatibility_for_hook(store.forge_root, operation="stop")
     try:
-        manifest = store.read()
-    except Exception as e:
-        _output_json({"success": False, "error": "manifest_read_failed", "message": str(e)})
-        return
+        instance_id = capture_hook_instance(store)
+        with session_worker_lease(
+            store.forge_root, store.session_name, expected_instance_id=instance_id, label="Stop hook"
+        ):
+            diagnose_project_compatibility_for_hook(store.forge_root, operation="stop")
+            try:
+                manifest = store.read()
+            except Exception as e:
+                _output_json({"success": False, "error": "manifest_read_failed", "message": str(e)})
+                return
 
-    transcript_path = data.get("transcript_path")
-    if not isinstance(transcript_path, str) or not transcript_path:
-        transcript_path = manifest.confirmed.transcript_path
+            transcript_path = data.get("transcript_path")
+            if not isinstance(transcript_path, str) or not transcript_path:
+                transcript_path = manifest.confirmed.transcript_path
 
-    if not transcript_path:
-        _output_json({"success": False, "error": "missing_transcript_path"})
-        return
+            if not transcript_path:
+                _output_json({"success": False, "error": "missing_transcript_path"})
+                return
 
-    session_id = data.get("session_id")
-    if not isinstance(session_id, str) or not session_id:
-        session_id = manifest.confirmed.claude_session_id
+            session_id = data.get("session_id")
+            if not isinstance(session_id, str) or not session_id:
+                session_id = manifest.confirmed.claude_session_id
 
-    if not session_id:
-        _output_json({"success": False, "error": "missing_session_id"})
-        return
+            if not session_id:
+                _output_json({"success": False, "error": "missing_session_id"})
+                return
 
-    try:
-        # Claude can invoke Stop repeatedly for the same session UUID as the
-        # transcript grows turn by turn. Refresh the UUID-named artifact so
-        # search/index consumers see the latest snapshot instead of the first
-        # turn that happened to be copied.
-        capture = _capture_transcript_artifact(
-            cwd=cwd,
-            store=store,
-            manifest=manifest,
-            transcript_path=transcript_path,
-            session_id=session_id,
-            reason="stop",
-            confirmed_by="hook:stop",
-            event_label="Stop",
-            fail_on_copy_error=True,
-        )
-    except Exception as e:
-        _output_json({"success": False, "error": "copy_failed", "message": str(e)})
-        return
+            try:
+                # Claude can invoke Stop repeatedly for the same session UUID as the
+                # transcript grows turn by turn. Refresh the UUID-named artifact so
+                # search/index consumers see the latest snapshot instead of the first
+                # turn that happened to be copied.
+                capture = _capture_transcript_artifact(
+                    cwd=cwd,
+                    store=store,
+                    manifest=manifest,
+                    transcript_path=transcript_path,
+                    session_id=session_id,
+                    reason="stop",
+                    confirmed_by="hook:stop",
+                    event_label="Stop",
+                    fail_on_copy_error=True,
+                    expected_instance_id=instance_id,
+                )
+            except Exception as e:
+                _output_json({"success": False, "error": "copy_failed", "message": str(e)})
+                return
 
-    copied = capture.copied
-    dst_abs = capture.dst_abs
-    dst_rel = capture.dst_rel
-    manifest_updated = capture.manifest_updated
-    manifest_error = capture.manifest_error
+            copied = capture.copied
+            dst_abs = capture.dst_abs
+            dst_rel = capture.dst_rel
+            manifest_updated = capture.manifest_updated
+            manifest_error = capture.manifest_error
 
-    # Run verification check (Ralph-Wiggum pattern)
-    # This must happen AFTER transcript copy so we have the artifact to check
-    # Re-read manifest to get latest state (may have been updated by artifact write)
-    try:
-        manifest = store.read()
-    except Exception:
-        pass  # Use stale manifest for verification - better than skipping
+            # Run verification check (Ralph-Wiggum pattern)
+            # This must happen AFTER transcript copy so we have the artifact to check
+            # Re-read manifest to get latest state (may have been updated by artifact write)
+            try:
+                manifest = store.read()
+            except Exception:
+                pass  # Use stale manifest for verification - better than skipping
 
-    should_allow_stop, block_message = _run_verification_check(
-        store=store,
-        manifest=manifest,
-        transcript_path=dst_abs,  # Check the copied artifact, not the original
-        timing=verification_timing,
-    )
+            should_allow_stop, block_message = _run_verification_check(
+                store=store,
+                manifest=manifest,
+                transcript_path=dst_abs,  # Check the copied artifact, not the original
+                timing=verification_timing,
+            )
 
-    if not should_allow_stop:
-        # Verification failed - block Stop
-        # Do NOT enqueue pending-work since we're blocking
-        _warn_if_forge_overhead_exceeded(
-            started=stop_started,
-            external_seconds=verification_timing.external_seconds,
-            operation="Stop",
-        )
-        click.echo(block_message, err=True)
-        sys.exit(2)
+            if not should_allow_stop:
+                # Verification failed - block Stop
+                # Do NOT enqueue pending-work since we're blocking
+                _warn_if_forge_overhead_exceeded(
+                    started=stop_started,
+                    external_seconds=verification_timing.external_seconds,
+                    operation="Stop",
+                )
+                click.echo(block_message, err=True)
+                sys.exit(2)
 
-    # Enqueue pending-work markers for deferred processing (best-effort)
-    # Important: enqueue even if manifest update failed - the transcript artifact
-    # exists on disk and deferred work should still be triggered.
-    # Only enqueue if verification passed (we reach here only if should_allow_stop=True)
-    deferred_worktree_path, marker_forge_root = _deferred_work_paths(cwd, store)
-    queued_stop = (
-        enqueue_stop_marker(
-            session_id=session_id,
-            worktree_path=deferred_worktree_path,
-            session_name=manifest.name,
-            transcript_snapshot_rel=str(dst_rel),
-            forge_root=marker_forge_root,
-        )
-        is not None
-    )
-    queued_index = (
-        enqueue_index_marker(
-            session_id=session_id,
-            worktree_path=deferred_worktree_path,
-            session_name=manifest.name,
-            transcript_snapshot_rel=str(dst_rel),
-            forge_root=marker_forge_root,
-        )
-        is not None
-    )
-
-    # Enqueue handoff marker if memory is enabled for this session (best-effort).
-    queued_handoff = False
-    try:
-        effective = compute_effective_intent(manifest)
-
-        from forge.session.project_memory import is_memory_enabled
-
-        if is_memory_enabled(manifest, effective):
-            queued_handoff = (
-                enqueue_handoff_marker(
+            # Enqueue pending-work markers for deferred processing (best-effort)
+            # Important: enqueue even if manifest update failed - the transcript artifact
+            # exists on disk and deferred work should still be triggered.
+            # Only enqueue if verification passed (we reach here only if should_allow_stop=True)
+            deferred_worktree_path, marker_forge_root = _deferred_work_paths(cwd, store)
+            queued_stop = (
+                enqueue_stop_marker(
                     session_id=session_id,
                     worktree_path=deferred_worktree_path,
                     session_name=manifest.name,
                     transcript_snapshot_rel=str(dst_rel),
-                    subprocess_proxy=effective.subprocess_proxy,
                     forge_root=marker_forge_root,
+                    admission_forge_root=str(store.forge_root),
+                    expected_instance_id=instance_id,
                 )
                 is not None
             )
-    except Exception:
-        logger.debug("Memory handoff enqueue failed for session %s", manifest.name, exc_info=True)
-
-    # Enqueue a shadow-drain marker only when this session captured pending shadow
-    # candidates (best-effort). The cheap directory glob keeps the Stop hook inert
-    # for the common case where shadow sampling is off (rate 0 never writes the dir).
-    queued_shadow = False
-    try:
-        from forge.policy.semantic.shadow import has_pending_candidates
-
-        # Candidate discovery runs at the hook boundary and must use the root
-        # visible to this process. In a sidecar, only the deferred marker payload
-        # is translated back to host-resolvable paths for the later host drain.
-        shadow_probe_root = str(store.forge_root)
-        if has_pending_candidates(shadow_probe_root, manifest.name):
-            queued_shadow = (
-                enqueue_shadow_marker(
+            queued_index = (
+                enqueue_index_marker(
                     session_id=session_id,
-                    session_name=manifest.name,
                     worktree_path=deferred_worktree_path,
+                    session_name=manifest.name,
+                    transcript_snapshot_rel=str(dst_rel),
                     forge_root=marker_forge_root,
+                    admission_forge_root=str(store.forge_root),
+                    expected_instance_id=instance_id,
                 )
                 is not None
             )
-    except Exception:
-        logger.debug("Shadow drain enqueue failed for session %s", manifest.name, exc_info=True)
 
-    if not manifest_updated:
-        # Manifest failed but we still tried to enqueue
-        _output_json(
-            {
-                "success": True,
-                "action": "partial",
-                "copied_path": str(dst_rel),
-                "copied": copied,
-                "manifest_updated": False,
-                "manifest_error": manifest_error,
-                "queued": queued_stop,
-                "queued_index": queued_index,
-                "queued_handoff": queued_handoff,
-                "queued_shadow": queued_shadow,
-            }
-        )
-    else:
-        _output_json(
-            {
-                "success": True,
-                "action": "copied",
-                "copied_path": str(dst_rel),
-                "copied": copied,
-                "queued": queued_stop,
-                "queued_index": queued_index,
-                "queued_handoff": queued_handoff,
-                "queued_shadow": queued_shadow,
-            }
-        )
-    _warn_if_forge_overhead_exceeded(
-        started=stop_started,
-        external_seconds=verification_timing.external_seconds,
-        operation="Stop",
-    )
+            # Enqueue handoff marker if memory is enabled for this session (best-effort).
+            queued_handoff = False
+            try:
+                effective = compute_effective_intent(manifest)
+
+                from forge.session.project_memory import is_memory_enabled
+
+                if is_memory_enabled(manifest, effective):
+                    queued_handoff = (
+                        enqueue_handoff_marker(
+                            session_id=session_id,
+                            worktree_path=deferred_worktree_path,
+                            session_name=manifest.name,
+                            transcript_snapshot_rel=str(dst_rel),
+                            subprocess_proxy=effective.subprocess_proxy,
+                            forge_root=marker_forge_root,
+                            admission_forge_root=str(store.forge_root),
+                            expected_instance_id=instance_id,
+                        )
+                        is not None
+                    )
+            except Exception:
+                logger.debug("Memory handoff enqueue failed for session %s", manifest.name, exc_info=True)
+
+            # Enqueue a shadow-drain marker only when this session captured pending shadow
+            # candidates (best-effort). The cheap directory glob keeps the Stop hook inert
+            # for the common case where shadow sampling is off (rate 0 never writes the dir).
+            queued_shadow = False
+            try:
+                from forge.policy.semantic.shadow import has_pending_candidates
+
+                # Candidate discovery runs at the hook boundary and must use the root
+                # visible to this process. In a sidecar, only the deferred marker payload
+                # is translated back to host-resolvable paths for the later host drain.
+                shadow_probe_root = str(store.forge_root)
+                if has_pending_candidates(shadow_probe_root, manifest.name):
+                    queued_shadow = (
+                        enqueue_shadow_marker(
+                            session_id=session_id,
+                            session_name=manifest.name,
+                            worktree_path=deferred_worktree_path,
+                            forge_root=marker_forge_root,
+                            admission_forge_root=str(store.forge_root),
+                            expected_instance_id=instance_id,
+                        )
+                        is not None
+                    )
+            except Exception:
+                logger.debug("Shadow drain enqueue failed for session %s", manifest.name, exc_info=True)
+
+            if not manifest_updated:
+                # Manifest failed but we still tried to enqueue
+                _output_json(
+                    {
+                        "success": True,
+                        "action": "partial",
+                        "copied_path": str(dst_rel),
+                        "copied": copied,
+                        "manifest_updated": False,
+                        "manifest_error": manifest_error,
+                        "queued": queued_stop,
+                        "queued_index": queued_index,
+                        "queued_handoff": queued_handoff,
+                        "queued_shadow": queued_shadow,
+                    }
+                )
+            else:
+                _output_json(
+                    {
+                        "success": True,
+                        "action": "copied",
+                        "copied_path": str(dst_rel),
+                        "copied": copied,
+                        "queued": queued_stop,
+                        "queued_index": queued_index,
+                        "queued_handoff": queued_handoff,
+                        "queued_shadow": queued_shadow,
+                    }
+                )
+            _warn_if_forge_overhead_exceeded(
+                started=stop_started,
+                external_seconds=verification_timing.external_seconds,
+                operation="Stop",
+            )
+
+    except Exception as error:
+        _output_json({"success": False, "error": "producer_not_admitted", "message": str(error)})
 
 
 @hooks.command(name="stop-failure")
@@ -750,12 +784,13 @@ def stop_failure() -> None:
 
     store = resolve_session_store(cwd, session_id=data.get("session_id"))
     if store is None:
-        if pending_transcript_path is not None:
+        if pending_transcript_path is not None and not is_managed_hook():
             _copy_transcript_to_pending_runs(pending_transcript_path, session_id=incoming_session_id)
         _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
     diagnose_project_compatibility_for_hook(store.forge_root, operation="stop-failure")
     try:
+        instance_id = capture_hook_instance(store)
         manifest = store.read()
     except Exception as e:
         _output_json({"success": False, "error": "manifest_read_failed", "message": str(e)})
@@ -777,17 +812,22 @@ def stop_failure() -> None:
 
     # Keep the session artifact aligned with the latest transcript snapshot
     # here too; StopFailure can arrive after earlier Stop captures.
-    capture = _capture_transcript_artifact(
-        cwd=cwd,
-        store=store,
-        manifest=manifest,
-        transcript_path=transcript_path,
-        session_id=session_id,
-        reason="stop-failure",
-        confirmed_by="hook:stop-failure",
-        event_label="StopFailure",
-        fail_on_copy_error=False,
-    )
+    try:
+        capture = _capture_transcript_artifact(
+            cwd=cwd,
+            store=store,
+            manifest=manifest,
+            transcript_path=transcript_path,
+            session_id=session_id,
+            reason="stop-failure",
+            confirmed_by="hook:stop-failure",
+            event_label="StopFailure",
+            fail_on_copy_error=False,
+            expected_instance_id=instance_id,
+        )
+    except Exception as error:
+        _output_json({"success": False, "error": "producer_not_admitted", "message": str(error)})
+        return
     copied = capture.copied
     dst_abs = capture.dst_abs
     dst_rel = capture.dst_rel
@@ -805,6 +845,8 @@ def stop_failure() -> None:
                 session_name=manifest.name,
                 transcript_snapshot_rel=str(dst_rel),
                 forge_root=marker_forge_root,
+                admission_forge_root=str(store.forge_root),
+                expected_instance_id=instance_id,
             )
             is not None
         )
@@ -815,6 +857,8 @@ def stop_failure() -> None:
                 session_name=manifest.name,
                 transcript_snapshot_rel=str(dst_rel),
                 forge_root=marker_forge_root,
+                admission_forge_root=str(store.forge_root),
+                expected_instance_id=instance_id,
             )
             is not None
         )
@@ -870,49 +914,53 @@ def pre_compact() -> None:
         store = resolve_session_store(cwd, session_id=session_id)
         if store is None or not store.exists():
             sys.exit(0)
-        diagnose_project_compatibility_for_hook(store.forge_root, operation="pre-compact")
+        instance_id = capture_hook_instance(store)
+        with session_worker_lease(
+            store.forge_root, store.session_name, expected_instance_id=instance_id, label="PreCompact capture"
+        ):
+            diagnose_project_compatibility_for_hook(store.forge_root, operation="pre-compact")
 
-        manifest = store.read()
-        if manifest is None:
-            sys.exit(0)
+            manifest = store.read()
+            if manifest is None:
+                sys.exit(0)
 
-        project_root = store.forge_root
-        paths = get_artifact_paths(project_root, manifest.name)
+            project_root = store.forge_root
+            paths = get_artifact_paths(project_root, manifest.name)
 
-        src = Path(transcript_path)
-        timestamp = now_iso().replace(":", "-")
-        snapshot_name = f"{session_id}_pre-compact_{timestamp}.jsonl"
-        dst_abs = paths.transcripts_abs / snapshot_name
-        dst_rel = paths.transcripts_rel / snapshot_name
+            src = Path(transcript_path)
+            timestamp = now_iso().replace(":", "-")
+            snapshot_name = f"{session_id}_pre-compact_{timestamp}.jsonl"
+            dst_abs = paths.transcripts_abs / snapshot_name
+            dst_rel = paths.transcripts_rel / snapshot_name
 
-        copied = safe_copy_file(src, dst_abs, overwrite=False)
+            copied = safe_copy_file(src, dst_abs, overwrite=False)
 
-        from forge.session.models import CompactionConfirmed, SessionState
+            from forge.session.models import CompactionConfirmed, SessionState
 
-        def _mutate(m: object) -> None:
-            if not isinstance(m, SessionState):
-                raise TypeError(f"Expected SessionState, got {type(m)}")
+            def _mutate(m: object) -> None:
+                if not isinstance(m, SessionState):
+                    raise TypeError(f"Expected SessionState, got {type(m)}")
 
-            if m.confirmed.compaction is None:
-                m.confirmed.compaction = CompactionConfirmed()
+                if m.confirmed.compaction is None:
+                    m.confirmed.compaction = CompactionConfirmed()
 
-            migrate_legacy_transcript_snapshots(m)
-            m.confirmed.compaction.compact_count += 1
+                migrate_legacy_transcript_snapshots(m)
+                m.confirmed.compaction.compact_count += 1
 
-            m.confirmed.compaction.transcript_snapshots.append(
-                {
-                    "captured_at": now_iso(),
-                    "reason": "pre-compact",
-                    "source_path": transcript_path,
-                    "snapshot_path": str(dst_rel),
-                    "copied": copied,
-                }
-            )
-            m.confirmed.confirmed_at = now_iso()
-            m.confirmed.confirmed_by = "hook:pre-compact"
+                m.confirmed.compaction.transcript_snapshots.append(
+                    {
+                        "captured_at": now_iso(),
+                        "reason": "pre-compact",
+                        "source_path": transcript_path,
+                        "snapshot_path": str(dst_rel),
+                        "copied": copied,
+                    }
+                )
+                m.confirmed.confirmed_at = now_iso()
+                m.confirmed.confirmed_by = "hook:pre-compact"
 
-        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
-        logger.debug("pre-compact: transcript snapshot captured at %s", dst_rel)
+            store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
+            logger.debug("pre-compact: transcript snapshot captured at %s", dst_rel)
     except TranscriptArtifactStateError as e:
         # Fail open, but durable-state corruption must remain visible at this
         # best-effort writer boundary.
@@ -959,6 +1007,8 @@ def post_compact() -> None:
     try:
         from forge.session.models import CompactionConfirmed, SessionState
 
+        instance_id = capture_hook_instance(store)
+
         def _mutate(m: object) -> None:
             if not isinstance(m, SessionState):
                 raise TypeError(f"Expected SessionState, got {type(m)}")
@@ -971,7 +1021,7 @@ def post_compact() -> None:
             m.confirmed.confirmed_at = now_iso()
             m.confirmed.confirmed_by = "hook:post-compact"
 
-        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
+        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate, expected_instance_id=instance_id)
         logger.debug("post-compact: compaction metadata recorded (trigger=%s)", compact_trigger)
     except Exception as e:
         logger.debug("post-compact: state update failed: %s", e)
@@ -1182,6 +1232,8 @@ def subagent_stop() -> None:
     try:
         from forge.session.models import SessionState, SubagentConfirmed
 
+        instance_id = capture_hook_instance(store)
+
         def _mutate(m: object) -> None:
             if not isinstance(m, SessionState):
                 raise TypeError(f"Expected SessionState, got {type(m)}")
@@ -1200,7 +1252,7 @@ def subagent_stop() -> None:
             m.confirmed.confirmed_at = now_iso()
             m.confirmed.confirmed_by = "hook:subagent-stop"
 
-        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
+        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate, expected_instance_id=instance_id)
         logger.debug("subagent-stop: recorded agent_type=%s total=%s", agent_type, "ok")
     except Exception as e:
         logger.debug("subagent-stop: state update failed: %s", e)
@@ -1247,6 +1299,7 @@ def policy_check() -> None:
         _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
     try:
+        instance_id = capture_hook_instance(store)
         manifest = store.read()
     except Exception as e:
         print(f"[forge] Policy check: cannot read session manifest: {e}", file=sys.stderr)
@@ -1313,6 +1366,7 @@ def policy_check() -> None:
     try:
         _persist_policy_state(
             store=store,
+            expected_instance_id=instance_id,
             engine=engine,
             result=result,
             effective=effective,
@@ -1471,6 +1525,7 @@ def codex_policy_check() -> None:
         logger.debug("Codex policy check: no session resolved")
         sys.exit(0)
     try:
+        instance_id = capture_hook_instance(store)
         manifest = store.read()
     except Exception as e:
         print(f"[forge] Policy check: cannot read session manifest: {e}", file=sys.stderr)
@@ -1590,6 +1645,7 @@ def codex_policy_check() -> None:
     try:
         _persist_policy_decisions(
             store=store,
+            expected_instance_id=instance_id,
             engine=engine,
             engine_state={} if blocked else aggregated_state,
             entries=[(result, f"apply_patch:{path}" if path else "apply_patch") for path, result in file_results],

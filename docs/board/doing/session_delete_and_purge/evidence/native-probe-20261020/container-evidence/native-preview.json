@@ -1,0 +1,14 @@
+{
+  "files": [],
+  "refusals": [
+    "Uncharacterized Claude subagent companion: /probe/home/.claude/projects/-probe-workspace/0e64d383-0c20-456b-93e4-70affb1778b3/subagents/agent-aeca28e6110ff07ca.meta.json"
+  ],
+  "outside_scope": [
+    "Provider-side request copies",
+    "Project memory documents and Git history",
+    "Global Forge telemetry",
+    "Claude history.jsonl, file-history, and other uncharacterized runtime state",
+    "Codex indexes, archived stores, and other uncharacterized runtime state",
+    "Native copies outside the recorded runtime store"
+  ]
+}

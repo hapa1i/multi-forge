@@ -83,7 +83,7 @@ def _supervisor_set_with_matching_source(
     if confirm_current_launch:
         current.confirmed.launch = LaunchConfirmed(routing_mode="proxy", proxy_id=proxy_id, base_url=base_url)
     store = SessionStore(str(project), current.name)
-    store.write(current)
+    publish_session(IndexStore(), current, project, forge_root=str(project))
 
     source = create_session_state("planner", worktree_path=str(project))
     source.forge_root = str(project)
@@ -92,6 +92,7 @@ def _supervisor_set_with_matching_source(
         proxy_id=proxy_id,
         template=template,
     )
+    publish_session(IndexStore(), source, project, forge_root=str(project))
     monkeypatch.setattr(
         policy_ops.supervisor_semantic,
         "validate_supervisor_target",

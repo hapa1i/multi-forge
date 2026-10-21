@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/probe/native_probe_payload.py", line 249, in <module>
+    run_native()
+  File "/probe/native_probe_payload.py", line 100, in run_native
+    result["lifecycle"] = verify_lifecycle(files)
+                          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/probe/native_probe_payload.py", line 125, in verify_lifecycle
+    raise ValueError("; ".join(inventory.refusals))
+ValueError: Uncharacterized Claude subagent companion: /probe/home/.claude/projects/-probe-workspace/0e64d383-0c20-456b-93e4-70affb1778b3/subagents/agent-aeca28e6110ff07ca.meta.json

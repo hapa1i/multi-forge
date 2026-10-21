@@ -118,6 +118,14 @@ def invoke_codex_interactive(
     env = sanitize_codex_child_env(preflight)
     env[_FORGE_SESSION_VAR] = session_name
     env[_FORGE_FORGE_ROOT_VAR] = forge_root
+    from forge.session.store import SessionStore
+    from forge.session.workers import SESSION_INSTANCE_ENV
+
+    store = SessionStore(forge_root, session_name)
+    instance_id = store.review_identity() if store.exists() else None
+    env.pop(SESSION_INSTANCE_ENV, None)
+    if instance_id is not None:
+        env[SESSION_INSTANCE_ENV] = instance_id
     env[FORGE_RUN_ID_VAR] = run_identity.run_id
     env[FORGE_ROOT_RUN_ID_VAR] = run_identity.root_run_id
     env.pop(FORGE_PARENT_RUN_ID_VAR, None)  # an interactive launch is its own root

@@ -375,6 +375,20 @@ def rebuild_index_cmd() -> None:
     index_store = IndexStateStore(forge_root=project_root)
 
     project_root_str = str(project_root)
+    from forge.session.cleanup_state import cleanup_state_path
+    from forge.session.identity import session_name_from_key
+    from forge.session.index import IndexStore
+    from forge.session.models import SessionIndexEntry
+
+    publication_index = IndexStore()
+    root_stat = project_root.stat()
+    root_identity = (root_stat.st_dev, root_stat.st_ino)
+    owners_before = {
+        session_name_from_key(key): entry.instance_id
+        for key, entry in publication_index.read().sessions.items()
+        if Path(entry.root).resolve() == project_root
+    }
+    scanned_sessions: set[str] = set()
 
     new_docs = []
     extracted_fingerprints: dict[str, IndexFingerprint] = {}
@@ -384,6 +398,7 @@ def rebuild_index_cmd() -> None:
         if not session_dir.is_dir():
             continue
         session_name = session_dir.name
+        scanned_sessions.add(session_name)
         transcripts_dir = session_dir / "transcripts"
         if not transcripts_dir.is_dir():
             continue
@@ -430,20 +445,38 @@ def rebuild_index_cmd() -> None:
         b=precomputed["b"],
     )
 
-    # Replace all three stores under locks
-    doc_store.replace_all(metas)
-    bm25_store.replace_all(bm25_data)
-    content_store.replace_all(content_map)
+    def publish(entries: list[tuple[str, SessionIndexEntry]]) -> None:
+        current_root = project_root.stat()
+        if (current_root.st_dev, current_root.st_ino) != root_identity:
+            raise ValueError("Project changed while rebuilding; rerun rebuild-index")
+        owners_now = {name: entry.instance_id for name, entry in entries if Path(entry.root).resolve() == project_root}
+        for name in scanned_sessions:
+            pending = cleanup_state_path(project_root, name)
+            if (
+                (name in owners_now, owners_now.get(name)) != (name in owners_before, owners_before.get(name))
+                or pending.exists()
+                or pending.is_symlink()
+            ):
+                raise ValueError(f"Session '{name}' changed or has unfinished cleanup; rerun after cleanup")
+        for doc in new_docs:
+            if not matches_index_fingerprint(Path(doc.transcript_path), extracted_fingerprints[doc.transcript_path]):
+                raise ValueError("Transcript changed while rebuilding; rerun rebuild-index")
 
-    # Rebuild state from the same successful extraction set. A single locked
-    # replacement repairs corrupt/newer bookkeeping without N read-modify-writes.
-    rebuilt_state = IndexState()
-    for doc in new_docs:
-        rebuilt_state.mark_indexed(
-            Path(doc.transcript_path),
-            fingerprint=extracted_fingerprints[doc.transcript_path],
-        )
-    index_store.replace_all(rebuilt_state)
+        # Publication authority excludes deletion until all derived stores agree.
+        doc_store.replace_all(metas)
+        bm25_store.replace_all(bm25_data)
+        content_store.replace_all(content_map)
+        rebuilt_state = IndexState()
+        for doc in new_docs:
+            rebuilt_state.mark_indexed(
+                Path(doc.transcript_path), fingerprint=extracted_fingerprints[doc.transcript_path]
+            )
+        index_store.replace_all(rebuilt_state)
+
+    try:
+        publication_index.run_session_entries_txn(publish)
+    except (OSError, ValueError) as error:
+        raise click.ClickException(f"Search rebuild was not published: {error}") from error
 
     # State describes the extracted bytes even if a later artifact write races
     # the bulk stores. Surface the drift so a rerun can index the latest version.

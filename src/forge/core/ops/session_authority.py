@@ -248,6 +248,19 @@ def _refuse_if_in_agent_or_active(store: SessionStore, state: SessionState, *, o
 
 @contextmanager
 def _authority_mutation_lock(store: SessionStore, *, operation: str) -> Iterator[None]:
+    """Bind manifest and journal updates to one original session instance."""
+    from forge.session.workers import capture_session_instance, session_worker_lease
+
+    instance_id = capture_session_instance(store.forge_root, store.session_name)
+    with session_worker_lease(
+        store.forge_root, store.session_name, expected_instance_id=instance_id, label="authority " + operation
+    ):
+        with _authority_mutation_lock_inner(store, operation=operation):
+            yield
+
+
+@contextmanager
+def _authority_mutation_lock_inner(store: SessionStore, *, operation: str) -> Iterator[None]:
     """Acquire the control lock quickly or record a live-launch refusal."""
 
     stack = ExitStack()

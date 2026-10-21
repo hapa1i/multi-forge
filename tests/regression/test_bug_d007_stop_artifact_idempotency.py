@@ -14,7 +14,8 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.hooks import hooks
-from forge.session import SessionStore, create_session_state
+from forge.session import IndexStore, SessionStore, create_session_state
+from tests.fixtures.session_state import publish_session
 
 pytestmark = pytest.mark.regression
 
@@ -25,7 +26,7 @@ def _store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SessionStore:
     monkeypatch.setenv("FORGE_SESSION", "artifact-session")
     monkeypatch.setenv("FORGE_FORGE_ROOT", str(tmp_path))
     store = SessionStore(str(tmp_path), "artifact-session")
-    store.write(create_session_state("artifact-session", worktree_path=str(tmp_path)))
+    publish_session(IndexStore(), create_session_state("artifact-session", worktree_path=str(tmp_path)), tmp_path)
     return store
 
 
