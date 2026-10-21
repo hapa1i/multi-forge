@@ -1,0 +1,276 @@
+{
+  "captured_date": "2026-10-22",
+  "repository": "hapa1i/multi-forge",
+  "alerts": [
+    {
+      "number": 34,
+      "package": "PyJWT",
+      "manifest": "uv.lock",
+      "severity": "high",
+      "ghsa_id": "GHSA-r6x4-923q-g947",
+      "vulnerable_version_range": "= 2.13.0",
+      "first_patched_version": "2.14.0",
+      "advisory_url": "https://github.com/advisories/GHSA-r6x4-923q-g947"
+    },
+    {
+      "number": 35,
+      "package": "PyJWT",
+      "manifest": "uv.lock",
+      "severity": "high",
+      "ghsa_id": "GHSA-w2cx-738m-mc7w",
+      "vulnerable_version_range": "= 2.13.0",
+      "first_patched_version": "2.14.0",
+      "advisory_url": "https://github.com/advisories/GHSA-w2cx-738m-mc7w"
+    },
+    {
+      "number": 36,
+      "package": "oauthlib",
+      "manifest": "uv.lock",
+      "severity": "medium",
+      "ghsa_id": "GHSA-hj66-6f7g-4r5v",
+      "vulnerable_version_range": ">= 0.6.1, <= 3.3.1",
+      "first_patched_version": "4.0.0",
+      "advisory_url": "https://github.com/advisories/GHSA-hj66-6f7g-4r5v"
+    },
+    {
+      "number": 37,
+      "package": "oauthlib",
+      "manifest": "uv.lock",
+      "severity": "medium",
+      "ghsa_id": "GHSA-xpv3-w29h-x7cv",
+      "vulnerable_version_range": ">= 3.0.0, < 4.0.0",
+      "first_patched_version": "4.0.0",
+      "advisory_url": "https://github.com/advisories/GHSA-xpv3-w29h-x7cv"
+    },
+    {
+      "number": 38,
+      "package": "PyJWT",
+      "manifest": "uv.lock",
+      "severity": "medium",
+      "ghsa_id": "GHSA-w6j9-cwv2-h6wq",
+      "vulnerable_version_range": ">= 2.9.0, <= 2.13.0",
+      "first_patched_version": "2.14.0",
+      "advisory_url": "https://github.com/advisories/GHSA-w6j9-cwv2-h6wq"
+    },
+    {
+      "number": 39,
+      "package": "pyjwt",
+      "manifest": "uv.lock",
+      "severity": "medium",
+      "ghsa_id": "GHSA-2gx3-rcp4-g85q",
+      "vulnerable_version_range": "<= 2.13.0",
+      "first_patched_version": "2.14.0",
+      "advisory_url": "https://github.com/advisories/GHSA-2gx3-rcp4-g85q"
+    },
+    {
+      "number": 40,
+      "package": "pyjwt",
+      "manifest": "uv.lock",
+      "severity": "high",
+      "ghsa_id": "GHSA-p4g4-x82p-q773",
+      "vulnerable_version_range": ">= 2.4.0, < 2.14.0",
+      "first_patched_version": "2.14.0",
+      "advisory_url": "https://github.com/advisories/GHSA-p4g4-x82p-q773"
+    },
+    {
+      "number": 41,
+      "package": "PyJWT",
+      "manifest": "uv.lock",
+      "severity": "high",
+      "ghsa_id": "GHSA-9v7f-9g4p-ffgj",
+      "vulnerable_version_range": "<= 2.13.0",
+      "first_patched_version": "2.14.0",
+      "advisory_url": "https://github.com/advisories/GHSA-9v7f-9g4p-ffgj"
+    },
+    {
+      "number": 42,
+      "package": "PyJWT",
+      "manifest": "uv.lock",
+      "severity": "critical",
+      "ghsa_id": "GHSA-ffc3-869f-jxw9",
+      "vulnerable_version_range": "<= 2.13.0",
+      "first_patched_version": "2.14.0",
+      "advisory_url": "https://github.com/advisories/GHSA-ffc3-869f-jxw9"
+    },
+    {
+      "number": 43,
+      "package": "PyJWT",
+      "manifest": "uv.lock",
+      "severity": "medium",
+      "ghsa_id": "GHSA-hxm8-2xgr-2p9m",
+      "vulnerable_version_range": "<= 2.13.0",
+      "first_patched_version": "2.14.0",
+      "advisory_url": "https://github.com/advisories/GHSA-hxm8-2xgr-2p9m"
+    },
+    {
+      "number": 44,
+      "package": "pyJWT",
+      "manifest": "uv.lock",
+      "severity": "medium",
+      "ghsa_id": "GHSA-8wjv-2p76-3863",
+      "vulnerable_version_range": ">= 2.13.0, < 2.14.0",
+      "first_patched_version": "2.14.0",
+      "advisory_url": "https://github.com/advisories/GHSA-8wjv-2p76-3863"
+    },
+    {
+      "number": 45,
+      "package": "PyJWT",
+      "manifest": "uv.lock",
+      "severity": "high",
+      "ghsa_id": "GHSA-9j54-fg26-wv3r",
+      "vulnerable_version_range": ">= 2.13.0, < 2.14.0",
+      "first_patched_version": "2.14.0",
+      "advisory_url": "https://github.com/advisories/GHSA-9j54-fg26-wv3r"
+    },
+    {
+      "number": 46,
+      "package": "pyjwt",
+      "manifest": "uv.lock",
+      "severity": "medium",
+      "ghsa_id": "GHSA-jwrc-g2q2-pq5p",
+      "vulnerable_version_range": "<= 2.13.0",
+      "first_patched_version": "2.14.0",
+      "advisory_url": "https://github.com/advisories/GHSA-jwrc-g2q2-pq5p"
+    },
+    {
+      "number": 47,
+      "package": "urllib3",
+      "manifest": "uv.lock",
+      "severity": "high",
+      "ghsa_id": "GHSA-8988-9cw3-xx77",
+      "vulnerable_version_range": ">= 1.26.0, < 2.8.0",
+      "first_patched_version": "2.8.0",
+      "advisory_url": "https://github.com/advisories/GHSA-8988-9cw3-xx77"
+    },
+    {
+      "number": 48,
+      "package": "urllib3",
+      "manifest": "uv.lock",
+      "severity": "high",
+      "ghsa_id": "GHSA-vxq7-64xx-v4gw",
+      "vulnerable_version_range": ">= 1.10.3, < 2.8.0",
+      "first_patched_version": "2.8.0",
+      "advisory_url": "https://github.com/advisories/GHSA-vxq7-64xx-v4gw"
+    },
+    {
+      "number": 49,
+      "package": "urllib3",
+      "manifest": "uv.lock",
+      "severity": "medium",
+      "ghsa_id": "GHSA-gh4c-6fx4-qh6g",
+      "vulnerable_version_range": ">= 2.6.2, < 2.8.0",
+      "first_patched_version": "2.8.0",
+      "advisory_url": "https://github.com/advisories/GHSA-gh4c-6fx4-qh6g"
+    },
+    {
+      "number": 50,
+      "package": "PyJWT",
+      "manifest": "uv.lock",
+      "severity": "medium",
+      "ghsa_id": "GHSA-42vr-xj54-vc7v",
+      "vulnerable_version_range": ">= 2.0.0a1, <= 2.14.0",
+      "first_patched_version": "2.15.0",
+      "advisory_url": "https://github.com/advisories/GHSA-42vr-xj54-vc7v"
+    },
+    {
+      "number": 51,
+      "package": "PyJWT",
+      "manifest": "uv.lock",
+      "severity": "medium",
+      "ghsa_id": "GHSA-gvp8-978c-rx2q",
+      "vulnerable_version_range": ">= 2.11.0, <= 2.13.0",
+      "first_patched_version": null,
+      "advisory_url": "https://github.com/advisories/GHSA-gvp8-978c-rx2q"
+    },
+    {
+      "number": 52,
+      "package": "virtualenv",
+      "manifest": "uv.lock",
+      "severity": "medium",
+      "ghsa_id": "GHSA-9h9j-4vrj-gf7g",
+      "vulnerable_version_range": "<= 21.7.10",
+      "first_patched_version": "21.7.11",
+      "advisory_url": "https://github.com/advisories/GHSA-9h9j-4vrj-gf7g"
+    },
+    {
+      "number": 53,
+      "package": "virtualenv",
+      "manifest": "uv.lock",
+      "severity": "high",
+      "ghsa_id": "GHSA-94p9-xgh2-xp45",
+      "vulnerable_version_range": "<= 21.7.11",
+      "first_patched_version": "21.7.12",
+      "advisory_url": "https://github.com/advisories/GHSA-94p9-xgh2-xp45"
+    },
+    {
+      "number": 54,
+      "package": "virtualenv",
+      "manifest": "uv.lock",
+      "severity": "high",
+      "ghsa_id": "GHSA-x78j-v8h9-3j2q",
+      "vulnerable_version_range": "<= 21.7.11",
+      "first_patched_version": "21.7.12",
+      "advisory_url": "https://github.com/advisories/GHSA-x78j-v8h9-3j2q"
+    },
+    {
+      "number": 55,
+      "package": "virtualenv",
+      "manifest": "uv.lock",
+      "severity": "high",
+      "ghsa_id": "GHSA-p58f-9548-mpm2",
+      "vulnerable_version_range": "<= 21.7.12",
+      "first_patched_version": "21.7.13",
+      "advisory_url": "https://github.com/advisories/GHSA-p58f-9548-mpm2"
+    },
+    {
+      "number": 56,
+      "package": "multidict",
+      "manifest": "uv.lock",
+      "severity": "medium",
+      "ghsa_id": "GHSA-54p9-h82j-f925",
+      "vulnerable_version_range": ">= 6.7.0, <= 6.9.0",
+      "first_patched_version": "6.9.1",
+      "advisory_url": "https://github.com/advisories/GHSA-54p9-h82j-f925"
+    },
+    {
+      "number": 57,
+      "package": "PyJWT",
+      "manifest": "uv.lock",
+      "severity": "medium",
+      "ghsa_id": "GHSA-x33g-cr3x-6449",
+      "vulnerable_version_range": ">= 2.1.0, <= 2.14.0",
+      "first_patched_version": "2.15.0",
+      "advisory_url": "https://github.com/advisories/GHSA-x33g-cr3x-6449"
+    },
+    {
+      "number": 58,
+      "package": "aiohttp",
+      "manifest": "uv.lock",
+      "severity": "high",
+      "ghsa_id": "GHSA-5wr8-gcqf-gqf3",
+      "vulnerable_version_range": "<= 3.14.3",
+      "first_patched_version": "3.14.4",
+      "advisory_url": "https://github.com/advisories/GHSA-5wr8-gcqf-gqf3"
+    },
+    {
+      "number": 59,
+      "package": "aiohttp",
+      "manifest": "uv.lock",
+      "severity": "low",
+      "ghsa_id": "GHSA-494j-54xm-rwp3",
+      "vulnerable_version_range": "<= 3.14.3",
+      "first_patched_version": "3.14.4",
+      "advisory_url": "https://github.com/advisories/GHSA-494j-54xm-rwp3"
+    },
+    {
+      "number": 60,
+      "package": "aiohttp",
+      "manifest": "uv.lock",
+      "severity": "high",
+      "ghsa_id": "GHSA-2g87-pp6c-29x5",
+      "vulnerable_version_range": "<= 3.14.3",
+      "first_patched_version": "3.14.4",
+      "advisory_url": "https://github.com/advisories/GHSA-2g87-pp6c-29x5"
+    }
+  ]
+}
