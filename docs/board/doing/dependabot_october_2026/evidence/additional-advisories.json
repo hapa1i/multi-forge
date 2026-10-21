@@ -1,0 +1,73 @@
+{
+  "captured_date": "2026-10-22",
+  "service": "PyPI via pip-audit",
+  "distributions_audited": 126,
+  "findings": [
+    {
+      "package": "certifi",
+      "version_audited": "2026.7.22",
+      "advisories": [
+        {
+          "id": "PYSEC-2026-4320",
+          "aliases": [
+            "GHSA-6q48-6c7w-9gw2"
+          ],
+          "fixed_versions": [
+            "2026.10.19"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "virtualenv",
+      "version_audited": "21.7.13",
+      "advisories": [
+        {
+          "id": "CVE-2026-113726",
+          "aliases": [
+            "GHSA-5vjq-rrrf-7h2q"
+          ],
+          "fixed_versions": [
+            "21.14.4"
+          ]
+        },
+        {
+          "id": "CVE-2026-113776",
+          "aliases": [
+            "GHSA-8rjx-v5ww-45pp"
+          ],
+          "fixed_versions": [
+            "21.14.2"
+          ]
+        },
+        {
+          "id": "CVE-2026-113732",
+          "aliases": [
+            "GHSA-c947-3pg5-gm8q"
+          ],
+          "fixed_versions": [
+            "21.14.2"
+          ]
+        },
+        {
+          "id": "CVE-2026-113725",
+          "aliases": [
+            "GHSA-vxj4-q4g9-crj7"
+          ],
+          "fixed_versions": [
+            "21.14.7"
+          ]
+        },
+        {
+          "id": "CVE-2026-113722",
+          "aliases": [
+            "GHSA-c978-59m8-c77v"
+          ],
+          "fixed_versions": [
+            "21.14.9"
+          ]
+        }
+      ]
+    }
+  ]
+}

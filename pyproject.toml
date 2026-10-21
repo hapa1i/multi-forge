@@ -45,25 +45,31 @@ dependencies = [
     # validated through LiteLLM 1.102.0; run scripts/test-wheel-runtime.sh before
     # raising the ceiling. Alternate servers, databases, and cloud integrations
     # remain outside Forge's runtime path.
-    "aiohttp>=3.14.3,<4",
+    "aiohttp>=3.14.4,<4",
     "apscheduler>=3.11.2,<4",
     "backoff>=2.2.1,<3",
     # LiteLLM 1.88+ imports the Focus S3 destination during proxy startup.
     "boto3>=1.43.1,<2",
+    # Exclude the compromised CA trust roots from clean installations too.
+    "certifi>=2026.10.19",
     "cryptography>=50.0.0",
     # LiteLLM 1.95 imports outbound-credential tagged unions at startup.
     "expression>=5.6.0,<6",
     # Keep FastAPI's lock-proven route-tree behavior; upgrade it separately.
     "fastapi>=0.136.3,<0.137",
     "fastapi-sso>=0.19.0,<1",
+    # Runtime security floors belong in wheel metadata, not only uv constraints.
+    "multidict>=6.9.1,<7",
+    "oauthlib>=4.0.0,<5",
     "orjson>=3.11.6,<4",
     "pydantic-settings>=2.14.1,<3",
-    "pyjwt>=2.13.0,<3",
+    "pyjwt>=2.15.0,<3",
     "python-multipart>=0.0.31,<1",
     # LiteLLM 1.95 imports its Redis support from the default startup graph.
     "redis>=5.2.0,<8",
     # Starlette 1.7 fixes TestClient's deprecated AnyIO BlockingPortal import.
     "starlette>=1.7.0,<1.8",
+    "urllib3>=2.8.0,<3",
     "uvicorn>=0.33.0,<1",
     "uvloop>=0.21.0,<1; sys_platform != 'win32'",
     "watchfiles>=0.20",
@@ -150,7 +156,7 @@ disallow_untyped_calls = false
 [tool.uv]
 constraint-dependencies = [
     "filelock>=3.20.3",
-    "virtualenv>=20.36.1",
+    "virtualenv>=21.14.12",
     "mcp>=1.28.1",
     "Pygments>=2.20.0",
     "pyasn1>=0.6.4",
