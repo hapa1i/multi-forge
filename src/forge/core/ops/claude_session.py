@@ -575,6 +575,14 @@ def launch_claude_session(
         worktree_path=worktree_path,
         claude_session_id=session_id,
     ) as authority_attempt:
+        from forge.session.workers import SESSION_INSTANCE_ENV
+
+        # Admission may have migrated an ownerless legacy session after env assembly.
+        instance_id = store.review_identity()
+        if instance_id is None:
+            raise ForgeOpError("Admitted session has no instance identity; inspect it before launch.")
+        env_vars[SESSION_INSTANCE_ENV] = instance_id
+        unset_env_vars = [key for key in unset_env_vars if key != SESSION_INSTANCE_ENV]
         env_vars.pop(AUTHORITY_MARKER_ENV, None)
         if authority_attempt is not None and authority_attempt.marker is not None:
             env_vars[AUTHORITY_MARKER_ENV] = authority_attempt.marker

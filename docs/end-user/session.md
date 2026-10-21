@@ -830,6 +830,11 @@ ignored source pin is not copied into the worktree and a tracked target pin rema
 replacement commit, and branch safety before removing anything. A refusal preserves its checkout, branch, dirty files,
 and session state.
 
+Replacing a stale target with `--force` removes its unreferenced Forge content before creating the new fork. If creation
+then fails, the error reports that the previous target was removed; Forge does not restore a session record pointing to
+deleted artifacts. This also applies to same-directory and `--into` replacement. Inspect the named target before
+retrying, since another session may have claimed it.
+
 **Resume mode (`--resume-mode`):** cross-directory forks (`--worktree`/`--into`) default to `transfer` — the assembled,
 editable context file above. For a byte-faithful alternative, pass `--resume-mode native-relocate`: Forge relocates the
 parent's Claude transcript into the fork so the full conversation resumes verbatim. It is **host mode only** (rejected

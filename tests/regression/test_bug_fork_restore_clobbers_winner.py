@@ -7,8 +7,8 @@ the name in between, `create_exclusive` correctly refused -- but the exception
 path ran `_restore_previous_target_state`, whose unconditional `write()` put the
 stale manifest back on top of the winner's.
 
-Fix: restore only over a path this fork owned, keyed on `wrote_manifest` (the
-ownership token `create_exclusive` produces) and a now-free path.
+Fix: completed cleanup is final; a failed replacement must not restore stale
+metadata or modify a concurrent owner.
 
 Affected: src/forge/session/manager.py
 """

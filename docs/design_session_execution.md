@@ -215,6 +215,12 @@ markers; they neither migrate ownership nor require the host's global index insi
 lease only after Docker confirms the container has exited. An interrupted launcher or an unavailable Docker daemon
 retains the lease for explicit recovery, and container PIDs are never interpreted as host liveness evidence.
 
+Claude launch refreshes the child environment's instance after admission, which may migrate an ownerless legacy session.
+Headless Codex start and resume pass their captured target instance alongside the session name and Forge root. Their
+temporary environment restores the caller's identity on success and failure; an inherited parent token cannot identify
+the child. Post-turn manifest and thread-index updates also check the captured instance, preserving a newer session
+created after the runtime exits.
+
 ### B.1 Marker schema (v1)
 
 ```json

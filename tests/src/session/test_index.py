@@ -900,9 +900,12 @@ class TestCodexThreadColumn:
     def test_drift_reconciliation_moves_the_guard_to_the_live_id(self, tmp_path: Path) -> None:
         """Codex can re-bind a thread across a resume; a stale column guards nothing."""
         store = IndexStore()
-        publish_session_from_fields(store, "drifter", tmp_path, tmp_path, codex_thread_id=self._THREAD)
+        published = publish_session_from_fields(store, "drifter", tmp_path, tmp_path, codex_thread_id=self._THREAD)
+        assert published.instance_id is not None
 
-        store.update_codex_thread("drifter", self._DRIFTED, str(tmp_path))
+        assert store.update_codex_thread(
+            "drifter", self._DRIFTED, str(tmp_path), expected_instance_id=published.instance_id
+        )
 
         entry = next(iter(store.read().sessions.values()))
         assert entry.codex_thread_id == self._DRIFTED
@@ -928,7 +931,9 @@ class TestCodexThreadColumn:
 
     def test_reconciling_an_unknown_session_is_a_no_op(self, tmp_path: Path) -> None:
         """Best-effort by contract: drift already happened, so this must not raise."""
-        IndexStore().update_codex_thread("never-added", self._DRIFTED, str(tmp_path))
+        assert not IndexStore().update_codex_thread(
+            "never-added", self._DRIFTED, str(tmp_path), expected_instance_id="a" * 32
+        )
 
     def test_drift_collision_is_logged_and_the_live_id_remains_guarded(
         self,
@@ -937,13 +942,16 @@ class TestCodexThreadColumn:
     ) -> None:
         store = IndexStore()
         publish_session_from_fields(store, "first", tmp_path, tmp_path, codex_thread_id=self._THREAD)
-        publish_session_from_fields(store, "drifter", tmp_path, tmp_path, codex_thread_id=self._DRIFTED)
+        published = publish_session_from_fields(store, "drifter", tmp_path, tmp_path, codex_thread_id=self._DRIFTED)
+        assert published.instance_id is not None
         first_key = make_scoped_key("first", str(tmp_path))
         drifter_key = make_scoped_key("drifter", str(tmp_path))
         first_before = store.read().sessions[first_key]
 
         with caplog.at_level(logging.WARNING, logger="forge.session.index"):
-            store.update_codex_thread("drifter", self._THREAD, str(tmp_path))
+            assert store.update_codex_thread(
+                "drifter", self._THREAD, str(tmp_path), expected_instance_id=published.instance_id
+            )
 
         sessions = store.read().sessions
         assert sessions[first_key] == first_before

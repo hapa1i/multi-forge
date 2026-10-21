@@ -1147,7 +1147,7 @@ class SessionManager:
         *,
         fork_name: str,
         target_forge_root: str,
-    ) -> tuple[SessionStore, SessionIndexEntry | None, SessionState | None]:
+    ) -> tuple[SessionStore, SessionIndexEntry | None, SessionState | None, str | None]:
         """Return the existing manifest/index state for a fork target.
 
         Uses the index self-healing path so stale index-only entries do not
@@ -1161,13 +1161,21 @@ class SessionManager:
             target_entry = None
 
         target_state: SessionState | None = None
+        target_instance_id: str | None = None
         if target_store.exists():
+            target_instance_id = target_store.review_identity()
             try:
                 target_state = target_store.read()
             except (ManifestCorruptedError, ManifestValidationError):
                 target_state = None
+            if target_store.review_identity() != target_instance_id or (
+                target_entry is not None
+                and target_entry.instance_id is not None
+                and target_entry.instance_id != target_instance_id
+            ):
+                raise ForgeSessionError(f"Session '{fork_name}' changed before replacement; retained its new owner")
 
-        return target_store, target_entry, target_state
+        return target_store, target_entry, target_state, target_instance_id
 
     def _can_force_replace_fork_target(
         self,
@@ -1303,12 +1311,14 @@ class SessionManager:
         target_store: SessionStore | None = None
         target_entry: SessionIndexEntry | None = None
         target_state: SessionState | None = None
+        target_instance_id: str | None = None
         replace_stale_target_state = False
         created_worktree = False
         rollback_worktree_path: str | None = None
         rollback_worktree_branch: str | None = None
         rollback_repo_root: Path | None = None
         replacement_start_point: str | None = None
+        removed_target_root: str | None = None
 
         def _rollback_created_worktree() -> list[str]:
             if not created_worktree or rollback_worktree_path is None:
@@ -1335,380 +1345,335 @@ class SessionManager:
                 )
                 return [str(e)]
 
-        if into_path is not None:
-            # Fork into an existing worktree (--into): land at the equivalent
-            # forge_root position in the target checkout.
-            from .worktree import get_main_repo_root
-
-            target_checkout_root = into_path  # Already normalized to checkout root by CLI
-            target_forge_root = str(Path(target_checkout_root) / parent_relative)
-
-            # Validate: target must have Forge enabled at that position
-            if not (Path(target_forge_root) / ".forge").is_dir():
-                raise ForgeSessionError(
-                    f"No Forge project at {target_forge_root}. "
-                    f"Run 'forge extension enable' in {target_forge_root} first, "
-                    "or use --worktree to create a new checkout with auto-enable."
-                )
-
-            enforce_project_compatibility(target_forge_root)
-
-            fork_worktree_path = target_checkout_root
-            fork_branch: str | None = branch  # CLI resolves branch from git
-            project_root = str(get_main_repo_root(Path(into_path)))
-            is_into = True
-
-            assert target_forge_root is not None
-            target_store, target_entry, target_state = self._load_existing_fork_target(
-                fork_name=fork_name,
-                target_forge_root=target_forge_root,
-            )
-            target_conflict_exists = target_store.exists() or target_entry is not None
-            if target_conflict_exists:
-                if not force:
-                    raise SessionExistsError(fork_name)
-
-                replace_stale_target_state = self._can_force_replace_fork_target(
-                    fork_name=fork_name,
-                    parent_name=parent_name,
-                    target_forge_root=target_forge_root,
-                    existing_state=target_state,
-                    expected_worktree_path=fork_worktree_path,
-                    expected_branch=fork_branch or fork_name,
-                    expected_is_worktree=True,
-                    expected_owns_worktree=False,
-                )
-                if not replace_stale_target_state:
-                    raise SessionExistsError(fork_name)
-        elif create_worktree:
-            from .worktree import (
-                copy_runtime_config,
-            )
-            from .worktree import create_worktree as git_create_worktree
-            from .worktree import (
-                get_main_repo_root,
-                preflight_create_worktree,
-                read_file_at_revision,
-                resolve_commit,
-                resolve_worktree_path,
-                sanitize_branch_name,
-            )
-
-            repo_root = get_main_repo_root(parent_worktree_path)
-            target_worktree_path = resolve_worktree_path(repo_root, fork_name)
-            target_forge_root = str(target_worktree_path / parent_relative)
-            target_branch = branch or sanitize_branch_name(fork_name)
-            target_store, target_entry, target_state = self._load_existing_fork_target(
-                fork_name=fork_name,
-                target_forge_root=target_forge_root,
-            )
-            target_conflict_exists = target_store.exists() or target_entry is not None
-            if target_conflict_exists:
-                if not force:
-                    raise SessionExistsError(fork_name)
-
-                replace_stale_target_state = self._can_force_replace_fork_target(
-                    fork_name=fork_name,
-                    parent_name=parent_name,
-                    target_forge_root=target_forge_root,
-                    existing_state=target_state,
-                    expected_worktree_path=str(target_worktree_path),
-                    expected_branch=target_branch,
-                    expected_is_worktree=True,
-                    expected_owns_worktree=True,
-                )
-                if not replace_stale_target_state:
-                    raise SessionExistsError(fork_name)
-
-                # Force replacement destroys the existing checkout and its
-                # auto-derived branch. Refuse against both that checkout's pin
-                # and the exact HEAD commit that will seed its replacement
-                # before authorizing the destructive Git step.
-                enforce_project_compatibility(target_forge_root)
-                replacement_start_point = resolve_commit(repo_root)
-                prospective_pin = read_file_at_revision(
-                    Path(parent_relative) / ".forge" / "project.toml",
-                    revision=replacement_start_point,
-                    cwd=repo_root,
-                )
-                if prospective_pin is not None:
-                    enforce_project_compatibility_toml(
-                        prospective_pin,
-                        path=Path(target_forge_root) / ".forge" / "project.toml",
-                    )
-                from .deletion import apply_session_deletion, plan_session_deletion
-
-                replacement = plan_session_deletion(
-                    self.index_store,
-                    fork_name,
-                    forge_root=target_forge_root,
-                    delete_worktree=True,
-                    delete_branch=True,
-                    force=True,
-                )
-                if replacement.state != target_state or (
-                    target_entry is not None
-                    and target_entry.instance_id is not None
-                    and replacement.instance_id != target_entry.instance_id
-                ):
-                    raise ForgeSessionError(f"Session '{fork_name}' changed before replacement; retained its new owner")
-                if replacement.worktree_path != str(target_worktree_path):
-                    raise ForgeSessionError(
-                        f"Cannot replace fork '{fork_name}': its worktree is shared or no longer owned"
-                    )
-                preflight_create_worktree(
-                    fork_name,
-                    branch,
-                    repo_root,
-                    force=True,
-                    replace_owned_stale_state=True,
-                )
-                # Delete while the original manifest can still authorize the
-                # content and checkout. A later creator must face a fresh,
-                # non-forcing Git create instead of another destructive retry.
-                apply_session_deletion(self.index_store, replacement)
-                replace_stale_target_state = False
-            wt_result = git_create_worktree(
-                session_name=fork_name,
-                branch=branch,
-                cwd=repo_root,
-                start_point=replacement_start_point,
-            )
-            created_worktree = True
-            rollback_worktree_path = wt_result.worktree_path
-            rollback_worktree_branch = wt_result.branch
-            rollback_repo_root = repo_root
-            target_forge_root = str(Path(wt_result.worktree_path) / parent_relative)
-            try:
-                enforce_project_compatibility(target_forge_root)
-            except ProjectCompatibilityError as compatibility_error:
-                rollback_errors = _rollback_created_worktree()
-                if rollback_errors:
-                    raise ForgeSessionError(
-                        f"{compatibility_error} Rollback incomplete: {'; '.join(rollback_errors)}"
-                    ) from compatibility_error
-                raise
-            copy_runtime_config(repo_root, Path(wt_result.worktree_path))
-
-            fork_worktree_path = wt_result.worktree_path
-            fork_branch = wt_result.branch
-            project_root = str(repo_root)
-            is_into = False
-        else:
-            target_forge_root = parent_forge_root
-            fork_worktree_path = str(parent_worktree_path)
-            fork_branch = parent.worktree.branch if parent.worktree else None
-            # Workspace anchor: git-common-dir root (groups sibling worktrees),
-            # not the per-worktree root find_project_root() would return.
-            project_root = self.resolve_project_root(fork_worktree_path)
-            is_into = False
-            assert target_forge_root is not None
-            target_store, target_entry, target_state = self._load_existing_fork_target(
-                fork_name=fork_name,
-                target_forge_root=target_forge_root,
-            )
-            target_conflict_exists = target_store.exists() or target_entry is not None
-            if target_conflict_exists:
-                if not force:
-                    raise SessionExistsError(fork_name)
-
-                replace_stale_target_state = self._can_force_replace_fork_target(
-                    fork_name=fork_name,
-                    parent_name=parent_name,
-                    target_forge_root=target_forge_root,
-                    existing_state=target_state,
-                    expected_worktree_path=fork_worktree_path,
-                    expected_branch=fork_branch or fork_name,
-                    expected_is_worktree=False,
-                    expected_owns_worktree=False,
-                )
-                if not replace_stale_target_state:
-                    raise SessionExistsError(fork_name)
-
-        if direct:
-            fork_proxy_template = None
-            fork_proxy_base_url = None
-        else:
-            fork_proxy_template = parent.intent.proxy.template if parent.intent.proxy else None
-            fork_proxy_base_url = parent.intent.proxy.base_url if parent.intent.proxy else None
-
-        fork_state = create_session_state(
-            name=fork_name,
-            proxy_template=fork_proxy_template,
-            proxy_base_url=fork_proxy_base_url,
-            parent_session=parent_name,
-            is_fork=True,
-            is_incognito=is_incognito,
-            worktree_path=fork_worktree_path,
-            worktree_branch=fork_branch,
-        )
-
-        _inherit_intent_fields(fork_state, parent)
-        if authority_explicit:
-            fork_state.intent.authority = deepcopy(authority)
-        # Direct mode: force host launch (sidecar requires a proxy)
-        if direct and fork_state.intent.launch and fork_state.intent.launch.mode != LAUNCH_MODE_HOST:
-            fork_state.intent.launch.mode = LAUNCH_MODE_HOST
-            fork_state.intent.launch.sidecar = None
-
-        if (create_worktree or is_into) and fork_state.worktree:
-            fork_state.worktree.is_worktree = True
-        if is_into and fork_state.worktree:
-            fork_state.worktree.owns_worktree = False
-
-        # Compute identity fields for the fork target.
-        fork_forge_root: str | None
-        fork_relative_path: str | None
-        if is_into:
-            assert target_forge_root is not None
-            fork_forge_root = target_forge_root
-            fork_checkout_root = fork_worktree_path
-            fork_relative_path = parent_entry.relative_path or "."
-        elif create_worktree:
-            # Fresh worktree has no .forge/; propagate parent's relative position.
-            parent_relative = parent_entry.relative_path or "."
-            fork_forge_root = str(Path(fork_worktree_path) / parent_relative)
-            fork_checkout_root = fork_worktree_path
-            fork_relative_path = parent_relative
-        else:
-            # Same-worktree fork: auto-detect
-            from forge.core.ops.context import find_forge_root
-
-            fork_forge_root_path = find_forge_root(Path(fork_worktree_path))
-            fork_forge_root = str(fork_forge_root_path) if fork_forge_root_path else None
-            fork_checkout_root = fork_worktree_path
-            fork_relative_path = None
-            if fork_forge_root and fork_checkout_root:
-                try:
-                    fork_relative_path = str(Path(fork_forge_root).relative_to(fork_checkout_root))
-                except ValueError:
-                    fork_relative_path = "."
-
-        fork_state.forge_root = fork_forge_root
-
-        from .memory_inheritance import apply_memory_inheritance
-
-        inh_warnings = apply_memory_inheritance(
-            parent_state=parent,
-            child_state=fork_state,
-            memory_flag=memory_flag,
-        )
-
-        # Opt-in native-relocate (worktree/--into only) overrides the transfer default. Cross-CWD
-        # forks default to transfer; same-directory forks default to native UNLESS the caller asks
-        # for transfer (resume_mode == "transfer", auto-switched or explicit), which opts them into
-        # a same-directory transfer fork. Recording the baseline here keeps derivation correct even
-        # if command core's best-effort _persist_fork_transfer_derivation refinement later fails.
-        if resume_mode == "native-relocate" and (create_worktree or is_into):
-            fork_resume_mode = "native-relocate"
-        elif create_worktree or is_into or resume_mode == "transfer":
-            fork_resume_mode = "transfer"
-        else:
-            fork_resume_mode = "native"
-        # For transfer-mode forks the per-child file is created lazily at launch
-        # (see _generate_parent_transfer_context). We pre-record the reference
-        # here so GC knows the fork's child file belongs to this session, even
-        # if launch happens later.
-        fork_context_file_rel = child_path_rel(parent_name, fork_name) if fork_resume_mode == "transfer" else None
-        # native-relocate copies the parent transcript into the child's encoded dir; record the
-        # parent UUID so cleanup can remove that copy (dir-scoped to the child, never the parent's).
-        fork_relocated_parent = parent.confirmed.claude_session_id if fork_resume_mode == "native-relocate" else None
-        fork_state.confirmed.derivation = Derivation(
-            parent_session=parent_name,
-            parent_transcript=parent_transcript_artifact_path,
-            inherited_proxy=fork_proxy_template,
-            resume_mode=fork_resume_mode,
-            strategy=None,
-            depth=1,
-            resumed_at=now_iso(),
-            lineage=[parent_name],
-            context_file=fork_context_file_rel,
-            relocated_parent_session_id=fork_relocated_parent,
-            parent_forge_root=parent_entry.forge_root or parent_entry.worktree_path,
-            parent_project_root=parent_entry.project_root,
-        )
-
-        fork_store = SessionStore(fork_forge_root or fork_worktree_path, fork_name)
-        restore_target_state = replace_stale_target_state and not create_worktree
-        replaced_target_state = False
-
-        def _restore_previous_target_state() -> None:
-            if not restore_target_state or not replaced_target_state or target_store is None or target_state is None:
-                return
-
-            # Bound before the closure below: narrowing from the guard above does
-            # not reach into a lambda over enclosing-scope names.
-            restore_store, restore_state = target_store, target_state
-
-            # create_exclusive, not write: a manifest sitting at this path is not
-            # the one this fork deleted -- it belongs to whoever claimed the name
-            # in the window -- and putting the stale target back over it is the bug
-            # test_bug_fork_restore_clobbers_winner guards. The old code spelled
-            # this as an unlocked `target_store.exists()` probe guarding a `write`,
-            # which meant the write never actually overwrote anything;
-            # create_exclusive makes that same decision under the manifest lock.
-            def _restore_manifest() -> None:
-                restore_store.create_exclusive(restore_state)
-
-            def _log_declined() -> None:
-                logger.info(
-                    "Not restoring the previous fork target '%s': another session owns that name now",
-                    fork_name,
-                )
-
-            if target_entry is None:
-                # The replaced target was itself a manifest with no index row. Put
-                # it back as it was: a failed fork must not double as a cleanup of
-                # state the user never asked us to touch.
-                try:
-                    _restore_manifest()
-                except SessionExistsError:
-                    _log_declined()
-                except Exception as e:
-                    logger.warning("Failed to restore fork target manifest '%s': %s", fork_name, e)
-                return
-
-            # Restore through the transaction, so its uniqueness check is what
-            # decides whether another creator won the name while this fork held it.
-            # Before the two writes shared a lock this was a `wrote_manifest` token;
-            # that no longer distinguishes "someone else owns the name" from "the
-            # index write failed", because the manifest is now written second.
-            try:
-                self.index_store.create_session_txn(
-                    restore_state,
-                    target_entry.project_root,
-                    checkout_root=target_entry.checkout_root,
-                    forge_root=target_entry.forge_root,
-                    relative_path=target_entry.relative_path,
-                    write_manifest=_restore_manifest,
-                )
-            except SessionExistsError:
-                _log_declined()
-            except Exception as e:
-                logger.warning("Failed to restore fork target '%s': %s", fork_name, e)
-
         try:
+            if into_path is not None:
+                # Fork into an existing worktree (--into): land at the equivalent
+                # forge_root position in the target checkout.
+                from .worktree import get_main_repo_root
+
+                target_checkout_root = into_path  # Already normalized to checkout root by CLI
+                target_forge_root = str(Path(target_checkout_root) / parent_relative)
+
+                # Validate: target must have Forge enabled at that position
+                if not (Path(target_forge_root) / ".forge").is_dir():
+                    raise ForgeSessionError(
+                        f"No Forge project at {target_forge_root}. "
+                        f"Run 'forge extension enable' in {target_forge_root} first, "
+                        "or use --worktree to create a new checkout with auto-enable."
+                    )
+
+                enforce_project_compatibility(target_forge_root)
+
+                fork_worktree_path = target_checkout_root
+                fork_branch: str | None = branch  # CLI resolves branch from git
+                project_root = str(get_main_repo_root(Path(into_path)))
+                is_into = True
+
+                assert target_forge_root is not None
+                target_store, target_entry, target_state, target_instance_id = self._load_existing_fork_target(
+                    fork_name=fork_name,
+                    target_forge_root=target_forge_root,
+                )
+                target_conflict_exists = target_store.exists() or target_entry is not None
+                if target_conflict_exists:
+                    if not force:
+                        raise SessionExistsError(fork_name)
+
+                    replace_stale_target_state = self._can_force_replace_fork_target(
+                        fork_name=fork_name,
+                        parent_name=parent_name,
+                        target_forge_root=target_forge_root,
+                        existing_state=target_state,
+                        expected_worktree_path=fork_worktree_path,
+                        expected_branch=fork_branch or fork_name,
+                        expected_is_worktree=True,
+                        expected_owns_worktree=False,
+                    )
+                    if not replace_stale_target_state:
+                        raise SessionExistsError(fork_name)
+            elif create_worktree:
+                from .worktree import (
+                    copy_runtime_config,
+                )
+                from .worktree import create_worktree as git_create_worktree
+                from .worktree import (
+                    get_main_repo_root,
+                    preflight_create_worktree,
+                    read_file_at_revision,
+                    resolve_commit,
+                    resolve_worktree_path,
+                    sanitize_branch_name,
+                )
+
+                repo_root = get_main_repo_root(parent_worktree_path)
+                target_worktree_path = resolve_worktree_path(repo_root, fork_name)
+                target_forge_root = str(target_worktree_path / parent_relative)
+                target_branch = branch or sanitize_branch_name(fork_name)
+                target_store, target_entry, target_state, target_instance_id = self._load_existing_fork_target(
+                    fork_name=fork_name,
+                    target_forge_root=target_forge_root,
+                )
+                target_conflict_exists = target_store.exists() or target_entry is not None
+                if target_conflict_exists:
+                    if not force:
+                        raise SessionExistsError(fork_name)
+
+                    replace_stale_target_state = self._can_force_replace_fork_target(
+                        fork_name=fork_name,
+                        parent_name=parent_name,
+                        target_forge_root=target_forge_root,
+                        existing_state=target_state,
+                        expected_worktree_path=str(target_worktree_path),
+                        expected_branch=target_branch,
+                        expected_is_worktree=True,
+                        expected_owns_worktree=True,
+                    )
+                    if not replace_stale_target_state:
+                        raise SessionExistsError(fork_name)
+
+                    # Force replacement destroys the existing checkout and its
+                    # auto-derived branch. Refuse against both that checkout's pin
+                    # and the exact HEAD commit that will seed its replacement
+                    # before authorizing the destructive Git step.
+                    enforce_project_compatibility(target_forge_root)
+                    replacement_start_point = resolve_commit(repo_root)
+                    prospective_pin = read_file_at_revision(
+                        Path(parent_relative) / ".forge" / "project.toml",
+                        revision=replacement_start_point,
+                        cwd=repo_root,
+                    )
+                    if prospective_pin is not None:
+                        enforce_project_compatibility_toml(
+                            prospective_pin,
+                            path=Path(target_forge_root) / ".forge" / "project.toml",
+                        )
+                    from .deletion import apply_session_deletion, plan_session_deletion
+
+                    replacement = plan_session_deletion(
+                        self.index_store,
+                        fork_name,
+                        forge_root=target_forge_root,
+                        delete_worktree=True,
+                        delete_branch=True,
+                        force=True,
+                    )
+                    if replacement.state != target_state or replacement.instance_id != target_instance_id:
+                        raise ForgeSessionError(
+                            f"Session '{fork_name}' changed before replacement; retained its new owner"
+                        )
+                    if replacement.worktree_path != str(target_worktree_path):
+                        raise ForgeSessionError(
+                            f"Cannot replace fork '{fork_name}': its worktree is shared or no longer owned"
+                        )
+                    preflight_create_worktree(
+                        fork_name,
+                        branch,
+                        repo_root,
+                        force=True,
+                        replace_owned_stale_state=True,
+                    )
+                    # Delete while the original manifest can still authorize the
+                    # content and checkout. A later creator must face a fresh,
+                    # non-forcing Git create instead of another destructive retry.
+                    apply_session_deletion(self.index_store, replacement)
+                    removed_target_root = target_forge_root
+                    replace_stale_target_state = False
+                wt_result = git_create_worktree(
+                    session_name=fork_name,
+                    branch=branch,
+                    cwd=repo_root,
+                    start_point=replacement_start_point,
+                )
+                created_worktree = True
+                rollback_worktree_path = wt_result.worktree_path
+                rollback_worktree_branch = wt_result.branch
+                rollback_repo_root = repo_root
+                target_forge_root = str(Path(wt_result.worktree_path) / parent_relative)
+                enforce_project_compatibility(target_forge_root)
+                copy_runtime_config(repo_root, Path(wt_result.worktree_path))
+
+                fork_worktree_path = wt_result.worktree_path
+                fork_branch = wt_result.branch
+                project_root = str(repo_root)
+                is_into = False
+            else:
+                target_forge_root = parent_forge_root
+                fork_worktree_path = str(parent_worktree_path)
+                fork_branch = parent.worktree.branch if parent.worktree else None
+                # Workspace anchor: git-common-dir root (groups sibling worktrees),
+                # not the per-worktree root find_project_root() would return.
+                project_root = self.resolve_project_root(fork_worktree_path)
+                is_into = False
+                assert target_forge_root is not None
+                target_store, target_entry, target_state, target_instance_id = self._load_existing_fork_target(
+                    fork_name=fork_name,
+                    target_forge_root=target_forge_root,
+                )
+                target_conflict_exists = target_store.exists() or target_entry is not None
+                if target_conflict_exists:
+                    if not force:
+                        raise SessionExistsError(fork_name)
+
+                    replace_stale_target_state = self._can_force_replace_fork_target(
+                        fork_name=fork_name,
+                        parent_name=parent_name,
+                        target_forge_root=target_forge_root,
+                        existing_state=target_state,
+                        expected_worktree_path=fork_worktree_path,
+                        expected_branch=fork_branch or fork_name,
+                        expected_is_worktree=False,
+                        expected_owns_worktree=False,
+                    )
+                    if not replace_stale_target_state:
+                        raise SessionExistsError(fork_name)
+
+            if direct:
+                fork_proxy_template = None
+                fork_proxy_base_url = None
+            else:
+                fork_proxy_template = parent.intent.proxy.template if parent.intent.proxy else None
+                fork_proxy_base_url = parent.intent.proxy.base_url if parent.intent.proxy else None
+
+            fork_state = create_session_state(
+                name=fork_name,
+                proxy_template=fork_proxy_template,
+                proxy_base_url=fork_proxy_base_url,
+                parent_session=parent_name,
+                is_fork=True,
+                is_incognito=is_incognito,
+                worktree_path=fork_worktree_path,
+                worktree_branch=fork_branch,
+            )
+
+            _inherit_intent_fields(fork_state, parent)
+            if authority_explicit:
+                fork_state.intent.authority = deepcopy(authority)
+            # Direct mode: force host launch (sidecar requires a proxy)
+            if direct and fork_state.intent.launch and fork_state.intent.launch.mode != LAUNCH_MODE_HOST:
+                fork_state.intent.launch.mode = LAUNCH_MODE_HOST
+                fork_state.intent.launch.sidecar = None
+
+            if (create_worktree or is_into) and fork_state.worktree:
+                fork_state.worktree.is_worktree = True
+            if is_into and fork_state.worktree:
+                fork_state.worktree.owns_worktree = False
+
+            # Compute identity fields for the fork target.
+            fork_forge_root: str | None
+            fork_relative_path: str | None
+            if is_into:
+                assert target_forge_root is not None
+                fork_forge_root = target_forge_root
+                fork_checkout_root = fork_worktree_path
+                fork_relative_path = parent_entry.relative_path or "."
+            elif create_worktree:
+                # Fresh worktree has no .forge/; propagate parent's relative position.
+                parent_relative = parent_entry.relative_path or "."
+                fork_forge_root = str(Path(fork_worktree_path) / parent_relative)
+                fork_checkout_root = fork_worktree_path
+                fork_relative_path = parent_relative
+            else:
+                # Same-worktree fork: auto-detect
+                from forge.core.ops.context import find_forge_root
+
+                fork_forge_root_path = find_forge_root(Path(fork_worktree_path))
+                fork_forge_root = str(fork_forge_root_path) if fork_forge_root_path else None
+                fork_checkout_root = fork_worktree_path
+                fork_relative_path = None
+                if fork_forge_root and fork_checkout_root:
+                    try:
+                        fork_relative_path = str(Path(fork_forge_root).relative_to(fork_checkout_root))
+                    except ValueError:
+                        fork_relative_path = "."
+
+            fork_state.forge_root = fork_forge_root
+
+            from .memory_inheritance import apply_memory_inheritance
+
+            inh_warnings = apply_memory_inheritance(
+                parent_state=parent,
+                child_state=fork_state,
+                memory_flag=memory_flag,
+            )
+
+            # Opt-in native-relocate (worktree/--into only) overrides the transfer default. Cross-CWD
+            # forks default to transfer; same-directory forks default to native UNLESS the caller asks
+            # for transfer (resume_mode == "transfer", auto-switched or explicit), which opts them into
+            # a same-directory transfer fork. Recording the baseline here keeps derivation correct even
+            # if command core's best-effort _persist_fork_transfer_derivation refinement later fails.
+            if resume_mode == "native-relocate" and (create_worktree or is_into):
+                fork_resume_mode = "native-relocate"
+            elif create_worktree or is_into or resume_mode == "transfer":
+                fork_resume_mode = "transfer"
+            else:
+                fork_resume_mode = "native"
+            # For transfer-mode forks the per-child file is created lazily at launch
+            # (see _generate_parent_transfer_context). We pre-record the reference
+            # here so GC knows the fork's child file belongs to this session, even
+            # if launch happens later.
+            fork_context_file_rel = child_path_rel(parent_name, fork_name) if fork_resume_mode == "transfer" else None
+            # native-relocate copies the parent transcript into the child's encoded dir; record the
+            # parent UUID so cleanup can remove that copy (dir-scoped to the child, never the parent's).
+            fork_relocated_parent = (
+                parent.confirmed.claude_session_id if fork_resume_mode == "native-relocate" else None
+            )
+            fork_state.confirmed.derivation = Derivation(
+                parent_session=parent_name,
+                parent_transcript=parent_transcript_artifact_path,
+                inherited_proxy=fork_proxy_template,
+                resume_mode=fork_resume_mode,
+                strategy=None,
+                depth=1,
+                resumed_at=now_iso(),
+                lineage=[parent_name],
+                context_file=fork_context_file_rel,
+                relocated_parent_session_id=fork_relocated_parent,
+                parent_forge_root=parent_entry.forge_root or parent_entry.worktree_path,
+                parent_project_root=parent_entry.project_root,
+            )
+
+            fork_store = SessionStore(fork_forge_root or fork_worktree_path, fork_name)
             # Same-checkout forks retain the checkout while replacing their
             # stale state. Worktree forks already completed shared cleanup.
             if replace_stale_target_state:
                 effective_fork_root = fork_forge_root or fork_worktree_path
                 try:
-                    self.delete_session(
-                        fork_name,
-                        delete_worktree=False,
-                        delete_branch=False,
-                        force=True,
-                        forge_root=effective_fork_root,
-                    )
+                    if target_instance_id is not None:
+                        self.delete_session(
+                            fork_name,
+                            delete_worktree=False,
+                            delete_branch=False,
+                            force=True,
+                            forge_root=effective_fork_root,
+                            expected_instance_id=target_instance_id,
+                        )
+                    else:
+                        from .deletion import (
+                            apply_session_deletion,
+                            plan_session_deletion,
+                        )
+
+                        replacement = plan_session_deletion(
+                            self.index_store,
+                            fork_name,
+                            forge_root=effective_fork_root,
+                            delete_worktree=False,
+                            force=True,
+                        )
+                        if replacement.state != target_state or replacement.instance_id != target_instance_id:
+                            raise ForgeSessionError(
+                                f"Session '{fork_name}' changed before replacement; retained its new owner"
+                            )
+                        apply_session_deletion(self.index_store, replacement)
                 except SessionNotFoundError:
                     pass
+                else:
+                    removed_target_root = effective_fork_root
 
                 # Publication below is exclusive. A replacement that claimed the
                 # freed name must survive; do not perform a second name-only delete.
                 if SessionStore(effective_fork_root, fork_name).exists():
                     raise SessionExistsError(fork_name)
-
-                replaced_target_state = True
 
             if warnings_sink is not None:
                 warnings_sink.extend(inh_warnings)
@@ -1734,14 +1699,22 @@ class SessionManager:
             return parent, fork_state
 
         except Exception as error:
-            # A replacement may have claimed the checkout after publication.
-            if create_worktree:
-                cleanup_errors = _rollback_created_worktree()
+            # Only compensate this invocation's new worktree, and only while no
+            # newer session owns it. Completed deletion has no content backup.
+            cleanup_errors = _rollback_created_worktree() if create_worktree else []
+            if removed_target_root is not None:
+                message = (
+                    f"{error}. Previous fork '{fork_name}' at {removed_target_root} and its Forge content "
+                    "were already removed before replacement failed. "
+                    "Inspect 'forge session list --scope all' before retrying the fork. "
+                    "Recover previous Forge content from a backup if needed."
+                )
                 if cleanup_errors:
-                    raise ForgeSessionError(f"{error}. Cleanup refused: {'; '.join(cleanup_errors)}") from error
-            else:
-                _restore_previous_target_state()
-
+                    message += f" Cleanup refused: {'; '.join(cleanup_errors)}"
+                raise ForgeSessionError(message) from error
+            if cleanup_errors:
+                status = "Rollback incomplete" if isinstance(error, ProjectCompatibilityError) else "Cleanup refused"
+                raise ForgeSessionError(f"{error}. {status}: {'; '.join(cleanup_errors)}") from error
             raise
 
     @_with_parent_lease()

@@ -189,9 +189,10 @@ def test_force_worktree_fork_preserves_checkout_published_after_cleanup(
         return result
 
     monkeypatch.setattr(deletion, "apply_session_deletion", replace_after_cleanup)
-    with pytest.raises(WorktreePathExistsError):
+    with pytest.raises(ForgeSessionError, match="already removed") as failure:
         case.manager.fork_session("parent", "child", create_worktree=True, force=True)
 
+    assert isinstance(failure.value.__cause__, WorktreePathExistsError)
     assert replacement_token and replacement_token[0] != case.token
     assert case.manager.index_store.get_session("child", str(case.root)).instance_id == replacement_token[0]
     assert winner_content.read_text() == "winner\n"

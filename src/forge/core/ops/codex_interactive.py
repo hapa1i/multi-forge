@@ -69,6 +69,7 @@ from forge.core.state.exceptions import StateCorruptedError, StateUnreadableErro
 from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.active import run_with_active_session
 from forge.session.codex_handoff import (
+    ObservationReceipt,
     clear_observation_receipt,
     clear_pending_context,
     read_observation_receipt,
@@ -357,13 +358,23 @@ def start_interactive_codex_session(
     # Post-exit reconciliation: receipts first (codex-reported, exact), discovery last.
     receipt_thread: str | None = None
     receipt_rollout: str | None = None
-    delivery_fact: str | None = None
-    if parent is not None and context_delivery == "hook":
-        delivery_fact, receipt_thread, receipt_rollout = _reconcile_interactive_hook_delivery(store.session_dir)
-    elif parent is not None:
-        delivery_fact = CONTEXT_DELIVERY_INITIAL
+    delivery_fact = (
+        CONTEXT_DELIVERY_UNDELIVERED
+        if parent is not None and context_delivery == "hook"
+        else CONTEXT_DELIVERY_INITIAL if parent is not None else None
+    )
+    observation: ObservationReceipt | None = None
 
-    observation = read_observation_receipt(store.session_dir)
+    def reconcile_receipts() -> None:
+        nonlocal delivery_fact, receipt_thread, receipt_rollout, observation
+        if parent is not None and context_delivery == "hook":
+            delivery_fact, receipt_thread, receipt_rollout = _reconcile_interactive_hook_delivery(store.session_dir)
+        observation = read_observation_receipt(store.session_dir)
+
+    manager.index_store.run_session_instance_txn(
+        name, str(store.forge_root), expected_instance_id=created_instances[0], callback=reconcile_receipts
+    )
+
     if receipt_thread is None and observation is not None:
         receipt_thread = observation.session_id
         receipt_rollout = observation.transcript_path
@@ -415,8 +426,12 @@ def start_interactive_codex_session(
         m.confirmed.confirmed_at = timestamp
         m.confirmed.confirmed_by = "cli:codex-interactive-start"
 
-    if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
-        sync_codex_thread_to_index(name, thread_id, str(child_forge_root))
+    if _update_manifest_if_present(
+        store, mutate=_mutate, warnings=warnings, session=name, expected_instance_id=created_instances[0]
+    ):
+        sync_codex_thread_to_index(
+            name, thread_id, str(store.forge_root), expected_instance_id=created_instances[0], warnings=warnings
+        )
 
     if thread_id is None:
         warnings.append(
@@ -544,7 +559,15 @@ def reattach_codex_session(
     effective_thread = thread_id
     rollout_path: str | None = None
     rollout_source: str | None = None
-    observation = read_observation_receipt(store.session_dir)
+    observation: ObservationReceipt | None = None
+
+    def read_turn_observation() -> None:
+        nonlocal observation
+        observation = read_observation_receipt(store.session_dir)
+
+    manager.index_store.run_session_instance_txn(
+        name, str(store.forge_root), expected_instance_id=instance_id, callback=read_turn_observation
+    )
     if observation is not None:
         if observation.session_id != thread_id:
             warnings.append(f"Codex thread_id drifted: {thread_id} -> {observation.session_id} (recorded the new id).")
@@ -574,8 +597,12 @@ def reattach_codex_session(
         codex.last_run_at = timestamp
         m.confirmed.codex = codex
 
-    if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
-        sync_codex_thread_to_index(name, effective_thread, session_forge_root)
+    if _update_manifest_if_present(
+        store, mutate=_mutate, warnings=warnings, session=name, expected_instance_id=instance_id
+    ):
+        sync_codex_thread_to_index(
+            name, effective_thread, str(store.forge_root), expected_instance_id=instance_id, warnings=warnings
+        )
 
     return CodexInteractiveResult(
         session=name,

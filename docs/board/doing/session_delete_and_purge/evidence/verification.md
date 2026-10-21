@@ -44,9 +44,10 @@ against the mounted manifest without needing the host's global index. The host r
 confirms exit; an interrupted launcher or failed census retains the lease and blocks cleanup.
 
 Dependency discovery includes registered roots and orphan manifests. Inactive children, borrowed context/plan paths,
-managed supervisor sources and shared native identities refuse cleanup. Unreadable state refuses rather than becoming an
-empty dependency set. Native purge also scans supported native ancestry and observes a runtime-wide process census; it
-cannot prevent an unrelated external client from starting afterward.
+configured prompt files, managed supervisor sources and shared native identities refuse cleanup. Legacy children resolve
+parent roots through read-only index membership, with ambiguous candidates and same-directory fallbacks protected.
+Unreadable state refuses rather than becoming an empty dependency set. Native purge also scans supported native ancestry
+and observes a runtime-wide process census; it cannot prevent an unrelated external client from starting afterward.
 
 The private retry inventory lives under `$FORGE_HOME/session-cleanup/`, outside a removed checkout. It binds the session
 instance, original manifest, Git identity and authorized files. A retry tolerates already-removed targets but refuses
@@ -84,6 +85,27 @@ prints the original `--forge-root` and options for recovery after worktree remov
   instance identity; refusal tests verify stdout detail, stderr failure, unchanged corrupt manifests and shared-branch
   preservation.
 
+## PR review corrections
+
+All five reported issues were confirmed against the implementation. The new regressions cover:
+
+- `test_bug_cleanup_implicit_dependencies.py`: prompt borrowers and legacy cross-worktree plan inheritance block
+  preview, apply and retry without repairing the index. Duplicate names resolve by project and relative path; ambiguous
+  parent candidates remain protected.
+- `test_bug_launch_instance_environment.py`: an ownerless v1 Claude sidecar receives the instance minted by admission.
+  Headless Codex start/resume use the target's captured token, admit its hook writes and restore the caller's
+  environment after success or failure.
+- `test_bug_codex_post_turn_identity.py`: both frontends preserve a replacement's manifest, receipts, pending context
+  and index after runtime exit or between manifest and index publication, returning the completed result with a warning.
+- `test_bug_force_fork_metadata_restore.py`: publication failure after force replacement does not recreate metadata for
+  deleted artifacts and transfer files. Same-directory, `--into` and owned-worktree paths retain native files and report
+  the prior target's removal. Refusal before cleanup preserves the original bytes; competing owners remain protected.
+
+The force-fork failure boundary also covers Git recreation, runtime-config copying and preparation after successful
+cleanup. Replacement cleanup checks the originally captured owner before removal, including legacy owners. Codex
+post-turn publication also checks the captured instance after the runtime lease ends. The user guide now distinguishes a
+refusal before removal from a creation failure after removal.
+
 ## Native evidence
 
 The first separately approved synthetic Claude 2.1.245 invocation reported $0.01699045 and completed one subagent. Purge
@@ -101,18 +123,18 @@ had networking disabled, no credentials and no native invocation.
 
 ## Aggregate checks
 
-Final checks on 2026-10-20:
+Final checks after the PR review corrections on 2026-10-21:
 
 | Command                                         | Result                                       |
 | ----------------------------------------------- | -------------------------------------------- |
-| `make test`                                     | 11,131 unit and 523 integration tests passed |
-| `make test-regression`                          | 1,951 tests passed                           |
+| `make test`                                     | 11,134 unit and 523 integration tests passed |
+| `make test-regression`                          | 2,040 tests passed                           |
 | `make pre-commit`                               | All hooks passed                             |
 | `uv run python scripts/check-markdown-links.py` | 741 Markdown sources passed                  |
 | `git diff --cached --check`                     | Passed                                       |
 
 Tests ran with provider credentials unset, `PYTHON_DOTENV_DISABLED=1` and an offline dependency cache. Unit selection
-deselected 117 integration-marked cases; integration selection deselected 13,238 nonselected cases, including slow
+deselected 117 integration-marked cases; integration selection deselected 13,330 nonselected cases, including slow
 provider trials. All selected tests passed without retries. The integration run includes the exact-wheel release-image
 check and the new cleanup lifecycle tests. Native-layout evidence remains the separately approved captures above.
 

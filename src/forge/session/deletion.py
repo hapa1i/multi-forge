@@ -296,6 +296,7 @@ def apply_session_deletion(index: IndexStore, plan: SessionDeletionPlan) -> tupl
                 plan.name,
                 plan.forge_root,
                 expected_manifest_sha256=plan.manifest_sha256,
+                require_ownerless=plan.instance_id is None,
             )
             if plan.instance_id is not None and token != plan.instance_id:
                 raise ValueError("Session instance changed since preview")

@@ -66,16 +66,37 @@ def test_legacy_preview_does_not_bind_or_write(tmp_path: Path) -> None:
     assert store.manifest_path.read_bytes() == manifest_before
 
 
-def test_migration_initializes_ownerless_legacy_session(tmp_path: Path) -> None:
+@pytest.mark.parametrize("require_ownerless", [False, True])
+def test_migration_initializes_ownerless_legacy_session(tmp_path: Path, require_ownerless: bool) -> None:
     index = IndexStore(tmp_path / "index.json")
     store, _ = _publish(tmp_path, index)
     _legacy_index(index)
     (store.session_dir / "review-identity").unlink()
 
-    token = index.migrate_session_identity("worker", str(store.forge_root))
+    token = index.migrate_session_identity("worker", str(store.forge_root), require_ownerless=require_ownerless)
 
     assert token == store.review_identity()
     assert token == index.get_session("worker", str(store.forge_root)).instance_id
+
+
+@pytest.mark.parametrize("legacy_row", [False, True])
+def test_ownerless_migration_refuses_existing_owner_without_mutation(tmp_path: Path, legacy_row: bool) -> None:
+    index = IndexStore(tmp_path / "index.json")
+    store, token = _publish(tmp_path, index)
+    if legacy_row:
+        _legacy_index(index)
+    before = index.index_path.read_bytes()
+    manifest_before = store.manifest_path.read_bytes()
+    digest = hashlib.sha256(manifest_before).hexdigest()
+
+    with pytest.raises(ValueError, match="instance changed since preview"):
+        index.migrate_session_identity(
+            "worker", str(store.forge_root), expected_manifest_sha256=digest, require_ownerless=True
+        )
+
+    assert index.index_path.read_bytes() == before
+    assert store.manifest_path.read_bytes() == manifest_before
+    assert store.review_identity() == token
 
 
 def test_migration_refuses_ownerless_review_history(tmp_path: Path) -> None:

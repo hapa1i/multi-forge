@@ -593,7 +593,9 @@ class IndexStore:
         except Exception as e:
             _log.debug("Index sync for '%s' failed (non-critical): %s", name, e)
 
-    def update_codex_thread(self, name: str, thread_id: str, forge_root: str | None = None) -> None:
+    def update_codex_thread(
+        self, name: str, thread_id: str, forge_root: str | None = None, *, expected_instance_id: str
+    ) -> bool:
         """Reconcile a session's ``codex_thread_id`` after the manifest changed.
 
         Codex can re-bind a thread across a resume ("drift"). The manifest records
@@ -605,13 +607,22 @@ class IndexStore:
         time this runs, so failing here must not break the resume that observed it.
         A collision is logged rather than raised for the same reason; the adoption
         guard still refuses the id, which is the outcome that matters.
+        Return False when the captured instance is no longer writable or the sync fails.
         """
+        _require_instance_id(expected_instance_id)
         try:
             with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
                 index = self.read()
                 key = resolve_key_best_effort(index.sessions, name, forge_root)
-                if key is None:
-                    return
+                if key is None or index.sessions[key].instance_id != expected_instance_id:
+                    return False
+                store = SessionStore(index.sessions[key].root, name)
+                if (
+                    _cleanup_pending(store.forge_root, name)
+                    or not store.exists()
+                    or store.review_identity() != expected_instance_id
+                ):
+                    return False
                 for other_key, other in index.sessions.items():
                     if other_key != key and other.codex_thread_id == thread_id:
                         _log.warning(
@@ -622,11 +633,18 @@ class IndexStore:
                         )
                 index.sessions[key].codex_thread_id = thread_id
                 self.write(index)
+                return True
         except Exception as e:
             _log.debug("Codex index sync for '%s' failed (non-critical): %s", name, e)
+            return False
 
     def migrate_session_identity(
-        self, name: str, forge_root: str | None = None, *, expected_manifest_sha256: str | None = None
+        self,
+        name: str,
+        forge_root: str | None = None,
+        *,
+        expected_manifest_sha256: str | None = None,
+        require_ownerless: bool = False,
     ) -> str:
         """Explicitly bind a legacy row to its durable per-creation owner.
 
@@ -642,9 +660,13 @@ class IndexStore:
             if key is None:
                 raise SessionNotFoundError(name)
             entry = index.sessions[key]
+            if require_ownerless and entry.instance_id is not None:
+                raise ValueError("Session instance changed since preview; expected an ownerless session")
             store = SessionStore(entry.root, name)
             token = store.migrate_instance_identity(
-                expected_manifest_sha256=expected_manifest_sha256, expected_instance_id=entry.instance_id
+                expected_manifest_sha256=expected_manifest_sha256,
+                expected_instance_id=entry.instance_id,
+                require_ownerless=require_ownerless,
             )
             if entry.instance_id == token:
                 return token

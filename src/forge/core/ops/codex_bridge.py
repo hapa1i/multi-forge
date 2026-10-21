@@ -62,6 +62,7 @@ from forge.session.transfer import (
     parse_transfer_context_strategy,
     parse_transfer_frontmatter,
 )
+from forge.session.workers import SESSION_INSTANCE_ENV
 
 from .context import ExecutionContext
 from .session import ForgeOpError
@@ -246,6 +247,7 @@ def _temporary_run_env(
     session: str,
     forge_root: str | None = None,
     *,
+    instance_id: str | None = None,
     extra_vars: dict[str, str] | None = None,
     unset_vars: tuple[str, ...] = (),
 ) -> Generator[None, None, None]:
@@ -257,7 +259,8 @@ def _temporary_run_env(
     ``codex exec`` run under one root. ``forge_root`` additionally sets
     ``FORGE_FORGE_ROOT`` so Codex hook subprocesses (``codex-session-start``,
     ``codex-policy-check``) resolve the session store under the CHILD's forge_root --
-    a worktree session's manifest is not findable from the payload cwd alone. Saves and
+    a worktree session's manifest is not findable from the payload cwd alone. The
+    captured ``instance_id`` replaces the caller's token; omission clears it. Saves and
     restores the prior values -- including absence -- on exit, even on exception, so
     this core op never leaks run identity into the rest of the process.
 
@@ -278,6 +281,7 @@ def _temporary_run_env(
         FORGE_PARENT_RUN_ID_VAR,
         _FORGE_SESSION_VAR,
         _FORGE_FORGE_ROOT_VAR,
+        SESSION_INSTANCE_ENV,
     ]
     ordered_keys.extend((extra_vars or {}).keys())
     ordered_keys.extend(unset_vars)
@@ -290,6 +294,10 @@ def _temporary_run_env(
         os.environ[_FORGE_SESSION_VAR] = session
         if forge_root is not None:
             os.environ[_FORGE_FORGE_ROOT_VAR] = forge_root
+        if instance_id is None:
+            os.environ.pop(SESSION_INSTANCE_ENV, None)
+        else:
+            os.environ[SESSION_INSTANCE_ENV] = instance_id
         for key in unset_vars:
             os.environ.pop(key, None)
         for key, value in (extra_vars or {}).items():
@@ -324,6 +332,7 @@ def bridge_session_to_codex(
     staged_context_path: Path | None = None,
     run_identity: RunIdentity | None = None,
     authority_marker: str | None = None,
+    expected_instance_id: str | None = None,
     before_invoke: Callable[[], None] | None = None,
     extra_args: Sequence[str] = (),
 ) -> CodexBridgeResult:
@@ -397,6 +406,7 @@ def bridge_session_to_codex(
         root,
         sess,
         forge_root=str(transfer_root),
+        instance_id=expected_instance_id,
         extra_vars=marker_env,
         unset_vars=(FORGE_AUTHORITY_MARKER_VAR,) if marker_env is None else (),
     ):

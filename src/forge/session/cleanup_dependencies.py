@@ -115,6 +115,7 @@ def find_cleanup_dependencies(
         if key in {"session_id", "rewind_relocated_session_id"}:
             ids.add(value)
     ids = {_normalized_native_id(value) for value in ids}
+    entries = session_entries(index)
     dependencies = []
     for other_root, name, other in discover_session_states(
         index,
@@ -125,15 +126,29 @@ def find_cleanup_dependencies(
             continue
         reasons: set[str] = set()
         derivation = other.confirmed.derivation
-        parent_root = Path((derivation.parent_forge_root if derivation else None) or other_root).resolve()
-        if parent_root == root and (
+        parent_roots = {Path((derivation.parent_forge_root if derivation else None) or other_root).resolve()}
+        ambiguous_parent = False
+        if derivation is None and other.parent_session:
+            parent_roots, ambiguous_parent = _legacy_parent_roots(other, other_root, entries)
+        if root in parent_roots and (
             other.parent_session == state.name
             or (
                 derivation is not None and (derivation.parent_session == state.name or state.name in derivation.lineage)
             )
         ):
-            reasons.add("parent/lineage")
+            reasons.add("ambiguous legacy parent/lineage" if ambiguous_parent else "parent/lineage")
         raw = asdict(other)
+        prompt = other.intent.system_prompt
+        references = [prompt.file] if prompt and prompt.file else []
+        if prompt and prompt.file:
+            # Prompt resolution runs before launch against the caller's CWD.
+            # Also protect resumes invoked from either recorded launch root.
+            prompt_roots = {Path.cwd()}
+            if other.worktree:
+                prompt_roots.add(Path(other.worktree.path))
+            if other.confirmed.claude_project_root:
+                prompt_roots.add(Path(other.confirmed.claude_project_root))
+            references.extend(str(base / Path(prompt.file).expanduser()) for base in prompt_roots)
         for key, value in _strings(raw):
             if _normalized_native_id(value) in ids and key in {
                 "claude_session_id",
@@ -158,18 +173,52 @@ def find_cleanup_dependencies(
                 "copied_path",
                 "rollout_path",
             }:
-                candidate = Path(value).expanduser()
-                for base in {Path(other_root), parent_root}:
-                    resolved = (candidate if candidate.is_absolute() else base / candidate).resolve()
-                    if resolved in selected_files or any(
-                        resolved == path or resolved.is_relative_to(path) for path in owned
-                    ):
-                        reasons.add("content reference")
+                references.append(value)
+        for value in references:
+            candidate = Path(value).expanduser()
+            for base in {Path(other_root), *parent_roots}:
+                resolved = (candidate if candidate.is_absolute() else base / candidate).resolve()
+                if resolved in selected_files or any(
+                    resolved == path or resolved.is_relative_to(path) for path in owned
+                ):
+                    reasons.add("content reference")
         if _supervisor_references(raw, state.name, root):
             reasons.add("supervisor source")
         if reasons:
             dependencies.append(f"{name} ({other_root}): {', '.join(sorted(reasons))}")
     return tuple(dependencies)
+
+
+def _legacy_parent_roots(
+    state: SessionState, root: str, entries: list[tuple[str, SessionIndexEntry]]
+) -> tuple[set[Path], bool]:
+    """Mirror inherited-plan membership lookup without its self-healing reads."""
+    current = Path(root).resolve()
+    parents = [entry for name, entry in entries if name == state.parent_session]
+    child = next(
+        (entry for name, entry in entries if name == state.name and Path(entry.root).resolve() == current), None
+    )
+    if child and child.project_root:
+        siblings = [
+            entry for entry in parents if Path(entry.project_root).resolve() == Path(child.project_root).resolve()
+        ]
+        matching = [entry for entry in siblings if (entry.relative_path or ".") == (child.relative_path or ".")]
+        if len(matching) == 1:
+            return {Path(matching[0].root).resolve()}, False
+        if len(siblings) == 1:
+            return {Path(siblings[0].root).resolve()}, False
+        if siblings:
+            candidates = {Path(entry.root).resolve() for entry in siblings}
+            if state.parent_session and SessionStore(root, state.parent_session).exists():
+                candidates.add(current)
+            return candidates, True
+        return {current}, False
+    # Orphan manifests have no reliable project membership. The inherited-plan
+    # reader can still consume a same-directory parent; otherwise retain all
+    # indexed candidates instead of guessing which project the orphan belongs to.
+    if state.parent_session and SessionStore(root, state.parent_session).exists():
+        return {current}, False
+    return ({Path(entry.root).resolve() for entry in parents} or {current}), bool(parents)
 
 
 def _normalized_native_id(value: str) -> str:

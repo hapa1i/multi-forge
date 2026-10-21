@@ -226,9 +226,11 @@ started_with_proxy:
 
 `session/deletion.py` owns the immutable plan and coordinated apply for delete, purge, clean, retention and incognito.
 `cleanup_dependencies.py` reads indexed sessions and orphan manifests in registered roots; existing children, lineage,
-borrowed plans/contexts, supervisor bindings and shared native identities block removal, even when inactive. Unreadable
-state refuses. A selected batch does not imply a cascade: all targets are admitted before any mutation and initially
-refused targets stay refused, independent of processing order.
+borrowed plans/contexts, configured prompt files, supervisor bindings and shared native identities block removal, even
+when inactive. Legacy children without derivation metadata resolve parents through read-only project and relative-path
+membership; ambiguous parent candidates remain protected. Unreadable state refuses. A selected batch does not imply a
+cascade: all targets are admitted before any mutation and initially refused targets stay refused, independent of
+processing order.
 
 Ordinary delete removes the session manifest and its unreferenced Forge content: artifacts, authority/routing/review
 journals, plans, reports, compaction copies, transfer snapshots and author notes, attributable pending QA/reviewer
@@ -248,7 +250,8 @@ removal guarantee.
 The existing per-creation `review-identity` token is the session instance. Index schema v2 mirrors it in `instance_id`;
 v1 reads project `null` without writes. Confirmed cleanup and content-producing operations explicitly migrate validated
 legacy rows under index then manifest locks. Old review history without an owner refuses migration. A plan binds the
-manifest digest and instance before cleanup; neither names nor timestamps identify a replacement.
+manifest digest and instance before cleanup; an ownerless preview requires ownership to remain absent until migration
+under those locks. Neither names nor timestamps identify a replacement.
 
 Apply holds the index publication and target manifest locks from final admission through bounded removal. It validates
 paths, ownership, dependencies, activity and workers again before mutation. Hooks, queue consumers, detached workers,
@@ -267,3 +270,7 @@ successful completion removes the record and inventory. `--forge-root` selects t
 no longer exists. `--force` bypasses dirty-worktree protection only. Incognito exit attempts purge after runtime exit.
 Verified original ownership permits a new preview after initial refusal or the exact retry of an interrupted inventory;
 unverified or replacement ownership receives no cleanup command.
+
+Forced fork replacement uses the same cleanup before publishing the new target. Once that cleanup succeeds, a later fork
+failure cannot restore the previous manifest without its removed artifacts and transfer files. It reports that the prior
+target was removed and preserves any competing replacement instance.

@@ -754,11 +754,11 @@ class TestInteractiveLaunchArgs:
 
 
 class TestUpdateManifestIfPresent:
-    """The exists()->update() race window and the lock-only-shell sweep.
+    """The exists()->publication race and the legacy lock-only-shell sweep.
 
     The ops-level deleted-during-TUI tests land in the exists() preflight branch;
     these pin the narrower race where the delete lands AFTER the preflight, so
-    update()'s lock acquisition recreates the session dir before read() raises.
+    publication must refuse before a manifest lock can recreate the session dir.
     """
 
     @staticmethod
@@ -775,17 +775,17 @@ class TestUpdateManifestIfPresent:
 
         return _exists
 
-    def test_race_window_removes_lock_only_dir(self, tmp_path: Path) -> None:
+    def test_race_window_does_not_create_manifest_lock_dir(self, tmp_path: Path) -> None:
         store = SessionStore(str(tmp_path), "ghost")
-        store.session_dir.mkdir(parents=True)
-        (store.session_dir / "forge.session.json.lock").touch()
         warnings: list[str] = []
 
         with patch.object(SessionStore, "exists", self._exists_true_once()):
-            updated = _update_manifest_if_present(store, mutate=lambda m: None, warnings=warnings, session="ghost")
+            updated = _update_manifest_if_present(
+                store, mutate=lambda m: None, warnings=warnings, session="ghost", expected_instance_id="a" * 32
+            )
 
         assert updated is False
-        assert any("deleted while Codex was running" in w for w in warnings)
+        assert any("skipped post-exit manifest update" in w for w in warnings)
         assert not store.session_dir.exists()
 
     def test_race_window_preserves_non_lock_content(self, tmp_path: Path) -> None:
@@ -796,10 +796,12 @@ class TestUpdateManifestIfPresent:
         warnings: list[str] = []
 
         with patch.object(SessionStore, "exists", self._exists_true_once()):
-            updated = _update_manifest_if_present(store, mutate=lambda m: None, warnings=warnings, session="ghost")
+            updated = _update_manifest_if_present(
+                store, mutate=lambda m: None, warnings=warnings, session="ghost", expected_instance_id="a" * 32
+            )
 
         assert updated is False
-        assert any("deleted while Codex was running" in w for w in warnings)
+        assert any("skipped post-exit manifest update" in w for w in warnings)
         # A dir holding more than the lock is not ours to judge; nothing is removed.
         assert (receipt_dir / "observation-receipt.json").exists()
 
@@ -814,12 +816,21 @@ class TestUpdateManifestIfPresent:
     )
     def test_non_absence_update_errors_remain_strict(self, tmp_path: Path, error: Exception) -> None:
         store = SessionStore(str(tmp_path), "live")
-        store.write(create_session_state(name="live", worktree_path=str(tmp_path)))
+        published = publish_session(
+            IndexStore(), create_session_state(name="live", worktree_path=str(tmp_path)), tmp_path
+        )
+        assert published.instance_id is not None
         warnings: list[str] = []
 
         with patch.object(store, "update", side_effect=error):
             with pytest.raises(type(error), match=str(error)):
-                _update_manifest_if_present(store, mutate=lambda m: None, warnings=warnings, session="live")
+                _update_manifest_if_present(
+                    store,
+                    mutate=lambda m: None,
+                    warnings=warnings,
+                    session="live",
+                    expected_instance_id=published.instance_id,
+                )
 
         assert warnings == []
 

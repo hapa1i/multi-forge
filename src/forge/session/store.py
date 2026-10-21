@@ -445,7 +445,11 @@ class SessionStore:
         return value.decode("ascii")
 
     def migrate_instance_identity(
-        self, *, expected_manifest_sha256: str | None = None, expected_instance_id: str | None = None
+        self,
+        *,
+        expected_manifest_sha256: str | None = None,
+        expected_instance_id: str | None = None,
+        require_ownerless: bool = False,
     ) -> str:
         """Bind legacy ownership under the manifest lock after validating the observed state.
 
@@ -464,6 +468,8 @@ class SessionStore:
                 if digest != expected_manifest_sha256:
                     raise ManifestChangedError(str(self._manifest_path))
             token = self.review_identity()
+            if require_ownerless and token is not None:
+                raise ValueError("Session instance changed since preview; expected an ownerless session")
             if expected_instance_id is not None and token != expected_instance_id:
                 raise ValueError(
                     f"Session '{self.session_name}' has inconsistent instance ownership; restore its owner file"

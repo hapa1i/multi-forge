@@ -872,9 +872,10 @@ class TestForkStaleTargetReplacement:
 
         monkeypatch.setattr(SessionManager, "delete_session", _publish_after_the_stale_delete)
 
-        with pytest.raises(SessionExistsError):
+        with pytest.raises(ForgeSessionError, match="already removed") as failure:
             manager.fork_session("parent", "target", force=True)
 
+        assert isinstance(failure.value.__cause__, SessionExistsError)
         assert published.get("uuid") == "n" * 8, "the replacement must actually have been published"
         survivor = SessionStore(str(project), "target")
         assert survivor.exists(), "fork must not destroy the replacement's manifest"

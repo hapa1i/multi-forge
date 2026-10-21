@@ -49,6 +49,7 @@ from forge.core.state import now_iso
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import (
     ForgeSessionError,
+    IndexStore,
     SessionManager,
     SessionNotFoundError,
     SessionState,
@@ -59,6 +60,7 @@ from forge.session.codex_handoff import (
     read_receipt,
 )
 from forge.session.exceptions import (
+    ManifestChangedError,
     SessionFileNotFoundError,
     SessionWorktreeMissingError,
 )
@@ -450,6 +452,7 @@ def _run_first_codex_turn(
             staged_context_path=staged_context_path,
             run_identity=root,
             authority_marker=(authority_attempt.marker if authority_attempt is not None else None),
+            expected_instance_id=expected_instance_id,
             before_invoke=commit_routing_before_invoke,
             extra_args=launch_args.runtime_argv("codex"),
         )
@@ -460,10 +463,18 @@ def _run_first_codex_turn(
     effective_thread_id = bridge.thread_id
     hook_rollout: str | None = None
     if context_delivery == "hook":
-        delivery_fact, effective_thread_id, hook_rollout = _reconcile_hook_delivery(
-            session_dir=store.session_dir,
-            thread_id=bridge.thread_id,
-            warnings=warnings,
+        delivery_fact = CONTEXT_DELIVERY_UNDELIVERED
+
+        def reconcile_receipt() -> None:
+            nonlocal delivery_fact, effective_thread_id, hook_rollout
+            delivery_fact, effective_thread_id, hook_rollout = _reconcile_hook_delivery(
+                session_dir=store.session_dir,
+                thread_id=bridge.thread_id,
+                warnings=warnings,
+            )
+
+        manager.index_store.run_session_instance_txn(
+            name, str(store.forge_root), expected_instance_id=expected_instance_id, callback=reconcile_receipt
         )
 
     if hook_rollout is not None:
@@ -504,8 +515,16 @@ def _run_first_codex_turn(
         m.confirmed.confirmed_at = timestamp
         m.confirmed.confirmed_by = "cli:codex-start"
 
-    if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
-        sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
+    if _update_manifest_if_present(
+        store, mutate=_mutate, warnings=warnings, session=name, expected_instance_id=expected_instance_id
+    ):
+        sync_codex_thread_to_index(
+            name,
+            effective_thread_id,
+            str(store.forge_root),
+            expected_instance_id=expected_instance_id,
+            warnings=warnings,
+        )
 
     if effective_thread_id is None:
         warnings.append(
@@ -632,6 +651,7 @@ def continue_codex_session(
             root,
             name,
             forge_root=entry.forge_root,
+            instance_id=instance_id,
             extra_vars=marker_env,
             unset_vars=(FORGE_AUTHORITY_MARKER_VAR,) if marker_env is None else (),
         ):
@@ -682,8 +702,12 @@ def continue_codex_session(
         codex.last_run_at = timestamp
         m.confirmed.codex = codex
 
-    if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
-        sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
+    if _update_manifest_if_present(
+        store, mutate=_mutate, warnings=warnings, session=name, expected_instance_id=instance_id
+    ):
+        sync_codex_thread_to_index(
+            name, effective_thread_id, str(store.forge_root), expected_instance_id=instance_id, warnings=warnings
+        )
 
     return CodexSessionResumeResult(
         session=name,
@@ -727,13 +751,25 @@ def _update_manifest_if_present(
     mutate: Callable[[SessionState], None],
     warnings: list[str],
     session: str,
+    expected_instance_id: str,
 ) -> bool:
-    """Best-effort post-turn update without resurrecting a deleted session."""
+    """Publish post-turn state only to the instance admitted before launch."""
     if not store.exists():
         warnings.append(f"Session '{session}' was deleted while Codex was running; skipped post-exit manifest update.")
         return False
+
+    def persist() -> None:
+        store.update(timeout_s=5.0, mutate=mutate, expected_instance_id=expected_instance_id)
+
     try:
-        store.update(timeout_s=5.0, mutate=mutate)
+        updated = IndexStore().run_session_instance_txn(
+            session,
+            str(store.forge_root),
+            expected_instance_id=expected_instance_id,
+            callback=persist,
+        )
+    except ManifestChangedError:
+        updated = False
     except SessionFileNotFoundError:
         # A concurrent delete can land after exists() but before update() reads. The
         # lock layer creates the session dir to hold forge.session.json.lock; remove
@@ -741,7 +777,12 @@ def _update_manifest_if_present(
         _remove_lock_only_session_dir(store.session_dir)
         warnings.append(f"Session '{session}' was deleted while Codex was running; skipped post-exit manifest update.")
         return False
-    return True
+    if not updated:
+        warnings.append(
+            f"Session '{session}' was deleted, replaced, or entered cleanup after Codex ran; "
+            "skipped post-exit manifest update."
+        )
+    return updated
 
 
 def _remove_lock_only_session_dir(session_dir: Path) -> None:
