@@ -1,7 +1,8 @@
 # Hardening verification
 
 Source base: `93b558d2`. Verification date: 2026-10-22. No model inference or native agent turns were run. The approved
-Anthropic token count covered only `docs/design_installation.md`: 24,152 tokens, below its 25,000-token target.
+Anthropic token count covered only `docs/design_installation.md`: 24,230 tokens after review edits, below its
+25,000-token target.
 
 ## Completed checks
 
@@ -21,9 +22,22 @@ Anthropic token count covered only `docs/design_installation.md`: 24,152 tokens,
   `tests/integration/docker/test_qa_release_artifact.py`, with `PYTHON_DOTENV_DISABLED=1`, `CLAUDE_VERSION=2.1.245` and
   `CODEX_VERSION=0.149.1`. This includes the offline wheel build and both runtime extension lifecycles. The image
   prepares hash-verified build dependencies explicitly; a separate online/offline build probe also passed.
+- Review verification added three Docker tests: an unrelated project resolves its own local backend despite a version
+  conflict with Forge's pins; Forge still builds offline using hashed backend artifacts; and the documented global wheel
+  recipe installs and registers a durable launcher. The recipe refuses wrong wheel/runtime hashes, an existing
+  installation directory and an occupied launcher path without replacing the previous launcher. The initial combined run
+  passed 28 tests and failed the recipe's incorrect offline-cache assumption; with that test-only restriction removed,
+  the recipe passed on its targeted rerun. All 29 targeted Docker tests now pass.
+- `./scripts/test-wheel-runtime.sh --unconstrained` passed in a disposable container with no host mounts or forwarded
+  credentials. Fresh metadata resolution installed a compatible graph and passed packaged LiteLLM start, local health
+  and stop. The separate daily/manual workflow uses this mode with no PR trigger, persisted checkout credentials or
+  provider secrets; its hosted scheduled execution starts after merge.
+- Real Git regressions prove a rejected source candidate preserves HEAD, source, the editable environment and launcher,
+  including a changed `FETCH_HEAD` during validation. Additional regressions cover a system Python lacking `tomllib`,
+  invalid runtime overrides during unit collection, and separation of locked versus unconstrained smoke installation.
 - Focused dependency-pin, environment-vocabulary and Pyright checks: 19 passed. The two publisher configuration checks
   also passed. Installer refusal fixtures include real local Git tag/branch selection and preservation of dirty files.
-- `make test-regression`: all 2,133 tests passed. All 29 focused installer tests also passed after the final help edits.
+- `make test-regression`: all 2,152 tests passed after review fixes.
 - `make test-unit`: 11,151 passed, 117 deselected, no failures.
 - `make pre-commit`: all hooks passed, including file-size verification, formatting, type checks, secret scanning,
   documentation links and dependency-export drift.
@@ -44,8 +58,10 @@ manifest/configuration digests and explicit input defaults were checked against 
 [publisher-image.json](publisher-image.json). An actual OIDC exchange, attestation signing and upload still require an
 authorized release run.
 
-The guarantees differ by path: uv's locked environment and the default wheel smoke use artifact hashes; uv 0.9.18 tool
-constraints enforce versions, not artifact hashes. Its project sync uses `tool.uv.build-constraint-dependencies`,
-because it does not apply `UV_BUILD_CONSTRAINT` to that path. Ordinary PyPI installs, host runtimes, npm transitives,
-updating Debian repositories and deliberately selected compatibility versions remain the documented boundaries in
-[dependency security](../../../../developer/dependency_security.md).
+The guarantees differ by path: uv's locked environment, default wheel smoke and optional verified global wheel recipe
+use artifact hashes; uv 0.9.18 tool constraints enforce versions, not artifact hashes. Its project sync uses
+`tool.uv.build-constraint-dependencies`, because it does not apply `UV_BUILD_CONSTRAINT` to that path. The image does
+not export this variable into unrelated workloads. Once a source candidate is admitted, a dependency-sync failure can
+still require rerunning setup; candidate validation is not an atomic environment replacement. Ordinary PyPI installs,
+host runtimes, npm transitives, updating Debian repositories and deliberately selected compatibility versions remain the
+documented boundaries in [dependency security](../../../../developer/dependency_security.md).

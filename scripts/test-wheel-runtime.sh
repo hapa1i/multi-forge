@@ -53,8 +53,10 @@ if [[ "${#SMOKE_WHEELS[@]}" -ne 1 || ! -f "${SMOKE_WHEELS[0]}" ]]; then
 fi
 
 if [[ "$SMOKE_UNCONSTRAINED" == "true" ]]; then
-    uv pip install --python "${SMOKE_VENV}/bin/python" "${SMOKE_WHEELS[0]}" \
-        --build-constraints "$SMOKE_REPO_ROOT/requirements/build.txt"
+    # Consumer resolution must not inherit this checkout's reviewed constraints.
+    env -u UV_BUILD_CONSTRAINT -u UV_CONSTRAINT -u UV_OVERRIDE -u UV_EXCLUDE \
+        -u UV_EXCLUDE_NEWER -u UV_CONFIG_FILE \
+        uv pip install --no-config --python "${SMOKE_VENV}/bin/python" "${SMOKE_WHEELS[0]}"
 else
     uv export --project "$SMOKE_REPO_ROOT" --locked --no-dev --no-emit-project \
         --output-file "$SMOKE_ROOT/runtime.txt" >/dev/null

@@ -46,6 +46,9 @@ shells. See [CONTRIBUTING.md](../../CONTRIBUTING.md).
 The ordinary PyPI commands above resolve compatible dependencies at installation time. To use reviewed dependency
 versions, install from a reviewed checkout with `./scripts/setup.sh --local`, or apply that release's constraints when
 installing its wheel. [Dependency security](../developer/dependency_security.md) explains both paths and their limits.
+For artifact verification as well as version pins, follow the
+[hash-verified wheel recipe](../developer/dependency_security.md#hash-verified-wheel-installation). It installs the
+reviewed dependency hashes into a dedicated environment and exposes a persistent global launcher.
 
 ### Upgrading from Pre-OSS Forge
 

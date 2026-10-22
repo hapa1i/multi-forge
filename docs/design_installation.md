@@ -165,10 +165,12 @@ again because its config location and command bytes changed.
 > user + project) is documented in [§C.5](design_installation.md#c5-multi-scope-installation-skill-resolution).
 
 Source builds and CI use `uv.lock` plus generated `requirements/build.txt` and `requirements/runtime.txt` exports.
-`scripts/check-dependency-pins.py` rejects export drift; release builds require build-artifact hashes. The source
-installer applies version constraints to global editable installs, refuses missing requested refs and preserves dirty
-checkouts. Ordinary PyPI tool installs still resolve metadata ranges. The exact guarantees and update procedure live in
-[dependency security](developer/dependency_security.md).
+`scripts/check-dependency-pins.py` rejects export drift; release builds require build-artifact hashes. Source updates
+validate an isolated candidate before changing the active checkout; global editable installs enforce version
+constraints. The optional verified-wheel recipe installs hashed runtime artifacts and publishes a persistent launcher
+after dependency checks. Ordinary PyPI tool installs still resolve metadata ranges; a separate scheduled compatibility
+job tests that path without gating merges. Docker scopes build constraints to Forge commands. The guarantees and update
+procedure live in [dependency security](developer/dependency_security.md).
 
 ### 5.3 Test Infrastructure (Docker-based)
 
