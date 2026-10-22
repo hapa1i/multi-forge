@@ -27,8 +27,8 @@ help:
 build:
 	@echo "Building source distribution and wheel..."
 	@build_python="$$(uv python find --no-project --no-config '>=3.11,<3.14')" && \
-		"$$build_python" -S scripts/check-dependency-pins.py
-	uv build --build-constraints requirements/build.txt --require-hashes
+		"$$build_python" -S scripts/check-dependency-pins.py && \
+		uv build --python "$$build_python" --build-constraints requirements/build.txt --require-hashes
 
 test-unit: deps
 	@echo "Running unit tests (excluding integration)..."

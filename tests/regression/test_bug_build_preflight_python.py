@@ -68,6 +68,8 @@ def test_make_build_checks_with_supported_python_before_building(tmp_path: Path,
         assert calls[1:] == [
             [
                 "build",
+                "--python",
+                sys.executable,
                 "--build-constraints",
                 "requirements/build.txt",
                 "--require-hashes",

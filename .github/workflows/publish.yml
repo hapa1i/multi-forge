@@ -32,7 +32,9 @@ jobs:
         run: make build
 
       - name: Export reviewed runtime artifact hashes
-        run: uv export --locked --offline --no-dev --no-emit-project --output-file requirements/runtime-hashed.txt
+        run: >-
+          uv export --python "$(command -v python)" --locked --offline --no-dev --no-emit-project
+          --output-file requirements/runtime-hashed.txt
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

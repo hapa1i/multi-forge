@@ -18,7 +18,7 @@ SPEC.loader.exec_module(PINS)
 
 @pytest.fixture
 def project(tmp_path: Path) -> Path:
-    for filename in ("pyproject.toml", "uv.lock"):
+    for filename in ("pyproject.toml", "uv.lock", ".python-version"):
         shutil.copyfile(ROOT / filename, tmp_path / filename)
     shutil.copytree(ROOT / "requirements", tmp_path / "requirements")
     return tmp_path

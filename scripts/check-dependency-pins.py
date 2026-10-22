@@ -21,6 +21,8 @@ def exported_requirements(root: Path, filename: str, options: list[str]) -> str:
         [
             "uv",
             "export",
+            "--python",
+            sys.executable,
             "--locked",
             "--offline",
             "--no-header",

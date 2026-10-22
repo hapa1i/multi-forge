@@ -29,6 +29,9 @@ build graph with `uv export --locked --only-group build --no-hashes --no-emit-pr
 transitive build pins with its exact requirements, and refresh the lock if those pins changed. The checker's `--write`
 mode regenerates the export files; it does not update this project-level list.
 
+The checker exports with its own Python interpreter. `make build` uses one installed Python 3.11--3.13 for both the
+checker and the build, so offline validation does not require the development version in `.python-version`.
+
 After updating and reviewing the dependency declarations and build pins:
 
 ```bash
@@ -90,9 +93,10 @@ Run this block in Bash. It requires a new installation directory and publishes t
     test ! -L "$FORGE_INSTALL_DIR"
     printf '%s  %s\n' "$FORGE_WHEEL_SHA256" "$FORGE_WHEEL" | shasum --algorithm 256 --check -
     mkdir -p "$FORGE_INSTALL_DIR"
-    uv export --project "$FORGE_CHECKOUT" --locked --offline --no-dev --no-emit-project \
-        --output-file "$FORGE_INSTALL_DIR/runtime-hashed.txt" >/dev/null
     uv venv --no-config --no-python-downloads --python '>=3.11,<3.14' "$FORGE_INSTALL_DIR/venv"
+    uv export --python "$FORGE_INSTALL_DIR/venv/bin/python" \
+        --project "$FORGE_CHECKOUT" --locked --offline --no-dev --no-emit-project \
+        --output-file "$FORGE_INSTALL_DIR/runtime-hashed.txt" >/dev/null
     uv pip install --no-config --python "$FORGE_INSTALL_DIR/venv/bin/python" \
         --require-hashes --no-build -r "$FORGE_INSTALL_DIR/runtime-hashed.txt"
     uv pip install --no-config --python "$FORGE_INSTALL_DIR/venv/bin/python" --no-deps --no-build "$FORGE_WHEEL"
