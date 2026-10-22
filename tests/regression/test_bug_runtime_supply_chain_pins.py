@@ -8,6 +8,7 @@ import io
 import json
 import os
 import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -39,6 +40,24 @@ def test_docker_and_integration_defaults_match_reviewed_qa_track(monkeypatch):
     dockerfile = (REPO_ROOT / "docker/Dockerfile.forge").read_text()
     for name, version in zip(("CLAUDE_VERSION", "CODEX_VERSION"), expected):
         assert re.search(rf"^ARG {name}={re.escape(version)}$", dockerfile, re.MULTILINE)
+
+
+def test_docker_prepares_hash_verified_build_cache():
+    dockerfile = (REPO_ROOT / "docker/Dockerfile.forge").read_text()
+    instructions = dockerfile.replace("\\\n", " ").splitlines()
+    build_commands = [
+        shlex.split(command.strip())
+        for instruction in instructions
+        if instruction.startswith("RUN ")
+        for command in instruction.removeprefix("RUN ").split("&&")
+        if command.strip().startswith("uv build ")
+    ]
+    assert build_commands, "The image must prepare backend artifacts before offline wheel tests."
+    for command in build_commands:
+        assert "--require-hashes" in command
+        assert "--no-verify-hashes" not in command
+        constraint_option = command.index("--build-constraints")
+        assert command[constraint_option + 1] == "/forge/requirements/build.txt"
 
 
 def test_explicit_runtime_overrides_are_preserved():

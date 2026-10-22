@@ -1,6 +1,6 @@
 # Supply-chain pinning checklist
 
-Current focus: finish verification and open a draft PR while the Docker-space and document-count approvals are pending.
+Current focus: review [PR #280](https://github.com/hapa1i/multi-forge/pull/280) after final verification.
 
 ## Implementation
 
@@ -30,7 +30,7 @@ Current focus: finish verification and open a draft PR while the Docker-space an
 - [x] Verify constrained global tool installation and read-only extension doctor in isolated tool/state directories.
 - [x] Verify the complete setup script and user/project extension enable in a disposable container.
 - [x] Run aggregate unit/regression tests and record results in [verification evidence](evidence/verification.md).
-- [ ] Refresh the approved document count and pass full unit/pre-commit checks.
-- [ ] Complete tests against the hardened Docker image after resolving disk space.
-- [x] Record evidence and remaining limitations for draft review.
+- [x] Refresh the approved document count and pass full unit/pre-commit checks.
+- [x] Complete tests against the hardened Docker image after resolving disk space.
+- [x] Record evidence and remaining limitations for review.
 - [ ] After merge, record closeout, move this card to done and update links.

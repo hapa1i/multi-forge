@@ -141,7 +141,11 @@ COPY src/forge ./src/forge
 COPY src/skills ./src/skills
 COPY src/commands ./src/commands
 COPY src/agents ./src/agents
-RUN uv sync --locked
+# Seed hash-verified backend artifacts for offline wheel builds in test containers.
+RUN uv sync --locked \
+    && uv build --wheel --build-constraints /forge/requirements/build.txt --require-hashes \
+        --out-dir /tmp/forge-build-cache \
+    && rm -rf /tmp/forge-build-cache
 
 # Copy the remaining repo content used by tests, extension installers, and
 # container tooling after the editable install layer is cached.
