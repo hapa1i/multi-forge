@@ -26,7 +26,8 @@ help:
 
 build:
 	@echo "Building source distribution and wheel..."
-	python3 -S scripts/check-dependency-pins.py
+	@build_python="$$(uv python find --no-project --no-config '>=3.11,<3.14')" && \
+		"$$build_python" -S scripts/check-dependency-pins.py
 	uv build --build-constraints requirements/build.txt --require-hashes
 
 test-unit: deps

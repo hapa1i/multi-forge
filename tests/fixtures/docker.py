@@ -54,9 +54,6 @@ trap - EXIT
 """
 
 
-CLAUDE_CODE_VERSION, CODEX_CLI_VERSION = integration_runtime_versions()
-
-
 class ContainerLike(Protocol):
     """Protocol for container-like objects that can execute commands.
 
@@ -444,12 +441,13 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
             "Docker not available and not running inside test container. Install Docker or run inside container."
         )
 
+    claude_version, codex_version = integration_runtime_versions()
     repo_root = _find_repo_root()
     forge_revision = _get_forge_revision(repo_root)
 
-    image_name = f"forge-claude-test:{CLAUDE_CODE_VERSION}-codex-{CODEX_CLI_VERSION}"
+    image_name = f"forge-claude-test:{claude_version}-codex-{codex_version}"
 
-    latest = "latest" in (CLAUDE_CODE_VERSION, CODEX_CLI_VERSION)
+    latest = "latest" in (claude_version, codex_version)
     prepared = os.environ.get("FORGE_INTEGRATION_PREBUILT_IMAGE") == image_name
     needs_build = (latest and not prepared) or not _image_exists(image_name)
     if not needs_build:
@@ -473,10 +471,7 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
     if not dockerfile.exists():
         pytest.fail(f"Dockerfile not found at {dockerfile}. Run from repo root or check docker/ directory.")
 
-    print(
-        f"\nBuilding Docker image {image_name} "
-        f"(Claude Code {CLAUDE_CODE_VERSION}, Codex CLI {CODEX_CLI_VERSION})..."
-    )
+    print(f"\nBuilding Docker image {image_name} " f"(Claude Code {claude_version}, Codex CLI {codex_version})...")
     result = subprocess.run(
         [
             "docker",
@@ -485,9 +480,9 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
             "-f",
             str(dockerfile),
             "--build-arg",
-            f"CLAUDE_VERSION={CLAUDE_CODE_VERSION}",
+            f"CLAUDE_VERSION={claude_version}",
             "--build-arg",
-            f"CODEX_VERSION={CODEX_CLI_VERSION}",
+            f"CODEX_VERSION={codex_version}",
             "--build-arg",
             f"FORGE_REV={forge_revision}",
             "-t",

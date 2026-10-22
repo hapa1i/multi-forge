@@ -128,7 +128,6 @@ RUN npm install -g @openai/codex@${CODEX_VERSION} \
 # --no-install-project skips the editable project install (needs source tree).
 COPY pyproject.toml uv.lock ./
 COPY requirements/build.txt requirements/runtime.txt ./requirements/
-ENV UV_BUILD_CONSTRAINT=/forge/requirements/build.txt
 RUN uv sync --locked --no-install-project
 
 # Copy package sources needed for editable install. Extensions (skills, agents,

@@ -10,6 +10,7 @@ import os
 import re
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -60,6 +61,14 @@ def test_docker_prepares_hash_verified_build_cache():
         assert command[constraint_option + 1] == "/forge/requirements/build.txt"
 
 
+def test_runtime_images_do_not_export_forge_build_constraints():
+    for dockerfile in (REPO_ROOT / "docker").glob("Dockerfile.*"):
+        instructions = dockerfile.read_text().replace("\\\n", " ").splitlines()
+        assert not any(
+            instruction.startswith("ENV ") and "UV_BUILD_CONSTRAINT" in instruction for instruction in instructions
+        ), f"{dockerfile.name} leaks Forge build policy to unrelated projects"
+
+
 def test_explicit_runtime_overrides_are_preserved():
     assert runtime_versions.integration_runtime_versions({"CLAUDE_VERSION": "2.1.294", "CODEX_VERSION": "latest"}) == (
         "2.1.294",
@@ -73,6 +82,37 @@ def test_nonexact_runtime_overrides_refuse(value):
         runtime_versions.integration_runtime_versions({"CLAUDE_VERSION": value})
 
 
+@pytest.mark.parametrize("name", ["CLAUDE_VERSION", "CODEX_VERSION"])
+@pytest.mark.parametrize("value", ["stable", ""])
+def test_invalid_integration_override_does_not_abort_unit_collection(name, value):
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q", "tests/src/scripts/test_dependency_pins.py"],
+        cwd=REPO_ROOT,
+        env={**os.environ, name: value, "PYTHON_DOTENV_DISABLED": "1"},
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "test_committed_exports_match_reviewed_lock" in result.stdout
+
+
+@pytest.mark.parametrize("name", ["CLAUDE_VERSION", "CODEX_VERSION"])
+@pytest.mark.parametrize("value", ["stable", ""])
+def test_invalid_integration_override_refuses_only_when_build_fixture_is_used(monkeypatch, name, value):
+    monkeypatch.delenv("CLAUDE_VERSION", raising=False)
+    monkeypatch.delenv("CODEX_VERSION", raising=False)
+    monkeypatch.setenv(name, value)
+
+    def unexpected_image_lookup():
+        pytest.fail("Invalid runtime override must refuse before touching Docker images")
+
+    monkeypatch.setattr(docker, "_find_repo_root", unexpected_image_lookup)
+    assert docker.forge_test_image.__wrapped__(True, True) is None
+    with pytest.raises(ValueError, match=f"{name} must be an exact version"):
+        docker.forge_test_image.__wrapped__(True, False)
+
+
 def test_mutable_default_in_qa_matrix_refuses(monkeypatch, tmp_path):
     matrix = tmp_path / "matrix.json"
     matrix.write_text(json.dumps({"tracks": {"pinned": {"claude": {"version": "latest"}}}}))
@@ -84,8 +124,8 @@ def test_mutable_default_in_qa_matrix_refuses(monkeypatch, tmp_path):
 @pytest.mark.parametrize("prepared", [False, True])
 def test_latest_fixture_refreshes_once_and_reuses_runner_image(monkeypatch, tmp_path, prepared):
     image_name = "forge-claude-test:latest-codex-0.149.1"
-    monkeypatch.setattr(docker, "CLAUDE_CODE_VERSION", "latest")
-    monkeypatch.setattr(docker, "CODEX_CLI_VERSION", "0.149.1")
+    monkeypatch.setenv("CLAUDE_VERSION", "latest")
+    monkeypatch.setenv("CODEX_VERSION", "0.149.1")
     monkeypatch.setattr(docker, "_find_repo_root", lambda: tmp_path)
     monkeypatch.setattr(docker, "_get_forge_revision", lambda root: "revision")
     monkeypatch.setattr(docker, "_get_image_revision", lambda image: "revision")

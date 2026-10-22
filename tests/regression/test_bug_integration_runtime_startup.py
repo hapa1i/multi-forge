@@ -57,6 +57,8 @@ def test_docker_client_timeout_still_removes_the_owned_container(monkeypatch):
 
 @pytest.mark.parametrize("cached", [True, False])
 def test_pytest_image_fixture_rejects_broken_runtime_before_yield(monkeypatch, tmp_path, cached):
+    monkeypatch.delenv("CLAUDE_VERSION", raising=False)
+    monkeypatch.delenv("CODEX_VERSION", raising=False)
     (tmp_path / "docker").mkdir()
     (tmp_path / "docker/Dockerfile.forge").touch()
     monkeypatch.setattr(docker, "_find_repo_root", lambda: tmp_path)

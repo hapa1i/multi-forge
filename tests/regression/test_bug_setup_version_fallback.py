@@ -29,6 +29,9 @@ case "$1" in
     -c) printf '3.11\n' ;;
     -S)
         printf '%s\n' "$@" > "$PIN_CHECK_LOG"
+        if [ -n "$MOVE_FETCH_HEAD_TO" ]; then
+            printf '%s\n' "$MOVE_FETCH_HEAD_TO" > "$FORGE_HOME/repo/.git/FETCH_HEAD"
+        fi
         if [ "$PIN_CHECK_FAILURE" = 1 ]; then
             printf 'Stale dependency constraints: requirements/runtime.txt\n' >&2
             exit 1
@@ -50,6 +53,14 @@ if [ "$1" = "$GIT_FAILURE" ]; then
     printf 'synthetic git failure\n' >&2
     exit 1
 fi
+write_candidate() {
+    mkdir -p "$1"
+    if [ "$MISSING_BUILD_CONSTRAINTS" != 1 ]; then
+        mkdir -p "$1/requirements" "$1/scripts"
+        printf 'hatchling==1.27.0\n' > "$1/requirements/build.txt"
+        printf '# fixture checker\n' > "$1/scripts/check-dependency-pins.py"
+    fi
+}
 case "$1" in
     clone)
         case "$*" in
@@ -62,18 +73,21 @@ case "$1" in
         esac
         for destination do :; done
         mkdir -p "$destination/.git"
-        if [ "$MISSING_BUILD_CONSTRAINTS" != 1 ]; then
-            mkdir -p "$destination/requirements" "$destination/scripts"
-            printf 'hatchling==1.27.0\n' > "$destination/requirements/build.txt"
-            printf '# fixture checker\n' > "$destination/scripts/check-dependency-pins.py"
-        fi
+        write_candidate "$destination"
         ;;
     checkout)
-        if [ "$MISSING_BUILD_CONSTRAINTS" != 1 ]; then
-            mkdir -p requirements scripts
-            printf 'hatchling==1.27.0\n' > requirements/build.txt
-            printf '# fixture checker\n' > scripts/check-dependency-pins.py
-        fi
+        write_candidate .
+        ;;
+    rev-parse)
+        printf '1234567890123456789012345678901234567890\n'
+        ;;
+    archive)
+        for argument do
+            case "$argument" in --output=*) archive_output=${argument#--output=} ;; esac
+        done
+        fixture_dir="${archive_output%/source.tar}/fixture"
+        write_candidate "$fixture_dir"
+        tar -cf "$archive_output" -C "$fixture_dir" .
         ;;
     status)
         printf '%s' "$GIT_DIRTY"
@@ -99,6 +113,7 @@ esac
         "MISSING_BUILD_CONSTRAINTS": "",
         "PIN_CHECK_LOG": str(tmp_path / "pin-check.log"),
         "PIN_CHECK_FAILURE": "",
+        "MOVE_FETCH_HEAD_TO": "",
     }
 
 
@@ -131,7 +146,7 @@ def test_requested_clone_failure_never_falls_back_to_default_branch(
     assert "sync " not in Path(env["UV_LOG"]).read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("failure", ["status", "fetch", "checkout"])
+@pytest.mark.parametrize("failure", ["status", "fetch", "rev-parse", "archive", "checkout"])
 def test_update_failure_does_not_install_stale_checkout(installer_environment: dict[str, str], failure: str) -> None:
     env = installer_environment
     env["GIT_FAILURE"] = failure
@@ -147,6 +162,7 @@ def test_update_failure_does_not_install_stale_checkout(installer_environment: d
     assert "Could not" in result.stderr
     assert "sync " not in Path(env["UV_LOG"]).read_text(encoding="utf-8")
     assert sentinel.read_text(encoding="utf-8") == "existing user content"
+    assert not list(Path(env["FORGE_HOME"]).glob(".install-candidate.*"))
 
 
 def test_dirty_checkout_refuses_before_fetch(
@@ -172,16 +188,21 @@ def test_existing_checkout_uses_exact_fetched_ref(installer_environment: dict[st
     result = _install(env, "--version", version)
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert Path(env["GIT_LOG"]).read_text(encoding="utf-8").splitlines() == [
+    git_calls = Path(env["GIT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert git_calls[:3] == [
         "status --porcelain",
         f"fetch origin {version}",
-        "checkout --detach FETCH_HEAD",
+        "rev-parse --verify FETCH_HEAD^{commit}",
     ]
+    assert git_calls[3].startswith("archive --format=tar --output=")
+    assert git_calls[3].endswith("1234567890123456789012345678901234567890")
+    assert git_calls[4:] == ["checkout --detach 1234567890123456789012345678901234567890"]
     assert "sync --locked --quiet" in Path(env["UV_LOG"]).read_text(encoding="utf-8").splitlines()
-    assert Path(env["PIN_CHECK_LOG"]).read_text(encoding="utf-8").splitlines() == [
-        "-S",
-        f"{env['FORGE_HOME']}/repo/scripts/check-dependency-pins.py",
-    ]
+    check_arguments = Path(env["PIN_CHECK_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert check_arguments[0] == "-S"
+    assert check_arguments[1].startswith(f"{env['FORGE_HOME']}/.install-candidate.")
+    assert check_arguments[1].endswith("/source/scripts/check-dependency-pins.py")
+    assert not list(Path(env["FORGE_HOME"]).glob(".install-candidate.*"))
 
 
 @pytest.mark.parametrize("version", ["v1.2.3", "main"])
@@ -288,6 +309,7 @@ def local_git_installation(installer_environment: dict[str, str], tmp_path: Path
     source = tmp_path / "source"
     source.mkdir()
     _git(source, env, "init", "--initial-branch=main")
+    (source / ".gitignore").write_text(".venv/\n", encoding="utf-8")
     (source / "requirements").mkdir()
     (source / "scripts").mkdir()
     (source / "scripts" / "check-dependency-pins.py").write_text("# fixture checker\n", encoding="utf-8")
@@ -340,3 +362,65 @@ def test_real_git_dirty_update_preserves_files_and_revision(
     assert (repo / "untracked.txt").read_text(encoding="utf-8") == "untracked user file\n"
     assert Path(env["GIT_LOG"]).read_text(encoding="utf-8").splitlines() == ["status --porcelain"]
     assert Path(env["UV_LOG"]).read_text(encoding="utf-8").splitlines() == ["--version"]
+
+
+@pytest.mark.parametrize("rejection", ["missing-build-constraints", "missing-checker", "stale-pins"])
+def test_rejected_revision_does_not_replace_active_editable_source(
+    local_git_installation: tuple[Path, Path, dict[str, str]], rejection: str
+) -> None:
+    source, repo, env = local_git_installation
+    original_commit = _git(repo, env, "rev-parse", "HEAD")
+    original_source = (repo / "source.txt").read_text(encoding="utf-8")
+    executable = repo / ".venv" / "bin" / "forge"
+    executable.parent.mkdir(parents=True)
+    executable.write_text('#!/bin/sh\ncat "$FORGE_HOME/repo/source.txt"\n', encoding="utf-8")
+    executable.chmod(0o755)
+    wrapper = Path(env["FORGE_HOME"]) / "bin" / "forge"
+    wrapper.parent.mkdir()
+    wrapper.write_text('#!/bin/sh\nexec "$FORGE_HOME/repo/.venv/bin/forge" "$@"\n', encoding="utf-8")
+    wrapper.chmod(0o755)
+    original_executable = executable.read_bytes()
+    original_wrapper = wrapper.read_bytes()
+    _git(source, env, "checkout", "-b", "rejected")
+    (source / "source.txt").write_text("refused candidate\n", encoding="utf-8")
+    if rejection == "missing-build-constraints":
+        (source / "requirements" / "build.txt").unlink()
+    elif rejection == "missing-checker":
+        (source / "scripts" / "check-dependency-pins.py").unlink()
+    else:
+        env["PIN_CHECK_FAILURE"] = "1"
+    _git(source, env, "add", "-A")
+    _git(source, env, "commit", "-m", "candidate that fails admission")
+
+    result = _install(env, "--version", "rejected")
+
+    assert result.returncode != 0
+    expected_error = {
+        "missing-build-constraints": "Reviewed build constraints are missing",
+        "missing-checker": "Dependency pin checker is missing",
+        "stale-pins": "Dependency pin verification failed",
+    }[rejection]
+    assert expected_error in result.stderr
+    assert _git(repo, env, "rev-parse", "HEAD") == original_commit
+    assert (repo / "source.txt").read_text(encoding="utf-8") == original_source
+    assert executable.read_bytes() == original_executable
+    assert wrapper.read_bytes() == original_wrapper
+    launched = subprocess.run([str(wrapper)], env=env, text=True, capture_output=True, check=True)
+    assert launched.stdout == original_source
+    assert _git(repo, env, "status", "--porcelain") == ""
+    assert Path(env["UV_LOG"]).read_text(encoding="utf-8").splitlines() == ["--version"]
+    assert not list(Path(env["FORGE_HOME"]).glob(".install-candidate.*"))
+
+
+def test_update_activates_admitted_commit_when_fetch_head_changes_during_verification(
+    local_git_installation: tuple[Path, Path, dict[str, str]],
+) -> None:
+    source, repo, env = local_git_installation
+    admitted_commit = _git(source, env, "rev-parse", "v1.2.3")
+    env["MOVE_FETCH_HEAD_TO"] = _git(repo, env, "rev-parse", "HEAD")
+
+    result = _install(env, "--version", "v1.2.3")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _git(repo, env, "rev-parse", "HEAD") == admitted_commit
+    assert (repo / "source.txt").read_text(encoding="utf-8") == "release\n"

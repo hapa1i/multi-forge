@@ -239,6 +239,29 @@ verify_dependency_pins() {
         fatal "Dependency pin verification failed. Use a source revision with matching lock and constraint files, then retry."
 }
 
+verify_source_candidate() {
+    local repo_dir="$1"
+    if [[ ! -s "$repo_dir/requirements/build.txt" ]]; then
+        fatal "Reviewed build constraints are missing. Use a source revision containing requirements/build.txt, then retry."
+    fi
+    verify_dependency_pins "$repo_dir"
+}
+
+verify_fetched_candidate() (
+    local candidate_dir
+    candidate_dir=$(mktemp -d "$FORGE_HOME/.install-candidate.XXXXXX") ||
+        fatal "Could not create a temporary candidate directory in '$FORGE_HOME'. Check permissions and disk space, then retry."
+    trap 'rm -rf "$candidate_dir"' EXIT
+
+    # Validate the requested source without changing the existing editable installation.
+    git archive --format=tar --output="$candidate_dir/source.tar" "$1" ||
+        fatal "Could not stage '$FORGE_VERSION' for verification. Resolve the Git error, then retry."
+    mkdir "$candidate_dir/source"
+    tar -xf "$candidate_dir/source.tar" -C "$candidate_dir/source" ||
+        fatal "Could not unpack '$FORGE_VERSION' for verification. Check disk space, then retry."
+    verify_source_candidate "$candidate_dir/source"
+)
+
 install_forge() {
     header "Installing Forge"
     validate_forge_home "install Forge"
@@ -260,8 +283,12 @@ install_forge() {
         fi
         git fetch origin "$FORGE_VERSION" ||
             fatal "Could not fetch '$FORGE_VERSION'. Check the requested branch/tag and repository access, then retry."
-        # Use the fetched revision directly; a local branch may contain unrelated commits.
-        git checkout --detach FETCH_HEAD ||
+        local candidate_commit
+        candidate_commit=$(git rev-parse --verify 'FETCH_HEAD^{commit}') ||
+            fatal "Could not resolve the fetched '$FORGE_VERSION' revision. Resolve the Git error, then retry."
+        verify_fetched_candidate "$candidate_commit"
+        # A later fetch must not change which admitted revision becomes active.
+        git checkout --detach "$candidate_commit" ||
             fatal "Could not check out '$FORGE_VERSION'. Resolve the Git error in '$repo_dir', then retry."
     else
         if [[ -e "$repo_dir" || -L "$repo_dir" ]]; then
@@ -271,15 +298,10 @@ install_forge() {
         git clone --depth 1 --branch "$FORGE_VERSION" "$FORGE_REPO" "$repo_dir" ||
             fatal "Could not clone '$FORGE_VERSION'. Check the requested branch/tag and repository access, then retry."
         cd "$repo_dir"
+        verify_source_candidate "$repo_dir"
     fi
 
     success "Repository ready"
-
-    local build_constraints="$repo_dir/requirements/build.txt"
-    if [[ ! -s "$build_constraints" ]]; then
-        fatal "Reviewed build constraints are missing. Use a source revision containing requirements/build.txt, then retry."
-    fi
-    verify_dependency_pins "$repo_dir"
 
     # Remove package installations that can shadow this checkout only after source validation.
     for pkg in "$FORGE_PACKAGE" "tr-claude-forge" "claude-forge"; do
