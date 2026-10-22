@@ -164,6 +164,12 @@ again because its config location and command bytes changed.
 > [design_installation.md §C](design_installation.md#c-install-model-reference). Multi-scope installation behavior (dual
 > user + project) is documented in [§C.5](design_installation.md#c5-multi-scope-installation-skill-resolution).
 
+Source builds and CI use `uv.lock` plus generated `requirements/build.txt` and `requirements/runtime.txt` exports.
+`scripts/check-dependency-pins.py` rejects export drift; release builds require build-artifact hashes. The source
+installer applies version constraints to global editable installs, refuses missing requested refs and preserves dirty
+checkouts. Ordinary PyPI tool installs still resolve metadata ranges. The exact guarantees and update procedure live in
+[dependency security](developer/dependency_security.md).
+
 ### 5.3 Test Infrastructure (Docker-based)
 
 **Runtime architecture (host-based)**: Proxy runs on host (`subprocess.Popen`), Claude Code runs on host. End users do
@@ -178,6 +184,11 @@ NOT need Docker.
 The shell runner and pytest fixture share a source revision plus dirty-content fingerprint for image reuse. Both check
 the exported image's Claude and Codex startup in a bounded, network-disabled container before tests; a cached build-time
 check is insufficient. See [runtime startup recovery](developer/testing_guidelines.md#docker-runtime-startup-failures).
+
+Default runtime versions come from the pinned QA matrix, shared by the shell runner and pytest fixture. Explicit version
+or `latest` overrides select compatibility testing. The runner passes its prepared image to pytest so a latest run does
+not refresh the base a second time after building the sidecar. Python and uv image inputs are digest-pinned; the native
+Claude installer verifies a repository-pinned checksum before publishing the binary.
 
 **Test workflow**:
 
@@ -370,6 +381,7 @@ variables must be added here and documented in the relevant end-user guide befor
 | `FORGE_SUBPROCESS_TEMPLATE`        | Internal wiring   | Child-process resolved proxy template                                |
 | `FORGE_TEMPLATE`                   | Internal wiring   | Sidecar template metadata                                            |
 | `FORGE_MANUAL_TEST_SYSTEM_PROMPT`  | Test/QA harness   | Manual QA fixture marker                                             |
+| `FORGE_INTEGRATION_PREBUILT_IMAGE` | Test/QA harness   | Runner-prepared runtime image reused by pytest                       |
 | `FORGE_QA_ARTIFACT_MODE`           | Test/QA harness   | Prebuilt release candidate or development-build label                |
 | `FORGE_QA_ANTHROPIC_PROXY`         | Test/QA harness   | QA container proxy fixture                                           |
 | `FORGE_QA_ANTHROPIC_TEMPLATE`      | Test/QA harness   | QA container template fixture                                        |

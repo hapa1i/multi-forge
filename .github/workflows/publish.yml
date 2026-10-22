@@ -8,28 +8,46 @@ on:
 permissions:
   contents: read
 
+env:
+  UV_BUILD_CONSTRAINT: requirements/build.txt
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
 
-      - name: Install build tools
-        run: pip install build
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: '0.9.18'
+          checksum: c2def3db178ade63933fa15ffc96e882c196ce53e06173dcee05b36c5f6f68f5
 
       - name: Build package
-        run: python -m build
+        run: make build
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: dist
-          path: dist/
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          if-no-files-found: error
+
+      - name: Upload dependency constraints
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: dependency-constraints
+          path: |
+            requirements/runtime.txt
+            requirements/build.txt
+          if-no-files-found: error
 
   publish:
     needs: build
@@ -39,10 +57,21 @@ jobs:
       id-token: write
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: dist
           path: dist/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: docker://ghcr.io/pypa/gh-action-pypi-publish@sha256:411241df99067c98b6d08fd8e26d14e86740a22460599c2af571e6dc26e27ffc
+        # Preserve the defaults from reviewed action source 7245906fb61fa33a13554f9d5fb856fe61758086.
+        env:
+          INPUT_USER: __token__
+          INPUT_PASSWORD: ''
+          INPUT_REPOSITORY_URL: https://upload.pypi.org/legacy/
+          INPUT_PACKAGES_DIR: dist
+          INPUT_VERIFY_METADATA: 'true'
+          INPUT_SKIP_EXISTING: 'false'
+          INPUT_VERBOSE: 'true'
+          INPUT_PRINT_HASH: 'true'
+          INPUT_ATTESTATIONS: 'true'

@@ -5,7 +5,7 @@
 #   docker build -f docker/Dockerfile.forge --build-arg CLAUDE_VERSION=2.1.7 \
 #     --build-arg CODEX_VERSION=0.149.0 -t forge-claude-test:2.1.7-codex-0.149.0 .
 #
-# Build with Anthropic's native installer:
+# Build with a checksum-verified native Claude binary:
 #   docker build -f docker/Dockerfile.forge --build-arg INSTALL_METHOD=native -t forge-claude-test:native .
 #
 # Run:
@@ -16,13 +16,15 @@
 # Install methods:
 #   - npm (default): Uses npm install; >= 2.1.112 downloads platform-native binary
 #     via optional deps. Older versions shipped a text cli.js.
-#   - native: Uses Anthropic's install.sh
+#   - native: Downloads a reviewed native binary without a remote shell installer
 
-ARG PYTHON_VERSION=3.12
+ARG PYTHON_IMAGE=python:3.12.15-slim-bookworm@sha256:6a0e06f5ba0b373d051aabd3fffb9b873f27f9a2a3a14bcbe37dee6f0e3bbc70
 ARG INSTALL_METHOD=npm
+ARG CLAUDE_VERSION=2.1.245
+ARG CODEX_VERSION=0.149.1
 
 # Add shared OS dependencies, uv, and CA configuration.
-FROM python:${PYTHON_VERSION}-slim-bookworm AS base
+FROM ${PYTHON_IMAGE} AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
@@ -34,7 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && ln -s /usr/bin/vim.tiny /usr/bin/vim
 
-RUN pip install --no-cache-dir uv
+COPY --from=ghcr.io/astral-sh/uv:0.9.18@sha256:5713fa8217f92b80223bc83aac7db36ec80a84437dbc0d04bbc659cae030d8c9 /uv /uvx /usr/local/bin/
 
 WORKDIR /forge
 
@@ -71,17 +73,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
-# install.sh places Claude in ~/.local/bin.
-RUN curl -fsSL https://claude.ai/install.sh | bash
+ARG CLAUDE_VERSION
+ARG TARGETARCH
+COPY docker/install-claude-native.py /tmp/install-claude-native.py
+RUN python /tmp/install-claude-native.py "${CLAUDE_VERSION}" "${TARGETARCH}" /root/.local/bin/claude \
+    && rm /tmp/install-claude-native.py
 
 ENV PATH="/root/.local/bin:${PATH}"
 
-# Fail the build if the native installer did not create the expected executable.
-RUN test -x /root/.local/bin/claude \
-    || (echo "ERROR: claude executable not found - install.sh may have failed" && exit 1)
-
-# Expose PATH in build logs and verify that Claude is runnable.
-RUN echo "Shell PATH=$PATH" && which claude && claude --version
+RUN test "$(claude --version | cut -d ' ' -f 1)" = "${CLAUDE_VERSION}"
 
 FROM base AS npm-toolchain
 
@@ -94,7 +94,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # >= 2.1.112: downloads platform-native binary via optional deps (no cli.js)
 # <  2.1.112: ships cli.js directly in the package
-ARG CLAUDE_VERSION=latest
+ARG CLAUDE_VERSION
 # Materialize and flush the launcher before snapshotting. A native package
 # hardlink was truncated in an exported layer despite passing --version in-build.
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_VERSION} \
@@ -119,7 +119,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     npm \
     && rm -rf /var/lib/apt/lists/*
 
-ARG CODEX_VERSION=latest
+ARG CODEX_VERSION
 RUN npm install -g @openai/codex@${CODEX_VERSION} \
     && CI=1 claude --version \
     && codex --version
@@ -127,7 +127,9 @@ RUN npm install -g @openai/codex@${CODEX_VERSION} \
 # Copy only manifests first so uv sync is re-run only when deps change.
 # --no-install-project skips the editable project install (needs source tree).
 COPY pyproject.toml uv.lock ./
-RUN uv sync --no-install-project
+COPY requirements/build.txt requirements/runtime.txt ./requirements/
+ENV UV_BUILD_CONSTRAINT=/forge/requirements/build.txt
+RUN uv sync --locked --no-install-project
 
 # Copy package sources needed for editable install. Extensions (skills, agents,
 # commands) are bundled into the wheel via hatch force-include in pyproject.toml,
@@ -139,7 +141,7 @@ COPY src/forge ./src/forge
 COPY src/skills ./src/skills
 COPY src/commands ./src/commands
 COPY src/agents ./src/agents
-RUN uv sync
+RUN uv sync --locked
 
 # Copy the remaining repo content used by tests, extension installers, and
 # container tooling after the editable install layer is cached.

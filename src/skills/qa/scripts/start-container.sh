@@ -512,7 +512,8 @@ prepare_artifact() {
         local artifact_build_dir
         artifact_build_dir="$(mktemp -d "$HOST_STATE_DIR/artifacts/build.XXXXXX")"
         info "Building one development QA wheel in $artifact_build_dir ..."
-        if ! (cd "$REPO_ROOT" && uv build --wheel --out-dir "$artifact_build_dir"); then
+        if ! (cd "$REPO_ROOT" && uv build --wheel --out-dir "$artifact_build_dir" \
+            --build-constraints "$REPO_ROOT/requirements/build.txt" --require-hashes); then
             error "Wheel build failed."
             exit 2
         fi

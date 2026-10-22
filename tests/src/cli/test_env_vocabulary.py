@@ -44,6 +44,7 @@ ENV_CLASSES = {
     "FORGE_SUBPROCESS_TEMPLATE": "internal-wiring",
     "FORGE_TEMPLATE": "internal-wiring",
     "FORGE_MANUAL_TEST_SYSTEM_PROMPT": "test-qa",
+    "FORGE_INTEGRATION_PREBUILT_IMAGE": "test-qa",
     "FORGE_QA_ARTIFACT_MODE": "test-qa",
     "FORGE_QA_ANTHROPIC_PROXY": "test-qa",
     "FORGE_QA_ANTHROPIC_TEMPLATE": "test-qa",

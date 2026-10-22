@@ -27,7 +27,8 @@ def _shell_assignment(source: str, name: str) -> str:
 def test_editable_integration_runners_share_codex_versioned_image_contract() -> None:
     source = INTEGRATION_RUNNER.read_text(encoding="utf-8")
     assert _shell_assignment(source, "IMAGE_NAME") == EXPECTED_SHELL_TAG
-    assert "CODEX_VERSION=\"$(codex --version 2>/dev/null | awk '{print $NF}')\"" in source
+    assert "uv run --locked python tests/fixtures/runtime_versions.py" in source
+    assert "export CLAUDE_VERSION CODEX_VERSION" in source
     assert '--build-arg "CODEX_VERSION=$CODEX_VERSION"' in source
 
 

@@ -1,17 +1,43 @@
 default_stages: [ pre-commit ]
 
 repos:
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v6.0.0
+- repo: local
+  # Python hooks share the project's locked dependencies.
   hooks:
       - id: check-merge-conflict
+        name: check for merge conflicts
+        entry: uv run --locked check-merge-conflict
+        language: system
+        types: [text]
       - id: trailing-whitespace
+        name: trim trailing whitespace
+        entry: uv run --locked trailing-whitespace-fixer
+        language: system
+        types: [text]
+        stages: [pre-commit, pre-push, manual]
+        minimum_pre_commit_version: '3.2.0'
         # Captured native bytes are pinned by their export SHA-256 inventory.
         exclude: ^docs/board/[^/]+/session_delete_and_purge/evidence/native-(companion-)?probe-20261020/container-evidence/
       - id: check-yaml
+        name: check yaml
+        entry: uv run --locked check-yaml
+        language: system
+        types: [yaml]
       - id: check-json
+        name: check json
+        entry: uv run --locked check-json
+        language: system
+        types: [json]
       - id: detect-private-key
+        name: detect private key
+        entry: uv run --locked detect-private-key
+        language: system
+        types: [text]
       - id: pretty-format-json          # Auto-format JSON files
+        name: pretty format json
+        entry: uv run --locked pretty-format-json
+        language: system
+        types: [json]
         exclude: ^docs/board/[^/]+/session_delete_and_purge/evidence/native-(companion-)?probe-20261020/container-evidence/
         args: [
           --autofix,
@@ -21,46 +47,71 @@ repos:
           --top-keys="",                # No keys forced to the top
         ]
       - id: check-shebang-scripts-are-executable
+        name: check that scripts with shebangs are executable
+        entry: uv run --locked check-shebang-scripts-are-executable
+        language: system
+        types: [text]
+        stages: [pre-commit, pre-push, manual]
+        minimum_pre_commit_version: '3.2.0'
       - id: end-of-file-fixer
+        name: fix end of files
+        entry: uv run --locked end-of-file-fixer
+        language: system
+        types: [text]
+        stages: [pre-commit, pre-push, manual]
+        minimum_pre_commit_version: '3.2.0'
         exclude: ^docs/board/[^/]+/session_delete_and_purge/evidence/native-(companion-)?probe-20261020/container-evidence/
       - id: check-added-large-files
+        name: check for added large files
+        entry: uv run --locked check-added-large-files
+        language: system
+        stages: [pre-commit, pre-push, manual]
+        minimum_pre_commit_version: '3.2.0'
 
 - repo: https://github.com/gitleaks/gitleaks
-  rev: v8.30.1
+  rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # v8.30.1
   hooks:                                # Prevent the accidental inclusion of passwords, API keys, and tokens in your commits
     - id: gitleaks                      # defaults to: gitleaks git --pre-commit --redact --staged --verbose
 
-- repo: https://github.com/pycqa/isort
-  rev: 9.0.1
+- repo: local
   hooks:
    - id: isort
+     name: isort
+     entry: uv run --locked isort
+     language: system
+     stages: [pre-commit, pre-merge-commit, pre-push, manual]
+     types_or: [cython, pyi, python]
+     require_serial: true
+     minimum_pre_commit_version: '3.2.0'
      args: ['--profile', 'black']
      exclude: >-
          (?x)^(
          .*__init__\.py$
          )
 
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.16.5
-  hooks:
-    - id: ruff
-      args: ['--fix', '--line-length', '120', '--exclude', '__init__.py']
+   - id: ruff
+     name: ruff (legacy alias)
+     entry: uv run --locked ruff check --force-exclude
+     language: system
+     types_or: [python, pyi, jupyter]
+     require_serial: true
+     minimum_pre_commit_version: '2.9.2'
+     args: ['--fix', '--line-length', '120', '--exclude', '__init__.py']
 
-- repo: https://github.com/psf/black
-  rev: 26.5.1
-  hooks:
-    - id: black
-      name: black
-      entry: black
-      language: python
-      types_or: [python, pyi]
-      args: ["--line-length", "120", "-t", "py310"]
+   - id: black
+     name: black
+     entry: uv run --locked black
+     language: system
+     require_serial: true
+     minimum_pre_commit_version: '2.9.2'
+     types_or: [python, pyi]
+     args: ["--line-length", "120", "-t", "py310"]
 - repo: local
   hooks:
   - id: mypy
     name: mypy
     language: system
-    entry: uv run --frozen mypy
+    entry: uv run --locked mypy
     types: [python]
     require_serial: true
     # Same-named standalone scripts in separate skill directories collide in
@@ -69,7 +120,7 @@ repos:
   - id: pyright
     name: pyright
     language: system
-    entry: uv run --frozen pyright
+    entry: uv run --locked python scripts/run-pyright.py
     types: [python]
     pass_filenames: false
     require_serial: true
@@ -79,6 +130,12 @@ repos:
     entry: ./scripts/check-file-limits.py
     files: \.(md|txt|py|js|ts|rst)$
     require_serial: true
+  - id: dependency-pins
+    name: dependency pins
+    language: system
+    entry: uv run --locked python scripts/check-dependency-pins.py
+    files: ^(pyproject\.toml|uv\.lock|requirements/(runtime|build)\.txt|scripts/check-dependency-pins\.py)$
+    pass_filenames: false
   - id: markdown-links
     name: repository Markdown links
     language: system
@@ -86,13 +143,9 @@ repos:
     files: \.md$
     always_run: true
     require_serial: true
-- repo: https://github.com/hukkin/mdformat
-  rev: 1.0.0
-  hooks:
-    - id: mdformat
-      # Pin plugins so local and CI caches use the same line-wrapping behavior.
-      additional_dependencies:
-        - mdformat-gfm==1.0.0            # GitHub-Flavored Markdown support - see https://github.github.com/gfm
-        - mdformat-gfm-alerts==2.1.0     # GitHub admonitions ([!WARNING], [!NOTE], etc.)
-        - mdformat-simple-breaks==0.1.0  # thematic breaks using three dashes instead of 70 underscores
-        - mdformat-frontmatter==2.1.2    # support for YAML front matter in Markdown files
+  - id: mdformat
+    name: mdformat
+    entry: uv run --locked mdformat
+    language: system
+    types: [markdown]
+    minimum_pre_commit_version: '1.0.0'
