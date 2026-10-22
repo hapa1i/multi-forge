@@ -10,6 +10,25 @@ Older entries are retained verbatim in [2026-08-20](archive/change_log_2026-08-2
 
 ## 2026-10-22
 
+### Pin build and installation inputs
+
+**Goal**: Make Forge-owned build and installation inputs reviewable and refuse unverified source updates.
+
+**Key changes**:
+
+- Derive runtime constraints and hashed build requirements from the lock; pin CI Actions, bootstrap artifacts and Docker
+  defaults.
+- Validate immutable source candidates before changing the active editable installation, and scope build constraints to
+  Forge commands.
+- Document and test hash-verified global wheel installation; add a separate scheduled/manual unconstrained wheel
+  compatibility check. The [dependency security guide](../developer/dependency_security.md) records remaining limits.
+
+**Verification**: [PR #280](https://github.com/hapa1i/multi-forge/pull/280) merged as `50472bee`, matching reviewed head
+`12a033bb`, with all five CI checks passing. Local checks passed 11,151 unit tests, 2,152 regressions, 29 targeted
+Docker tests, full pre-commit, build and clean-wheel checks. The
+[closeout](done/supply_chain_pins/checklist.md#merged-closeout) links the evidence and retains the distinction between
+version constraints and hash verification.
+
 ### Separate session deletion from native purge
 
 **Goal**: Separate Forge-owned session cleanup from explicitly requested removal of native conversation files.

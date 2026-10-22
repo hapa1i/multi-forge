@@ -1,7 +1,7 @@
 # Supply-chain pinning checklist
 
-Current focus: review [PR #280](https://github.com/hapa1i/multi-forge/pull/280) with the verified refusal fixes,
-hash-based wheel recipe and separate consumer-compatibility check.
+Complete: [PR #280](https://github.com/hapa1i/multi-forge/pull/280) merged with the verified refusal fixes, hash-based
+wheel recipe and separate consumer-compatibility check.
 
 ## Implementation
 
@@ -45,4 +45,21 @@ hash-based wheel recipe and separate consumer-compatibility check.
 - [x] Refresh the installation design count after review edits and pass full pre-commit checks.
 - [x] Rerun targeted installer/QA tests and unrelated-project builds against the updated Docker image.
 - [x] Update evidence and remaining limitations for review.
-- [ ] After merge, record closeout, move this card to done and update links.
+- [x] After merge, record closeout, move this card to done and update links.
+
+## Merged closeout
+
+[PR #280](https://github.com/hapa1i/multi-forge/pull/280) merged on 2026-10-22 as `50472bee`, with the same tree as
+reviewed head `12a033bb`. All five CI checks passed: pre-commit, tests, both CodeQL analyses and the CodeQL result.
+
+Local verification passed 11,151 unit tests, 2,152 regression tests, and 29 targeted Docker integration tests across the
+recorded run and recipe rerun. Full pre-commit, `make build`, the clean-wheel checks and the isolated unconstrained
+wheel smoke passed. The [verification record](evidence/verification.md) preserves the commands, scopes and limitations.
+Installation design, end-user guidance and the [dependency security guide](../../../developer/dependency_security.md)
+describe the shipped guarantees and remaining mutable inputs.
+
+The card and evidence moved to `done/`; the change log and installation notes link this closeout. No existing inbound
+links required repointing, and the evidence's relative links keep the same depth.
+
+Closeout verification: `make pre-commit-md` (including Markdown links and repository size limits) and `git diff --check`
+passed. This documentation-only closeout did not repeat the recorded runtime tests or provider calls.

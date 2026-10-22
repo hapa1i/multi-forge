@@ -8,6 +8,18 @@ Durable core, state, extension, hook, and installation decisions.
 
 ## Notes
 
+### Validate immutable candidates before activating editable updates (supply_chain_pins, reviewed 2026-10-22)
+
+- Capture the fetched commit and validate an isolated archive before touching the active editable checkout. Use that
+  same commit for activation: rereading mutable `FETCH_HEAD` can select a different revision after validation.
+- Verify version and hash enforcement for the actual install/build command. Keep Forge build constraints scoped to Forge
+  commands; exporting them image-wide also constrains unrelated projects running inside the image.
+
+Sources: [dependency security guide](../../developer/dependency_security.md),
+[closeout](../done/supply_chain_pins/checklist.md#merged-closeout),
+[verification evidence](../done/supply_chain_pins/evidence/verification.md), and
+[installer regressions](../../../tests/regression/test_bug_setup_version_fallback.py).
+
 ### Validate exported runtime images before integration setup (B3, reviewed 2026-10-11)
 
 - A passing build-time version probe does not prove the exported executable is intact. Check Claude/Codex startup in a

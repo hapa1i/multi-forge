@@ -1,6 +1,7 @@
 # Pin build and installation inputs
 
-**Status**: Doing. Branch `codex/harden-supply-chain`, based on merged `main` at `93b558d2`.
+**Status**: Done. [PR #280](https://github.com/hapa1i/multi-forge/pull/280) merged on 2026-10-22 as `50472bee`. See the
+[merged closeout](checklist.md#merged-closeout). Execution branch: `codex/harden-supply-chain`, based on `93b558d2`.
 
 ## Problem
 
