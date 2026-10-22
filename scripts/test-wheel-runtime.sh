@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SMOKE_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SMOKE_UNCONSTRAINED=false
+if [[ "${1:-}" == "--unconstrained" && "$#" -eq 1 ]]; then
+    SMOKE_UNCONSTRAINED=true
+elif [[ "$#" -ne 0 ]]; then
+    echo "Usage: $0 [--unconstrained]" >&2
+    exit 2
+fi
+
 SMOKE_TEMP_BASE="${TMPDIR:-/tmp}"
 SMOKE_TEMP_BASE="${SMOKE_TEMP_BASE%/}"
 SMOKE_ROOT="$(mktemp -d "${SMOKE_TEMP_BASE}/multi-forge-wheel-smoke.XXXXXX")"
@@ -33,7 +42,8 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$SMOKE_DIST"
-uv build --wheel --out-dir "$SMOKE_DIST"
+uv build "$SMOKE_REPO_ROOT" --wheel --out-dir "$SMOKE_DIST" \
+    --build-constraints "$SMOKE_REPO_ROOT/requirements/build.txt" --require-hashes
 uv venv --python "$SMOKE_PYTHON" "$SMOKE_VENV"
 
 SMOKE_WHEELS=("$SMOKE_DIST"/multi_forge-*.whl)
@@ -42,7 +52,17 @@ if [[ "${#SMOKE_WHEELS[@]}" -ne 1 || ! -f "${SMOKE_WHEELS[0]}" ]]; then
     exit 1
 fi
 
-uv pip install --python "${SMOKE_VENV}/bin/python" "${SMOKE_WHEELS[0]}"
+if [[ "$SMOKE_UNCONSTRAINED" == "true" ]]; then
+    # Consumer resolution must not inherit this checkout's reviewed constraints.
+    env -u UV_BUILD_CONSTRAINT -u UV_CONSTRAINT -u UV_OVERRIDE -u UV_EXCLUDE \
+        -u UV_EXCLUDE_NEWER -u UV_CONFIG_FILE \
+        uv pip install --no-config --python "${SMOKE_VENV}/bin/python" "${SMOKE_WHEELS[0]}"
+else
+    uv export --project "$SMOKE_REPO_ROOT" --locked --no-dev --no-emit-project \
+        --output-file "$SMOKE_ROOT/runtime.txt" >/dev/null
+    uv pip install --no-config --python "${SMOKE_VENV}/bin/python" --require-hashes --no-build -r "$SMOKE_ROOT/runtime.txt"
+    uv pip install --python "${SMOKE_VENV}/bin/python" --no-deps "${SMOKE_WHEELS[0]}"
+fi
 uv pip check --python "${SMOKE_VENV}/bin/python"
 "${SMOKE_VENV}/bin/python" -c '
 from forge.cli.statusline.registry import SEGMENTS

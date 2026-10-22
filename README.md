@@ -137,6 +137,9 @@ forge auth login -c openrouter                        # store OPENROUTER_API_KEY
 forge session start --proxy openrouter-anthropic
 ```
 
+These PyPI installs resolve compatible dependency versions. For a constrained installation from reviewed source or a
+release wheel, see [dependency security](docs/developer/dependency_security.md).
+
 Developing on Forge itself? See [CONTRIBUTING.md](CONTRIBUTING.md) for the editable install.
 
 Once running, try `/smoke-test` (Claude) or `$smoke-test` (Codex) for a read-only health check. `/walkthrough` teaches

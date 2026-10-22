@@ -11,7 +11,7 @@
 #   --purge           With --uninstall: also remove project-local .forge/ dirs
 #   --local           Install from current directory in editable mode (for development)
 #   --no-modify-path  Don't modify shell profile
-#   --version X.Y.Z   Install specific version
+#   --version REF     Install a branch/tag with reviewed dependency pins
 #   --help            Show this help
 
 set -e
@@ -230,6 +230,38 @@ check_prerequisites() {
 
 # Installation
 
+verify_dependency_pins() {
+    local checker="$1/scripts/check-dependency-pins.py"
+    if [[ ! -f "$checker" ]]; then
+        fatal "Dependency pin checker is missing. Use a source revision containing scripts/check-dependency-pins.py, then retry."
+    fi
+    python3 -S "$checker" ||
+        fatal "Dependency pin verification failed. Use a source revision with matching lock and constraint files, then retry."
+}
+
+verify_source_candidate() {
+    local repo_dir="$1"
+    if [[ ! -s "$repo_dir/requirements/build.txt" ]]; then
+        fatal "Reviewed build constraints are missing. Use a source revision containing requirements/build.txt, then retry."
+    fi
+    verify_dependency_pins "$repo_dir"
+}
+
+verify_fetched_candidate() (
+    local candidate_dir
+    candidate_dir=$(mktemp -d "$FORGE_HOME/.install-candidate.XXXXXX") ||
+        fatal "Could not create a temporary candidate directory in '$FORGE_HOME'. Check permissions and disk space, then retry."
+    trap 'rm -rf "$candidate_dir"' EXIT
+
+    # Validate the requested source without changing the existing editable installation.
+    git archive --format=tar --output="$candidate_dir/source.tar" "$1" ||
+        fatal "Could not stage '$FORGE_VERSION' for verification. Resolve the Git error, then retry."
+    mkdir "$candidate_dir/source"
+    tar -xf "$candidate_dir/source.tar" -C "$candidate_dir/source" ||
+        fatal "Could not unpack '$FORGE_VERSION' for verification. Check disk space, then retry."
+    verify_source_candidate "$candidate_dir/source"
+)
+
 install_forge() {
     header "Installing Forge"
     validate_forge_home "install Forge"
@@ -239,7 +271,39 @@ install_forge() {
     mkdir -p "$FORGE_BIN"
     echo "$FORGE_HOME_STAMP" > "$FORGE_HOME/.forge-home"
 
-    # Remove package installations that can shadow this checkout.
+    local repo_dir="$FORGE_HOME/repo"
+    if [[ -d "$repo_dir/.git" ]]; then
+        info "Updating existing installation..."
+        cd "$repo_dir"
+        local dirty_status
+        dirty_status=$(git status --porcelain) ||
+            fatal "Could not inspect '$repo_dir'. Resolve the Git error, then retry installation."
+        if [[ -n "$dirty_status" ]]; then
+            fatal "Existing repository '$repo_dir' has uncommitted changes. Commit or stash them before retrying."
+        fi
+        git fetch origin "$FORGE_VERSION" ||
+            fatal "Could not fetch '$FORGE_VERSION'. Check the requested branch/tag and repository access, then retry."
+        local candidate_commit
+        candidate_commit=$(git rev-parse --verify 'FETCH_HEAD^{commit}') ||
+            fatal "Could not resolve the fetched '$FORGE_VERSION' revision. Resolve the Git error, then retry."
+        verify_fetched_candidate "$candidate_commit"
+        # A later fetch must not change which admitted revision becomes active.
+        git checkout --detach "$candidate_commit" ||
+            fatal "Could not check out '$FORGE_VERSION'. Resolve the Git error in '$repo_dir', then retry."
+    else
+        if [[ -e "$repo_dir" || -L "$repo_dir" ]]; then
+            fatal "Existing path '$repo_dir' is not a Git checkout. Move it aside or choose another FORGE_HOME, then retry."
+        fi
+        info "Cloning Forge repository..."
+        git clone --depth 1 --branch "$FORGE_VERSION" "$FORGE_REPO" "$repo_dir" ||
+            fatal "Could not clone '$FORGE_VERSION'. Check the requested branch/tag and repository access, then retry."
+        cd "$repo_dir"
+        verify_source_candidate "$repo_dir"
+    fi
+
+    success "Repository ready"
+
+    # Remove package installations that can shadow this checkout only after source validation.
     for pkg in "$FORGE_PACKAGE" "tr-claude-forge" "claude-forge"; do
         if _pip show "$pkg" &>/dev/null; then
             warn "Found stale pip install of '$pkg' -- removing to avoid conflicts..."
@@ -253,26 +317,9 @@ install_forge() {
         fi
     done
 
-    local repo_dir="$FORGE_HOME/repo"
-    if [[ -d "$repo_dir/.git" ]]; then
-        info "Updating existing installation..."
-        cd "$repo_dir"
-        git fetch origin
-        git checkout "$FORGE_VERSION"
-        git pull origin "$FORGE_VERSION" 2>/dev/null || true
-    else
-        info "Cloning Forge repository..."
-        rm -rf "$repo_dir"
-        git clone --depth 1 --branch "$FORGE_VERSION" "$FORGE_REPO" "$repo_dir" 2>/dev/null || \
-        git clone --depth 1 "$FORGE_REPO" "$repo_dir"
-        cd "$repo_dir"
-    fi
-
-    success "Repository ready"
-
     info "Installing Python package..."
     cd "$repo_dir"
-    uv sync --quiet
+    uv sync --locked --quiet
 
     success "Package installed"
 
@@ -302,6 +349,13 @@ install_forge_local() {
     local repo_dir="$(pwd)"
     info "Installing from: $repo_dir"
 
+    local runtime_constraints="$repo_dir/requirements/runtime.txt"
+    local build_constraints="$repo_dir/requirements/build.txt"
+    if [[ ! -s "$runtime_constraints" || ! -s "$build_constraints" ]]; then
+        fatal "Reviewed dependency constraints are missing. Use a source revision containing requirements/runtime.txt and requirements/build.txt, then retry."
+    fi
+    verify_dependency_pins "$repo_dir"
+
     # Local installs still use FORGE_HOME for configuration and state.
     mkdir -p "$FORGE_HOME"
     echo "$FORGE_HOME_STAMP" > "$FORGE_HOME/.forge-home"
@@ -329,8 +383,8 @@ install_forge_local() {
     done
 
     # Install the editable source as a uv tool in ~/.local/bin.
-    info "Installing with 'uv tool install -e --force .'..."
-    uv tool install -e --force "."
+    info "Installing editable package with reviewed runtime and build constraints..."
+    uv tool install -e --force --constraints "$runtime_constraints" --build-constraints "$build_constraints" "."
 
     # Verify the uv installation without consulting PATH.
     if uv tool list 2>/dev/null | grep -q "^$FORGE_PACKAGE"; then
@@ -692,7 +746,7 @@ Options:
   --purge             With --uninstall: also remove project-local .forge/ directories
   --yes, -y           Skip interactive confirmations (for scripted use)
   --no-modify-path    Don't modify shell profile
-  --version X.Y.Z     Install specific version/branch
+  --version REF       Install a branch/tag with reviewed dependency pins
   --help              Show this help
 
 Environment Variables:
@@ -703,8 +757,8 @@ Examples:
   # Install latest
   curl -sSL $FORGE_SETUP_URL | bash
 
-  # Install specific version
-  curl -sSL $FORGE_SETUP_URL | bash -s -- --version v1.0.0
+  # Install a reviewed tag that includes dependency constraints
+  curl -sSL $FORGE_SETUP_URL | bash -s -- --version '<reviewed-tag>'
 
   # Development install (from local clone)
   cd multi-forge && ./scripts/setup.sh --local
@@ -741,6 +795,9 @@ main() {
                 shift
                 ;;
             --version)
+                if [[ $# -lt 2 || -z "$2" || "$2" == -* ]]; then
+                    fatal "--version requires a branch or tag (for example: --version main)."
+                fi
                 FORGE_VERSION="$2"
                 shift 2
                 ;;

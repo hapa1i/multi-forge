@@ -10,7 +10,8 @@ import pytest
 pytestmark = pytest.mark.regression
 
 
-def test_failed_backend_start_prints_log_before_cleanup(tmp_path: Path) -> None:
+@pytest.mark.parametrize("arguments", [[], ["--unconstrained"]])
+def test_failed_backend_start_prints_log_before_cleanup(tmp_path: Path, arguments: list[str]) -> None:
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
     smoke_temps = tmp_path / "smoke"
@@ -22,7 +23,8 @@ def test_failed_backend_start_prints_log_before_cleanup(tmp_path: Path) -> None:
             set -eu
             case "$1" in
                 build)
-                    touch "$4/multi_forge-test.whl"
+                    while [[ "$1" != --out-dir ]]; do shift; done
+                    touch "$2/multi_forge-test.whl"
                     ;;
                 venv)
                     mkdir -p "$4/bin"
@@ -53,7 +55,7 @@ def test_failed_backend_start_prints_log_before_cleanup(tmp_path: Path) -> None:
 
     script = Path(__file__).resolve().parents[2] / "scripts" / "test-wheel-runtime.sh"
     result = subprocess.run(
-        ["bash", str(script)],
+        ["bash", str(script), *arguments],
         env={
             **os.environ,
             "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",

@@ -88,7 +88,7 @@ Issues = "https://github.com/hapa1i/multi-forge/issues"
 Documentation = "https://github.com/hapa1i/multi-forge/tree/main/docs"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -154,6 +154,16 @@ disallow_untyped_calls = false
 
 # Security floor for transitive dependencies (Dependabot alerts)
 [tool.uv]
+# uv sync does not consume UV_BUILD_CONSTRAINT; keep its isolated builds pinned too.
+# scripts/check-dependency-pins.py checks this list against the build-group export.
+build-constraint-dependencies = [
+    "hatchling==1.32.4",
+    "packaging==26.3",
+    "pathspec==1.1.1",
+    "pluggy==1.6.0",
+    "tomlkit==0.15.2",
+    "trove-classifiers==2026.9.21.13",
+]
 constraint-dependencies = [
     "filelock>=3.20.3",
     "virtualenv>=21.14.12",
@@ -164,6 +174,13 @@ constraint-dependencies = [
 
 [dependency-groups]
 dev = [
+    "pre-commit-hooks==6.0.0",
+    "isort==9.0.1",
+    "mdformat==1.0.0",
+    "mdformat-gfm==1.0.0",
+    "mdformat-gfm-alerts==2.1.0",
+    "mdformat-simple-breaks==0.1.0",
+    "mdformat-frontmatter==2.1.2",
     "pytest>=9.0.3",
     "pytest-cov>=4.1.0",
     "pytest-asyncio>=0.23.0",
@@ -178,6 +195,7 @@ dev = [
     "types-requests>=2.31.0",
     "httpx2>=2.3.0",
 ]
+build = ["hatchling==1.32.4"]
 provider-check = [
     # scripts/count-tokens.py imports provider-specific count_tokens surfaces;
     # keep lock refreshes inside the API families verified by that script.

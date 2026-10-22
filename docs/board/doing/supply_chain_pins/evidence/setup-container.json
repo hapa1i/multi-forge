@@ -1,0 +1,39 @@
+{
+  "result": "passed",
+  "image": "forge-claude-test:2.1.304-codex-0.163.0",
+  "image_scope": "Pre-existing image; does not verify the new hardened Dockerfile",
+  "uv": "0.13.4",
+  "python": "3.12",
+  "architecture": "aarch64 Linux",
+  "commands": [
+    "scripts/setup.sh --local",
+    "forge extension doctor --json",
+    "forge extension enable --scope user",
+    "forge extension enable",
+    "forge extension status --json"
+  ],
+  "runtime_pins_verified": 85,
+  "install_kind": "editable",
+  "on_path": true,
+  "hook_dispatcher": "current",
+  "runtime_hook_scopes": [
+    "user"
+  ],
+  "double_fire_risk": false,
+  "project_registry": "ok",
+  "enrolled_count": 1,
+  "extension_status_schema": 3,
+  "package_downloads": true,
+  "model_calls": false,
+  "host_home_changed": false,
+  "host_hooks_enabled": false,
+  "disposable_container_removed": true,
+  "source_sha256": {
+    "scripts/setup.sh": "89b9f33864993850cfb9718196c0848a61f236c9e629814309830961e04c9a82",
+    "pyproject.toml": "42e36f5427891af254eeb1742bbb2b9752de40682bb4789b78f0f72d8c177388",
+    "uv.lock": "49d5bb98d31fdc44a5355e4e99ddd180f63d46d8772a9d56179af90227b4a23b",
+    "requirements/runtime.txt": "dbc43eb641eceea1d82e2cfd74b8ecf7ee3c471d6c4aebac35669394980d1f1a",
+    "requirements/build.txt": "355f5d8a3e83ac4cd74a8850af3bce497ce969c54091d4004cea004b3a918811"
+  },
+  "subsequent_edits": "Installer help text only; installer behavior unchanged and all 29 focused installer tests passed afterward."
+}

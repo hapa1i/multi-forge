@@ -37,7 +37,7 @@ regression, pre-commit, and board/link checks on the integrated head before clos
 
 Use `uv` for dependencies and `make` for the standard workflow:
 
-- `uv sync` installs runtime and dev dependencies.
+- `uv sync --locked` installs the reviewed runtime and dev dependencies without changing the lock.
 - `./scripts/setup.sh --local` performs the editable local install used for development.
 - `FORGE_DEV="$PWD" uv run forge session start dev-hooks` launches a managed session whose host hooks use this checkout;
   `FORGE_DEV` must be an absolute root, and the session must be relaunched after changing or unsetting it.
@@ -51,9 +51,9 @@ Use `uv` for dependencies and `make` for the standard workflow:
   temporary `FORGE_HOME` LiteLLM process on port 4001 and removes it on exit, so that port must be free. Set
   `PYTHON_DOTENV_DISABLED=1` for no-`.env` runs; inherited environment variables remain available. If runtime startup
   preflight fails, follow the same-version `--no-cache` rebuild in `docs/developer/testing_guidelines.md`.
-- `./scripts/test-wheel-runtime.sh` builds and installs a clean wheel with dependencies resolved outside `uv.lock`, then
-  smoke-tests packaged LiteLLM start/health/stop; run it when the LiteLLM compatibility ceiling or Forge-owned proxy
-  dependency set changes.
+- `./scripts/test-wheel-runtime.sh` builds a clean wheel with hashed build constraints, installs hash-checked runtime
+  dependencies from `uv.lock`, and smoke-tests packaged LiteLLM start/health/stop. Use `--unconstrained` explicitly to
+  test consumer dependency resolution; see `docs/developer/dependency_security.md` for pin updates.
 - `make test-regression` runs regression tests.
 - `make test` runs the full test suite.
 - `make pre-commit` runs the full hook suite (ruff, black, isort, mypy, pyright, mdformat, gitleaks); run it before

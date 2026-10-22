@@ -50,19 +50,15 @@ if [[ "${PYTHON_DOTENV_DISABLED:-0}" != "1" && -f ".env" ]]; then
     source .env
 fi
 
-if command -v claude &>/dev/null; then
-    CLAUDE_VERSION="$(claude --version 2>/dev/null | awk '{print $1}')"
-fi
-CLAUDE_VERSION="${CLAUDE_VERSION:-latest}"
-if command -v codex &>/dev/null; then
-    CODEX_VERSION="$(codex --version 2>/dev/null | awk '{print $NF}')"
-fi
-CODEX_VERSION="${CODEX_VERSION:-latest}"
+# Share QA defaults with the pytest fixture; host CLI auto-updates must not select builds.
+RUNTIME_VERSIONS="$(uv run --locked python tests/fixtures/runtime_versions.py)"
+IFS=$'\t' read -r CLAUDE_VERSION CODEX_VERSION <<< "$RUNTIME_VERSIONS"
+export CLAUDE_VERSION CODEX_VERSION
 IMAGE_NAME="forge-claude-test:${CLAUDE_VERSION}-codex-${CODEX_VERSION}"
 
 # Match pytest's content fingerprint: a constant '-dirty' suffix can reuse an
 # image built before later uncommitted fixes, including Dockerfile changes.
-FORGE_REV="$(uv run python -c 'from pathlib import Path; from tests.fixtures.docker import _get_forge_revision; print(_get_forge_revision(Path.cwd()))')"
+FORGE_REV="$(uv run --locked python -c 'from pathlib import Path; from tests.fixtures.docker import _get_forge_revision; print(_get_forge_revision(Path.cwd()))')"
 
 if ! command -v docker &> /dev/null; then
     error "Docker command not found. Please install Docker."
@@ -78,7 +74,11 @@ fi
 info "Using Docker image: $IMAGE_NAME (Claude Code $CLAUDE_VERSION, Codex CLI $CODEX_VERSION)"
 
 needs_build=false
-if ! docker image inspect "$IMAGE_NAME" &> /dev/null; then
+BUILD_COMMAND=(docker build)
+if [[ "$CLAUDE_VERSION" == "latest" || "$CODEX_VERSION" == "latest" ]]; then
+    needs_build=true
+    BUILD_COMMAND+=(--pull --no-cache)
+elif ! docker image inspect "$IMAGE_NAME" &> /dev/null; then
     needs_build=true
 else
     image_rev="$(docker image inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE_NAME")" || {
@@ -100,7 +100,7 @@ if [[ "$needs_build" == "true" ]]; then
     fi
 
     info "Building Docker image (this may take a few minutes)..."
-    if ! docker build \
+    if ! "${BUILD_COMMAND[@]}" \
         -f "$DOCKERFILE" \
         --build-arg "CLAUDE_VERSION=$CLAUDE_VERSION" \
         --build-arg "CODEX_VERSION=$CODEX_VERSION" \
@@ -119,10 +119,12 @@ fi
 # Cached toolchain layers can fail at runtime despite a matching source label.
 # Refuse before shared infrastructure or pytest turns that into unrelated failures.
 info "Checking integration runtime startup"
-if ! uv run python tests/fixtures/runtime_image.py "$IMAGE_NAME"; then
+if ! uv run --locked python tests/fixtures/runtime_image.py "$IMAGE_NAME"; then
     error "Integration runtime preflight failed; no tests were run."
     exit 1
 fi
+# The pytest fixture must reuse this run's fresh compatibility image with its sidecar.
+export FORGE_INTEGRATION_PREBUILT_IMAGE="$IMAGE_NAME"
 
 # Build the sidecar image (base + entrypoint) so sidecar integration tests have
 # their prerequisite. Thin layer on the just-built base; the COPY of entrypoint.sh
@@ -147,7 +149,7 @@ cleanup_local_litellm() {
     if [[ -z "$INTEGRATION_LITELLM_HOME" ]]; then
         return
     fi
-    FORGE_HOME="$INTEGRATION_LITELLM_HOME" uv run forge model backend stop litellm-4001 >/dev/null 2>&1 || true
+    FORGE_HOME="$INTEGRATION_LITELLM_HOME" uv run --locked forge model backend stop litellm-4001 >/dev/null 2>&1 || true
     rm -rf "$INTEGRATION_LITELLM_HOME"
 }
 trap cleanup_local_litellm EXIT
@@ -165,9 +167,9 @@ start_local_litellm() {
 
     INTEGRATION_LITELLM_HOME="$(mktemp -d "${TMPDIR:-/tmp}/forge-integration-litellm.XXXXXX")"
     info "Materializing an isolated local LiteLLM config"
-    FORGE_HOME="$INTEGRATION_LITELLM_HOME" uv run forge model backend create litellm
+    FORGE_HOME="$INTEGRATION_LITELLM_HOME" uv run --locked forge model backend create litellm
     info "Starting isolated local LiteLLM on port 4001"
-    FORGE_HOME="$INTEGRATION_LITELLM_HOME" uv run forge model backend start litellm --port 4001
+    FORGE_HOME="$INTEGRATION_LITELLM_HOME" uv run --locked forge model backend start litellm --port 4001
 }
 
 start_local_litellm
@@ -203,4 +205,4 @@ else
     fi
 fi
 
-uv run pytest "${PYTEST_ARGS[@]}"
+uv run --locked pytest "${PYTEST_ARGS[@]}"

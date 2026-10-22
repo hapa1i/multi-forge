@@ -57,6 +57,8 @@ def test_docker_client_timeout_still_removes_the_owned_container(monkeypatch):
 
 @pytest.mark.parametrize("cached", [True, False])
 def test_pytest_image_fixture_rejects_broken_runtime_before_yield(monkeypatch, tmp_path, cached):
+    monkeypatch.delenv("CLAUDE_VERSION", raising=False)
+    monkeypatch.delenv("CODEX_VERSION", raising=False)
     (tmp_path / "docker").mkdir()
     (tmp_path / "docker/Dockerfile.forge").touch()
     monkeypatch.setattr(docker, "_find_repo_root", lambda: tmp_path)
@@ -89,7 +91,9 @@ def test_shell_runner_stops_before_sidecar_or_pytest(tmp_path, cached_revision):
         "docker": 'printf "docker %s\\n" "$*" >> "$CALL_LOG"; if [ "$1" = image ]; then echo "$CACHED_REVISION"; fi',
         "uv": (
             'printf "uv %s\\n" "$*" >> "$CALL_LOG"; '
-            'if [ "$3" = -c ]; then echo exact-dirty-fingerprint; exit 0; fi; '
+            'if [ "$2" != --locked ]; then echo "unlocked uv invocation" >&2; exit 2; fi; '
+            'if [ "$4" = tests/fixtures/runtime_versions.py ]; then printf "2.1.245\\t0.149.1\\n"; exit 0; fi; '
+            'if [ "$4" = -c ]; then echo exact-dirty-fingerprint; exit 0; fi; '
             'echo "Runtime startup failed: exit 135" >&2; exit 1'
         ),
     }
@@ -114,7 +118,7 @@ def test_shell_runner_stops_before_sidecar_or_pytest(tmp_path, cached_revision):
     assert result.returncode == 1
     assert "no tests were run" in result.stderr
     calls = log.read_text()
-    assert "uv run python tests/fixtures/runtime_image.py forge-claude-test:2.1.294-codex-0.162.1" in calls
+    assert "uv run --locked python tests/fixtures/runtime_image.py forge-claude-test:2.1.245-codex-0.149.1" in calls
     assert "_get_forge_revision(Path.cwd())" in calls
     assert ("docker build" in calls) is (cached_revision != "exact-dirty-fingerprint")
-    assert "Dockerfile.sidecar" not in calls and "uv run pytest" not in calls
+    assert "Dockerfile.sidecar" not in calls and "uv run --locked pytest" not in calls

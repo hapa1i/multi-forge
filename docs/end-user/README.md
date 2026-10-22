@@ -38,10 +38,17 @@ first" trap. Host Claude and Codex runtime hooks instead invoke an absolute `<fo
 dispatcher resolves its launcher from `~/.forge/runtime.json` and known user-tool directories, not inherited `PATH`.
 Claude launched from the Dock or an IDE inherits a minimal `PATH` that can still miss bare `forge` consumers --
 `forge extension doctor` reports that fact as `on_path_minimal`. Contributors working on Forge itself use an editable
-install (`uv sync`, then `./scripts/setup.sh --local` for a persistent launcher), or set `FORGE_DEV` when launching a
-managed session to route dispatcher-backed hooks through that checkout. If uv's tool bin is not yet available in the
-current shell, run `export PATH="$(uv tool dir --bin):$PATH"`; `uv tool update-shell` configures future shells. See
-[CONTRIBUTING.md](../../CONTRIBUTING.md).
+install (`uv sync --locked`, then `./scripts/setup.sh --local` for a persistent launcher), or set `FORGE_DEV` when
+launching a managed session to route dispatcher-backed hooks through that checkout. If uv's tool bin is not yet
+available in the current shell, run `export PATH="$(uv tool dir --bin):$PATH"`; `uv tool update-shell` configures future
+shells. See [CONTRIBUTING.md](../../CONTRIBUTING.md).
+
+The ordinary PyPI commands above resolve compatible dependencies at installation time. To use reviewed dependency
+versions, install from a reviewed checkout with `./scripts/setup.sh --local`, or apply that release's constraints when
+installing its wheel. [Dependency security](../developer/dependency_security.md) explains both paths and their limits.
+For artifact verification as well as version pins, follow the
+[hash-verified wheel recipe](../developer/dependency_security.md#hash-verified-wheel-installation). It installs the
+reviewed dependency hashes into a dedicated environment and exposes a persistent global launcher.
 
 ### Upgrading from Pre-OSS Forge
 
