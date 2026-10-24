@@ -286,13 +286,36 @@ explicit alternatives, with `fable` and `claude-fable` selecting Fable 5.1.
 
 The existing OpenRouter family templates also expose these explicit alternatives without changing their tier defaults:
 
-| Template              | New alternatives                              |
-| --------------------- | --------------------------------------------- |
-| `openrouter-deepseek` | `deepseek-v4.1-flash`, `deepseek-v4-pro-0813` |
-| `openrouter-qwen`     | `qwen3.8-flash`, `qwen3.8-max-0902`           |
-| `openrouter-glm`      | `glm-5.3-flash`, `glm-5.3-flashx`             |
+| Template              | New alternatives                                                          |
+| --------------------- | ------------------------------------------------------------------------- |
+| `openrouter-deepseek` | `deepseek-v4.1-flash-1017`, `deepseek-v4.1-flash`, `deepseek-v4-pro-0813` |
+| `openrouter-kimi`     | `kimi-k3.1-pro`                                                           |
+| `openrouter-minimax`  | `minimax-m3.1-flash`                                                      |
+| `openrouter-qwen`     | `qwen3.8-flash`, `qwen3.8-max-0902`                                       |
+| `openrouter-glm`      | `glm-5.3-flash`, `glm-5.3-flashx`                                         |
 
 The dated Qwen Max entry preserves the explicit snapshot identity; `qwen3.8-max` remains separately selectable.
+
+Kimi K3.1 Pro, MiniMax M3.1 Flash, and DeepSeek V4.1 Flash 1017 are also explicit workflow workers. All three support
+image input and a 1,048,576-token context through OpenRouter. Kimi uses `low`, `high`, or `max` reasoning and filters
+temperature, top-p, and top-k. Use `auto` or `none` tool choice for this route; Forge conservatively rejects forced
+choices because the endpoint does not support forcing a named tool. MiniMax M3.1 Flash adds `low`, `medium`, `high`,
+`xhigh`, and `max` effort controls; MiniMax M3 retains its existing behavior. DeepSeek's dated snapshot has its own
+identity and supports `low`, `high`, and `max` effort.
+
+```bash
+forge proxy create openrouter-kimi
+forge session start kimi-review --proxy openrouter-kimi --model kimi-k3.1-pro --model-tier sonnet
+forge workflow panel -p "Review the current diff" --context blind \
+  -m kimi-k3.1-pro,minimax-m3.1-flash,deepseek-v4.1-flash-1017
+```
+
+These are translated OpenRouter routes. Tool calls and tool results are retained, but Forge's translated Messages path
+does not return or replay provider reasoning blocks. This differs from Kimi's native history-preservation
+recommendation; start a new session when switching models. The additions do not change family defaults or the default
+workflow quorum. Existing snapshots need the new `model_alternatives` entries copied from
+`forge proxy template show <template>` via `forge proxy edit <proxy_id>`, or recreation from the template, before
+canonical model selection can use them. Restart after editing; a restart alone does not update the saved snapshot.
 
 Qwen3.8 27B is now both the Haiku and Sonnet default because it was the least-expensive multimodal Qwen with a ZDR
 endpoint in the audit. Qwen3.8 Max is the configured Opus model, but the default OpenRouter data policy resolves it to

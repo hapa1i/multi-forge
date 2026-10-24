@@ -89,6 +89,36 @@ def _read_capture_files(workspace: ContainerLike, glob_expr: str) -> list[str]:
 
 
 class TestRunMultiReviewE2E:
+    def test_october_workers_keep_exact_models_on_a_shared_proxy(self, mock_claude_workspace: ContainerLike) -> None:
+        _write_proxy_registry(
+            mock_claude_workspace,
+            proxy_id="openrouter-kimi",
+            base_url="http://127.0.0.1:4001",
+            port=4001,
+        )
+        models = {
+            "kimi-k3.1-pro": "moonshotai/kimi-k3.1-pro",
+            "minimax-m3.1-flash": "minimax/minimax-m3.1-flash",
+            "deepseek-v4.1-flash-1017": "deepseek/deepseek-v4.1-flash-1017",
+        }
+
+        result = mock_claude_workspace.exec(
+            f"cd /workspace && forge workflow panel --models {','.join(models)} "
+            "--proxy openrouter-kimi --context blind -p 'ping' --timeout 5 --json",
+            timeout=30,
+        )
+
+        assert result.returncode == 0, result.stderr
+        data = json.loads(result.stdout)
+        assert set(data["results"]) == set(models)
+        assert data["successful"] == 3
+        _assert_invocation_count(mock_claude_workspace, 3)
+        invocations = mock_claude_workspace.read_file("/tmp/claude_invocations.log")
+        for slug in models.values():
+            assert f"--model {slug}" in invocations
+        for env_text in _read_capture_files(mock_claude_workspace, "/tmp/claude_env_*.log"):
+            assert "ANTHROPIC_BASE_URL=http://127.0.0.1:4001" in env_text
+
     def test_sets_anthropic_base_url_from_registry(
         self,
         mock_claude_workspace: ContainerLike,

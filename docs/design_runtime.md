@@ -646,6 +646,15 @@ Pricing belongs to backend configuration, outside the intrinsic catalog. Sonnet 
 prevents LiteLLM from silently deleting invalid `disabled` requests and enabling adaptive thinking; native validation
 rejects them and directs callers to `between_tools`.
 
+Kimi K3.1 Pro, MiniMax M3.1 Flash, and DeepSeek V4.1 Flash 1017 are explicit OpenRouter alternatives and workflow
+workers. Their family defaults and the default workflow quorum remain unchanged. All three use implicit prompt caching
+and support image input. Kimi filters sampling controls and admits only `low`, `high`, and `max` reasoning; named forced
+tools are unsupported, so Forge's coarse forced-tool capability rejects both forced forms. MiniMax M3.1 Flash exposes
+effort controls independently of M3. The DeepSeek dated snapshot does not retarget the undated alias. Translated
+Messages preserve tool exchanges but omit provider reasoning history; these additions do not claim native reasoning
+continuity. Saved proxy files remain unchanged and need explicit alternative entries for session model selection;
+workflow provider refs can use an existing OpenRouter proxy.
+
 The model route catalog is separate **authoritative operational data**:
 
 - Location: `src/forge/core/data/model_routes.yaml`
