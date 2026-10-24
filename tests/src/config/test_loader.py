@@ -1241,11 +1241,13 @@ class TestTemplateResolution:
         kimi = load_config(template="openrouter-kimi")
         assert kimi.proxy.openrouter.model_alternatives == {
             "sonnet": {
+                "kimi-k3.1-pro": "moonshotai/kimi-k3.1-pro",
                 "kimi-k2.7-code": "moonshotai/kimi-k2.7-code",
                 "kimi-k2.6": "moonshotai/kimi-k2.6",
                 "kimi-k2.5": "moonshotai/kimi-k2.5",
             },
             "opus": {
+                "kimi-k3.1-pro": "moonshotai/kimi-k3.1-pro",
                 "kimi-k2.7-code": "moonshotai/kimi-k2.7-code",
                 "kimi-k2.6": "moonshotai/kimi-k2.6",
                 "kimi-k2.5": "moonshotai/kimi-k2.5",
@@ -1258,10 +1260,12 @@ class TestTemplateResolution:
         minimax = load_config(template="openrouter-minimax")
         assert minimax.proxy.openrouter.model_alternatives == {
             "sonnet": {
+                "minimax-m3.1-flash": "minimax/minimax-m3.1-flash",
                 "minimax-m2.7": "minimax/minimax-m2.7",
                 "minimax-m2.5": "minimax/minimax-m2.5",
             },
             "opus": {
+                "minimax-m3.1-flash": "minimax/minimax-m3.1-flash",
                 "minimax-m2.7": "minimax/minimax-m2.7",
                 "minimax-m2.5": "minimax/minimax-m2.5",
             },

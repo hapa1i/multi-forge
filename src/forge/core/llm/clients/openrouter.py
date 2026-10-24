@@ -92,7 +92,7 @@ class OpenRouterClient:
         ``verbosity``, passed via ``extra_body`` since the OpenAI SDK does not
         accept them as direct kwargs.
         """
-        extra_body: dict[str, Any] = kwargs.pop("extra_body", None) or {}
+        extra_body: dict[str, Any] = dict(kwargs.pop("extra_body", None) or {})
         effort = kwargs.pop("reasoning_effort", None)
         if effort is not None:
             extra_body["reasoning"] = {"effort": effort}

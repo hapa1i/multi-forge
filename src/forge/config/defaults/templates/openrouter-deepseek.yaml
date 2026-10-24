@@ -19,11 +19,14 @@ proxy:
       opus: deepseek/deepseek-v4-pro
     model_alternatives:
       haiku:
+        deepseek-v4.1-flash-1017: deepseek/deepseek-v4.1-flash-1017
         deepseek-v4.1-flash: deepseek/deepseek-v4.1-flash
       sonnet:
+        deepseek-v4.1-flash-1017: deepseek/deepseek-v4.1-flash-1017
         deepseek-v4.1-flash: deepseek/deepseek-v4.1-flash
         deepseek-v4-pro-0813: deepseek/deepseek-v4-pro-0813
       opus:
+        deepseek-v4.1-flash-1017: deepseek/deepseek-v4.1-flash-1017
         deepseek-v4.1-flash: deepseek/deepseek-v4.1-flash
         deepseek-v4-pro-0813: deepseek/deepseek-v4-pro-0813
     tier_overrides:
