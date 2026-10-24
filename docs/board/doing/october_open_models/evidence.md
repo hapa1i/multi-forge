@@ -34,21 +34,20 @@ Request-capture tests found that OpenRouter's parameter translator mutated a cal
 reasoning and verbosity from one request to leak into another. The translator now copies that mapping; a regression
 checks the next request as well as the original settings.
 
-All runs use `PYTHON_DOTENV_DISABLED=1`. Live tests resolve the existing OpenRouter credential and pass it only through
-the child environment; test proxies and configuration snapshots use temporary Forge homes.
+All test runs use `PYTHON_DOTENV_DISABLED=1`. Live tests resolve the existing OpenRouter credential and pass it only
+through the child environment; test proxies and configuration snapshots use temporary Forge homes.
 
-| Check                                                    | Result                                                |
-| -------------------------------------------------------- | ----------------------------------------------------- |
-| Focused catalog, SDK, routing, and regression tests      | 551 passed                                            |
-| Final focused tests after test organization/formatting   | 189 passed                                            |
-| Configuration loader tests after alternative-list update | 89 passed                                             |
-| Live proxy and existing Docker workflow integration      | 18 passed                                             |
-| Snapshot and new three-worker Docker integration         | 4 passed                                              |
-| `forge workflow list-models --available --json`          | All three ready                                       |
-| `make build`                                             | Wheel and sdist built                                 |
-| `./scripts/test-wheel-runtime.sh`                        | Clean install and LiteLLM lifecycle passed            |
-| Clean wheel model checks outside checkout                | All three catalogs, routes, templates, workers passed |
-| `make pre-commit`                                        | Passed; refreshed proxy-guide token cache             |
+| Check                                               | Result                                                |
+| --------------------------------------------------- | ----------------------------------------------------- |
+| `make test-unit`                                    | 11,170 passed; 120 integration tests deselected       |
+| `make test-regression`                              | 2,154 passed                                          |
+| Live proxy and existing Docker workflow integration | 18 passed                                             |
+| Snapshot and new three-worker Docker integration    | 4 passed                                              |
+| `forge workflow list-models --available --json`     | All three ready                                       |
+| `make build`                                        | Wheel and sdist built                                 |
+| `./scripts/test-wheel-runtime.sh`                   | Clean install and LiteLLM lifecycle passed            |
+| Clean wheel model checks outside checkout           | All three catalogs, routes, templates, workers passed |
+| `make pre-commit`                                   | Passed; refreshed proxy-guide token cache             |
 
 The live integration file exercises each model with streaming and unary tool calls, then replays the returned tool block
 with a tool result. All six cases passed with ZDR required and nonzero usage. The shared OpenRouter SDK tests cover
@@ -63,5 +62,5 @@ Reproduce the integration selections with:
   tests/integration/cli/test_workflow_integration.py::TestRunMultiReviewE2E::test_october_workers_keep_exact_models_on_a_shared_proxy -q
 ```
 
-The first full unit run passed 11,172 tests and exposed one stale expected-alternatives list, now updated. The complete
-unit rerun and regression suite are still pending. Initial formatting and token-cache failures were corrected.
+The initial unit run exposed a stale expected-alternatives list. After updating it, all 89 configuration-loader tests
+and the complete unit rerun passed. Initial formatting and token-cache failures were also corrected.

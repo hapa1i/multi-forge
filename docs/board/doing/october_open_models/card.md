@@ -3,6 +3,8 @@
 **Status**: Doing, 2026-10-24. One PR requested for Kimi K3.1 Pro, MiniMax M3.1 Flash, and DeepSeek V4.1 Flash 1017.
 Branch: `codex/october-open-models`, based on `529be2aa` (`origin/main`).
 
+**PR**: [#281](https://github.com/hapa1i/multi-forge/pull/281). Implementation verified; awaiting review and merge.
+
 ## Scope
 
 Add explicit catalog identities, OpenRouter routes, family-template alternatives, and workflow workers for:
