@@ -22,7 +22,9 @@ OPENAI_DEFAULT = get_compact_name(get_default_model("openai", "opus"))
 pytestmark = [pytest.mark.integration, pytest.mark.docker_in]
 
 
-def _write_proxy_registry(workspace: ContainerLike, *, proxy_id: str, base_url: str, port: int) -> None:
+def _write_proxy_registry(
+    workspace: ContainerLike, request: pytest.FixtureRequest, *, proxy_id: str, base_url: str, port: int
+) -> None:
     workspace.mkdir("$HOME/.forge/proxies", parents=True)
     workspace.write_json(
         "$HOME/.forge/proxies/index.json",
@@ -40,10 +42,12 @@ def _write_proxy_registry(workspace: ContainerLike, *, proxy_id: str, base_url: 
             },
         },
     )
-    _start_proxy_health_stub(workspace, proxy_id=proxy_id, port=port)
+    _start_proxy_health_stub(workspace, request, proxy_id=proxy_id, port=port)
 
 
-def _start_proxy_health_stub(workspace: ContainerLike, *, proxy_id: str, port: int) -> None:
+def _start_proxy_health_stub(
+    workspace: ContainerLike, request: pytest.FixtureRequest, *, proxy_id: str, port: int
+) -> None:
     """Start a minimal HTTP stub that responds to proxy health checks.
 
     check_proxy_reachable() does an HTTP GET to the proxy base_url to verify
@@ -64,10 +68,13 @@ class H(http.server.BaseHTTPRequestHandler):
 http.server.HTTPServer(("127.0.0.1", {port}), H).serve_forever()
 """,
     )
+    started = workspace.exec("nohup python3 /tmp/health_stub.py > /dev/null 2>&1 & echo $!")
+    assert started.returncode == 0, started.stderr
+    pid = int(started.stdout.strip())
+    # A different model family can use this same port in the next test.
+    request.addfinalizer(lambda: workspace.exec(f"kill {pid} 2>/dev/null || true"))
     result = workspace.exec(
-        "nohup python3 /tmp/health_stub.py > /dev/null 2>&1 & "
-        "sleep 0.5 && "
-        f"curl -sf http://127.0.0.1:{port}/ > /dev/null",
+        f"sleep 0.5 && kill -0 {pid} && curl -sf http://127.0.0.1:{port}/ > /dev/null",
         timeout=10,
     )
     assert result.returncode == 0, f"Health stub not responding on port {port}: {result.stderr}"
@@ -89,9 +96,12 @@ def _read_capture_files(workspace: ContainerLike, glob_expr: str) -> list[str]:
 
 
 class TestRunMultiReviewE2E:
-    def test_october_workers_keep_exact_models_on_a_shared_proxy(self, mock_claude_workspace: ContainerLike) -> None:
+    def test_october_workers_keep_exact_models_on_a_shared_proxy(
+        self, mock_claude_workspace: ContainerLike, request: pytest.FixtureRequest
+    ) -> None:
         _write_proxy_registry(
             mock_claude_workspace,
+            request,
             proxy_id="openrouter-kimi",
             base_url="http://127.0.0.1:4001",
             port=4001,
@@ -103,7 +113,7 @@ class TestRunMultiReviewE2E:
         }
 
         result = mock_claude_workspace.exec(
-            f"cd /workspace && forge workflow panel --models {','.join(models)} "
+            f"cd /workspace && PYTHON_DOTENV_DISABLED=1 forge workflow panel --models {','.join(models)} "
             "--proxy openrouter-kimi --context blind -p 'ping' --timeout 5 --json",
             timeout=30,
         )
@@ -123,16 +133,19 @@ class TestRunMultiReviewE2E:
         self,
         mock_claude_workspace: ContainerLike,
         claude_capture_file: Callable[[str], str],
+        request: pytest.FixtureRequest,
     ) -> None:
         _write_proxy_registry(
             mock_claude_workspace,
+            request,
             proxy_id="openrouter-openai",
             base_url="http://127.0.0.1:4001",
             port=4001,
         )
 
         result = mock_claude_workspace.exec(
-            f"cd /workspace && forge workflow panel --models {OPENAI_DEFAULT} -p 'ping' --timeout 5 --json",
+            f"cd /workspace && PYTHON_DOTENV_DISABLED=1 forge workflow panel "
+            f"--models {OPENAI_DEFAULT} -p 'ping' --timeout 5 --json",
             timeout=30,
         )
         assert result.returncode == 0, result.stderr
@@ -146,16 +159,20 @@ class TestRunMultiReviewE2E:
         assert "ANTHROPIC_BASE_URL=http://127.0.0.1:4001" in env_text
         assert "FORGE_DEPTH=1" in env_text
 
-    def test_context_resume_adds_resume_flag(self, mock_claude_workspace: ContainerLike) -> None:
+    def test_context_resume_adds_resume_flag(
+        self, mock_claude_workspace: ContainerLike, request: pytest.FixtureRequest
+    ) -> None:
         _write_proxy_registry(
             mock_claude_workspace,
+            request,
             proxy_id="openrouter-openai",
             base_url="http://127.0.0.1:4001",
             port=4001,
         )
 
         result = mock_claude_workspace.exec(
-            f"cd /workspace && forge workflow panel --models {OPENAI_DEFAULT} --context resume:abc-123 -p 'ping' --timeout 5",
+            f"cd /workspace && PYTHON_DOTENV_DISABLED=1 forge workflow panel "
+            f"--models {OPENAI_DEFAULT} --context resume:abc-123 -p 'ping' --timeout 5",
             timeout=30,
         )
         assert result.returncode == 0, result.stderr
@@ -314,16 +331,19 @@ class TestRunPanelCodeE2E:
         self,
         mock_claude_workspace: ContainerLike,
         claude_capture_file: Callable[[str], str],
+        request: pytest.FixtureRequest,
     ) -> None:
         _write_proxy_registry(
             mock_claude_workspace,
+            request,
             proxy_id="openrouter-openai",
             base_url="http://127.0.0.1:4001",
             port=4001,
         )
 
         result = mock_claude_workspace.exec(
-            f"cd /workspace && forge workflow panel src/ --code --models {OPENAI_DEFAULT} --timeout 5 --json",
+            f"cd /workspace && PYTHON_DOTENV_DISABLED=1 forge workflow panel "
+            f"src/ --code --models {OPENAI_DEFAULT} --timeout 5 --json",
             timeout=30,
         )
         assert result.returncode == 0, result.stderr
