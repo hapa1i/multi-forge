@@ -40,6 +40,7 @@ def test_skip_hydration_after_dotenv_and_remove_competing_routes(personal_login,
         "CLAUDE_CODE_USE_FOUNDRY",
         "FORGE_SUBPROCESS_PROXY",
         "FORGE_SUBPROCESS_BASE_URL",
+        "FORGE_REVIEWER_API_KEY_HELPER",
         "HTTPS_PROXY",
         "NODE_OPTIONS",
     }

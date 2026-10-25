@@ -29,6 +29,7 @@ ENV_CLASSES = {
     "FORGE_PARENT_SESSION": "internal-wiring",
     "FORGE_PROXY_ID": "internal-wiring",
     "FORGE_PROXY_WIRE_SHAPE": "internal-wiring",
+    "FORGE_REVIEWER_API_KEY_HELPER": "internal-wiring",
     "FORGE_ROOT_RUN_ID": "internal-wiring",
     "FORGE_RUN_ID": "internal-wiring",
     "FORGE_SESSION": "internal-wiring",

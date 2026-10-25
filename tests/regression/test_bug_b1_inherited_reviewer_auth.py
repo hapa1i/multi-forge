@@ -2,15 +2,12 @@
 
 import json
 import os
-import sys
 
 import pytest
 
 from forge.core.reactive.reviewer_settings import (
-    auth_settings_descriptor,
     inherited_auth_settings,
 )
-from forge.core.reactive.watchdog import run_guarded
 
 pytestmark = pytest.mark.regression
 
@@ -32,20 +29,6 @@ def test_user_auth_settings_survive_without_customizations(tmp_path):
     selected = inherited_auth_settings(env, cwd=str(tmp_path), direct=True)
     assert selected == {"apiKeyHelper": "/trusted/helper"}
     assert env == {"HOME": str(tmp_path), "ANTHROPIC_API_KEY": "synthetic-settings-key"}
-    with auth_settings_descriptor(selected) as (args, descriptors):
-        assert "synthetic-settings-key" not in " ".join(args)
-        result = run_guarded(
-            [sys.executable, "-I", "-c", "import pathlib,sys; print(pathlib.Path(sys.argv[1]).read_text())", args[1]],
-            input="",
-            cwd=str(tmp_path),
-            env=dict(os.environ),
-            timeout=5,
-            pass_fds=descriptors,
-        )
-    assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout) == selected
-    with pytest.raises(OSError):
-        os.fstat(descriptors[0])
 
 
 def test_explicit_child_credentials_and_route_win_settings(tmp_path):

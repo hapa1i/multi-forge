@@ -368,6 +368,7 @@ variables must be added here and documented in the relevant end-user guide befor
 | `FORGE_PARENT_SESSION`             | Internal wiring   | Fork/relaunch lineage metadata                                       |
 | `FORGE_PROXY_ID`                   | Internal wiring   | Sidecar/proxy runtime identity                                       |
 | `FORGE_PROXY_WIRE_SHAPE`           | Internal wiring   | Proxy wire-shape metadata propagated to children                     |
+| `FORGE_REVIEWER_API_KEY_HELPER`    | Internal wiring   | Trusted helper command projected into the reviewer environment       |
 | `FORGE_ROOT_RUN_ID`                | Internal wiring   | Run-tree attribution root id                                         |
 | `FORGE_RUN_ID`                     | Internal wiring   | Run-tree attribution id                                              |
 | `FORGE_SESSION`                    | Internal wiring   | Launcher-provided session identity for hooks/status/session tooling  |
