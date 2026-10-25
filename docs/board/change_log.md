@@ -8,6 +8,27 @@ Older entries are retained verbatim in [2026-08-20](archive/change_log_2026-08-2
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-25
+
+### Add the October open-model shortlist
+
+**Goal**: Support Kimi K3.1 Pro, MiniMax M3.1 Flash, and DeepSeek V4.1 Flash 1017 as explicit model choices.
+
+**Key changes**:
+
+- Add catalog entries, OpenRouter routes, template alternatives, and workflow workers while preserving existing defaults
+  and saved proxy snapshots.
+- Apply model-specific reasoning, sampling, and tool-choice constraints; document translated reasoning-history limits
+  and add release QA coverage.
+- Prevent OpenRouter request extras from leaking across requests, clean up workflow test health stubs, and restore
+  inherited reviewer helpers on supported Claude versions that reject anonymous settings paths.
+
+**Verification**: [PR #281](https://github.com/hapa1i/multi-forge/pull/281) merged as `30ad379b`, matching reviewed head
+`d1edbed9`, with both CI workflows passing. Local verification includes six live tool round trips, 2,158 regressions, 16
+workflow/auth integration cases, full pre-commit, build and clean-wheel checks. The
+[closeout](done/october_open_models/checklist.md#merged-closeout) preserves the evidence and corrected local
+unit-inventory failure; proxy-guide size cleanup remains a separate proposal.
+
 ## 2026-10-22
 
 ### Pin build and installation inputs

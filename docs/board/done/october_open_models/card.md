@@ -1,9 +1,10 @@
 # Add the October open-model shortlist
 
-**Status**: Doing, 2026-10-24. One PR requested for Kimi K3.1 Pro, MiniMax M3.1 Flash, and DeepSeek V4.1 Flash 1017.
-Branch: `codex/october-open-models`, based on `529be2aa` (`origin/main`).
+**Status**: Done, 2026-10-25. Kimi K3.1 Pro, MiniMax M3.1 Flash, and DeepSeek V4.1 Flash 1017 shipped together.
+Execution branch: `codex/october-open-models`, based on `529be2aa`.
 
-**PR**: [#281](https://github.com/hapa1i/multi-forge/pull/281). Implementation verified; awaiting review and merge.
+**PR**: [#281](https://github.com/hapa1i/multi-forge/pull/281), merged as `30ad379b`. The merged tree matches reviewed
+head `d1edbed9`; both CI workflows passed. See the [merged closeout](checklist.md#merged-closeout).
 
 ## Scope
 
