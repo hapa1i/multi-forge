@@ -36,6 +36,12 @@ load_dotenv(_repo_root / ".env", override=False)
 # File-level mark for ALL tests in integration/proxy/
 pytestmark = pytest.mark.integration
 
+_OCTOBER_MODELS = [
+    ("kimi", "kimi-k3.1-pro", "moonshotai/kimi-k3.1-pro"),
+    ("minimax", "minimax-m3.1-flash", "minimax/minimax-m3.1-flash"),
+    ("deepseek", "deepseek-v4.1-flash-1017", "deepseek/deepseek-v4.1-flash-1017"),
+]
+
 
 @dataclass(frozen=True)
 class RegisteredProxyServer:
@@ -955,6 +961,21 @@ def _openrouter_family_proxy(
         yield proxy_base_url
     finally:
         kill_process(proc.pid)
+
+
+@pytest.fixture(scope="module", params=_OCTOBER_MODELS, ids=[model for _, model, _ in _OCTOBER_MODELS])
+def october_proxy(
+    request: pytest.FixtureRequest, module_forge_home: Path, tmp_path_factory: pytest.TempPathFactory
+) -> Generator[tuple[str, str, str], None, None]:
+    family, model, slug = request.param
+    for base_url in _openrouter_family_proxy(
+        f"openrouter-{family}",
+        module_forge_home,
+        tmp_path_factory,
+        "October model proxy unreachable",
+        preflight=False,
+    ):
+        yield base_url, model, slug
 
 
 @pytest.fixture(scope="module")

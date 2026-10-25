@@ -68,10 +68,11 @@ compatible proxy found in the registry will work.
 Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, `claude-opus-4.8`, `claude-opus-5`,
 `claude-opus-5.5`, and `claude-fable` (most capable, currently Fable 5.1). Other family defaults include
 `deepseek-v4-pro`, `minimax-m3`, `qwen3.8-max`, `kimi-k3`, and `glm-5.3`; explicit alternatives now include
-`deepseek-v4.1-flash`, `deepseek-v4-pro-0813`, `qwen3.8-flash`, `qwen3.8-max-0902`, `glm-5.3-flash`, and
-`glm-5.3-flashx`. Under the default OpenRouter policy, both Qwen3.8 Max entries dispatch the text-only Qwen3.8 2.4T A95B
-fallback, while Qwen3.8 Flash dispatches Qwen3.8 27B; see [OpenRouter ZDR](proxy.md#openrouter-zero-data-retention-zdr)
-before reviewing image-bearing targets. Use `--proxy` to route proxy-backed workers through a specific proxy:
+`kimi-k3.1-pro`, `minimax-m3.1-flash`, `deepseek-v4.1-flash-1017`, `deepseek-v4.1-flash`, `deepseek-v4-pro-0813`,
+`qwen3.8-flash`, `qwen3.8-max-0902`, `glm-5.3-flash`, and `glm-5.3-flashx`. Under the default OpenRouter policy, both
+Qwen3.8 Max entries dispatch the text-only Qwen3.8 2.4T A95B fallback, while Qwen3.8 Flash dispatches Qwen3.8 27B; see
+[OpenRouter ZDR](proxy.md#openrouter-zero-data-retention-zdr) before reviewing image-bearing targets. Use `--proxy` to
+route proxy-backed workers through a specific proxy:
 
 ```bash
 # Route all workers through one proxy (single OPENROUTER_API_KEY setup)

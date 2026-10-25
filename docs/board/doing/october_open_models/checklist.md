@@ -10,7 +10,12 @@ Current focus: review and merge of [PR #281](https://github.com/hapa1i/multi-for
 - [x] Update model selection and runtime documentation.
 - [x] Run applicable unit, regression, integration, pre-commit, and clean-wheel checks.
 - [x] Review the complete diff and open the single PR.
+- [x] Address review feedback on worker docs, release QA, capability coverage, and fixture ownership; rerun affected
+  checks.
 - [ ] After merge, record closeout and move the card to done.
+
+Guide-size cleanup is tracked separately in the
+[proxy model guidance partition proposal](../../proposed/proxy_model_guidance_partition/card.md).
 
 | Fixture / path                         | Acceptance                                             |
 | -------------------------------------- | ------------------------------------------------------ |

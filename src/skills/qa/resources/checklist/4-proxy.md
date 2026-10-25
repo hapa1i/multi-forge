@@ -461,11 +461,14 @@ forge proxy template show openrouter-qwen
 - [ ] Anthropic templates retain explicit `claude-opus-5` alternatives while unversioned Opus selects 5.5
 - [ ] `openrouter-deepseek` maps tiers to DeepSeek models (haiku=deepseek-v4-flash, sonnet/opus=deepseek-v4-pro)
 - [ ] `openrouter-deepseek` exposes `deepseek-v4.1-flash` and `deepseek-v4-pro-0813` alternatives
+- [ ] `openrouter-deepseek` exposes the distinct `deepseek-v4.1-flash-1017` alternative on all three tiers
 - [ ] `openrouter-glm` maps tiers to GLM models (haiku=glm-4.7-flash, sonnet/opus=glm-5.3)
 - [ ] `openrouter-glm` exposes `glm-5.3-flash` and `glm-5.3-flashx` alternatives
 - [ ] `openrouter-kimi` maps tiers to Gemma/Kimi models (haiku=gemma-4-31b-it, sonnet/opus=kimi-k3)
 - [ ] `openrouter-kimi` exposes `kimi-k2.7-code` as a sonnet/opus model alternative
+- [ ] `openrouter-kimi` exposes `kimi-k3.1-pro` as a sonnet/opus model alternative
 - [ ] `openrouter-minimax` maps tiers to Gemma/MiniMax models (haiku=gemma-4-31b-it, sonnet/opus=minimax-m3)
+- [ ] `openrouter-minimax` exposes `minimax-m3.1-flash` as a sonnet/opus model alternative
 - [ ] `openrouter-qwen` maps tiers to Qwen models (haiku/sonnet=qwen3.8-27b, opus=qwen3.8-max)
 - [ ] `openrouter-qwen` exposes `qwen3.8-flash` and the distinct `qwen3.8-max-0902` snapshot
 - [ ] Every OpenRouter template defaults `allow_non_zdr` to false; no LiteLLM template contains ZDR fields

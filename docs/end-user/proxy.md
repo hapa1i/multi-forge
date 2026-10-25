@@ -305,17 +305,17 @@ identity and supports `low`, `high`, and `max` effort.
 
 ```bash
 forge proxy create openrouter-kimi
-forge session start kimi-review --proxy openrouter-kimi --model kimi-k3.1-pro --model-tier sonnet
+forge session start kimi-review --proxy openrouter-kimi --model kimi-k3.1-pro
 forge workflow panel -p "Review the current diff" --context blind \
   -m kimi-k3.1-pro,minimax-m3.1-flash,deepseek-v4.1-flash-1017
 ```
 
 These are translated OpenRouter routes. Tool calls and tool results are retained, but Forge's translated Messages path
-does not return or replay provider reasoning blocks. This differs from Kimi's native history-preservation
-recommendation; start a new session when switching models. The additions do not change family defaults or the default
-workflow quorum. Existing snapshots need the new `model_alternatives` entries copied from
-`forge proxy template show <template>` via `forge proxy edit <proxy_id>`, or recreation from the template, before
-canonical model selection can use them. Restart after editing; a restart alone does not update the saved snapshot.
+does not return or replay provider reasoning blocks. This differs from Kimi's native history-preservation recommendation
+even when continuing with the same model. The additions do not change family defaults or the default workflow quorum.
+Existing snapshots need the new `model_alternatives` entries copied from `forge proxy template show <template>` via
+`forge proxy edit <proxy_id>`, or recreation from the template, before canonical model selection can use them. Restart
+after editing; a restart alone does not update the saved snapshot.
 
 Qwen3.8 27B is now both the Haiku and Sonnet default because it was the least-expensive multimodal Qwen with a ZDR
 endpoint in the audit. Qwen3.8 Max is the configured Opus model, but the default OpenRouter data policy resolves it to

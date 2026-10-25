@@ -3,37 +3,12 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Generator
-from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
 
-from tests.integration.proxy.conftest import _openrouter_family_proxy
-
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
-
-_MODELS = [
-    ("kimi", "kimi-k3.1-pro", "moonshotai/kimi-k3.1-pro"),
-    ("minimax", "minimax-m3.1-flash", "minimax/minimax-m3.1-flash"),
-    ("deepseek", "deepseek-v4.1-flash-1017", "deepseek/deepseek-v4.1-flash-1017"),
-]
-
-
-@pytest.fixture(scope="module", params=_MODELS, ids=[model for _, model, _ in _MODELS])
-def october_proxy(
-    request: pytest.FixtureRequest, module_forge_home: Path, tmp_path_factory: pytest.TempPathFactory
-) -> Generator[tuple[str, str, str], None, None]:
-    family, model, slug = request.param
-    for base_url in _openrouter_family_proxy(
-        f"openrouter-{family}",
-        module_forge_home,
-        tmp_path_factory,
-        "October model proxy unreachable",
-        preflight=False,
-    ):
-        yield base_url, model, slug
 
 
 def _message(response: httpx.Response, stream: bool) -> dict[str, Any]:

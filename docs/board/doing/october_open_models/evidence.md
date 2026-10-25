@@ -64,3 +64,11 @@ Reproduce the integration selections with:
 
 The initial unit run exposed a stale expected-alternatives list. After updating it, all 89 configuration-loader tests
 and the complete unit rerun passed. Initial formatting and token-cache failures were also corrected.
+
+Review follow-up verification on 2026-10-25: the catalog, session-route, and QA contract selection passed all 94 tests;
+the six live proxy cases passed after moving their fixture into `conftest.py`. The rebuilt wheel/sdist includes the
+updated QA resources, verified from an isolated wheel installation with 687 parsed assertions and all three October
+alternatives. The catalog assertions now protect Kimi's forced-tool rejection flag. Workflow guidance and proxy examples
+are corrected; guide-size cleanup is tracked in the
+[partition proposal](../../proposed/proxy_model_guidance_partition/card.md). Full pre-commit passed; the refreshed
+proxy-guide count is 28,304 Opus tokens.

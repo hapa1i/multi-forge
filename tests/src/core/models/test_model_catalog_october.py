@@ -28,6 +28,7 @@ def test_october_model_identity_and_provider_envelope(
     assert spec.context_window_tokens == 1_048_576
     assert spec.max_output_tokens == max_output
     assert spec.supports_images is True
+    assert spec.supports_forced_tool_choice is (model != "kimi-k3.1-pro")
     assert spec.prompt_cache_mechanism == "auto"
     assert spec.native_thinking_param == "reasoning_effort"
     assert spec.litellm_reasoning_efforts == efforts
