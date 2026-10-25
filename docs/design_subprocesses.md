@@ -141,10 +141,12 @@ status remains a per-dispatch check; 2.1.291 is the measured version, not an exa
 Inherited review projects `apiKeyHelper` from user settings and auth/provider environment settings from user settings
 and explicitly trusted project/local settings. A checkout-specific helper refuses with guidance to move it to user
 settings or export its credential, because checkout code must not become reviewer authentication code. Explicit child
-routing and environment/Forge credentials retain precedence. The helper configuration travels through an anonymous
-inherited file descriptor, not command-line JSON or a named credential file; hooks, permissions, plugins, and other
-customizations remain excluded. Subscription-only review never uses this projection. Both watchdog helpers use Python
-isolated mode and a neutral CWD; only the reviewer receives the action CWD.
+routing and environment/Forge credentials retain precedence. The helper command travels in the child-only
+`FORGE_REVIEWER_API_KEY_HELPER` environment variable. An inline `--settings` argument contains only a fixed shell
+indirection; no helper command or credential material is written into argv or a settings file. This supports Claude
+versions that canonicalize and reject anonymous descriptor paths. Hooks, permissions, plugins, and other customizations
+remain excluded. Subscription-only review never uses this projection. Both watchdog helpers use Python isolated mode and
+a neutral CWD; only the reviewer receives the action CWD.
 
 **Native Codex supervision (B5).** This separate source mode requires explicit `subscription-only` or `api`; it does not
 change inherited auth for fresh Codex or auxiliary consumers. `codex_reviewer_home` owns a marked private reviewer login

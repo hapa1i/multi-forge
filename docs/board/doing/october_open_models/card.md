@@ -19,6 +19,9 @@ Keep family defaults, the default workflow quorum, prior model identities, and s
 provides hosted OpenRouter support; it does not add self-hosted deployment adapters. Kimi's weights are announced for
 November 4; MiniMax's community-licensed and DeepSeek's MIT-licensed weights are already published.
 
+Reported integration failures also require per-test proxy-stub cleanup and a reviewer auth transport fix: supported
+Claude versions reject the anonymous settings-file path previously used for inherited helpers.
+
 ## Acceptance
 
 - Resolve each exact model and provider alias to the intended upstream slug, including workflow fallback routes.

@@ -12,6 +12,7 @@ Current focus: review and merge of [PR #281](https://github.com/hapa1i/multi-for
 - [x] Review the complete diff and open the single PR.
 - [x] Address review feedback on worker docs, release QA, capability coverage, and fixture ownership; rerun affected
   checks.
+- [x] Verify reported workflow/auth integration failures, helper transport regressions, and final package/check gates.
 - [ ] After merge, record closeout and move the card to done.
 
 Guide-size cleanup is tracked separately in the

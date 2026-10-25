@@ -6,13 +6,15 @@ import shlex
 
 import pytest
 
+from forge.core.reactive.reviewer_runtime import MIN_REVIEWER_VERSION
 from tests.fixtures.docker import ContainerLike
 from tests.integration.docker.conftest import setup_real_claude
 
 pytestmark = [pytest.mark.integration, pytest.mark.docker_in]
 
-_PROBE = r"""import json, os, subprocess, tempfile
+_PROBE = r"""import json, os, subprocess, tempfile, time
 from pathlib import Path
+from forge.core.reactive.reviewer_runtime import require_reviewer_runtime
 from forge.core.reactive.supervisor_auth import READ_ONLY_FLAGS, subscription_environment
 from forge.core.reactive.session_runner import run_claude_session
 
@@ -35,13 +37,14 @@ settings = {"apiKeyHelper":str(helper), "env":{"ANTHROPIC_API_KEY":"synthetic-se
 for p in (root / ".claude/settings.json", project / ".claude/settings.json", project / ".claude/settings.local.json"):
     p.write_text(json.dumps(settings))
 (root / ".forge").mkdir()
-(root / ".forge/credentials.yaml").write_text("anthropic_api_key: synthetic-forge-key\n")
+(root / ".forge/credentials.yaml").write_text(json.dumps({"version":1,"profiles":{"default":{"ANTHROPIC_API_KEY":"synthetic-forge-key"}}}))
 (project / ".env").write_text("ANTHROPIC_API_KEY=synthetic-dotenv-key\n")
 from dotenv import load_dotenv
 load_dotenv(project / ".env", override=True)
 
 def status(env, flags):
     p = subprocess.run(["claude", *flags, "auth", "status", "--json"], env=env, cwd=project, text=True, capture_output=True, timeout=20)
+    assert p.stdout.strip(), f"Claude auth status returned no JSON (exit {p.returncode}): {p.stderr}"
     raw = json.loads(p.stdout)
     return {k:raw.get(k) for k in ("loggedIn","authMethod","apiProvider","apiKeySource")}
 
@@ -53,11 +56,13 @@ selectors = {
  "ANTHROPIC_FEDERATION_RULE_ID":"synthetic", "ANTHROPIC_ORGANIZATION_ID":"synthetic",
  "CLAUDE_CODE_USE_BEDROCK":"1", "CLAUDE_CODE_USE_VERTEX":"1", "CLAUDE_CODE_USE_FOUNDRY":"1",
  "ANTHROPIC_BASE_URL":"http://127.0.0.1:9", "FORGE_SUBPROCESS_BASE_URL":"http://127.0.0.1:9",
- "FORGE_SUBPROCESS_PROXY":"synthetic", "HTTPS_PROXY":"http://127.0.0.1:9"
+ "FORGE_SUBPROCESS_PROXY":"synthetic", "HTTPS_PROXY":"http://127.0.0.1:9",
+ "FORGE_REVIEWER_API_KEY_HELPER":"synthetic-parent-helper"
 }
 os.environ.update(selectors)
 clean = subscription_environment()
 assert set(selectors).isdisjoint(clean)
+require_reviewer_runtime(env=clean, deadline=time.monotonic() + 20)
 clean_status = status(clean, READ_ONLY_FLAGS)
 assert clean_status["loggedIn"] is False, clean_status
 result = run_claude_session("must never infer", direct=True, read_only=True, subscription_only=True, cwd=str(project), timeout_seconds=30)
@@ -87,8 +92,8 @@ finally:
     managed.unlink()
 assert not (root / "helper-count").exists()
 # Inherit mode must retain user/sidecar authentication without loading hooks or
-# permissions. The helper settings travel on an anonymous inherited descriptor.
-from forge.core.reactive.reviewer_settings import inherited_auth_settings, auth_settings_descriptor
+# permissions. The helper command travels through the child environment.
+from forge.core.reactive.reviewer_settings import inherited_auth_settings, project_auth_settings
 from forge.core.reactive.watchdog import run_guarded
 for p in (project / ".claude/settings.json", project / ".claude/settings.local.json"):
     p.unlink()
@@ -96,8 +101,9 @@ for p in (project / ".claude/settings.json", project / ".claude/settings.local.j
 inherited = dict(clean)
 selected = inherited_auth_settings(inherited, cwd=str(project), direct=False)
 assert selected == {"apiKeyHelper":str(helper)}
-with auth_settings_descriptor(selected) as (args, descriptors):
-    result = run_guarded(["claude", *READ_ONLY_FLAGS, *args, "auth", "status", "--json"], input="", env=inherited, cwd=str(project), timeout=20, pass_fds=descriptors)
+args, child_env = project_auth_settings(selected, inherited)
+assert str(helper) not in " ".join(args)
+result = run_guarded(["claude", *READ_ONLY_FLAGS, *args, "auth", "status", "--json"], input="", env=child_env, cwd=str(project), timeout=20)
 assert result.returncode == 0, result.stderr
 inherited_status = json.loads(result.stdout)
 assert inherited_status["authMethod"] == "api_key_helper", inherited_status
@@ -109,16 +115,11 @@ print(json.dumps({"platform":"linux", "claude_version":version, "synthetic_only"
 
 @pytest.mark.parametrize("legacy_metadata", [True, False])
 def test_disposable_auth_location_matrix(forge_workspace: ContainerLike, legacy_metadata: bool):
-    # An explicit compatibility run may select an older supported reviewer when
-    # the host-matched Linux binary cannot start on the container architecture.
-    if version := os.environ.get("FORGE_AUTH_TEST_CLAUDE_VERSION"):
-        package = shlex.quote("@anthropic-ai/claude-code@" + version)
-        installed = forge_workspace.exec(f"npm install --prefix /tmp/auth-reviewer {package}", timeout=120)
-        assert installed.returncode == 0, installed.stderr
-        selected = forge_workspace.exec(
-            "ln -sfn /tmp/auth-reviewer/node_modules/.bin/claude /usr/local/bin/claude-real"
-        )
-        assert selected.returncode == 0, selected.stderr
+    # The general QA pin can predate the reviewer's required isolation flags.
+    version = os.environ.get("FORGE_AUTH_TEST_CLAUDE_VERSION", MIN_REVIEWER_VERSION)
+    package = shlex.quote("@anthropic-ai/claude-code@" + version)
+    installed = forge_workspace.exec(f"npm install --prefix /tmp/auth-reviewer {package}", timeout=120)
+    assert installed.returncode == 0, installed.stderr
     setup_real_claude(forge_workspace, session_name="auth-matrix")
     probe = (
         _PROBE
@@ -127,7 +128,9 @@ def test_disposable_auth_location_matrix(forge_workspace: ContainerLike, legacy_
     )
     written = forge_workspace.write_file("/tmp/b1-auth-matrix.py", probe, mode=0o600)
     assert written.returncode == 0, written.stderr
-    result = forge_workspace.exec("/forge/.venv/bin/python /tmp/b1-auth-matrix.py", timeout=100)
+    result = forge_workspace.exec(
+        "PATH=/tmp/auth-reviewer/node_modules/.bin:$PATH /forge/.venv/bin/python /tmp/b1-auth-matrix.py", timeout=100
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     evidence = json.loads(result.stdout.strip().splitlines()[-1])
     assert evidence["helper_invocations"] == 0

@@ -321,19 +321,18 @@ def run_claude_session(
         def execute(argv: list[str]) -> subprocess.CompletedProcess[str]:
             if read_only:
                 from forge.core.reactive.reviewer_settings import (
-                    auth_settings_descriptor,
+                    project_auth_settings,
                 )
                 from forge.core.reactive.watchdog import run_guarded
 
-                with auth_settings_descriptor(auth_settings) as (settings_args, descriptors):
-                    return run_guarded(
-                        [*argv, *settings_args],
-                        input=prompt,
-                        timeout=_remaining_time(expires),
-                        cwd=cwd,
-                        env=env,
-                        pass_fds=descriptors,
-                    )
+                settings_args, child_env = project_auth_settings(auth_settings, env)
+                return run_guarded(
+                    [*argv, *settings_args],
+                    input=prompt,
+                    timeout=_remaining_time(expires),
+                    cwd=cwd,
+                    env=child_env,
+                )
             return subprocess.run(
                 argv, input=prompt, capture_output=True, text=True, timeout=_remaining_time(expires), cwd=cwd, env=env
             )

@@ -72,3 +72,35 @@ alternatives. The catalog assertions now protect Kimi's forced-tool rejection fl
 are corrected; guide-size cleanup is tracked in the
 [partition proposal](../../proposed/proxy_model_guidance_partition/card.md). Full pre-commit passed; the refreshed
 proxy-guide count is 28,304 Opus tokens.
+
+## Integration failure follow-up
+
+The new Kimi workflow case left its health server on port 4001, so later Astra cases reached a server identifying as
+Kimi. Route discovery rejected it and reported a missing credential while checking fallback routes. Each test now owns
+and terminates its stub process. The complete workflow file passes with dotenv disabled for proxy-backed commands and
+without host provider keys.
+
+The auth matrix used the general QA pin (Claude 2.1.245), which predates the required reviewer flags. It now selects the
+minimum supported reviewer (2.1.248) for the probe only. That exposed a production failure: Claude canonicalized an
+anonymous settings descriptor into a deleted Linux path. The trusted helper command now travels in the child
+environment, and the settings argument contains only fixed shell indirection. No temporary credential file is created;
+subscription-only review strips the new internal variable.
+
+The 16-case Docker selection passed, including both auth metadata variants and old-runtime refusal. The 55 focused
+reviewer tests passed, including helper quoting and preservation of the original environment. A clean wheel installation
+with hash-checked runtime dependencies also executed the helper through the watchdog and verified subscription
+stripping.
+
+A real Claude 2.1.248 request against a disposable local HTTP server executed the projected helper and sent its
+synthetic key. No provider inference was used. The full regression run passed all 2,158 tests; build and pre-commit
+passed. The full unit run passed 11,169 tests and failed only the new environment-variable inventory assertion. After
+classifying the variable and updating the installation guide and its token cache, all 58 environment/cache tests passed;
+the exact failed assertion, documentation table, and cache-byte checks also passed on a final rerun.
+
+```bash
+PYTHON_DOTENV_DISABLED=1 env -u OPENROUTER_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY \
+  -u FORGE_AUTH_TEST_CLAUDE_VERSION ./scripts/test-integration.sh \
+  tests/integration/cli/test_workflow_integration.py \
+  tests/integration/docker/test_supervisor_auth_isolation.py \
+  tests/integration/docker/test_reviewer_compatibility.py::test_old_blocking_pin_refuses_without_inference -q
+```
