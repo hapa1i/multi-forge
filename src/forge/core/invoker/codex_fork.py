@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 
 from forge.core.invoker.types import Attribution, HeadlessRequest
+from forge.core.worker_controls import CODEX_WORKER_PROFILE
 
 
 @dataclass(frozen=True)
@@ -71,13 +72,13 @@ def prepare_codex_fork_request(
     for feature in ("hooks", "multi_agent", "apps", "plugins"):
         argv += ["--disable", feature]
     for config in (
-        "agents.enabled=false",
         f'cli_auth_credentials_store="{"file" if auth_mode == "subscription-only" else "ephemeral"}"',
         f'forced_login_method="{"chatgpt" if auth_mode == "subscription-only" else "api"}"',
         f"model_reasoning_effort={json.dumps(effort)}",
         f"sqlite_home={json.dumps(sqlite_home)}",
     ):
         argv += ["-c", config]
+    CODEX_WORKER_PROFILE.apply(argv, env)
     argv += [source_id, "-"]
     return CodexForkRequest(
         argv=argv,

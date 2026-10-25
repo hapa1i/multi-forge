@@ -34,6 +34,7 @@ from forge.core.reactive.structured_output import (
     observed_headless_models,
     parse_headless_envelope,
 )
+from forge.core.worker_controls import CLAUDE_WORKER_PROFILE
 
 _log = logging.getLogger(__name__)
 
@@ -123,6 +124,7 @@ def run_claude_session(
     deadline: float | None = None,
     subscription_only: bool = False,
     retry_output_format: bool = True,
+    worker: bool = False,
 ) -> SessionResult:
     """Run ``claude -p`` as a headless subprocess.
 
@@ -159,6 +161,7 @@ def run_claude_session(
         read_only: Restrict built-in tools to Read/Glob/Grep and disable customizations.
         additional_dirs: Explicit additional checkout roots available to file tools.
         deadline: Optional absolute monotonic deadline shared with the invoking hook.
+        worker: Apply the native delegation/memory profile after caller environment changes.
 
     Returns:
         SessionResult with stdout/stderr/returncode or error details, plus
@@ -267,6 +270,9 @@ def run_claude_session(
     if reasoning_effort:
         cmd.extend(["--effort", reasoning_effort])
 
+    if worker:
+        CLAUDE_WORKER_PROFILE.apply(cmd, env)
+
     # Guard: fail if subprocess proxy was configured but didn't resolve.
     # Prevents silent fallback to direct mode (which would burn subscription quota).
     subprocess_proxy = env.get(FORGE_SUBPROCESS_PROXY_VAR)
@@ -325,7 +331,7 @@ def run_claude_session(
                 )
                 from forge.core.reactive.watchdog import run_guarded
 
-                settings_args, child_env = project_auth_settings(auth_settings, env)
+                settings_args, child_env = project_auth_settings(auth_settings, env, worker=worker)
                 return run_guarded(
                     [*argv, *settings_args],
                     input=prompt,

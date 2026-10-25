@@ -730,9 +730,31 @@ Skills vary in what they execute. Four types cover all current and planned cases
 
 Claude session subprocesses use `--bare` when `ANTHROPIC_API_KEY` is in the environment (skips hooks, LSP, plugin sync,
 skill walks for faster startup). `--bare` disables OAuth/keychain auth, so it is only safe when an explicit API key is
-available. They are full Claude Code agents (Read/Grep/Bash/Write) but cannot invoke skills that spawn more subprocesses
-(`FORGE_DEPTH` prevents recursion at depth >= 2 as defense-in-depth). Pure text (.md) is a markdown prompt run in that
-environment.
+available. Worker tool access otherwise follows the caller's sandbox/read-only contract. Pure text (.md) is a markdown
+prompt run in that environment.
+
+**Worker native controls:** `core/worker_controls.py` owns the fixed profiles selected explicitly by review workers,
+semantic/team supervisors, memory writer and shadow curation. `run_claude_session(worker=True)` applies its profile
+after caller environment overrides/removals; review preparation applies the same profile to its durable base request.
+Claude receives `--disallowedTools Agent Workflow SendMessage`, `--disable-slash-commands`, and environment values
+`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=0`, `CLAUDE_CODE_FORK_SUBAGENT=0`, `CLAUDE_CODE_DISABLE_WORKFLOWS=1`, and
+`CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`. Disabling skills closes the `context: fork` path that can create a child even with
+`Agent` denied. A CLI `--settings` override repeats these four fixed environment values because inherited `settings.env`
+can override the process environment. Auth-helper projection preserves that override. Both API-key bare mode and
+non-bare subscription/proxy workers receive these controls.
+
+`prepare_codex_request(worker=True)` appends `-c agents.enabled=false`, `-c memories.use_memories=false`, and
+`-c memories.generate_memories=false` after caller options and before `resume`. Native fork reviewers apply the same
+profile on the fork leaf, alongside their stronger customization/auth restrictions. JSON-format retry removes only the
+output-format option; it retains worker controls and resume/fork intent. Shared helpers default to ordinary launches, so
+managed root delegation and memory choices are preserved.
+
+Profiles log their emitted arguments and fixed environment values at debug level. The offline native admission test
+(`tests/integration/docker/test_worker_native_controls.py`) records exact CLI/wheel versions, controls, tool admission,
+and child-transcript evidence from a clean wheel. It includes a fork-skill positive control, Claude auto-memory prompt
+checks against hostile settings, and a Codex root that can delegate. Emitted Codex memory settings are configuration
+evidence, not proof of historical non-use. These native controls do not restrict arbitrary external processes launched
+through Bash or MCP; `FORGE_DEPTH` remains a separate guard on Forge recursion.
 
 Claude skill packages can declare `effort: high|medium|low` in emitted `SKILL.md` frontmatter (Claude Code 2.1.80+).
 Portable sources place this Claude-only field under the manifest's adapter data; it is not emitted into Codex

@@ -118,6 +118,12 @@ commitment, not a dispatch. Default lanes never freeze and remain re-pinnable. `
 `policy supervisor set <target> --runtime` set the override; raw `set` is rejected. Re-pinning is an idempotent no-op;
 `policy supervisor remove` clears intent and confirmed.
 
+**Worker native controls.** Review preparation and every consumer lane explicitly select the profiles in
+`core/worker_controls.py`. Claude controls are finalized after environment overrides/removals, and Codex controls follow
+caller config overrides. They stay on the base request across retries and resumes; native fork reviewers retain their
+stronger isolation flags. Shared helpers do not impose worker restrictions on managed root launches. See
+[the worker launch contract](design_workflows.md#34-skill-execution-types) for exact controls and native verification.
+
 **Supervisor auth opt-in (B1).** `auth_mode=inherit` is the legacy default, including frozen `claude-max` bindings.
 Resolvable keys still win as API for all four consumers; the backend name alone does not select authentication.
 `subscription-only` is a supervisor-local, direct Claude/`claude-max` route: construct the child once without Forge

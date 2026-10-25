@@ -330,6 +330,46 @@ class TestRunParallel:
 
 class TestRun:
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
+    def test_worker_profile_remains_on_format_retry(self, mock_popen):
+        from forge.review.engine import _prepare_worker
+        from tests.regression.test_bug_worker_native_delegation import (
+            _assert_claude_controls,
+        )
+        from tests.src.review.test_engine import _routing_result, _spec
+
+        mock_popen.side_effect = [
+            _mock_proc(
+                stdout="",
+                stderr="error: unknown option '--output-format'",
+                returncode=2,
+            ),
+            _mock_proc(stdout="review complete"),
+        ]
+        with patch("forge.review.engine.resolve_env_or_credential", return_value=None):
+            request = _prepare_worker(
+                _spec(),
+                _routing_result(),
+                prompt="review",
+                cwd=None,
+                resume_id="worker-id",
+                timeout_seconds=30,
+                attribution=None,
+            )
+        assert isinstance(request, HeadlessRequest)
+        hj.reset_json_capability_cache()
+        try:
+            result = ClaudeHeadlessInvoker().run(request)
+        finally:
+            hj.reset_json_capability_cache()
+        assert result.success
+        assert mock_popen.call_count == 2
+        for call in mock_popen.call_args_list:
+            _assert_claude_controls(call.args[0], call.kwargs["env"])
+            assert call.args[0][call.args[0].index("--resume") + 1] == "worker-id"
+        assert "--output-format" in mock_popen.call_args_list[0].args[0]
+        assert "--output-format" not in mock_popen.call_args_list[1].args[0]
+
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_single_shot_success_surfaces_run_id(self, mock_popen):
         mock_popen.return_value = _mock_proc("out")
         out = ClaudeHeadlessInvoker().run(_req(env={"FORGE_RUN_ID": "run_s", "FORGE_ROOT_RUN_ID": "run_s"}))

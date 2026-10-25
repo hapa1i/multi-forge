@@ -1,0 +1,47 @@
+# Worker native controls checklist
+
+**Current focus:** Prepare the standalone draft PR for review. Implementation and required local checks are complete,
+including clean-wheel native probes and the final mixed live panel. Branch: `codex/worker-native-controls`; base:
+`b8e184bd`.
+
+M0 executes independently. Managed-root delegation and memory policy, child capture and other epic members remain
+outside scope. Preserve the pre-existing `AGENTS.md` working-tree edit.
+
+## Contract and implementation
+
+- [x] Inspect the proposal, epic boundaries, shared launchers and current worker call sites.
+- [x] Verify the pinned Claude/Codex admission controls, including fork-context skills, using isolated fixtures. The
+  proposal cites Claude 2.1.258/Codex 0.153.4; blocking QA pins are 2.1.245/0.149.1. Native Codex fork reviewers already
+  disable agents and executable customizations; preserve those stronger restrictions.
+- [x] Add regressions for inherited delegation/memory settings and late environment removal. The initial review-worker
+  regression run failed all three cases before implementation. Seven Claude cases also failed before adding the
+  `--settings` override that prevents inherited settings from re-enabling native memory.
+- [x] Apply the explicit profile to review workers, semantic/team supervisors, memory writer and shadow curation.
+- [x] Preserve restrictions across JSON-format retries, resume/fork requests, all auth paths and Codex consumer lanes.
+- [x] Keep managed root exec/resume and interactive launches outside the worker profile.
+- [x] Record emitted controls, runtime/wheel identities and verified behavior without claiming historical non-use. See
+  [verification](verification.md) and [native evidence](evidence/native-worker-controls-20261025.json).
+
+## Acceptance
+
+| Test              | Fixture                                                      | Assertion                                                              | Test home                                            |
+| ----------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------- |
+| Worker selection  | Review and all supported consumer lanes                      | Every worker opts in; managed roots retain their configuration         | Review, consumer and Codex session tests             |
+| Claude ordering   | Hostile inherited settings, caller overrides and late unsets | Tool and environment restrictions reach the child                      | Reactive env/session runner and Claude invoker tests |
+| Retry/resume      | JSON rejection and existing worker conversation              | The durable base request retains the profile                           | Claude invoker/session runner tests                  |
+| Codex controls    | Fresh, resumed and native-fork workers                       | Delegation and both memory controls remain disabled                    | Codex invoker and native supervisor tests            |
+| Native admission  | Real pinned binaries and isolated local upstream             | Delegation tools and fork-context skills cannot create native children | Targeted Docker/workflow integration tests           |
+| Installed package | Clean wheel and both runtime paths                           | Packaged code emits the same controls; evidence names exact versions   | Workflow integration and clean-wheel checks          |
+
+## Validation and closeout
+
+- [x] Run focused unit/regression tests and applicable Docker integration tests: final pinned probes and native fork
+  composition, 11 passed; final live mixed panel, both workers succeeded.
+- [x] Update workflow/memory design and end-user guides; update subprocess contracts if ownership changes.
+- [x] Run aggregate regression (2,167 passed), build, clean-wheel and board/link checks.
+- [x] Finish aggregate unit and full pre-commit gates. Unit run: 11,172 passed, one stale-cache failure. After explicit
+  user approval, refresh `docs/design_workflows.md` with Anthropic (27,121 tokens, below the 30,000 hard limit); its
+  cache-consistency rerun passed. Full `make pre-commit` passed, including file-size limits.
+- [x] Record limitations and review the final diff. The pre-existing `AGENTS.md` edit is unchanged and unstaged.
+- [x] Prepare the reviewed implementation and verification for the standalone PR.
+- [ ] After merge, verify the merged tree and CI, record closeout and move the card to done.

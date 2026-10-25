@@ -1,0 +1,509 @@
+{
+  "fixture_sha256": {
+    "tests/fixtures/worker_native_probe.py": "906ad128183f779442c50cc6de44e6e08e087a1aad70f9619c1fdbef0453bc39",
+    "tests/integration/docker/test_worker_native_controls.py": "4a8adbedb49beaa82296c0474d90f14e835fa162873b959296b2391e141c0499"
+  },
+  "forge_file": "/opt/forge-qa/lib/python3.12/site-packages/forge/__init__.py",
+  "forge_version": "1.1.3",
+  "memory_evidence": "Claude auto-memory prompt absent under hostile settings; Codex controls emitted. No claim of historical non-use.",
+  "probes": [
+    {
+      "argv": [
+        "claude",
+        "-p",
+        "--model",
+        "claude-haiku-4-5",
+        "--disallowedTools",
+        "Agent",
+        "Workflow",
+        "SendMessage"
+      ],
+      "auto_memory_prompt": true,
+      "bare": false,
+      "child_transcripts": 1,
+      "discovered_tools": [],
+      "environment": {
+        "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+        "CLAUDE_CODE_DISABLE_WORKFLOWS": "1",
+        "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0",
+        "CLAUDE_CODE_FORK_SUBAGENT": "0"
+      },
+      "injected_tool": "Skill",
+      "mode": "legacy",
+      "requests": 3,
+      "runtime": "claude",
+      "tool_outputs": [
+        "Skill \"fork-probe\" completed (forked execution).\n\nResult:\nPROBE_DONE"
+      ],
+      "tools": [
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskOutput",
+        "TaskStop",
+        "TaskUpdate",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "version": "2.1.245 (Claude Code)"
+    },
+    {
+      "argv": [
+        "claude",
+        "-p",
+        "--model",
+        "claude-haiku-4-5",
+        "--disallowedTools",
+        "Agent",
+        "Workflow",
+        "SendMessage",
+        "--disable-slash-commands",
+        "--settings",
+        "{\"env\": {\"CLAUDE_CODE_DISABLE_AUTO_MEMORY\": \"1\", \"CLAUDE_CODE_DISABLE_WORKFLOWS\": \"1\", \"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS\": \"0\", \"CLAUDE_CODE_FORK_SUBAGENT\": \"0\"}}"
+      ],
+      "auto_memory_prompt": false,
+      "bare": false,
+      "child_transcripts": 0,
+      "discovered_tools": [],
+      "environment": {
+        "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+        "CLAUDE_CODE_DISABLE_WORKFLOWS": "1",
+        "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0",
+        "CLAUDE_CODE_FORK_SUBAGENT": "0"
+      },
+      "injected_tool": "Agent",
+      "mode": "review",
+      "requests": 2,
+      "runtime": "claude",
+      "tool_outputs": [
+        "<tool_use_error>Error: No such tool available: Agent. Agent is disabled for this session, in subagents as well as here.</tool_use_error>"
+      ],
+      "tools": [
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskOutput",
+        "TaskStop",
+        "TaskUpdate",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "version": "2.1.245 (Claude Code)"
+    },
+    {
+      "argv": [
+        "claude",
+        "-p",
+        "--model",
+        "claude-haiku-4-5",
+        "--disallowedTools",
+        "Agent",
+        "Workflow",
+        "SendMessage",
+        "--disable-slash-commands",
+        "--settings",
+        "{\"env\": {\"CLAUDE_CODE_DISABLE_AUTO_MEMORY\": \"1\", \"CLAUDE_CODE_DISABLE_WORKFLOWS\": \"1\", \"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS\": \"0\", \"CLAUDE_CODE_FORK_SUBAGENT\": \"0\"}}"
+      ],
+      "auto_memory_prompt": false,
+      "bare": false,
+      "child_transcripts": 0,
+      "discovered_tools": [],
+      "environment": {
+        "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+        "CLAUDE_CODE_DISABLE_WORKFLOWS": "1",
+        "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0",
+        "CLAUDE_CODE_FORK_SUBAGENT": "0"
+      },
+      "injected_tool": "Skill",
+      "mode": "review",
+      "requests": 2,
+      "runtime": "claude",
+      "tool_outputs": [
+        "<tool_use_error>Error: No such tool available: Skill. Skill is disabled for this session, in subagents as well as here.</tool_use_error>"
+      ],
+      "tools": [
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskOutput",
+        "TaskStop",
+        "TaskUpdate",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "version": "2.1.245 (Claude Code)"
+    },
+    {
+      "argv": [
+        "claude",
+        "-p",
+        "--bare",
+        "--model",
+        "claude-haiku-4-5",
+        "--disallowedTools",
+        "Agent",
+        "Workflow",
+        "SendMessage",
+        "--disable-slash-commands",
+        "--settings",
+        "{\"env\": {\"CLAUDE_CODE_DISABLE_AUTO_MEMORY\": \"1\", \"CLAUDE_CODE_DISABLE_WORKFLOWS\": \"1\", \"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS\": \"0\", \"CLAUDE_CODE_FORK_SUBAGENT\": \"0\"}}"
+      ],
+      "auto_memory_prompt": false,
+      "bare": true,
+      "child_transcripts": 0,
+      "discovered_tools": [],
+      "environment": {
+        "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+        "CLAUDE_CODE_DISABLE_WORKFLOWS": "1",
+        "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0",
+        "CLAUDE_CODE_FORK_SUBAGENT": "0"
+      },
+      "injected_tool": "Skill",
+      "mode": "review",
+      "requests": 2,
+      "runtime": "claude",
+      "tool_outputs": [
+        "<tool_use_error>Error: No such tool available: Skill. Skill is disabled for this session, in subagents as well as here.</tool_use_error>"
+      ],
+      "tools": [
+        "Bash",
+        "Edit",
+        "Read"
+      ],
+      "version": "2.1.245 (Claude Code)"
+    },
+    {
+      "argv": [
+        "claude",
+        "-p",
+        "--model",
+        "claude-haiku-4-5",
+        "--disallowedTools",
+        "Agent",
+        "Workflow",
+        "SendMessage",
+        "--disable-slash-commands",
+        "--settings",
+        "{\"env\": {\"CLAUDE_CODE_DISABLE_AUTO_MEMORY\": \"1\", \"CLAUDE_CODE_DISABLE_WORKFLOWS\": \"1\", \"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS\": \"0\", \"CLAUDE_CODE_FORK_SUBAGENT\": \"0\"}}",
+        "--output-format",
+        "json"
+      ],
+      "auto_memory_prompt": false,
+      "bare": false,
+      "child_transcripts": 0,
+      "discovered_tools": [],
+      "environment": {
+        "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+        "CLAUDE_CODE_DISABLE_WORKFLOWS": "1",
+        "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0",
+        "CLAUDE_CODE_FORK_SUBAGENT": "0"
+      },
+      "injected_tool": "Workflow",
+      "mode": "consumer",
+      "requests": 2,
+      "runtime": "claude",
+      "tool_outputs": [
+        "<tool_use_error>Error: No such tool available: Workflow. Workflow is disabled for this session, in subagents as well as here.</tool_use_error>"
+      ],
+      "tools": [
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskOutput",
+        "TaskStop",
+        "TaskUpdate",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "version": "2.1.245 (Claude Code)"
+    },
+    {
+      "argv": [
+        "claude",
+        "-p",
+        "--model",
+        "claude-haiku-4-5",
+        "--disallowedTools",
+        "Agent",
+        "Workflow",
+        "SendMessage",
+        "--disable-slash-commands",
+        "--settings",
+        "{\"env\": {\"CLAUDE_CODE_DISABLE_AUTO_MEMORY\": \"1\", \"CLAUDE_CODE_DISABLE_WORKFLOWS\": \"1\", \"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS\": \"0\", \"CLAUDE_CODE_FORK_SUBAGENT\": \"0\"}}",
+        "--output-format",
+        "json"
+      ],
+      "auto_memory_prompt": false,
+      "bare": false,
+      "child_transcripts": 0,
+      "discovered_tools": [],
+      "environment": {
+        "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+        "CLAUDE_CODE_DISABLE_WORKFLOWS": "1",
+        "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0",
+        "CLAUDE_CODE_FORK_SUBAGENT": "0"
+      },
+      "injected_tool": "SendMessage",
+      "mode": "consumer",
+      "requests": 2,
+      "runtime": "claude",
+      "tool_outputs": [
+        "<tool_use_error>Error: No such tool available: SendMessage. SendMessage is disabled for this session, in subagents as well as here.</tool_use_error>"
+      ],
+      "tools": [
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskOutput",
+        "TaskStop",
+        "TaskUpdate",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "version": "2.1.245 (Claude Code)"
+    },
+    {
+      "argv": [
+        "claude",
+        "-p",
+        "--model",
+        "claude-haiku-4-5",
+        "--disallowedTools",
+        "Agent",
+        "Workflow",
+        "SendMessage",
+        "--disable-slash-commands",
+        "--settings",
+        "{\"env\": {\"CLAUDE_CODE_DISABLE_AUTO_MEMORY\": \"1\", \"CLAUDE_CODE_DISABLE_WORKFLOWS\": \"1\", \"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS\": \"0\", \"CLAUDE_CODE_FORK_SUBAGENT\": \"0\"}}",
+        "--output-format",
+        "json"
+      ],
+      "auto_memory_prompt": false,
+      "bare": false,
+      "child_transcripts": 0,
+      "discovered_tools": [],
+      "environment": {
+        "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+        "CLAUDE_CODE_DISABLE_WORKFLOWS": "1",
+        "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0",
+        "CLAUDE_CODE_FORK_SUBAGENT": "0"
+      },
+      "injected_tool": "Skill",
+      "mode": "consumer",
+      "requests": 2,
+      "runtime": "claude",
+      "tool_outputs": [
+        "<tool_use_error>Error: No such tool available: Skill. Skill is disabled for this session, in subagents as well as here.</tool_use_error>"
+      ],
+      "tools": [
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "NotebookEdit",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskOutput",
+        "TaskStop",
+        "TaskUpdate",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "version": "2.1.245 (Claude Code)"
+    },
+    {
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "--sandbox",
+        "read-only"
+      ],
+      "auto_memory_prompt": false,
+      "bare": false,
+      "child_transcripts": null,
+      "discovered_tools": [
+        "multi_agent_v1.close_agent",
+        "multi_agent_v1.resume_agent",
+        "multi_agent_v1.spawn_agent"
+      ],
+      "environment": {},
+      "injected_tool": "spawn_agent",
+      "mode": "root",
+      "requests": 3,
+      "runtime": "codex",
+      "tool_outputs": [
+        "{\"agent_id\":\"01a17459-18cd-7502-bedf-093fe9dfed4f\",\"nickname\":\"Locke\"}"
+      ],
+      "tools": [
+        "apply_patch",
+        "create_goal",
+        "exec_command",
+        "get_goal",
+        "request_user_input",
+        "tool_search",
+        "update_goal",
+        "update_plan",
+        "view_image",
+        "web_search",
+        "write_stdin"
+      ],
+      "version": "codex-cli 0.149.1"
+    },
+    {
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "--sandbox",
+        "read-only",
+        "-c",
+        "agents.enabled=false",
+        "-c",
+        "memories.use_memories=false",
+        "-c",
+        "memories.generate_memories=false"
+      ],
+      "auto_memory_prompt": false,
+      "bare": false,
+      "child_transcripts": null,
+      "discovered_tools": [],
+      "environment": {},
+      "injected_tool": "spawn_agent",
+      "mode": "worker",
+      "requests": 3,
+      "runtime": "codex",
+      "tool_outputs": [
+        "unsupported call: multi_agent_v1spawn_agent"
+      ],
+      "tools": [
+        "apply_patch",
+        "create_goal",
+        "exec_command",
+        "get_goal",
+        "request_user_input",
+        "update_goal",
+        "update_plan",
+        "view_image",
+        "web_search",
+        "write_stdin"
+      ],
+      "version": "codex-cli 0.149.1"
+    },
+    {
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "--sandbox",
+        "read-only",
+        "-c",
+        "agents.enabled=false",
+        "-c",
+        "memories.use_memories=false",
+        "-c",
+        "memories.generate_memories=false",
+        "resume",
+        "01a17459-45d3-7421-9071-d7ec9adf1e5c"
+      ],
+      "auto_memory_prompt": false,
+      "bare": false,
+      "child_transcripts": null,
+      "discovered_tools": [],
+      "environment": {},
+      "injected_tool": "spawn_agent",
+      "mode": "resume",
+      "requests": 3,
+      "runtime": "codex",
+      "tool_outputs": [
+        "unsupported call: multi_agent_v1spawn_agent"
+      ],
+      "tools": [
+        "apply_patch",
+        "create_goal",
+        "exec_command",
+        "get_goal",
+        "request_user_input",
+        "update_goal",
+        "update_plan",
+        "view_image",
+        "web_search",
+        "write_stdin"
+      ],
+      "version": "codex-cli 0.149.1"
+    }
+  ],
+  "runtime_network": "none",
+  "upstream": "deterministic local fixture; no provider inference",
+  "wheel_name": "multi_forge-1.1.3-py3-none-any.whl",
+  "wheel_sha256": "313e05fb38b5633848de254cdb488b253ceb991be86262a368e32dd181fde974"
+}

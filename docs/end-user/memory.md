@@ -6,6 +6,11 @@ The memory writer is queued automatically when a session ends. A later queue-pro
 a detached process to update tracked memory docs based on what happened in the session. It reads the session transcript
 and writes updates to pre-existing official files or Forge-owned shadow proposal files.
 
+The memory writer and shadow curator disable native delegation and the runtime's own memory facilities: Claude
+auto-memory, or Codex memory use and generation. They continue to read the selected transcript and designated project
+docs and write Forge memory artifacts. The parent session's native-memory settings and existing memory files are
+preserved. Claude worker skills are disabled, including skills that fork a child.
+
 - Canonical architecture: [`docs/design.md` §5.6](../design.md)
 - Sessions (unit of work): [`session.md`](session.md)
 - Hooks (lifecycle events): [`hook.md`](hook.md)

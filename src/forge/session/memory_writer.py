@@ -537,6 +537,7 @@ def run_memory_writer(
     with track_verb_cost("memory-writer", [tracking_url] if tracking_url else []) as cost:
         result = run_claude_session(
             prompt,
+            worker=True,
             base_url=base_url,
             direct=config.direct,
             timeout_seconds=effective_timeout,
@@ -683,6 +684,7 @@ def _dispatch_codex_memory_writer(
             return False
         request = prepare_codex_request(
             prompt=prompt,
+            worker=True,
             preflight=preflight,
             attribution=Attribution(
                 command="memory-writer",

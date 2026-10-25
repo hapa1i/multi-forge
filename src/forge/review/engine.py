@@ -36,6 +36,7 @@ from forge.core.reactive.env import (
 )
 from forge.core.reactive.routing import RoutingResult
 from forge.core.runtime.codex_preflight import CodexPreflight
+from forge.core.worker_controls import CLAUDE_WORKER_PROFILE
 from forge.review.routing import (
     WorkerRoutingPlan,
     resolve_invocation_routing,
@@ -346,6 +347,7 @@ def _prepare_worker(
             )
         return prepare_codex_request(
             prompt=worker_prompt,
+            worker=True,
             preflight=codex_preflight,
             attribution=attribution,
             cwd=cwd,
@@ -409,6 +411,7 @@ def _prepare_worker(
         cmd.extend(["--model", model_flag])
     if reasoning_effort:
         cmd.extend(["--effort", reasoning_effort])
+    CLAUDE_WORKER_PROFILE.apply(cmd, env)
 
     return HeadlessRequest(
         argv=cmd,

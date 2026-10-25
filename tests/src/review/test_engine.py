@@ -213,7 +213,7 @@ class TestRunMultiReview:
                 reasoning_effort="high",
             )
 
-        assert captured == [
+        expected = [
             HeadlessRequest(
                 argv=[
                     "claude",
@@ -272,6 +272,24 @@ class TestRunMultiReview:
                 base_url=None,
             ),
         ]
+        for request in expected:
+            request.argv += [
+                "--disallowedTools",
+                "Agent",
+                "Workflow",
+                "SendMessage",
+                "--disable-slash-commands",
+                "--settings",
+                '{"env": {"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1", "CLAUDE_CODE_DISABLE_WORKFLOWS": "1", '
+                '"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0", "CLAUDE_CODE_FORK_SUBAGENT": "0"}}',
+            ]
+            request.env.update(
+                CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="0",
+                CLAUDE_CODE_FORK_SUBAGENT="0",
+                CLAUDE_CODE_DISABLE_WORKFLOWS="1",
+                CLAUDE_CODE_DISABLE_AUTO_MEMORY="1",
+            )
+        assert captured == expected
 
     @patch("forge.review.engine.ClaudeHeadlessInvoker.run_parallel")
     @patch("forge.review.engine.CodexHeadlessInvoker.run_parallel")
@@ -294,7 +312,19 @@ class TestRunMultiReview:
         mock_codex_parallel.assert_called_once()
         mock_claude_parallel.assert_not_called()
         request = mock_codex_parallel.call_args.args[0][0]
-        assert request.argv == ["codex", "exec", "--json", "--sandbox", "read-only"]
+        assert request.argv == [
+            "codex",
+            "exec",
+            "--json",
+            "--sandbox",
+            "read-only",
+            "-c",
+            "agents.enabled=false",
+            "-c",
+            "memories.use_memories=false",
+            "-c",
+            "memories.generate_memories=false",
+        ]
 
     @patch("forge.review.engine.ClaudeHeadlessInvoker.run_parallel")
     @patch("forge.review.engine.CodexHeadlessInvoker.run_parallel")
@@ -1012,7 +1042,19 @@ class TestCodexWorkerShaping:
         )
 
         assert isinstance(prepared, HeadlessRequest)
-        assert prepared.argv == ["codex", "exec", "--json", "--sandbox", "read-only"]
+        assert prepared.argv == [
+            "codex",
+            "exec",
+            "--json",
+            "--sandbox",
+            "read-only",
+            "-c",
+            "agents.enabled=false",
+            "-c",
+            "memories.use_memories=false",
+            "-c",
+            "memories.generate_memories=false",
+        ]
         assert prepared.prompt == "review this"
         assert prepared.cwd == "/worktree"
         assert prepared.timeout_seconds == 321

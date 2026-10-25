@@ -331,6 +331,7 @@ class TestRunSupervisor:
         mock_session.assert_called_once()
         assert mock_session.call_args.kwargs["base_url"] is None
         assert mock_session.call_args.kwargs["direct"] is True
+        assert mock_session.call_args.kwargs["worker"] is True
         assert mock_session.call_args.kwargs["unset_env_vars"] is None
 
 
