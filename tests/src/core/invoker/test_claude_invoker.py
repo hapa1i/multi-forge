@@ -332,10 +332,11 @@ class TestRun:
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_worker_profile_remains_on_format_retry(self, mock_popen):
         from forge.review.engine import _prepare_worker
-        from tests.regression.test_bug_worker_native_delegation import (
-            _assert_claude_controls,
+        from tests.fixtures.review_workers import (
+            assert_claude_worker_controls as _assert_claude_controls,
         )
-        from tests.src.review.test_engine import _routing_result, _spec
+        from tests.fixtures.review_workers import make_model_spec as _spec
+        from tests.fixtures.review_workers import make_routing_result as _routing_result
 
         mock_popen.side_effect = [
             _mock_proc(

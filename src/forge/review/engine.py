@@ -188,7 +188,7 @@ def run_multi_review(
             resolves routing once at the top before fan-out.
         timeout_seconds: Per-model timeout in seconds.
         cwd: Working directory for each subprocess.
-        resume_id: If set, adds ``--resume <id>`` to each Claude subprocess.
+        resume_id: If set, forks each Claude worker from that conversation without changing its transcript.
             Combining it with a Codex worker fails the invocation closed.
         attribution: Verb context (command/workflow/session) for per-worker usage
             events. None (default) skips per-worker emission.
@@ -405,7 +405,7 @@ def _prepare_worker(
     if can_use_bare(env):
         cmd.append("--bare")
     if resume_id:
-        cmd.extend(["--resume", resume_id])
+        cmd.extend(["--resume", resume_id, "--fork-session"])
     model_flag = resolve_model_flag(route)
     if model_flag:
         cmd.extend(["--model", model_flag])

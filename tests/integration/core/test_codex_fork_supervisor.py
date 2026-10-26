@@ -119,7 +119,7 @@ def test_native_allow_and_deny_use_one_invoker_with_immutable_audit(native_revie
             assert call["argv"].index(control) > call["argv"].index("fork")
         assert "--ignore-user-config" in call["argv"] and "--ignore-rules" in call["argv"]
         disabled = [value for flag, value in zip(call["argv"], call["argv"][1:]) if flag == "--disable"]
-        assert disabled == ["hooks", "multi_agent", "apps", "plugins"]
+        assert disabled == ["hooks", "apps", "plugins", "multi_agent"]
     records = read_attempts("executor")
     assert len(records) == 3
     for record in records:

@@ -69,7 +69,7 @@ def prepare_codex_fork_request(
         raise ValueError("Native Codex reviews require an explicit auth route")
     argv = [binary, "exec", "--json", "--sandbox", "read-only", "-C", cwd, "fork", "--ephemeral"]
     argv += ["--ignore-user-config", "--ignore-rules", "--output-schema", schema_path, "-m", model]
-    for feature in ("hooks", "multi_agent", "apps", "plugins"):
+    for feature in ("hooks", "apps", "plugins"):
         argv += ["--disable", feature]
     for config in (
         f'cli_auth_credentials_store="{"file" if auth_mode == "subscription-only" else "ephemeral"}"',

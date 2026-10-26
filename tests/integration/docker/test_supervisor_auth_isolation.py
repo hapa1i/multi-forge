@@ -65,7 +65,7 @@ assert set(selectors).isdisjoint(clean)
 require_reviewer_runtime(env=clean, deadline=time.monotonic() + 20)
 clean_status = status(clean, READ_ONLY_FLAGS)
 assert clean_status["loggedIn"] is False, clean_status
-result = run_claude_session("must never infer", direct=True, read_only=True, subscription_only=True, cwd=str(project), timeout_seconds=30)
+result = run_claude_session("must never infer", worker=True, direct=True, read_only=True, subscription_only=True, cwd=str(project), timeout_seconds=30)
 assert not result.dispatched and result.child_billing_mode is None
 rows = [{"case":"missing-login-with-competing-selectors-and-trusted-settings", "refused":True}]
 for relative, content in (
@@ -76,7 +76,7 @@ for relative, content in (
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
-    result = run_claude_session("must never infer", direct=True, read_only=True, subscription_only=True, cwd=str(project), timeout_seconds=30)
+    result = run_claude_session("must never infer", worker=True, direct=True, read_only=True, subscription_only=True, cwd=str(project), timeout_seconds=30)
     assert not result.dispatched, relative
     rows.append({"case":relative,"refused":True})
     path.unlink()
@@ -85,7 +85,7 @@ managed.parent.mkdir(parents=True, exist_ok=True)
 assert not managed.exists()
 try:
     managed.write_text('{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:9"}}')
-    result = run_claude_session("must never infer", direct=True, read_only=True, subscription_only=True, cwd=str(project), timeout_seconds=30)
+    result = run_claude_session("must never infer", worker=True, direct=True, read_only=True, subscription_only=True, cwd=str(project), timeout_seconds=30)
     assert not result.dispatched and "managed" in result.error
     rows.append({"case":"managed-gateway","refused":True})
 finally:
@@ -101,7 +101,8 @@ for p in (project / ".claude/settings.json", project / ".claude/settings.local.j
 inherited = dict(clean)
 selected = inherited_auth_settings(inherited, cwd=str(project), direct=False)
 assert selected == {"apiKeyHelper":str(helper)}
-args, child_env = project_auth_settings(selected, inherited)
+projected, child_env = project_auth_settings(selected, inherited)
+args = ["--settings", json.dumps(projected)]
 assert str(helper) not in " ".join(args)
 result = run_guarded(["claude", *READ_ONLY_FLAGS, *args, "auth", "status", "--json"], input="", env=child_env, cwd=str(project), timeout=20)
 assert result.returncode == 0, result.stderr

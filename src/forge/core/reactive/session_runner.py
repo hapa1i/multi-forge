@@ -10,6 +10,7 @@ For interactive sessions (stdin/stdout inherited), use
 
 from __future__ import annotations
 
+import json
 import logging
 import subprocess
 from dataclasses import dataclass
@@ -107,6 +108,7 @@ def _is_effort_flag_rejection(returncode: int, stderr: str) -> bool:
 def run_claude_session(
     prompt: str,
     *,
+    worker: bool,
     resume_id: str | None = None,
     fork_session: bool = False,
     model: str | None = None,
@@ -124,7 +126,6 @@ def run_claude_session(
     deadline: float | None = None,
     subscription_only: bool = False,
     retry_output_format: bool = True,
-    worker: bool = False,
 ) -> SessionResult:
     """Run ``claude -p`` as a headless subprocess.
 
@@ -241,11 +242,22 @@ def run_claude_session(
             refused = _session_result(error=f"Claude review unavailable: {exc}")
             refused.dispatched = False
             return refused
+    control_args: list[str] = list(READ_ONLY_FLAGS) if read_only else []
+    projected_settings: dict[str, object] = {}
+    if read_only:
+        from forge.core.reactive.reviewer_settings import project_auth_settings
+
+        projected_settings, env = project_auth_settings(auth_settings, env)
+    if worker:
+        CLAUDE_WORKER_PROFILE.apply(control_args, env, extra_settings=projected_settings)
+    elif projected_settings:
+        control_args.extend(["--settings", json.dumps(projected_settings, sort_keys=True)])
+
     if subscription_only:
         try:
             if not read_only or not direct or base_url or bare:
                 raise ValueError("Subscription-only review requires read-only direct Claude without bare mode.")
-            binary = preflight_subscription(env=env, cwd=cwd, deadline=expires)
+            binary = preflight_subscription(env=env, cwd=cwd, deadline=expires, control_args=control_args)
             child_billing_mode = "subscription_quota"
         except Exception as exc:
             refused = _session_result(error=f"Subscription review unavailable: {exc}")
@@ -256,8 +268,7 @@ def run_claude_session(
     cmd = [binary, "-p"]
     if use_bare:
         cmd.append("--bare")
-    if read_only:
-        cmd.extend(READ_ONLY_FLAGS)
+    cmd.extend(control_args)
     for directory in additional_dirs:
         cmd.extend(["--add-dir", directory])
     if resume_id:
@@ -269,9 +280,6 @@ def run_claude_session(
     # In `cmd` (not the json-prepared argv) so it survives the --output-format retry below.
     if reasoning_effort:
         cmd.extend(["--effort", reasoning_effort])
-
-    if worker:
-        CLAUDE_WORKER_PROFILE.apply(cmd, env)
 
     # Guard: fail if subprocess proxy was configured but didn't resolve.
     # Prevents silent fallback to direct mode (which would burn subscription quota).
@@ -326,18 +334,14 @@ def run_claude_session(
 
         def execute(argv: list[str]) -> subprocess.CompletedProcess[str]:
             if read_only:
-                from forge.core.reactive.reviewer_settings import (
-                    project_auth_settings,
-                )
                 from forge.core.reactive.watchdog import run_guarded
 
-                settings_args, child_env = project_auth_settings(auth_settings, env, worker=worker)
                 return run_guarded(
-                    [*argv, *settings_args],
+                    argv,
                     input=prompt,
                     timeout=_remaining_time(expires),
                     cwd=cwd,
-                    env=child_env,
+                    env=env,
                 )
             return subprocess.run(
                 argv, input=prompt, capture_output=True, text=True, timeout=_remaining_time(expires), cwd=cwd, env=env

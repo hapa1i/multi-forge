@@ -19,7 +19,8 @@ def test_helper_executes_without_a_settings_path_or_secret_in_argv(tmp_path, tok
     helper = f"printf '%s\\n' {shlex.quote(token)}"
     original_env = dict(os.environ, FORGE_REVIEWER_API_KEY_HELPER="stale helper")
     settings = {"apiKeyHelper": helper}
-    args, child_env = project_auth_settings(settings, original_env)
+    projected, child_env = project_auth_settings(settings, original_env)
+    args = ["--settings", json.dumps(projected)]
     assert helper not in " ".join(args)
     assert token not in " ".join(args)
     assert original_env["FORGE_REVIEWER_API_KEY_HELPER"] == "stale helper"
@@ -50,9 +51,9 @@ raise SystemExit(result.returncode)
 
 @pytest.mark.parametrize("settings", [{}, {"apiKeyHelper": ""}])
 def test_absent_or_empty_helper_stays_disabled(settings):
-    args, child_env = project_auth_settings(settings, {})
-    if args:
-        assert json.loads(args[1]) == {"apiKeyHelper": ""}
+    projected, child_env = project_auth_settings(settings, {})
+    if projected:
+        assert projected == {"apiKeyHelper": ""}
         assert child_env["FORGE_REVIEWER_API_KEY_HELPER"] == ""
     else:
         assert child_env == {}

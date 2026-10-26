@@ -1,57 +1,75 @@
-# Worker native-control verification -- 2026-10-25
+# Worker native-control verification -- 2026-10-26
 
-The pinned native probes ran from a clean `multi_forge-1.1.3-py3-none-any.whl` install under `/opt/forge-qa`, using
-Claude Code **2.1.245** and Codex CLI **0.149.1**. The release-QA image recipe installed hash-checked locked
-dependencies; the runtime container used `--network none`, fresh homes, synthetic credentials and a deterministic local
-upstream. [Machine-readable evidence](evidence/native-worker-controls-20261025.json) records the wheel SHA-256, emitted
-arguments, fixed environment values, native tool outcomes and fixture hashes.
+The review fixes were verified with clean `multi_forge-1.1.3-py3-none-any.whl` installations under `/opt/forge-qa`.
+[Machine-readable evidence](evidence/native-worker-controls-20261026.json) records the wheel SHA-256, fixture hashes,
+exact arguments, native tool outcomes and source-transcript hashes. The release-QA image installs hash-checked locked
+dependencies; probes use fresh homes, synthetic credentials, a deterministic localhost upstream and `--network none`.
 
-## Native admission
+The pinned track uses Claude **2.1.245** and Codex **0.149.1**. Its guarded helper-backed reviewer uses Claude
+**2.1.248**, the minimum admitted reviewer version. The compatibility track uses Claude **2.1.304** and Codex
+**0.164.0**, including the guarded helper path. Both tracks use the same wheel bytes.
 
-| Probe                                                    | Observed result                                                                                                              |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Claude proposal controls, fork-context Skill             | Skill admitted; one native child transcript created. Denying Agent alone did not close this path.                            |
-| Claude review worker, injected Agent or Skill            | Native tool unavailable; no child transcript. Skill also rejected in API-key bare mode.                                      |
-| Claude consumer, injected Workflow, SendMessage or Skill | Native tool unavailable after hostile inherited settings, caller overrides and late environment unsets; no child transcript. |
-| Codex ordinary root                                      | Tool search discovered `multi_agent_v1.spawn_agent`; the namespaced call returned a native child ID.                         |
-| Codex fresh and resumed workers                          | Tool search exposed no native agent tools; the same namespaced spawn call was rejected.                                      |
+## Native evidence
 
-The Codex positive control matters: an unnamespaced `spawn_agent` call is rejected even by an unrestricted root. The
-final fixture exercises the actual discovery/namespace path, rather than treating that rejection as evidence of worker
-isolation. The Claude fork-skill positive control likewise establishes that the fixture can create a native child.
+| Probe                                                 | Observed result on both tracks                                                                                                                                                  |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude proposal controls, fork-context Skill          | Skill admitted and a native child transcript created; denying Agent alone does not close this path.                                                                             |
+| Claude review and consumer workers                    | Injected Agent, Workflow, SendMessage or Skill unavailable; no native child transcript. Hostile inherited settings cannot restore the auto-memory prompt.                       |
+| Guarded Claude reviewer with inherited `apiKeyHelper` | Actual guarded dispatch succeeds with one settings payload, one slash-command disable, the helper indirection and fixed worker settings; Skill remains unavailable.             |
+| Claude API-key bare worker                            | Compatible launch and rejected Skill. Bare mode already excludes Skill without the profile, so this case does not establish causal isolation.                                   |
+| Two parallel Claude reviews of one source             | Distinct worker session IDs; the original transcript's before/after SHA-256 values match.                                                                                       |
+| Codex ordinary root                                   | Native spawn succeeds. Version 0.149.1 discovers the namespace through tool search; 0.164.0 advertises it directly.                                                             |
+| Codex fresh and resumed workers                       | Neither discovery nor direct advertisement exposes native spawn; an injected namespaced call is rejected. Both memory controls and the multi-agent feature disable are emitted. |
 
-Hostile Claude `settings.env` could re-enable auto-memory despite the process environment's disable switch. The final
-profile repeats the fixed environment through CLI `--settings`, including when projecting an auth helper. The pinned
-probe checks that the auto-memory system prompt is present in the positive control and absent in protected workers. Both
-Codex memory overrides are present in emitted requests; that verifies configuration, not historical absence of memory
-use. Resumed conversation text is retained. Native controls do not restrict external programs invoked through Bash or
-MCP, and this card does not add a managed-root delegation policy. Native Codex fork reviewers retain their existing
-hook/plugin/app and auth isolation controls.
+The unit/regression checks also snapshot subscription authentication and dispatch independently: environment, working
+directory and control arguments match. They verify that helper projection preserves non-environment profile settings,
+that retries retain the composed controls, and that managed root launches retain their normal configuration. Shared test
+builders and wheel/image helpers replace the cross-test imports and repeated packaging setup.
+
+Claude memory evidence covers the auto-memory prompt under hostile settings. Codex memory evidence covers emitted
+configuration; it does not establish historical non-use. Existing conversation text is retained. Native controls do not
+govern external programs invoked through Bash or MCP, and this card does not add a managed-root delegation policy.
+Native Codex fork reviewers retain their hook/plugin/app and authentication restrictions.
 
 ## Validation
 
-- Focused unit/regression runs: 457 passed across workers and consumer lanes; 38 passed across invoker retry,
-  native-control regressions and subscription auth. Final settings/auth-helper regressions: 13 passed.
-- Final `make test-unit`: **11,172 passed, one failed, 120 deselected**. The failure is the exact-content provider-cache
-  assertion for the edited `docs/design_workflows.md`; all implementation tests passed. After explicit user approval,
-  its provider count was refreshed and the cache-consistency test rerun passed (**1 passed**). Final
-  `make test-regression`: **2,167 passed**. An earlier sandboxed focused run hit six process-fixture permission errors;
-  the aggregate run with process access resolved those errors.
-- `CLAUDE_VERSION=2.1.245 CODEX_VERSION=0.149.1 PYTHON_DOTENV_DISABLED=1 env -u GEMINI_API_KEY ./scripts/test-integration.sh tests/integration/docker/test_worker_native_controls.py tests/integration/core/test_codex_fork_supervisor.py -q -s`:
-  **11 passed**, including the clean wheel and native fork-supervisor composition.
-- `make build`: wheel and source distribution built with pinned build constraints.
-- Live CLI: `forge workflow list-models --available --json`, `forge runtime preflight codex --json`, and blind panels
-  with `-m codex` and `-m claude-opus,codex`. Host Claude **2.1.304**, Codex **0.164.0**; all three worker results were
-  `WORKER_OK`. The final settings-precedence fix also passed a fresh preflight and mixed panel with both results
-  `WORKER_OK`. Codex used ChatGPT subscription auth. Mixed panels used the standard dotenv setup; the preflight reported
-  the installed Codex version as beyond its validated 0.161.0 matrix.
-- No-dotenv path: Codex panel succeeded. Direct Claude refused before dispatch with an actionable missing
-  `ANTHROPIC_API_KEY` diagnostic; the isolated credentials-file fallback also had no Anthropic credential. No auth
-  configuration was changed.
-- Full `make pre-commit`: **passed**, including type checks, secret scanning, Markdown links and file-size limits. The
-  approved workflow count is **27,121 tokens**, above the 25,000 target but below the 30,000 hard limit. Four unchanged
-  documents also retain target warnings. The exact-content provider cache is current.
+- Focused worker, auth, invoker and managed-session tests: **197 passed**. Strengthened regressions first reproduced
+  five failures before the fixes.
+- `make test-unit`: **11,173 passed, 120 deselected**.
+- `make test-regression`: **2,168 passed**. The first aggregate run found two test callers missing the newly required
+  worker argument; those callers were updated, their focused rerun passed, and the full rerun is clean.
+- `make build`: **passed** for wheel and sdist. The built wheel SHA-256 matches both native evidence tracks.
+- Targeted Docker native, auth-isolation, native-fork and release-artifact tests: **16 passed**. The final wheel's
+  pinned native probes and current-version compatibility probes then passed **2 tests each**, retaining 22 native
+  admission cases and two parallel-resume checks in the evidence.
+- Additional live Docker reviewer-auth, old-runtime refusal and headless cost checks: **4 passed** on Claude 2.1.304.
+- `make pre-commit`: **passed**, including type checks, secret scanning, Markdown links and file-size limits. Initial
+  type-inference and import-format failures were corrected before the passing run. The approved workflow document count
+  is **27,346 tokens**, above the 25,000 target and below the 30,000 hard limit.
+- `forge workflow list-models --available --json`, `forge runtime preflight codex --json` and blind Codex/mixed panels:
+  **passed**. Codex preflight and the Codex-only panel ran with `PYTHON_DOTENV_DISABLED=1`; the mixed panel used the
+  existing configured credentials. Every worker returned `WORKER_OK`. Earlier no-dotenv Claude verification refused
+  missing credentials with an actionable diagnostic; no authentication configuration was changed.
 
-The early fixture runs failed during clean dependency setup and then on a Codex positive-control assumption. The final
-passing run uses the existing release-QA install recipe and the discovered native namespace. Those fixture corrections
-did not change the production controls.
+The targeted Docker command was:
+
+```bash
+CLAUDE_VERSION=2.1.245 CODEX_VERSION=0.149.1 PYTHON_DOTENV_DISABLED=1 env -u GEMINI_API_KEY \
+  ./scripts/test-integration.sh \
+  tests/integration/docker/test_worker_native_controls.py \
+  tests/integration/docker/test_supervisor_auth_isolation.py \
+  tests/integration/core/test_codex_fork_supervisor.py \
+  tests/integration/docker/test_qa_release_artifact.py \
+  tests/integration/docker/test_walkthrough_release_artifact.py -q -s
+```
+
+The additional live tests selected `tests/integration/docker/test_reviewer_compatibility.py` and
+`tests/integration/docker/test_real_claude_headless_cost.py` with the existing Anthropic credential,
+`CLAUDE_VERSION=2.1.304 CODEX_VERSION=0.164.0 PYTHON_DOTENV_DISABLED=1`, and Gemini unset.
+
+The final native reruns selected only `tests/integration/docker/test_worker_native_controls.py`. The compatibility run
+set `CLAUDE_VERSION=2.1.304 CODEX_VERSION=0.164.0 FORGE_AUTH_TEST_CLAUDE_VERSION=2.1.304` with the same no-dotenv
+isolation. Docker setup downloads the pinned packages; the actual native probes run offline without provider inference.
+
+[Initial implementation evidence](evidence/native-worker-controls-20261025.json) remains available as a historical
+snapshot; the 2026-10-26 evidence above supersedes its launch arguments and coverage.

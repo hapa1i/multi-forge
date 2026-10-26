@@ -107,7 +107,12 @@ def preflight_supervisor_runtime(config: SupervisorConfig, lane: LaneRecord, *, 
     expires = monotonic() + 15
     try:
         if config.auth_mode == "subscription-only":
-            preflight_subscription(env=subscription_environment(), cwd=cwd, deadline=expires)
+            from forge.core.worker_controls import CLAUDE_WORKER_PROFILE
+
+            env = subscription_environment()
+            control_args: list[str] = list(READ_ONLY_FLAGS)
+            CLAUDE_WORKER_PROFILE.apply(control_args, env)
+            preflight_subscription(env=env, cwd=cwd, deadline=expires, control_args=control_args)
         else:
             from forge.core.reactive.reviewer_settings import inherited_auth_settings
 

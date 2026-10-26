@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from forge.core.reactive.supervisor_auth import (
+    READ_ONLY_FLAGS,
     preflight_subscription,
     subscription_environment,
 )
@@ -18,6 +19,7 @@ def main() -> None:
         env=subscription_environment(),
         cwd=str(root / "project"),
         deadline=time.monotonic() + 20,
+        control_args=READ_ONLY_FLAGS,
     )
     result = {
         "synthetic": True,

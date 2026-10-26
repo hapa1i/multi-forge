@@ -50,7 +50,7 @@ def test_o021_generic_unknown_option_does_not_retry_or_latch(
         returncode=2,
     )
 
-    result = run_claude_session("prompt")
+    result = run_claude_session("prompt", worker=False)
 
     assert result.returncode == 2
     assert mock_run.call_count == 1

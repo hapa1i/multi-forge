@@ -80,7 +80,7 @@ def _only_downstream_attempt() -> DownstreamRecord:
 @patch("forge.core.reactive.session_runner.subprocess.run")
 def test_direct_claude_verb_downstream_keeps_cache_writes(mock_run: MagicMock) -> None:
     mock_run.return_value = MagicMock(stdout=_direct_envelope(), stderr="", returncode=0)
-    result = run_claude_session("prompt")
+    result = run_claude_session("prompt", worker=False)
 
     emit_usage_for_session_result(replace(result, run_id="run-verb"), command="memory-writer", direct=True)
 

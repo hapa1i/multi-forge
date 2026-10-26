@@ -1,44 +1,32 @@
 """Workers inherited native delegation and memory settings from their executor."""
 
 import json
+import os
 import subprocess
+from dataclasses import replace
 from unittest.mock import patch
 
 import pytest
 
 from forge.core.invoker import HeadlessRequest
 from forge.core.reactive.session_runner import run_claude_session
+from forge.core.worker_controls import CLAUDE_WORKER_PROFILE
 from forge.review.engine import _prepare_worker
-from tests.src.review.test_engine import (
-    _codex_preflight,
-    _codex_spec,
-    _routing_result,
-    _runtime_native_result,
-    _spec,
+from tests.fixtures.review_workers import (
+    HOSTILE_ENV,
+)
+from tests.fixtures.review_workers import (
+    assert_claude_worker_controls as _assert_claude_controls,
+)
+from tests.fixtures.review_workers import make_codex_preflight as _codex_preflight
+from tests.fixtures.review_workers import make_codex_spec as _codex_spec
+from tests.fixtures.review_workers import make_model_spec as _spec
+from tests.fixtures.review_workers import make_routing_result as _routing_result
+from tests.fixtures.review_workers import (
+    runtime_native_result as _runtime_native_result,
 )
 
 pytestmark = pytest.mark.regression
-
-HOSTILE_ENV = {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "CLAUDE_CODE_FORK_SUBAGENT": "1",
-    "CLAUDE_CODE_DISABLE_WORKFLOWS": "0",
-    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "0",
-}
-
-
-def _assert_claude_controls(argv, env):
-    assert env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "0"
-    assert env["CLAUDE_CODE_FORK_SUBAGENT"] == "0"
-    assert env["CLAUDE_CODE_DISABLE_WORKFLOWS"] == "1"
-    assert env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] == "1"
-    index = argv.index("--disallowedTools")
-    assert argv[index + 1 : index + 4] == ["Agent", "Workflow", "SendMessage"]
-    assert "--disable-slash-commands" in argv
-    settings = [json.loads(value) for flag, value in zip(argv, argv[1:]) if flag == "--settings"]
-    assert settings, "settings.env must not overwrite the process environment's native controls"
-    for projected in settings:
-        assert projected["env"] == {key: env[key] for key in HOSTILE_ENV}
 
 
 @pytest.mark.parametrize("api_key", [None, "fixture-key"])
@@ -61,6 +49,7 @@ def test_claude_review_worker_overrides_inherited_native_capabilities(monkeypatc
     assert isinstance(request, HeadlessRequest)
     _assert_claude_controls(request.argv, request.env)
     assert request.argv[request.argv.index("--resume") + 1] == "existing-worker"
+    assert "--fork-session" in request.argv
 
 
 @pytest.mark.parametrize("route", ["subscription", "api", "proxy", "subscription-only", "inherited-helper"])
@@ -79,7 +68,11 @@ def test_consumer_profile_survives_overrides_unsets_and_format_retry(monkeypatch
         return subprocess.CompletedProcess(argv, 0, "review complete", "")
 
     subscription_only = route == "subscription-only"
+    profile = replace(
+        CLAUDE_WORKER_PROFILE, settings={**CLAUDE_WORKER_PROFILE.settings, "permissions": {"deny": ["WebFetch"]}}
+    )
     with (
+        patch("forge.core.reactive.session_runner.CLAUDE_WORKER_PROFILE", profile),
         patch("forge.core.reactive.session_runner.subprocess.run", side_effect=execute),
         patch("forge.core.reactive.watchdog.run_guarded", side_effect=execute),
         patch("forge.core.reactive.reviewer_runtime.require_reviewer_runtime", return_value="claude"),
@@ -121,6 +114,7 @@ def test_consumer_profile_survives_overrides_unsets_and_format_retry(monkeypatch
         if route == "inherited-helper":
             assert env["FORGE_REVIEWER_API_KEY_HELPER"] == "fixture-private-helper"
             assert "fixture-private-helper" not in " ".join(argv)
+            assert json.loads(argv[argv.index("--settings") + 1])["permissions"] == {"deny": ["WebFetch"]}
     assert "--output-format" in calls[0][0]
     assert "--output-format" not in calls[1][0]
 
@@ -130,7 +124,7 @@ def test_shared_claude_runner_preserves_root_native_choices(monkeypatch):
         monkeypatch.setenv(name, value)
     with patch("forge.core.reactive.session_runner.subprocess.run") as run:
         run.return_value = subprocess.CompletedProcess([], 0, "done", "")
-        result = run_claude_session("Root work", output_format=None)
+        result = run_claude_session("Root work", worker=False, output_format=None)
     assert result.success
     assert "--disallowedTools" not in run.call_args.args[0]
     assert "--disable-slash-commands" not in run.call_args.args[0]
@@ -153,3 +147,43 @@ def test_codex_review_worker_disables_native_agents_and_memory():
     assert "agents.enabled=false" in config
     assert "memories.use_memories=false" in config
     assert "memories.generate_memories=false" in config
+
+
+def test_subscription_checks_the_final_worker_configuration(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        os,
+        "environ",
+        {
+            "HOME": str(tmp_path),
+            "FORGE_HOME": str(tmp_path / ".forge"),
+            "PATH": os.environ["PATH"],
+            "PYTHON_DOTENV_DISABLED": "1",
+        },
+    )
+    calls = []
+
+    def guarded(argv, **kwargs):
+        calls.append((list(argv), dict(kwargs["env"]), kwargs["cwd"]))
+        status = {"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty", "subscriptionType": "max"}
+        return subprocess.CompletedProcess(argv, 0, json.dumps(status) if "auth" in argv else "verdict", "")
+
+    with (
+        patch("forge.core.reactive.supervisor_auth.validate_subscription_location", return_value="claude_max"),
+        patch("forge.core.reactive.supervisor_auth.require_reviewer_runtime", return_value="/verified/claude"),
+        patch("forge.core.reactive.supervisor_auth.run_guarded", side_effect=guarded),
+        patch("forge.core.reactive.watchdog.run_guarded", side_effect=guarded),
+    ):
+        result = run_claude_session(
+            "review",
+            worker=True,
+            direct=True,
+            read_only=True,
+            subscription_only=True,
+            cwd=str(tmp_path),
+            output_format=None,
+        )
+    assert result.success, result.error
+    auth, dispatch = calls
+    assert auth[1:] == dispatch[1:]
+    assert auth[0][1:-3] == dispatch[0][2:]
+    _assert_claude_controls(dispatch[0], dispatch[1])

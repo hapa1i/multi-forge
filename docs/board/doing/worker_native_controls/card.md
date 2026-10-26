@@ -31,12 +31,15 @@ the version-sensitive control baseline. Environment switches alone do not remove
   `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`. The pinned Claude 2.1.245 probe confirmed that a `context: fork` skill can create
   a child with only the originally listed controls; `--disable-slash-commands` closes that admission path. CLI
   `--settings` repeats the four fixed environment values to prevent inherited `settings.env` from re-enabling worker
-  capabilities. Auth-helper projection preserves this override.
-- Codex worker requests include `-c agents.enabled=false`, `-c memories.use_memories=false`, and
-  `-c memories.generate_memories=false`.
+  capabilities. The launcher composes the complete profile and auth-helper projection into a single settings payload
+  before subscription authentication checks; dispatch uses that same configuration.
+- Codex worker requests include `--disable multi_agent`, `-c agents.enabled=false`, `-c memories.use_memories=false`,
+  and `-c memories.generate_memories=false`.
 - Put restrictions in the durable base request used by retries/resumes, after caller environment removal/overrides.
   Cover Claude API-key `--bare`, subscription and proxy paths. A main session's memory allowance cannot relax a worker's
   profile.
+- Resumed Claude reviews fork the source with `--fork-session`; parallel workers must leave the source transcript
+  unchanged and receive separate native session IDs. Claude launchers require explicit worker selection.
 - Record emitted controls and runtime-version verification in worker evidence. Do not infer historical absence of
   delegation or memory use from arguments alone. No new session manifest schema is required for this card.
 - The pinned-runtime probe must verify native admission paths, including fork-context skills. If the listed switches
@@ -50,14 +53,15 @@ monitoring. Native tool controls do not govern arbitrary external processes laun
 
 ## Acceptance
 
-| Test                        | Fixture and assertion                                                                                                       | Test file                                                                                                |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Worker selection            | Review and all consumer-lane callers opt into the profile; ordinary managed roots do not                                    | `tests/src/review/test_engine.py`, `tests/src/core/reactive/test_session_runner.py`                      |
-| Claude controls             | Hostile inherited settings cannot erase tool, team, fork, workflow or memory restrictions                                   | `tests/regression/test_bug_worker_native_delegation.py`, `tests/src/core/invoker/test_claude_invoker.py` |
-| Codex controls              | Worker overrides present; managed exec/resume requests retain their normal delegation configuration                         | `tests/src/core/invoker/test_codex_invoker.py`, `tests/src/core/ops/test_codex_session.py`               |
-| Retry and environment order | JSON-format retry, resumed worker and late env unsets preserve the same worker restrictions                                 | `tests/src/core/invoker/test_claude_invoker.py`, `tests/src/core/reactive/test_session_runner.py`        |
-| Pinned runtime              | Claude/Codex worker probes verify native delegation unavailable, including fork-context skills, and memory controls emitted | `tests/integration/docker/test_worker_native_controls.py`                                                |
-| Clean installation          | Wheel-installed workers exercise both runtime paths; verification names runtime and wheel versions                          | `tests/integration/docker/test_worker_native_controls.py`                                                |
+| Test               | Fixture and assertion                                                                            | Test file                                                                                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worker selection   | All consumer lanes opt in; shared Claude callers must choose explicitly                          | `tests/src/session/test_memory_writer.py`, `tests/src/session/test_shadow_curation.py`, `tests/src/policy/semantic/test_supervisor.py`, `tests/src/policy/team/test_handlers.py` |
+| Claude controls    | Hostile settings, overrides, unsets and retries retain the profile                               | `tests/regression/test_bug_worker_native_delegation.py`, `tests/src/core/invoker/test_claude_invoker.py`                                                                         |
+| Auth composition   | One settings payload retains the helper and full profile; auth and dispatch snapshots match      | `tests/regression/test_bug_worker_native_delegation.py`, `tests/src/core/reactive/test_supervisor_auth.py`                                                                       |
+| Codex controls     | Fresh/resumed workers are restricted; managed exec/resume keep normal configuration              | `tests/src/core/invoker/test_codex_invoker.py`, `tests/src/core/ops/test_codex_session.py`                                                                                       |
+| Native admission   | Pinned runtimes reject delegation; an admitted Claude reviewer exercises the guarded helper path | `tests/integration/docker/test_worker_native_controls.py`                                                                                                                        |
+| Parallel resume    | Two actual workers fork one source into distinct sessions without changing its bytes             | `tests/integration/docker/test_worker_native_controls.py`                                                                                                                        |
+| Clean installation | Native probes use the installed wheel and record runtime and wheel identities                    | `tests/integration/docker/test_worker_native_controls.py`                                                                                                                        |
 
 The pinned-runtime and clean-install assertions are implemented in
 `tests/integration/docker/test_worker_native_controls.py` with the reusable local-upstream fixture

@@ -557,7 +557,7 @@ Reference details for [Policy and Enforcement](#1-policy-enforcement).
 | Utility            | Extracted from                      | API                                                                                                  |
 | ------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | LLM transport      | five direct-call consumers          | `complete_llm_call(model, messages, provider?, hyperparams?) -> (response, latency_ms, request_id?)` |
-| Session runner     | `supervisor.py`, `memory_writer.py` | `run_claude_session(prompt, resume_id?, model?, base_url?, timeout, unset_env_vars?)`                |
+| Session runner     | `supervisor.py`, `memory_writer.py` | `run_claude_session(prompt, worker=True, resume_id?, model?, base_url?, timeout, unset_env_vars?)`   |
 | Proxy resolution   | both                                | `resolve_base_url(proxy_id?, explicit_url?, fallbacks)`                                              |
 | Throttle cache     | `policy/store.py`                   | `ThrottleCache(ttl).check(key) / .update(key, value)`                                                |
 | Structured output  | `verdict.py`                        | `extract_json_verdict(stdout, schema)`                                                               |
@@ -587,7 +587,7 @@ class MigrationReviewPolicy(DeterministicPolicy):
         tags = tag_action(ctx, model="haiku", prompt="Is this a schema migration? tags: migration | safe")
         if "migration" not in tags:
             return self._allow()
-        verdict = run_claude_session(prompt=REVIEW_PROMPT.format(...), resume_id=config.resume_id)
+        verdict = run_claude_session(prompt=REVIEW_PROMPT.format(...), worker=True, resume_id=config.resume_id)
         return verdict_to_decision(verdict)
 ```
 
@@ -735,26 +735,32 @@ prompt run in that environment.
 
 **Worker native controls:** `core/worker_controls.py` owns the fixed profiles selected explicitly by review workers,
 semantic/team supervisors, memory writer and shadow curation. `run_claude_session(worker=True)` applies its profile
-after caller environment overrides/removals; review preparation applies the same profile to its durable base request.
-Claude receives `--disallowedTools Agent Workflow SendMessage`, `--disable-slash-commands`, and environment values
-`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=0`, `CLAUDE_CODE_FORK_SUBAGENT=0`, `CLAUDE_CODE_DISABLE_WORKFLOWS=1`, and
-`CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`. Disabling skills closes the `context: fork` path that can create a child even with
-`Agent` denied. A CLI `--settings` override repeats these four fixed environment values because inherited `settings.env`
-can override the process environment. Auth-helper projection preserves that override. Both API-key bare mode and
-non-bare subscription/proxy workers receive these controls.
+after caller environment overrides/removals; its required `worker` argument makes selection explicit. Review preparation
+applies the same profile to its durable base request. Claude receives `--disallowedTools Agent Workflow SendMessage`,
+`--disable-slash-commands`, and environment values `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=0`,
+`CLAUDE_CODE_FORK_SUBAGENT=0`, `CLAUDE_CODE_DISABLE_WORKFLOWS=1`, and `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`. Disabling
+skills closes the `context: fork` path that can create a child even with `Agent` denied. A CLI `--settings` override
+repeats these four fixed environment values because inherited `settings.env` can override the process environment. The
+launcher composes worker settings and the projected auth helper into one `--settings` payload, preserving the complete
+profile. Subscription auth checks receive the finalized environment and control arguments used for dispatch. Both
+API-key bare mode and non-bare subscription/proxy workers receive these controls.
 
-`prepare_codex_request(worker=True)` appends `-c agents.enabled=false`, `-c memories.use_memories=false`, and
-`-c memories.generate_memories=false` after caller options and before `resume`. Native fork reviewers apply the same
-profile on the fork leaf, alongside their stronger customization/auth restrictions. JSON-format retry removes only the
-output-format option; it retains worker controls and resume/fork intent. Shared helpers default to ordinary launches, so
-managed root delegation and memory choices are preserved.
+`prepare_codex_request(worker=True)` appends `--disable multi_agent`, `-c agents.enabled=false`,
+`-c memories.use_memories=false`, and `-c memories.generate_memories=false` after caller options and before `resume`.
+Native fork reviewers apply the same profile on the fork leaf, alongside their stronger customization/auth restrictions.
+JSON-format retry removes only the output-format option; it retains worker controls and resume/fork intent. Review
+workers use `--resume --fork-session` so parallel reviews create separate children and preserve the source transcript.
+Codex shared helpers default to ordinary launches; the Claude helper requires explicit selection. Managed root
+delegation and memory choices are preserved.
 
 Profiles log their emitted arguments and fixed environment values at debug level. The offline native admission test
 (`tests/integration/docker/test_worker_native_controls.py`) records exact CLI/wheel versions, controls, tool admission,
 and child-transcript evidence from a clean wheel. It includes a fork-skill positive control, Claude auto-memory prompt
-checks against hostile settings, and a Codex root that can delegate. Emitted Codex memory settings are configuration
-evidence, not proof of historical non-use. These native controls do not restrict arbitrary external processes launched
-through Bash or MCP; `FORGE_DEPTH` remains a separate guard on Forge recursion.
+checks against hostile settings, a guarded helper-backed reviewer on an admitted Claude version, parallel resume
+transcript checks, and a Codex root that can delegate through discovered or directly advertised tools. The bare-mode
+case is compatibility evidence: bare mode already excludes Skill without the profile. Emitted Codex memory settings are
+configuration evidence, not proof of historical non-use. These native controls do not restrict arbitrary external
+processes launched through Bash or MCP; `FORGE_DEPTH` remains a separate guard on Forge recursion.
 
 Claude skill packages can declare `effort: high|medium|low` in emitted `SKILL.md` frontmatter (Claude Code 2.1.80+).
 Portable sources place this Claude-only field under the manifest's adapter data; it is not emitted into Codex

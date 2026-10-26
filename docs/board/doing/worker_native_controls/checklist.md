@@ -1,8 +1,8 @@
 # Worker native controls checklist
 
-**Current focus:** Prepare the standalone draft PR for review. Implementation and required local checks are complete,
-including clean-wheel native probes and the final mixed live panel. Branch: `codex/worker-native-controls`; base:
-`b8e184bd`.
+**Current focus:** Review and merge of [PR #282](https://github.com/hapa1i/multi-forge/pull/282). Branch:
+`codex/worker-native-controls`; base: `b8e184bd`. Review fixes and fresh verification are complete; see
+[verification](verification.md).
 
 M0 executes independently. Managed-root delegation and memory policy, child capture and other epic members remain
 outside scope. Preserve the pre-existing `AGENTS.md` working-tree edit.
@@ -20,7 +20,7 @@ outside scope. Preserve the pre-existing `AGENTS.md` working-tree edit.
 - [x] Preserve restrictions across JSON-format retries, resume/fork requests, all auth paths and Codex consumer lanes.
 - [x] Keep managed root exec/resume and interactive launches outside the worker profile.
 - [x] Record emitted controls, runtime/wheel identities and verified behavior without claiming historical non-use. See
-  [verification](verification.md) and [native evidence](evidence/native-worker-controls-20261025.json).
+  [verification](verification.md) and [native evidence](evidence/native-worker-controls-20261026.json).
 
 ## Acceptance
 
@@ -33,7 +33,19 @@ outside scope. Preserve the pre-existing `AGENTS.md` working-tree edit.
 | Native admission  | Real pinned binaries and isolated local upstream             | Delegation tools and fork-context skills cannot create native children | Targeted Docker/workflow integration tests           |
 | Installed package | Clean wheel and both runtime paths                           | Packaged code emits the same controls; evidence names exact versions   | Workflow integration and clean-wheel checks          |
 
-## Validation and closeout
+## Review fixes
+
+- [x] Fork resumed panel workers and prove parallel workers preserve the original transcript.
+- [x] Compose worker and auth-helper settings once; verify subscription auth against the final dispatch configuration.
+- [x] Require explicit Claude worker selection, remove duplicate flags and add the Codex feature disable.
+- [x] Add admitted read-only/helper runtime coverage, label bare-mode compatibility evidence accurately and support both
+  directly advertised and discovered Codex tools.
+- [x] Extract shared test builders/assertions and wheel/image helpers; correct the acceptance-table test locations.
+- [x] Run focused and relevant Docker tests, aggregate checks, build and live panel checks for the revised head. Unit:
+  11,173 passed. Regression: 2,168 passed. Targeted Docker: 16 synthetic/packaging and 4 live tests passed; final
+  pinned/current native probes passed 2 tests each. Full pre-commit, build and live panels passed.
+
+## Initial validation (2026-10-25)
 
 - [x] Run focused unit/regression tests and applicable Docker integration tests: final pinned probes and native fork
   composition, 11 passed; final live mixed panel, both workers succeeded.
@@ -44,4 +56,7 @@ outside scope. Preserve the pre-existing `AGENTS.md` working-tree edit.
   cache-consistency rerun passed. Full `make pre-commit` passed, including file-size limits.
 - [x] Record limitations and review the final diff. The pre-existing `AGENTS.md` edit is unchanged and unstaged.
 - [x] Prepare the reviewed implementation and verification for the standalone PR.
+
+## Closeout
+
 - [ ] After merge, verify the merged tree and CI, record closeout and move the card to done.

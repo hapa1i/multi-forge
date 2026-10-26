@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.metadata
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -22,6 +24,7 @@ from forge.core.invoker import (
 )
 from forge.core.reactive.routing import ModelRoute, RoutingResult
 from forge.core.reactive.session_runner import SessionResult, run_claude_session
+from forge.core.reactive.watchdog import run_guarded
 from forge.core.runtime.codex_preflight import CodexPreflight
 from forge.review.engine import _prepare_worker
 from forge.review.models import ModelSpec
@@ -154,12 +157,14 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         tool = self.server.tool if len(self.server.requests) == 1 else ""
         if self.server.runtime == "codex" and self.server.tool:
-            # Agent tools are deferred and namespaced in the pinned runtime. Exercise discovery before admission.
-            tool = (
-                "tool_search"
-                if len(self.server.requests) == 1
-                else self.server.tool if len(self.server.requests) == 2 else ""
-            )
+            # Some admitted versions advertise the namespace directly; older ones defer it to search.
+            advertised = tool_names(self.server.requests[0].get("tools", []))
+            if "multi_agent_v1.spawn_agent" not in advertised:
+                tool = (
+                    "tool_search"
+                    if len(self.server.requests) == 1
+                    else self.server.tool if len(self.server.requests) == 2 else ""
+                )
         events = claude_events(tool) if self.server.runtime == "claude" else codex_events(tool)
         for event in events:
             self.wfile.write(("event: " + event["type"] + "\ndata: " + json.dumps(event) + "\n\n").encode())
@@ -229,6 +234,52 @@ def codex_request(repo: Path, worker: bool, resume_id: str | None = None) -> Hea
     )
 
 
+def tool_names(tools: list[dict], namespace: str = "") -> set[str]:
+    names = set()
+    for tool in tools:
+        name = tool.get("name", tool.get("type", ""))
+        qualified = f"{namespace}.{name}" if namespace else name
+        if "tools" in tool:
+            names.update(tool_names(tool["tools"], qualified))
+        else:
+            names.add(qualified)
+    return names
+
+
+def claude_request(repo: Path, base: str, resume_id: str | None = None, label: str = "probe") -> HeadlessRequest:
+    route = ModelRoute(
+        provider="openrouter",
+        credential="fixture",
+        family="anthropic",
+        template_id=None,
+        template_family=None,
+        model_ref="claude-haiku-4-5",
+    )
+    prepared = _prepare_worker(
+        ModelSpec(
+            name=label,
+            model_id="claude-haiku-4-5",
+            family="anthropic",
+            description="fixture",
+        ),
+        RoutingResult(
+            base_url=base,
+            proxy_id=None,
+            template=None,
+            source="preferred_proxy",
+            route=route,
+            credential=None,
+        ),
+        prompt="Reply PROBE_DONE",
+        cwd=str(repo),
+        resume_id=resume_id,
+        timeout_seconds=30,
+        attribution=None,
+    )
+    assert isinstance(prepared, HeadlessRequest), prepared
+    return prepared
+
+
 def run_probe(runtime: str, tool: str, mode: str, bare: bool = False) -> dict:
     with tempfile.TemporaryDirectory(prefix="native-worker-") as root:
         home = Path(root)
@@ -239,6 +290,13 @@ def run_probe(runtime: str, tool: str, mode: str, bare: bool = False) -> dict:
         threading.Thread(target=server.serve_forever, daemon=True).start()
         base = f"http://127.0.0.1:{server.server_port}"
         env = configure(home, runtime, base, bare)
+        if mode == "reviewer":
+            settings_path = home / ".claude/settings.json"
+            settings = json.loads(settings_path.read_text())
+            settings["apiKeyHelper"] = "printf fixture-not-a-provider-key"
+            settings_path.write_text(json.dumps(settings))
+            env.pop("ANTHROPIC_AUTH_TOKEN", None)
+            env.pop("ANTHROPIC_API_KEY", None)
         calls: list[tuple[list[str], dict[str, str]]] = []
         run = subprocess.run
 
@@ -246,6 +304,10 @@ def run_probe(runtime: str, tool: str, mode: str, bare: bool = False) -> dict:
             if "-p" in argv:
                 calls.append((list(argv), dict(kwargs["env"])))
             return run(argv, **kwargs)
+
+        def record_guarded(argv, **kwargs):
+            calls.append((list(argv), dict(kwargs["env"])))
+            return run_guarded(argv, **kwargs)
 
         result: HeadlessResult | SessionResult | None
         try:
@@ -270,14 +332,18 @@ def run_probe(runtime: str, tool: str, mode: str, bare: bool = False) -> dict:
                     request = codex_request(repo, worker=mode != "root", resume_id=resume_id)
                     calls.append((request.argv, request.env))
                     result = CodexHeadlessInvoker().run(request)
-                elif mode == "consumer":
-                    with patch(
-                        "forge.core.reactive.session_runner.subprocess.run",
-                        side_effect=record,
+                elif mode in {"consumer", "reviewer"}:
+                    with (
+                        patch(
+                            "forge.core.reactive.session_runner.subprocess.run",
+                            side_effect=record,
+                        ),
+                        patch("forge.core.reactive.watchdog.run_guarded", side_effect=record_guarded),
                     ):
                         result = run_claude_session(
                             "Reply PROBE_DONE",
                             worker=True,
+                            read_only=mode == "reviewer",
                             model="claude-haiku-4-5",
                             base_url=base,
                             cwd=str(repo),
@@ -317,37 +383,7 @@ def run_probe(runtime: str, tool: str, mode: str, bare: bool = False) -> dict:
                     assert completed.returncode == 0, completed.stderr
                     result = None
                 else:
-                    route = ModelRoute(
-                        provider="openrouter",
-                        credential="fixture",
-                        family="anthropic",
-                        template_id=None,
-                        template_family=None,
-                        model_ref="claude-haiku-4-5",
-                    )
-                    prepared = _prepare_worker(
-                        ModelSpec(
-                            name="probe",
-                            model_id="claude-haiku-4-5",
-                            family="anthropic",
-                            description="fixture",
-                        ),
-                        RoutingResult(
-                            base_url=base,
-                            proxy_id=None,
-                            template=None,
-                            source="preferred_proxy",
-                            route=route,
-                            credential=None,
-                        ),
-                        prompt="Reply PROBE_DONE",
-                        cwd=str(repo),
-                        resume_id=None,
-                        timeout_seconds=30,
-                        attribution=None,
-                    )
-                    assert isinstance(prepared, HeadlessRequest), prepared
-                    request = prepared
+                    request = claude_request(repo, base)
                     calls.append((request.argv, request.env))
                     result = ClaudeHeadlessInvoker().run(request)
                 if result is not None:
@@ -362,10 +398,7 @@ def run_probe(runtime: str, tool: str, mode: str, bare: bool = False) -> dict:
             for req in server.requests:
                 for item in req.get("input", []):
                     if isinstance(item, dict) and item.get("type") == "tool_search_output":
-                        for namespace in item.get("tools", []):
-                            discovered.update(
-                                f"{namespace['name']}.{tool['name']}" for tool in namespace.get("tools", [])
-                            )
+                        discovered.update(tool_names(item.get("tools", [])))
                 outputs.extend(
                     item["output"]
                     for item in req.get("input", [])
@@ -387,6 +420,8 @@ def run_probe(runtime: str, tool: str, mode: str, bare: bool = False) -> dict:
                 "tools": tools,
                 "tool_outputs": sorted({output.split("\n\n<system-reminder>")[0] for output in outputs}),
                 "discovered_tools": sorted(discovered),
+                "advertised_tools": sorted(set().union(*(tool_names(req.get("tools", [])) for req in server.requests))),
+                "purpose": "bare compatibility" if bare else "native admission",
                 "auto_memory_prompt": any(
                     "# auto memory" in block.get("text", "")
                     for req in server.requests
@@ -402,25 +437,75 @@ def run_probe(runtime: str, tool: str, mode: str, bare: bool = False) -> dict:
             server.server_close()
 
 
+def run_parallel_resume_probe() -> dict:
+    """Two real review workers must fork the same native source without rewriting it."""
+    with tempfile.TemporaryDirectory(prefix="native-resume-") as root:
+        home = Path(root)
+        repo = home / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        server = Upstream("claude", "")
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{server.server_port}"
+        env = configure(home, "claude", base, False)
+        try:
+            with patch.dict(os.environ, env, clear=True):
+                seed = subprocess.run(
+                    ["claude", "-p", "--model", "claude-haiku-4-5", "--output-format", "json"],
+                    input="Seed conversation",
+                    cwd=repo,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                assert seed.returncode == 0, seed.stderr
+                source_id = json.loads(seed.stdout)["session_id"]
+                transcript = next(home.rglob(source_id + ".jsonl"))
+                before = transcript.read_bytes()
+                existing = set(transcript.parent.glob("*.jsonl"))
+                requests = [claude_request(repo, base, source_id, label=f"worker-{i}") for i in range(2)]
+                results = ClaudeHeadlessInvoker().run_parallel(requests)
+                assert all(result.success for result in results), results
+                children = sorted(path.stem for path in set(transcript.parent.glob("*.jsonl")) - existing)
+                after = transcript.read_bytes()
+                assert before == after, "Review workers changed the source transcript"
+                assert len(children) == 2 and source_id not in children, children
+                return {
+                    "source_session_id": source_id,
+                    "worker_session_ids": children,
+                    "source_sha256_before": hashlib.sha256(before).hexdigest(),
+                    "source_sha256_after": hashlib.sha256(after).hexdigest(),
+                    "worker_argv": [request.argv for request in requests],
+                }
+        finally:
+            server.shutdown()
+            server.server_close()
+
+
 if __name__ == "__main__":
-    cases: list[tuple[str, str, str, bool]] = [
-        ("claude", "Skill", "legacy", False),
-        ("claude", "Agent", "review", False),
-        ("claude", "Skill", "review", False),
-        ("claude", "Skill", "review", True),
-        ("claude", "Workflow", "consumer", False),
-        ("claude", "SendMessage", "consumer", False),
-        ("claude", "Skill", "consumer", False),
-        ("codex", "spawn_agent", "root", False),
-        ("codex", "spawn_agent", "worker", False),
-        ("codex", "spawn_agent", "resume", False),
-    ]
-    print(
-        json.dumps(
-            {
-                "forge_version": importlib.metadata.version("multi-forge"),
-                "forge_file": forge.__file__,
-                "probes": [run_probe(*case) for case in cases],
-            }
-        )
+    reviewer_only = sys.argv[1:] == ["reviewer"]
+    cases: list[tuple[str, str, str, bool]] = (
+        [("claude", "Skill", "reviewer", False)]
+        if reviewer_only
+        else [
+            ("claude", "Skill", "legacy", False),
+            ("claude", "Agent", "review", False),
+            ("claude", "Skill", "review", False),
+            ("claude", "Skill", "review", True),
+            ("claude", "Workflow", "consumer", False),
+            ("claude", "SendMessage", "consumer", False),
+            ("claude", "Skill", "consumer", False),
+            ("codex", "spawn_agent", "root", False),
+            ("codex", "spawn_agent", "worker", False),
+            ("codex", "spawn_agent", "resume", False),
+        ]
     )
+    evidence: dict[str, object] = {
+        "forge_version": importlib.metadata.version("multi-forge"),
+        "forge_file": forge.__file__,
+        "probes": [run_probe(*case) for case in cases],
+    }
+    if not reviewer_only:
+        evidence["parallel_resume"] = run_parallel_resume_probe()
+    print(json.dumps(evidence))
