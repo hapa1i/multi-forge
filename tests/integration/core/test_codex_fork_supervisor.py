@@ -111,6 +111,15 @@ def test_native_allow_and_deny_use_one_invoker_with_immutable_audit(native_revie
         assert call["stdin_chars"] > 100 and call["cwd"] == context.repo_root
         assert not {"FORGE_SESSION", "FORGE_ROOT_RUN_ID", "FORGE_RUN_ID", "FORGE_DEV"} & set(call["env_keys"])
         assert call["argv"].index('forced_login_method="chatgpt"') > call["argv"].index("fork")
+        for control in (
+            "agents.enabled=false",
+            "memories.use_memories=false",
+            "memories.generate_memories=false",
+        ):
+            assert call["argv"].index(control) > call["argv"].index("fork")
+        assert "--ignore-user-config" in call["argv"] and "--ignore-rules" in call["argv"]
+        disabled = [value for flag, value in zip(call["argv"], call["argv"][1:]) if flag == "--disable"]
+        assert disabled == ["hooks", "apps", "plugins", "multi_agent"]
     records = read_attempts("executor")
     assert len(records) == 3
     for record in records:

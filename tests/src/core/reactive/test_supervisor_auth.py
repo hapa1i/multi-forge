@@ -96,7 +96,7 @@ def test_preflight_and_dispatch_share_one_final_environment(personal_login, monk
     calls = []
 
     def guarded(argv, **kwargs):
-        calls.append((argv, kwargs))
+        calls.append((list(argv), {**kwargs, "env": dict(kwargs["env"])}))
         output = "2.1.291 (Claude Code)" if "--version" in argv else json.dumps(status) if "auth" in argv else "verdict"
         return subprocess.CompletedProcess(argv, 0, output, "")
 
@@ -109,12 +109,18 @@ def test_preflight_and_dispatch_share_one_final_environment(personal_login, monk
         ),
     ):
         result = run_claude_session(
-            "review", direct=True, read_only=True, subscription_only=True, cwd=str(personal_login), timeout_seconds=10
+            "review",
+            worker=True,
+            direct=True,
+            read_only=True,
+            subscription_only=True,
+            cwd=str(personal_login),
+            timeout_seconds=10,
         )
     assert result.dispatched is accepted
     assert len(calls) == (2 if accepted else 1)
     assert all("ANTHROPIC_API_KEY" not in kwargs["env"] for _, kwargs in calls)
-    assert len({id(kwargs["env"]) for _, kwargs in calls}) == 1
+    assert all(kwargs["env"] == calls[0][1]["env"] for _, kwargs in calls)
     if accepted:
         assert result.child_billing_mode == "subscription_quota"
         assert calls[-1][0][0] == "/verified/claude"

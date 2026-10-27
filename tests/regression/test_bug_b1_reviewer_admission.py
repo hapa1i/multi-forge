@@ -53,7 +53,7 @@ def test_unsupported_reviewer_never_attempts_inference():
         ),
         patch("forge.core.reactive.watchdog.run_guarded") as dispatch,
     ):
-        result = run_claude_session("review", read_only=True)
+        result = run_claude_session("review", worker=False, read_only=True)
     assert not result.dispatched
     assert "claude update" in result.error
     dispatch.assert_not_called()

@@ -24,7 +24,7 @@ def test_output_format_retry_uses_remaining_budget(monkeypatch):
         return subprocess.CompletedProcess(argv, 0, "ok", "")
 
     monkeypatch.setattr(session_runner.subprocess, "run", run)
-    result = session_runner.run_claude_session("review", timeout_seconds=45)
+    result = session_runner.run_claude_session("review", worker=True, timeout_seconds=45)
     assert result.success
     assert len(timeouts) == 2
     assert 0 < timeouts[1] <= 1
@@ -60,7 +60,7 @@ from forge.core.reactive.session_runner import run_claude_session
 # This test owns output-format negotiation, not cold admission startup latency.
 require_reviewer_runtime(env=build_claude_env(), deadline=time.monotonic()+10)
 start=time.monotonic()
-r=run_claude_session('review',timeout_seconds=2,read_only=True)
+r=run_claude_session('review',worker=True,timeout_seconds=2,read_only=True)
 print(json.dumps({'timed_out':r.timed_out,'elapsed':time.monotonic()-start,'error':r.error,'dispatched':r.dispatched}))
 """
     env = dict(os.environ, PATH=str(tmp_path) + os.pathsep + os.environ["PATH"])

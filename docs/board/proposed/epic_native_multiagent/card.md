@@ -1,8 +1,9 @@
 # Epic: Native multi-agent -- children, delegation envelope, single-agent handoff
 
 **Epic** -- coordinating card governed by the [board contract](../../../developer/board_contract.md). Lane: `proposed/`.
-Position established and reviewed on 2026-09-06; not accepted for implementation. This revision splits independent
-capabilities and preserves the unresolved runtime probe gates.
+Position established and reviewed on 2026-09-06; the broader epic is not accepted for implementation. M0 was selected
+for standalone execution on 2026-10-25; other members remain proposed. This revision splits independent capabilities and
+preserves the unresolved runtime probe gates.
 
 **Origin**: supersedes [team_orchestration](../../retired/team_orchestration/card.md), retired on 2026-09-06 as
 non-implementable. Its shipped team gates remain normative in `docs/design_workflows.md` §1.2. The old topology,
@@ -87,7 +88,7 @@ Original ids remain recognizable; M3 and M8 have split suffixes, M0 is the early
 
 | Id  | Card                                                                      | Independently shippable outcome                                  | Depends on          |
 | --- | ------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------- |
-| M0  | [worker_native_controls](../worker_native_controls/card.md)               | Worker-only native delegation and memory restrictions            | --                  |
+| M0  | [worker_native_controls](../../doing/worker_native_controls/card.md)      | Worker-only native delegation and memory restrictions            | --                  |
 | M1  | [child_conversation_identity](../child_conversation_identity/card.md)     | Probed Claude root/child lifecycle ownership                     | --                  |
 | M2  | [transfer_summarizer_fidelity](../transfer_summarizer_fidelity/card.md)   | Block-list results and delegation descriptions retained          | --                  |
 | M3a | [child_transcript_snapshots](../child_transcript_snapshots/card.md)       | Common reader/citations, Claude child/team capture               | M1                  |

@@ -3,6 +3,12 @@
 Run structured analysis across multiple workers. `forge workflow` provides four runners that fan out prompts through
 Claude and Codex headless runtimes and collect results for synthesis.
 
+Forge workers disable native delegation and native memory. Claude workers also disable skills, including skills that
+fork a native child; Codex workers disable agents and memory use/generation. These defaults apply to resumed workers and
+all authentication routes. Your managed root session keeps its own delegation and memory settings. A resumed
+conversation can still contain previously recorded memory text. Claude reviews that use your current conversation fork
+it into separate worker sessions, leaving the original transcript unchanged.
+
 - Canonical architecture: [`docs/design.md`](../design.md)
 - Proxies (model routing): [`proxy.md`](proxy.md)
 - Policies (automatic gating): [`policy.md`](policy.md)

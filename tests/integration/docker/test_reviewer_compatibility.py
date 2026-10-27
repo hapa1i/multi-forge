@@ -37,7 +37,7 @@ source=SOURCE
 auth={"apiKeyHelper":str(helper)} if source=="helper" else {"env":{"ANTHROPIC_API_KEY":key}}
 auth["hooks"]={"SessionStart":[{"hooks":[{"type":"command", "command":"touch " + str(root/"hook-fired")}]}]}
 (root/".claude/settings.json").write_text(json.dumps(auth))
-result=run_claude_session("Reply exactly: auth-ok", model="haiku", direct=True, read_only=True, cwd=str(root), timeout_seconds=40)
+result=run_claude_session("Reply exactly: auth-ok", worker=True, model="haiku", direct=True, read_only=True, cwd=str(root), timeout_seconds=40)
 assert result.success, result.error or result.stderr
 assert "auth-ok" in result.stdout
 assert not (root/"hook-fired").exists()
@@ -62,7 +62,7 @@ def test_old_blocking_pin_refuses_without_inference(forge_workspace: ContainerLi
 from forge.core.reactive.session_runner import run_claude_session
 home=tempfile.mkdtemp(prefix="old-reviewer-home-")
 os.environ.update(HOME=home, FORGE_HOME=home+"/.forge", PATH="/tmp/old-reviewer/node_modules/.bin:"+os.environ["PATH"])
-result=run_claude_session("must not infer", read_only=True, direct=True)
+result=run_claude_session("must not infer", worker=True, read_only=True, direct=True)
 assert not result.dispatched and "claude update" in result.error, result
 print(json.dumps({"dispatched":result.dispatched, "actionable":True}))
 """

@@ -14,16 +14,24 @@ from forge.core.invoker import (
     HeadlessRequest,
     HeadlessResult,
 )
-from forge.core.reactive.routing import ModelRoute, RoutingResult, RoutingSource
-from forge.core.runtime.codex_preflight import CodexPreflight
+from forge.core.reactive.routing import RoutingResult
 from forge.review.engine import (
     _prepare_worker,
     _to_review_result,
     preflight_check,
     run_multi_review,
 )
-from forge.review.models import DEFAULT_MODELS, ModelAvailability, ModelSpec, PromptMode
-from forge.review.routing import WorkerRoutingPlan, derive_model_routes
+from forge.review.models import DEFAULT_MODELS, ModelAvailability, ModelSpec
+from forge.review.routing import derive_model_routes
+from tests.fixtures.review_workers import make_codex_preflight as _codex_preflight
+from tests.fixtures.review_workers import make_codex_spec as _codex_spec
+from tests.fixtures.review_workers import make_model_route as _route
+from tests.fixtures.review_workers import make_model_spec as _spec
+from tests.fixtures.review_workers import make_routing_result as _routing_result
+from tests.fixtures.review_workers import make_worker_plan as _plan
+from tests.fixtures.review_workers import (
+    runtime_native_result as _runtime_native_result,
+)
 
 _CODEX_SUCCESS_STREAM = (Path(__file__).resolve().parents[2] / "fixtures/codex/exec_json_success.jsonl").read_text()
 
@@ -38,110 +46,6 @@ def _no_api_key(monkeypatch):
 def _claude_cli_available(monkeypatch):
     """Preflight tests opt out explicitly when they need to simulate a missing worker runtime."""
     monkeypatch.setattr("forge.review.engine.shutil.which", lambda name: "/usr/local/bin/claude")
-
-
-def _spec(
-    name: str = "test-model",
-    family: str = "openai",
-    direct: bool = False,
-    prompt: str | None = None,
-    prompt_mode: PromptMode = "override",
-    runtime: str = "claude_code",
-) -> ModelSpec:
-    return ModelSpec(
-        name=name,
-        model_id=("codex-default" if runtime == "codex" else "claude-opus-4-6" if direct else "gpt-5.6-sol"),
-        family="anthropic" if direct and runtime != "codex" else family,
-        description="Test",
-        prompt=prompt,
-        prompt_mode=prompt_mode,
-        runtime=runtime,
-    )
-
-
-def _codex_spec() -> ModelSpec:
-    return ModelSpec(
-        name="codex",
-        model_id="codex-default",
-        family="openai",
-        description="Native Codex",
-        runtime="codex",
-    )
-
-
-def _route(
-    provider: str = "openrouter",
-    model_ref: str = "openai/gpt-5.5",
-    template_id: str = "openrouter-openai",
-    credential: str = "openrouter",
-    family: str = "openai",
-) -> ModelRoute:
-    return ModelRoute(
-        provider=provider,
-        credential=credential,
-        family=family,
-        template_id=template_id if provider != "direct" else None,
-        template_family=family if provider != "direct" else None,
-        model_ref=model_ref,
-    )
-
-
-def _routing_result(
-    route: ModelRoute | None = None,
-    base_url: str | None = "http://localhost:8096",
-    source: RoutingSource = "preferred_proxy",
-) -> RoutingResult:
-    if route is None:
-        route = _route()
-    return RoutingResult(
-        base_url=base_url,
-        proxy_id="test-proxy",
-        template="openrouter-openai",
-        source=source,
-        route=route,
-        credential=route.credential if route else None,
-    )
-
-
-def _runtime_native_result() -> RoutingResult:
-    return RoutingResult(
-        base_url=None,
-        proxy_id=None,
-        template=None,
-        source="runtime_native",
-        route=None,
-        credential=None,
-    )
-
-
-def _plan(*results: RoutingResult, codex_preflight: CodexPreflight | None = None) -> WorkerRoutingPlan:
-    return WorkerRoutingPlan(
-        routes=tuple(results),
-        resolved_at="2026-05-14T12:00:00Z",
-        via_override=None,
-        codex_preflight=codex_preflight,
-    )
-
-
-def _codex_preflight(
-    *,
-    ready: bool = True,
-    blocking_reason: str | None = None,
-    billing_mode: str = "subscription_quota",
-) -> CodexPreflight:
-    return CodexPreflight(
-        installed=True,
-        version="0.145.0",
-        version_ok=True,
-        auth_method="chatgpt_tokens",
-        auth_source="codex_store",
-        billing_mode=billing_mode,  # type: ignore[arg-type]
-        ready=ready,
-        blocking_reason=blocking_reason,
-        hook_seam="enrollment_gated",
-        proxy_responses="native_direct",
-        doctor_status="ok",
-    )
 
 
 def _mock_popen(stdout: str = "review output", returncode: int = 0, stderr: str = ""):
@@ -213,7 +117,7 @@ class TestRunMultiReview:
                 reasoning_effort="high",
             )
 
-        assert captured == [
+        expected = [
             HeadlessRequest(
                 argv=[
                     "claude",
@@ -272,6 +176,24 @@ class TestRunMultiReview:
                 base_url=None,
             ),
         ]
+        for request in expected:
+            request.argv += [
+                "--disallowedTools",
+                "Agent",
+                "Workflow",
+                "SendMessage",
+                "--disable-slash-commands",
+                "--settings",
+                '{"env": {"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1", "CLAUDE_CODE_DISABLE_WORKFLOWS": "1", '
+                '"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0", "CLAUDE_CODE_FORK_SUBAGENT": "0"}}',
+            ]
+            request.env.update(
+                CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="0",
+                CLAUDE_CODE_FORK_SUBAGENT="0",
+                CLAUDE_CODE_DISABLE_WORKFLOWS="1",
+                CLAUDE_CODE_DISABLE_AUTO_MEMORY="1",
+            )
+        assert captured == expected
 
     @patch("forge.review.engine.ClaudeHeadlessInvoker.run_parallel")
     @patch("forge.review.engine.CodexHeadlessInvoker.run_parallel")
@@ -294,7 +216,21 @@ class TestRunMultiReview:
         mock_codex_parallel.assert_called_once()
         mock_claude_parallel.assert_not_called()
         request = mock_codex_parallel.call_args.args[0][0]
-        assert request.argv == ["codex", "exec", "--json", "--sandbox", "read-only"]
+        assert request.argv == [
+            "codex",
+            "exec",
+            "--json",
+            "--sandbox",
+            "read-only",
+            "--disable",
+            "multi_agent",
+            "-c",
+            "agents.enabled=false",
+            "-c",
+            "memories.use_memories=false",
+            "-c",
+            "memories.generate_memories=false",
+        ]
 
     @patch("forge.review.engine.ClaudeHeadlessInvoker.run_parallel")
     @patch("forge.review.engine.CodexHeadlessInvoker.run_parallel")
@@ -1012,7 +948,21 @@ class TestCodexWorkerShaping:
         )
 
         assert isinstance(prepared, HeadlessRequest)
-        assert prepared.argv == ["codex", "exec", "--json", "--sandbox", "read-only"]
+        assert prepared.argv == [
+            "codex",
+            "exec",
+            "--json",
+            "--sandbox",
+            "read-only",
+            "--disable",
+            "multi_agent",
+            "-c",
+            "agents.enabled=false",
+            "-c",
+            "memories.use_memories=false",
+            "-c",
+            "memories.generate_memories=false",
+        ]
         assert prepared.prompt == "review this"
         assert prepared.cwd == "/worktree"
         assert prepared.timeout_seconds == 321

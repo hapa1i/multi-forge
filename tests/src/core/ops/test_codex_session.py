@@ -895,6 +895,8 @@ class TestContinueCodexSession:
 
         assert isinstance(result, CodexSessionResumeResult)
         assert codex.argv[-2:] == ["resume", _SUCCESS_TID]
+        assert "--disable" not in codex.argv
+        assert not any(arg.startswith(("agents.", "memories.")) for arg in codex.argv)
         # Cross-CWD: the turn runs in the session's recorded worktree, not the invocation cwd.
         assert codex.call.kwargs["cwd"] == str(proj)
         assert codex.stdin == "Keep going"

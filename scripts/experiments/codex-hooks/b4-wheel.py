@@ -117,6 +117,7 @@ def main() -> int:
             report["lifecycle"] = lifecycle(root, launcher)
             refusal = run_claude_session(
                 "Must never infer",
+                worker=True,
                 direct=True,
                 read_only=True,
                 subscription_only=True,

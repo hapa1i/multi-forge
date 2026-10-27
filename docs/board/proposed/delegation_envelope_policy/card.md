@@ -3,8 +3,8 @@
 **Epic**: [epic_native_multiagent](../epic_native_multiagent/card.md) (M7 -- the envelope, not counters).
 
 **Lane**: `proposed/`. Depends on M1's Claude identity rules. Worker restrictions ship independently in
-[M0](../worker_native_controls/card.md); this card owns the managed-session envelope. Codex pre-tool origin/capability
-verification belongs here and does not require Codex transcript capture or transfer support.
+[M0](../../doing/worker_native_controls/card.md); this card owns the managed-session envelope. Codex pre-tool
+origin/capability verification belongs here and does not require Codex transcript capture or transfer support.
 [epic_budgeted_review_guards](../epic_budgeted_review_guards/card.md), Seam 5, owns counters and spend caps.
 
 ## Problem (verified 2026-09-06)

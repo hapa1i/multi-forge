@@ -54,7 +54,7 @@ cd /workspace && /forge/.venv/bin/python - <<'PY'
 import json
 from forge.core.reactive.session_runner import run_claude_session
 
-r = run_claude_session("Reply with exactly: ok", timeout_seconds=60)
+r = run_claude_session("Reply with exactly: ok", worker=True, timeout_seconds=60)
 print("FORGE_RESULT=" + json.dumps({
     "returncode": r.returncode,
     "success": r.success,

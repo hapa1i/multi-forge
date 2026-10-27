@@ -294,6 +294,7 @@ def _run_supervisor(
     with track_verb_cost("team-supervisor", [base_url] if base_url else []) as cost:
         result = run_claude_session(
             prompt,
+            worker=True,
             resume_id=config.resume_id,
             base_url=base_url,
             direct=config.direct,

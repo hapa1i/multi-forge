@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import shlex
 import subprocess
 import sys
-import uuid
-import zipfile
-from email.parser import Parser
 from pathlib import Path
 
 import pytest
+
+from tests.fixtures.release_artifact import build_qa_image, build_wheel
 
 pytestmark = [pytest.mark.integration, pytest.mark.docker_host]
 
@@ -21,28 +19,11 @@ DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.qa"
 QA_SKILL_ROOT = REPO_ROOT / "src" / "skills" / "qa"
 
 
-def _wheel_version(wheel: Path) -> str:
-    with zipfile.ZipFile(wheel) as archive:
-        metadata_path = next(name for name in archive.namelist() if name.endswith(".dist-info/METADATA"))
-        return Parser().parsestr(archive.read(metadata_path).decode("utf-8"))["Version"]
-
-
 def test_release_image_imports_only_the_exact_wheel(tmp_path: Path, forge_test_image: str | None) -> None:
     assert forge_test_image is not None, "release artifact isolation requires the Docker-host test lane"
 
-    built = subprocess.run(
-        ["uv", "build", "--wheel", "--out-dir", str(tmp_path), str(REPO_ROOT)],
-        capture_output=True,
-        text=True,
-        timeout=180,
-    )
-    assert built.returncode == 0, built.stderr
-    wheels = list(tmp_path.glob("*.whl"))
-    assert len(wheels) == 1
-    wheel = wheels[0]
-    digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
-    version = _wheel_version(wheel)
-    image = f"forge-qa-artifact-test:{uuid.uuid4().hex[:12]}"
+    artifact = build_wheel(tmp_path)
+    wheel, version = artifact.path, artifact.version
 
     driver_probe = subprocess.run(
         [
@@ -65,37 +46,7 @@ def test_release_image_imports_only_the_exact_wheel(tmp_path: Path, forge_test_i
     driver_identity = json.loads(driver_probe.stdout)
     assert len(driver_identity["qa_driver_sha256"]) == 64
 
-    build = subprocess.run(
-        [
-            "docker",
-            "build",
-            "-f",
-            str(DOCKERFILE),
-            "--build-arg",
-            f"BASE_IMAGE={forge_test_image}",
-            "--build-arg",
-            f"FORGE_WHEEL_NAME={wheel.name}",
-            "--build-arg",
-            f"FORGE_WHEEL_SHA256={digest}",
-            "--build-arg",
-            f"FORGE_VERSION={version}",
-            "--build-arg",
-            "FORGE_REV=artifact-test",
-            "--build-arg",
-            "RUNTIME_TRACK=test",
-            "--build-arg",
-            "CLAUDE_VERSION=test",
-            "--build-arg",
-            "CODEX_VERSION=test",
-            "-t",
-            image,
-            str(tmp_path),
-        ],
-        capture_output=True,
-        text=True,
-        timeout=600,
-    )
-    assert build.returncode == 0, build.stderr
+    image = build_qa_image(artifact, forge_test_image)
 
     probe_code = """
 import importlib.metadata as metadata

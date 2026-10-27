@@ -277,6 +277,7 @@ class TestRunShadowCuration:
         call_kwargs = mock_run.call_args
         assert call_kwargs.kwargs.get("base_url") == "http://proxy:8085"
         assert call_kwargs.kwargs.get("direct") is True
+        assert call_kwargs.kwargs["worker"] is True
 
         # Verify cost tracking label
         mock_cost.assert_called_once_with("curation", ["http://proxy:8085"])
@@ -601,6 +602,7 @@ class TestCodexShadowCuration:
         mock_claude.assert_not_called()
         # Read-only sandbox, no model pin (codex picks its own), self-contained prompt at forge_root.
         assert mock_prepare.call_args.kwargs["sandbox"] == "read-only"
+        assert mock_prepare.call_args.kwargs["worker"] is True
         assert mock_prepare.call_args.kwargs["model"] is None
         assert mock_prepare.call_args.kwargs["cwd"] == str(tmp_path)
         # Report persisted from codex stdout.

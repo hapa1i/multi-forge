@@ -408,6 +408,7 @@ class TestSupervisorDepthGuard:
             invoke_supervisor(_make_config(), _make_context())
 
         extra_env = mock_run.call_args.kwargs["extra_env"]
+        assert mock_run.call_args.kwargs["worker"] is True
         assert extra_env[FORGE_COMMAND_VAR] == "supervisor"
         assert extra_env[FORGE_SESSION_VAR] == "test-session"
 
@@ -880,6 +881,7 @@ class TestSupervisorLaneDispatch:
         mock_invoker_cls.return_value.run.assert_called_once()
         # Read-only sandbox + no model pin (codex picks its own); plan-bearing prompt passed through.
         assert mock_prepare.call_args.kwargs["sandbox"] == "read-only"
+        assert mock_prepare.call_args.kwargs["worker"] is True
         assert mock_prepare.call_args.kwargs["model"] is None
         assert mock_prepare.call_args.kwargs["prompt"] == "check this"
         # The ACTION repo (context.repo_root), not the planner's source_cwd.

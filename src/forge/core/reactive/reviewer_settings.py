@@ -78,16 +78,16 @@ def inherited_auth_settings(
     return selected
 
 
-def project_auth_settings(settings: dict[str, object], env: dict[str, str]) -> tuple[list[str], dict[str, str]]:
+def project_auth_settings(settings: dict[str, object], env: dict[str, str]) -> tuple[dict[str, object], dict[str, str]]:
     """Carry the trusted helper in child environment, with no credential file or secret argv."""
     helper = settings.get("apiKeyHelper")
     if helper is None:
-        return [], env
+        return {}, env
     if not isinstance(helper, str):
         raise ValueError("Claude apiKeyHelper must be a command string")
     # Claude canonicalizes --settings paths, so an unlinked /dev/fd file cannot
     # survive its file checks. Inline only the fixed shell indirection; the
     # trusted command itself stays in the child environment, like API keys.
     child_env = {**env, _HELPER_ENV: helper}
-    projected = {"apiKeyHelper": f'eval "${_HELPER_ENV}"' if helper else ""}
-    return ["--settings", json.dumps(projected)], child_env
+    projected: dict[str, object] = {"apiKeyHelper": f'eval "${_HELPER_ENV}"' if helper else ""}
+    return projected, child_env

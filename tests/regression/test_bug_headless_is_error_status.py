@@ -53,7 +53,7 @@ def _envelope(is_error: bool) -> str:
 @patch("forge.core.reactive.session_runner.subprocess.run")
 def test_exit_zero_with_is_error_sets_runtime_is_error(mock_run: MagicMock) -> None:
     mock_run.return_value = MagicMock(stdout=_envelope(is_error=True), stderr="", returncode=0)
-    result = run_claude_session("prompt")
+    result = run_claude_session("prompt", worker=False)
 
     assert result.returncode == 0
     assert result.runtime_is_error is True
@@ -64,7 +64,7 @@ def test_exit_zero_with_is_error_sets_runtime_is_error(mock_run: MagicMock) -> N
 @patch("forge.core.reactive.session_runner.subprocess.run")
 def test_exit_zero_without_is_error_is_clean(mock_run: MagicMock) -> None:
     mock_run.return_value = MagicMock(stdout=_envelope(is_error=False), stderr="", returncode=0)
-    result = run_claude_session("prompt")
+    result = run_claude_session("prompt", worker=False)
     assert result.runtime_is_error is False
 
 

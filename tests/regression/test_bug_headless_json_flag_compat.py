@@ -44,7 +44,7 @@ def test_session_runner_retries_once_without_flag_and_latches(mock_run: MagicMoc
         MagicMock(stdout="", stderr=_REJECT, returncode=2),  # flag rejected
         MagicMock(stdout="raw text after retry", stderr="", returncode=0),  # retry sans flag
     ]
-    result = run_claude_session("prompt")
+    result = run_claude_session("prompt", worker=False)
 
     assert mock_run.call_count == 2, "exactly one retry, no more"
     first_argv = mock_run.call_args_list[0].args[0]
@@ -61,7 +61,7 @@ def test_session_runner_retries_once_without_flag_and_latches(mock_run: MagicMoc
 def test_session_runner_skips_flag_when_already_latched(mock_run: MagicMock) -> None:
     hj.mark_json_output_unsupported()
     mock_run.return_value = MagicMock(stdout="plain", stderr="", returncode=0)
-    run_claude_session("prompt")
+    run_claude_session("prompt", worker=False)
 
     assert mock_run.call_count == 1, "latched -> no flag, no retry, single spawn"
     assert "--output-format" not in mock_run.call_args.args[0]
@@ -71,7 +71,7 @@ def test_session_runner_skips_flag_when_already_latched(mock_run: MagicMock) -> 
 def test_session_runner_no_retry_on_unrelated_nonzero_exit(mock_run: MagicMock) -> None:
     # A genuine error (not a flag rejection) must NOT trigger a retry or latch.
     mock_run.return_value = MagicMock(stdout="", stderr="model overloaded", returncode=1)
-    result = run_claude_session("prompt")
+    result = run_claude_session("prompt", worker=False)
 
     assert mock_run.call_count == 1
     assert result.returncode == 1
@@ -166,7 +166,7 @@ def test_session_runner_no_retry_when_unrelated_error_echoes_flag(mock_run: Magi
     mock_run.return_value = MagicMock(
         stdout="", stderr="API Error: 529 overloaded_error\n  claude -p --output-format json", returncode=1
     )
-    result = run_claude_session("prompt")
+    result = run_claude_session("prompt", worker=False)
 
     assert mock_run.call_count == 1  # no retry: the flag echo is not a rejection
     assert result.returncode == 1

@@ -52,7 +52,9 @@ def test_personal_status_can_replace_absent_metadata_only(tmp_path, monkeypatch,
         patch("forge.core.reactive.watchdog.run_guarded", side_effect=guarded),
         patch("forge.core.reactive.session_runner.prepare_json_argv", side_effect=lambda cmd, *a, **kw: (cmd, False)),
     ):
-        result = run_claude_session("review", direct=True, read_only=True, subscription_only=True, timeout_seconds=10)
+        result = run_claude_session(
+            "review", worker=False, direct=True, read_only=True, subscription_only=True, timeout_seconds=10
+        )
     assert result.dispatched is accepted
     assert bool(dispatched) is accepted
     assert result.child_billing_mode == ("subscription_quota" if accepted else None)
