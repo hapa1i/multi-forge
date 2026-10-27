@@ -1,8 +1,10 @@
 # transfer_summarizer_fidelity -- retain tool results and delegation descriptions
 
-**Epic**: [epic_native_multiagent](../epic_native_multiagent/card.md) (M2 -- a bug fix that makes lossiness deliberate).
+**Epic**: [epic_native_multiagent](../../proposed/epic_native_multiagent/card.md) (M2 -- a bug fix that makes lossiness
+deliberate).
 
-**Lane**: `proposed/`. No dependencies; small enough for a single PR with a regression test.
+**Lane**: `doing/`, accepted 2026-10-27. Standalone branch `codex/transfer-summarizer-fidelity`, based on `484dfe04`. No
+dependencies; M1 and the broader epic remain proposed. See [checklist](checklist.md).
 
 ## Problem (verified 2026-09-06)
 
@@ -19,8 +21,10 @@ there. Preserve search coverage; do not introduce an unnecessary extractor rewri
 - Join text blocks from list-form tool results in order; omit image payloads and preserve existing result truncation
   limits. Empty or unsupported blocks must not fabricate text or discard supported neighboring blocks.
 - Render `Agent(type=<subagent_type>, description=<description>)`, with bounded description and available prompt. Render
-  `SendMessage` recipient and description/prompt where present. Keep fields labeled so task text cannot be confused with
-  a returned result.
+  `SendMessage` recipient and description/prompt where present, including native summary/content fields. Keep fields
+  labeled so task text cannot be confused with a returned result.
+- Retain tool-only turns and user text beside tool results in structured output; recovering a result must not hide its
+  supported neighboring text.
 - Preserve string-form results and existing path/command formatting. This fixes accidental loss before strategy
   selection; it does not promise unbounded result carry.
 - Add a regression for a real list-form result shape and retain extractor parity coverage.
@@ -42,5 +46,5 @@ and child strategy semantics.
 
 ## Design-doc sync
 
-`docs/design_sessions.md` §3.9 (what transfer summaries retain); `docs/end-user/transfer.md` (Agent-line example, if
-present). Lossiness remains bounded and documented.
+`docs/design_session_context.md` §3.9 (what transfer summaries retain); `docs/end-user/transfer.md` (Agent-line example,
+if present). Lossiness remains bounded and documented.

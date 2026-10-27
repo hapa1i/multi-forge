@@ -314,6 +314,32 @@ def parse_lineage_depth(value: str | int) -> int | None:
     return depth
 
 
+def _summarize_tool_use(name: str, tool_input: Any) -> str:
+    if not isinstance(tool_input, dict):
+        return f"{name}(...)"
+
+    delegation_fields = {
+        "Agent": ("subagent_type", "description", "prompt"),
+        "SendMessage": ("recipient", "description", "summary", "prompt", "content"),
+    }.get(name)
+    if delegation_fields is not None:
+        arguments = []
+        for key in delegation_fields:
+            value = tool_input.get(key)
+            if isinstance(value, str) and value:
+                label = "type" if key == "subagent_type" else key
+                arguments.append(f"{label}={truncate(value, TOOL_ARG_TRUNCATE_CHARS)}")
+        return f"{name}({', '.join(arguments) or '...'})"
+
+    path = tool_input.get("file_path") or tool_input.get("path")
+    command = tool_input.get("command")
+    if path:
+        return f"{name}(path={truncate(str(path), TOOL_ARG_TRUNCATE_CHARS)})"
+    if command:
+        return f"{name}(command={truncate(str(command), TOOL_ARG_TRUNCATE_CHARS)})"
+    return f"{name}(...)"
+
+
 def _extract_turn_summary(entry: dict[str, Any]) -> dict[str, Any] | None:
     """Extract a summarized turn from a transcript entry.
 
@@ -343,23 +369,19 @@ def _extract_turn_summary(entry: dict[str, Any]) -> dict[str, Any] | None:
                 text_parts.append(t)
 
         elif block_type == "tool_use":
-            name = block.get("name", "unknown")
-            inp = block.get("input", {})
-            # Summarize key args
-            if isinstance(inp, dict):
-                path = inp.get("file_path") or inp.get("path")
-                cmd = inp.get("command")
-                if path:
-                    tools.append(f"{name}(path={truncate(str(path), TOOL_ARG_TRUNCATE_CHARS)})")
-                elif cmd:
-                    tools.append(f"{name}(command={truncate(str(cmd), TOOL_ARG_TRUNCATE_CHARS)})")
-                else:
-                    tools.append(f"{name}(...)")
-            else:
-                tools.append(f"{name}(...)")
+            tools.append(_summarize_tool_use(str(block.get("name", "unknown")), block.get("input", {})))
 
         elif block_type == "tool_result":
             result = block.get("content", "")
+            if isinstance(result, list):
+                result = "\n".join(
+                    part["text"]
+                    for part in result
+                    if isinstance(part, dict)
+                    and part.get("type") == "text"
+                    and isinstance(part.get("text"), str)
+                    and part["text"]
+                )
             if isinstance(result, str) and result:
                 tools.append(f"[result: {truncate(result, TOOL_RESULT_TRUNCATE_CHARS)}]")
 
@@ -479,10 +501,8 @@ def _generate_structured_context(
                     continue
 
                 if summary["role"] == "user":
-                    # Skip tool_result entries for user text (they're just results)
-                    if summary["text"] and not summary["tools"]:
+                    if summary["text"]:
                         user_texts.append(summary["text"])
-                    # But collect tool results for display
                     if summary["tools"]:
                         all_tools.extend(summary["tools"])
                 else:
@@ -491,7 +511,7 @@ def _generate_structured_context(
                     if summary["tools"]:
                         all_tools.extend(summary["tools"])
 
-            if user_texts or assistant_texts:
+            if user_texts or assistant_texts or all_tools:
                 turn_num += 1
                 lines.append(f"### Turn {turn_num}")
                 lines.append("")

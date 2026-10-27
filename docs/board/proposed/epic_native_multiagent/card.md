@@ -3,8 +3,8 @@
 **Epic** -- coordinating card governed by the [board contract](../../../developer/board_contract.md). Lane: `proposed/`.
 Position established and reviewed on 2026-09-06; the broader epic is not accepted for implementation.
 [M0](../../done/worker_native_controls/checklist.md#merged-closeout) shipped independently in PR #282 on 2026-10-27;
-other members remain proposed. This revision splits independent capabilities and preserves the unresolved runtime probe
-gates.
+[M2](../../doing/transfer_summarizer_fidelity/card.md) was selected for standalone execution on 2026-10-27. Other
+members remain proposed. This revision splits independent capabilities and preserves the unresolved runtime probe gates.
 
 **Origin**: supersedes [team_orchestration](../../retired/team_orchestration/card.md), retired on 2026-09-06 as
 non-implementable. Its shipped team gates remain normative in `docs/design_workflows.md` §1.2. The old topology,
@@ -87,20 +87,20 @@ This gate does not block independent M0 worker controls, M2 fidelity, M8a postur
 
 Original ids remain recognizable; M3 and M8 have split suffixes, M0 is the early worker card, and M9 owns D9.
 
-| Id  | Card                                                                      | Independently shippable outcome                                  | Depends on          |
-| --- | ------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------- |
-| M0  | [worker_native_controls](../../done/worker_native_controls/card.md)       | Shipped: worker-only native delegation and memory restrictions   | --                  |
-| M1  | [child_conversation_identity](../child_conversation_identity/card.md)     | Probed Claude root/child lifecycle ownership                     | --                  |
-| M2  | [transfer_summarizer_fidelity](../transfer_summarizer_fidelity/card.md)   | Block-list results and delegation descriptions retained          | --                  |
-| M3a | [child_transcript_snapshots](../child_transcript_snapshots/card.md)       | Common reader/citations, Claude child/team capture               | M1                  |
-| M3b | [codex_source_adapter](../codex_source_adapter/card.md)                   | Codex capture, adapter and basic Codex-as-source launch          | M3a                 |
-| M4  | [windowed_incremental_curation](../windowed_incremental_curation/card.md) | Bounded cached curation with Claude-source acceptance            | M2, M3a             |
-| M5  | [child_transfer_strategies](../child_transfer_strategies/card.md)         | Child strategy matrix and Sources with Claude-source acceptance  | M2, M3a, M4, M6, M9 |
-| M6  | [lineage_search_retrofit](../lineage_search_retrofit/card.md)             | Cross-root lineage search for Claude/team/handoff sources        | M3a                 |
-| M7  | [delegation_envelope_policy](../delegation_envelope_policy/card.md)       | Managed-session delegation envelope and verified delivery        | M1                  |
-| M8a | [native_memory_explicit](../native_memory_explicit/card.md)               | Main-session memory intent, controls and per-run posture         | --                  |
-| M8b | [native_memory_import](../native_memory_import/card.md)                   | Bounded native-memory import through reviewed transfer selection | M8a, M9             |
-| M9  | [reviewed_launch_artifact](../reviewed_launch_artifact/card.md)           | Reviewed transfer selection, delivery, deferred resume and GC    | --                  |
+| Id  | Card                                                                             | Independently shippable outcome                                  | Depends on          |
+| --- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------- |
+| M0  | [worker_native_controls](../../done/worker_native_controls/card.md)              | Shipped: worker-only native delegation and memory restrictions   | --                  |
+| M1  | [child_conversation_identity](../child_conversation_identity/card.md)            | Probed Claude root/child lifecycle ownership                     | --                  |
+| M2  | [transfer_summarizer_fidelity](../../doing/transfer_summarizer_fidelity/card.md) | Block-list results and delegation descriptions retained          | --                  |
+| M3a | [child_transcript_snapshots](../child_transcript_snapshots/card.md)              | Common reader/citations, Claude child/team capture               | M1                  |
+| M3b | [codex_source_adapter](../codex_source_adapter/card.md)                          | Codex capture, adapter and basic Codex-as-source launch          | M3a                 |
+| M4  | [windowed_incremental_curation](../windowed_incremental_curation/card.md)        | Bounded cached curation with Claude-source acceptance            | M2, M3a             |
+| M5  | [child_transfer_strategies](../child_transfer_strategies/card.md)                | Child strategy matrix and Sources with Claude-source acceptance  | M2, M3a, M4, M6, M9 |
+| M6  | [lineage_search_retrofit](../lineage_search_retrofit/card.md)                    | Cross-root lineage search for Claude/team/handoff sources        | M3a                 |
+| M7  | [delegation_envelope_policy](../delegation_envelope_policy/card.md)              | Managed-session delegation envelope and verified delivery        | M1                  |
+| M8a | [native_memory_explicit](../native_memory_explicit/card.md)                      | Main-session memory intent, controls and per-run posture         | --                  |
+| M8b | [native_memory_import](../native_memory_import/card.md)                          | Bounded native-memory import through reviewed transfer selection | M8a, M9             |
+| M9  | [reviewed_launch_artifact](../reviewed_launch_artifact/card.md)                  | Reviewed transfer selection, delivery, deferred resume and GC    | --                  |
 
 [team_supervisor_plan_context](../team_supervisor_plan_context/card.md) remains adjacent and owns its Codex lane; it
 does not gate capture.

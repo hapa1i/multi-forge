@@ -69,6 +69,19 @@ model — it distils the transcript into the full schema; the others are determi
 ZDR endpoints. Without usable authentication or a compatible endpoint, curation falls back to `structured`; proxy-level
 non-ZDR opt-outs do not apply to this Forge-owned call.
 
+Structured and full transfers retain text from tool results, including results returned as text/image/text blocks. Text
+stays in order; images are omitted. Each result retains up to 500 characters, plus `...` when truncated. Agent and
+SendMessage calls retain labeled task/message fields, for example:
+
+```text
+Agent(type=Explore, description=Inspect transfer fidelity, prompt=Check list-form tool results)
+SendMessage(recipient=reviewer, summary=Transfer findings, content=Keep both text blocks)
+[result: The parser preserves the first finding.]
+```
+
+Each labeled argument is capped at 100 characters, plus `...` when truncated. The same text is available to AI curation,
+which chooses what reaches its output. Structured transfers keep tool-only turns and user text alongside tool results.
+
 `rewind` is a resume/fork launch strategy, not a `forge session transfer regenerate` strategy. Use
 `forge session resume <parent> --fresh --strategy rewind --drop-last N` to resume a fresh child from a truncated native
 transcript plus a code-delta prompt for the dropped tail. Same-directory resume is allowed because Forge resumes a fresh

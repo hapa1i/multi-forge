@@ -180,6 +180,13 @@ unset (§3.5). Field-by-field sources and the `rollout_source` provenance table:
 
 Transfer accepts only these values before writes and persists the value used.
 
+`structured`, `full` and the input to `ai-curated` share bounded tool summaries. String results and ordered text blocks
+from list-form results retain up to 500 characters per result, followed by `...` when truncated; image payloads and
+unsupported blocks are omitted. `structured` also retains turns containing only tool calls or results. Agent calls label
+the subagent type, description and prompt; SendMessage calls label the recipient and available description, summary,
+prompt or content. Each argument retains up to 100 characters, plus a truncation marker. Task/message fields remain
+separate from `[result: ...]` text. `full` preserves ordinary message text but still uses these bounded tool summaries.
+
 **Curated transfer is the primary cross-boundary substrate, not a lossy fallback.** Native resume is byte-faithful but
 same-runtime, same-CWD, and opaque (the user cannot inspect or prune the carried conversation); curated transfer is
 runtime-neutral and *user-editable* — the only way to carry context across worktrees, projects, and runtimes while
