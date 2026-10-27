@@ -31,13 +31,15 @@ version_ge() { # version_ge ACTUAL FLOOR -> exit 0 when ACTUAL >= FLOOR
 
 # A separate round owner must also sweep detached descendants (see probe-runtime.py).
 with_timeout() {
-    if command -v timeout >/dev/null 2>&1; then
-        timeout --kill-after="${PROBE_KILL_GRACE:-5}s" "$PROBE_TURN_TIMEOUT" "$@"
-    elif command -v gtimeout >/dev/null 2>&1; then
-        gtimeout --kill-after="${PROBE_KILL_GRACE:-5}s" "$PROBE_TURN_TIMEOUT" "$@"
-    else
-        err "GNU timeout/gtimeout is required; refusing an unbounded probe."
-    fi
+    local candidate version
+    for candidate in timeout gtimeout gnutimeout; do
+        if command -v "$candidate" >/dev/null 2>&1 &&
+            version="$("$candidate" --version 2>/dev/null)" && [[ "$version" == *"GNU coreutils"* ]]; then
+            "$candidate" --kill-after="${PROBE_KILL_GRACE:-5}s" "$PROBE_TURN_TIMEOUT" "$@"
+            return $?
+        fi
+    done
+    err "GNU timeout (timeout/gtimeout/gnutimeout) is required; refusing an unbounded probe."
 }
 
 probe_home() {

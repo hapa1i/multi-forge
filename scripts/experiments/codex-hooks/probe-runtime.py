@@ -101,8 +101,17 @@ def bounded_run(command: list[str], evidence: Path, seconds: float, grace: float
     """Run GNU timeout under an independent owner, then sweep registered descendants."""
     if not command or seconds <= 0 or grace <= 0 or settle < 0:
         raise ValueError("A command and positive timeout/grace are required.")
-    timeout = shutil.which("timeout") or shutil.which("gtimeout")
-    if not timeout or "GNU coreutils" not in subprocess.check_output([timeout, "--version"], text=True):
+    timeout = None
+    # Ubuntu exposes GNU utilities separately when uutils owns the unprefixed name.
+    for name in ("timeout", "gtimeout", "gnutimeout"):
+        candidate = shutil.which(name)
+        if candidate is None:
+            continue
+        version = subprocess.run([candidate, "--version"], capture_output=True, text=True, timeout=5)
+        if version.returncode == 0 and "GNU coreutils" in version.stdout:
+            timeout = candidate
+            break
+    if timeout is None:
         raise ValueError("GNU timeout is required; no unbounded fallback.")
     process_table()  # Refuse before spawning if the outer sandbox forbids process inspection.
     evidence.mkdir(parents=True, exist_ok=False)

@@ -44,6 +44,8 @@ outside scope. Preserve the pre-existing `AGENTS.md` working-tree edit.
 - [x] Run focused and relevant Docker tests, aggregate checks, build and live panel checks for the revised head. Unit:
   11,173 passed. Regression: 2,168 passed. Targeted Docker: 16 synthetic/packaging and 4 live tests passed; final
   pinned/current native probes passed 2 tests each. Full pre-commit, build and live panels passed.
+- [x] Repair GNU timeout discovery after the Ubuntu 26.04 CI runner update. Script/probe checks: 201 passed locally;
+  focused cleanup and timeout regressions: 14 passed in a clean Ubuntu 26.04 container.
 
 ## Initial validation (2026-10-25)
 

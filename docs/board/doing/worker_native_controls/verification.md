@@ -73,3 +73,27 @@ isolation. Docker setup downloads the pinned packages; the actual native probes 
 
 [Initial implementation evidence](evidence/native-worker-controls-20261025.json) remains available as a historical
 snapshot; the 2026-10-26 evidence above supersedes its launch arguments and coverage.
+
+## CI portability follow-up (2026-10-27)
+
+[CI run 40374223892](https://github.com/hapa1i/multi-forge/actions/runs/40374223892) failed one unit test on Ubuntu
+26.04: the detached-process cleanup probe rejected the runner's uutils `timeout` before launching its fixture. GNU
+timeout is available there as `gnutimeout`. Both probe entry points now check `timeout`, `gtimeout` and `gnutimeout` for
+a successful GNU version response, preserving the refusal when no GNU implementation is available.
+
+- Eight new regression cases cover all three names and refusal with only non-GNU implementations. Five failed before the
+  fix; all eight now pass.
+- Script unit tests plus the timeout, login-admission and operator-environment regressions: **201 passed**.
+- The six existing probe unit tests and eight new regressions: **14 passed** in a clean Ubuntu 26.04 container with
+  Python 3.11.14 and locked project dependencies. The image exposes uutils 0.10.0 as `timeout` and GNU coreutils 9.7 as
+  `gnutimeout`; tests ran with networking disabled and a read-only checkout. Temporary fixture executables require an
+  executable `/tmp` mount.
+
+The local script checks used:
+
+```bash
+PYTHON_DOTENV_DISABLED=1 .venv/bin/pytest tests/src/scripts \
+  tests/regression/test_bug_b2_probe_login_admission.py \
+  tests/regression/test_bug_b2_probe_operator_environment.py \
+  tests/regression/test_bug_probe_gnu_timeout_selection.py -q
+```

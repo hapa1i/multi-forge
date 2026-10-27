@@ -54,10 +54,11 @@ of an assertion. Existing capture paths must be archived after their processes s
 
 `probe-runtime.py run --evidence <new-directory> --seconds 240 --grace 5 -- <command>` provides the independent cleanup
 owner. It snapshots revision, harness hashes, and retained binary identity; registers detached fixture processes;
-records survivors **before** TERM/KILL cleanup; and refuses missing GNU timeout. Keep its registry active for every
-model case. `instrumentation/sitecustomize.py` is fixture-only observation code, except the explicitly labelled
-`natural-review-expiry` arm, which extends reviewer transport to 90 seconds to expose Codex's 60-second hook expiry.
-Never load that arm into ordinary product-deadline checks.
+records survivors **before** TERM/KILL cleanup; and requires a verified GNU timeout binary. Both the owner and shell
+stages check `timeout`, Homebrew's `gtimeout`, and Ubuntu's `gnutimeout`; a non-GNU binary does not hide a later GNU
+candidate. Keep its registry active for every model case. `instrumentation/sitecustomize.py` is fixture-only observation
+code, except the explicitly labelled `natural-review-expiry` arm, which extends reviewer transport to 90 seconds to
+expose Codex's 60-second hook expiry. Never load that arm into ordinary product-deadline checks.
 
 Budget reservations include failed launches, subagents, Stop continuation, and every advisory enrollment check. A real
 Claude reviewer is not part of this round: the stub passes admission and records entry before responding or sleeping.
