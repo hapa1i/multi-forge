@@ -1,11 +1,10 @@
 # Worker native controls checklist
 
-**Current focus:** Review and merge of [PR #282](https://github.com/hapa1i/multi-forge/pull/282). Branch:
-`codex/worker-native-controls`; base: `b8e184bd`. Review fixes and fresh verification are complete; see
-[verification](verification.md).
+**Current focus:** Completed. [PR #282](https://github.com/hapa1i/multi-forge/pull/282) merged on 2026-10-27 as
+`ef6a41e1`; its tree matches the verified head `81586905`. See [verification](verification.md).
 
-M0 executes independently. Managed-root delegation and memory policy, child capture and other epic members remain
-outside scope. Preserve the pre-existing `AGENTS.md` working-tree edit.
+M0 shipped independently. Managed-root delegation and memory policy, child capture and other epic members remain outside
+scope.
 
 ## Contract and implementation
 
@@ -61,4 +60,16 @@ outside scope. Preserve the pre-existing `AGENTS.md` working-tree edit.
 
 ## Closeout
 
-- [ ] After merge, verify the merged tree and CI, record closeout and move the card to done.
+- [x] After merge, verify the merged tree and CI, record closeout and move the card to done.
+
+## Merged closeout
+
+- PR #282 merged as `ef6a41e1` on 2026-10-27. Its tree is identical to reviewed head `81586905`.
+- All five GitHub checks passed on that head. [Tests](https://github.com/hapa1i/multi-forge/actions/runs/40425656855)
+  passed 11,173 unit tests (120 deselected), 2,176 regressions, dependency pins and clean-wheel LiteLLM runtime checks.
+  [Pre-commit](https://github.com/hapa1i/multi-forge/actions/runs/40425656883) and
+  [CodeQL](https://github.com/hapa1i/multi-forge/actions/runs/40425652702) passed too.
+- [Verification](verification.md) retains the pinned/current native-runtime evidence, guarded authentication and
+  parallel-resume checks, live panels, and the Ubuntu timeout repair.
+- Workflow, memory, subprocess and end-user documentation reflect the shipped worker boundary. The broader epic and its
+  remaining members stay proposed; M0 is removed from the optional future batch.

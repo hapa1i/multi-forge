@@ -3,9 +3,9 @@
 **Epic**: [epic_native_multiagent](../../proposed/epic_native_multiagent/card.md) (M0 -- independently shippable worker
 defaults).
 
-**Lane**: `doing/`, accepted 2026-10-25. Standalone branch `codex/worker-native-controls`, based on `b8e184bd`. No
-dependencies; M1/M2 and the broader epic remain proposed. Managed-session delegation policy remains M7; session memory
-choices remain M8a.
+**Lane**: `done/`. Accepted 2026-10-25; [PR #282](https://github.com/hapa1i/multi-forge/pull/282) merged on 2026-10-27
+as `ef6a41e1`. See the [merged closeout](checklist.md#merged-closeout). M0 shipped independently; M1/M2 and the broader
+epic remain proposed. Managed-session delegation policy remains M7; session memory choices remain M8a.
 
 ## Problem (verified 2026-09-06)
 
