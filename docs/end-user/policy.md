@@ -213,6 +213,10 @@ session config even when enforcement is disabled — useful for verifying fixes 
 > **Note:** `%policy enable/disable` applies session overrides that persist until changed or reset. The CLI command
 > `forge policy enable/disable` mutates the session intent.
 
+Fork and fresh-resume children inherit baseline policy, so a parent's temporary `%policy disable` does not disable
+policy in those children. A relaunch child preserves live overrides, and ordinary reattach keeps the same session. See
+[configuration inheritance and reset](session.md#configuration-inheritance-and-reset).
+
 For the full list of `%` commands, see [`hook.md`](hook.md#in-session-commands-commands).
 
 ---

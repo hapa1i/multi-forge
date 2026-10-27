@@ -134,10 +134,12 @@ forge session resume parent --fresh          # inherit parent's memory on/off
 forge session resume parent --fresh --memory off
 ```
 
-Inheritance copies only `auto_update` (enabled, mode, min_turns, proxy). Other `MemoryIntent` fields do not propagate.
-`--memory off` writes an explicit `MemoryWriterConfig(enabled=False)` so the child is deliberately off even if later
-defaults change. `--memory on` reuses the parent's non-enabled config (mode, proxy, min_turns) or `MemoryWriterConfig`
-defaults.
+Inheritance copies only effective `auto_update` (enabled, mode, min_turns, proxy, direct and effort) into the child's
+baseline. Other `MemoryIntent` fields do not propagate. A generic child reset therefore does not undo inherited memory
+activation; [session inheritance](design_sessions.md#derived-session-configuration) distinguishes this from relaunch,
+which retains separate baseline and override layers. `--memory off` writes an explicit
+`MemoryWriterConfig(enabled=False)` so the child is deliberately off even if later defaults change. `--memory on` reuses
+the parent's other writer settings (mode, proxy, direct, min_turns and effort) or `MemoryWriterConfig` defaults.
 
 Memory docs are not inherited. Passports are git-tracked and discovered live by the detached writer in whatever checkout
 the child session runs in. This applies equally to same-checkout forks, `--worktree`, and `--into`.

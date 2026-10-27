@@ -2,7 +2,10 @@
 
 **Origin**: D040 residual admission recheck on merged `main` at `bad273ef` (2026-08-19).
 
-**Lane**: `proposed/` -- design decision required; not accepted for implementation.
+**Lane**: `doing/` -- accepted for design work on 2026-10-27. Branch `codex/derived-session-override-inheritance`, based
+on `32df0219`. The maintainer selected the inheritance contract on 2026-10-27; runtime validation remains in the
+separate [implementation proposal](../../proposed/validate_derived_session_overrides/card.md). See
+[checklist](checklist.md).
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../done/epic_repo_maintenance_round/card.md) (completed provenance).
 
@@ -11,7 +14,14 @@
 When fork, fresh resume, and relaunch derive a child, should live parent overrides be copied as overrides, baked into
 the child's baseline intent, or omitted except for explicitly inheritable fields?
 
-## Verified Evidence
+## Selected outcome
+
+The maintainer selected the [decision](decision.md): fork/fresh inherit selected baseline intent plus effective memory
+settings; relaunch retains valid live overrides as a separate, resettable layer. The 2026-10-27 recheck confirms the
+distinction and existing regressions that require relaunch to preserve disabled policy. [Evidence](evidence.md) records
+the current behavior and validation gaps. Uniform pre-derivation validation has not shipped.
+
+## Original evidence
 
 - `_inherit_intent_fields` deep-copies raw baseline intent for fork, fresh resume, and relaunch.
 - `apply_memory_inheritance` then deliberately reads effective parent memory and bakes only `auto_update` into the
@@ -26,14 +36,14 @@ The asymmetry is real, but D040's proposed correction is not grounded enough to 
 effective state could unexpectedly propagate temporary policy suspension, while dropping memory's effective value would
 break an explicit contract.
 
-## Decision Required
+## Decision considered
 
-Choose and document behavior separately for fork, fresh resume, and relaunch:
+The original alternatives were:
 
 1. copy raw intent plus selected explicit inheritance only;
 2. copy raw intent and the parent's generic overrides; or
 3. materialize effective values into a fresh child baseline and clear inherited overrides.
 
-The decision must address transient policy suspension, consumer lanes, immutable launch/runtime keys, malformed legacy
-overrides, reset semantics, and whether relaunch should remain distinct. Only then create an implementation card with
-fixture-grounded acceptance tests.
+The selected contract uses option 1 for fork/fresh and option 2 for relaunch, preserving memory's explicit exception. It
+specifies policy suspension, consumer lanes, lifecycle-owned fields, malformed legacy overrides and reset semantics. The
+follow-up card carries fixture-grounded acceptance tests; selecting this decision does not activate that proposal.

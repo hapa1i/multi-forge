@@ -222,6 +222,40 @@ started_with_proxy:
 > `memory.tags` without losing `memory.auto_recall`. This applies to session-owned fields only (`tdd_mode`, `memory.*`,
 > etc.). Proxy-owned fields come directly from the proxy.
 
+#### Derived-session configuration
+
+Inheritance follows the Forge lifecycle operation, independently of native versus transfer context transport. For valid
+parent configuration, the layer contract is:
+
+| Operation         | Baseline                                             | Generic overrides |
+| ----------------- | ---------------------------------------------------- | ----------------- |
+| Fork              | Selected raw intent plus effective memory activation | Empty             |
+| Fresh resume      | Selected raw intent plus effective memory activation | Empty             |
+| Relaunch as child | Selected raw intent                                  | Parent map copied |
+| Ordinary reattach | Same session                                         | Retained in place |
+
+Fork/fresh copy baseline policy, verification, system prompt, subprocess proxy, requested consumer lanes and launch
+preferences, with existing explicit child routing/authority choices taking precedence. Their memory exception
+materializes the parent's effective `memory.auto_update` into fresh memory intent; other memory fields take defaults.
+The [memory contract](design_memory.md#54-memory-activation-on-fork-and-fresh-resume) owns explicit on/off flags.
+Authority inherits advisory roles only. Consumer lanes inherit requested intent, including a cleared request, without
+copying frozen bindings or degradation state. Execution facts and review allowances belong to the child.
+
+Relaunch-as-child preserves the baseline and override layers, including temporary policy suspension and memory changes.
+It is the Claude resume path used for active `--force` and the existing non-resumable fallback, not ordinary inactive
+reattach. A same-directory native fork or fresh native resume still uses the fork/fresh rule. Codex reattach and the
+Claude-to-Codex start bridge retain their separate lifecycle contracts.
+
+Reset removes only the child's overrides. Fork/fresh memory activation is already baseline and survives `reset --all`;
+relaunch reset restores its copied baseline. Later parent changes never update an existing child. Do not materialize the
+entire effective configuration: that would turn temporary policy suspension into baseline and erase reset provenance.
+
+Relaunch currently copies stored overrides without complete pre-publication value/path validation. Readable legacy
+overrides can therefore remain invalid or conflict with lifecycle-owned fields. Uniform refusal before derivation is
+tracked in [the validation proposal](board/proposed/validate_derived_session_overrides/card.md); this layer contract
+does not imply that guard has shipped. Existing strict reads and typed runtime, route, authority and lane owners remain
+in force.
+
 ### Session cleanup
 
 `session/deletion.py` owns the immutable plan and coordinated apply for delete, purge, clean, retention and incognito.

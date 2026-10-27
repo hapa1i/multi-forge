@@ -805,6 +805,8 @@ sessions were started concurrently in the same directory, the thread may stay un
 `forge session delete <name>` plus a fresh start is the recovery. Interactive turns do not appear in the usage ledger
 (Codex reports no attributable usage for TUI turns); a bridge's transfer curation still does.
 
+### Fork an existing Claude session
+
 ```bash
 forge session fork auth-refactor --name auth-refactor-alt
 ```
@@ -812,11 +814,15 @@ forge session fork auth-refactor --name auth-refactor-alt
 A fork creates a new named session that branches the parent's Claude conversation. By default the fork stays in the same
 directory, so Claude's `--resume --fork-session` finds the parent conversation and carries it over.
 
-**What gets copied:**
+**What carries over:**
 
-- Session file (`intent`, `overrides`, `confirmed`) -> new session's location
-- `confirmed.latest_plan_path` -> forked session inherits the same plan
-- Claude Code conversation context -> carried over via `--fork-session` (same directory)
+- Selected baseline settings, including policy, launch preferences and requested consumer lanes. Generic live overrides
+  do not carry into the fork.
+- Effective memory-writer settings become the child's baseline; `--memory on|off` selects activation explicitly.
+- Conversation context carries over via `--fork-session` in the same directory. The child records its own runtime facts,
+  frozen lane bindings and review state.
+
+See [configuration inheritance](#configuration-inheritance-and-reset) for policy suspension, authority and reset rules.
 
 **With `--worktree` (code isolation):**
 
@@ -1109,6 +1115,28 @@ forge session reset memory.tags
 # Reset all overrides
 forge session reset --all
 ```
+
+### Configuration inheritance and reset
+
+Fork and `resume --fresh` inherit selected **baseline** settings and start with no generic overrides. For example,
+`%policy disable` temporarily disables a parent's policy, but a fork/fresh child still uses the parent's baseline policy
+setting. The terminal `forge policy enable|disable` commands change that baseline and therefore affect later children.
+This distinction also applies to native-context forks and fresh resumes.
+
+Memory is the explicit exception: the parent's current effective memory-writer configuration becomes the fork/fresh
+child's baseline. Other memory settings, such as tags, do not carry over. Resetting the child's overrides does not undo
+inherited memory activation; use `--memory on|off` when deriving the child or the session memory commands afterward.
+
+Ordinary inactive resume reattaches to the same session and retains its overrides. When Claude resume instead creates a
+relaunch child, such as `--force` against an active resumable session, it copies baseline and live overrides separately.
+Temporary policy suspension and memory changes remain effective, and `session reset --all --session <child>` restores
+the child's copied baseline. Reset never changes the parent, and later parent changes do not update existing children.
+
+Children inherit requested consumer lanes, not the parent's frozen bindings; a cleared lane request remains cleared in
+the child. [Advisory authority](#assign-inherit-and-inspect-authority) inherits with its tier, while producer authority
+does not. Explicit child routing and authority choices take precedence.
+
+### Protected settings
 
 Launch runtime is immutable session identity. `session set` rejects `launch.runtime`, a parent `launch` object that
 contains `runtime`, and `launch.*`; create a new session with `--runtime` instead. Whole-launch and nullable sibling
