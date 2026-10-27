@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import struct
+import sys
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -22,6 +25,7 @@ from forge.session.codex_invoke import (
     _build_codex_proxy_env,
     invoke_codex_bare_proxy,
     invoke_codex_interactive,
+    max_initial_prompt_bytes,
 )
 
 _TID = "019eaa51-6920-7c41-ae34-d4f7f368d55a"
@@ -100,6 +104,37 @@ class TestArgv:
         with pytest.raises(ValueError, match="mutually exclusive"):
             _invoke(mock_run, resume_thread_id=_TID, initial_prompt="x")
         mock_run.assert_not_called()
+
+
+class TestInitialPromptLimit:
+    def test_linux_caps_one_argument_at_max_arg_strlen(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(sys, "platform", "linux")
+        monkeypatch.setattr(os, "sysconf", {"SC_PAGE_SIZE": 4096, "SC_ARG_MAX": 2 * 1024 * 1024}.__getitem__)
+        # 32 pages including the argument's NUL terminator.
+        assert max_initial_prompt_bytes(argv=[], env={}) == 131_071
+
+    def test_linux_limit_follows_the_page_size(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(sys, "platform", "linux")
+        monkeypatch.setattr(os, "sysconf", {"SC_PAGE_SIZE": 16384, "SC_ARG_MAX": 8 * 1024 * 1024}.__getitem__)
+        assert max_initial_prompt_bytes(argv=[], env={}) == 524_287
+
+    def test_total_argument_space_bounds_other_hosts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(sys, "platform", "darwin")
+        monkeypatch.setattr(os, "sysconf", {"SC_ARG_MAX": 1024 * 1024}.__getitem__)
+        # "KEY=" + value + NUL is 100 bytes; include the prompt NUL and four pointers.
+        assert max_initial_prompt_bytes(argv=[], env={"KEY": "v" * 95}) == (
+            1024 * 1024 - 100 - 4 * struct.calcsize("P") - 1 - 16 * 1024
+        )
+
+    def test_total_argument_space_also_bounds_linux(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(sys, "platform", "linux")
+        monkeypatch.setattr(os, "sysconf", {"SC_PAGE_SIZE": 4096, "SC_ARG_MAX": 128 * 1024}.__getitem__)
+        assert max_initial_prompt_bytes(argv=[], env={}) == 128 * 1024 - 3 * struct.calcsize("P") - 1 - 16 * 1024
+
+    def test_indeterminate_limits_are_unbounded(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(sys, "platform", "darwin")
+        monkeypatch.setattr(os, "sysconf", {"SC_ARG_MAX": -1}.__getitem__)
+        assert max_initial_prompt_bytes(argv=[], env={}) is None
 
 
 @patch("forge.session.codex_invoke.subprocess.run")

@@ -38,17 +38,12 @@ def test_new_tool_text_is_writable_when_json_contains_a_lone_surrogate(tmp_path:
         "agent": {"type": "tool_use", "name": "Agent", "input": {"prompt": damaged}},
         "message": {"type": "tool_use", "name": "SendMessage", "input": {"content": damaged}},
     }
+    note = {"type": "text", "text": "Review note"}
+    # Native transcripts put tool results before neighboring text and tool calls after it.
+    ordered = [blocks[block_kind], note] if block_kind == "result" else [note, blocks[block_kind]]
     transcript = tmp_path / "damaged.jsonl"
     transcript.write_text(
-        json.dumps(
-            {
-                "message": {
-                    "role": "user" if block_kind == "result" else "assistant",
-                    "content": [{"type": "text", "text": "Review note"}, blocks[block_kind]],
-                }
-            }
-        )
-        + "\n"
+        json.dumps({"message": {"role": "user" if block_kind == "result" else "assistant", "content": ordered}}) + "\n"
     )
     parent = create_session_state("parent", worktree_path=str(tmp_path))
     parent.confirmed.transcript_path = str(transcript)

@@ -76,7 +76,11 @@ from forge.session.codex_handoff import (
     read_receipt,
     stage_pending_context,
 )
-from forge.session.codex_invoke import invoke_codex_interactive
+from forge.session.codex_invoke import (
+    build_codex_interactive_launch,
+    invoke_codex_interactive,
+    max_initial_prompt_bytes,
+)
 from forge.session.config import LAUNCH_MODE_HOST
 from forge.session.exceptions import SessionWorktreeMissingError
 from forge.session.launchability import require_session_worktree
@@ -281,6 +285,21 @@ def start_interactive_codex_session(
                     stage_pending_context(store.session_dir, compose_codex_handoff_context(assembly.body))
                 else:
                     initial_prompt = compose_codex_interactive_context(assembly.body)
+                    argv, env = build_codex_interactive_launch(
+                        preflight=preflight,
+                        session_name=name,
+                        forge_root=str(child_forge_root),
+                        run_identity=root,
+                        sandbox=sandbox,
+                        extra_args=launch_args.runtime_argv("codex"),
+                    )
+                    _require_initial_prompt_fits(
+                        initial_prompt,
+                        limit=max_initial_prompt_bytes(argv=argv, env=env),
+                        strategy=strategy,
+                        curation_ran=assembly.curation_ran,
+                        hook_capable=preflight.hook_seam not in _HOOK_INCAPABLE_SEAMS,
+                    )
 
             # Tight discovery window: taken AFTER assembly (which can run 30s+ of LLM
             # curation) and immediately before the TUI spawns.
@@ -615,6 +634,33 @@ def reattach_codex_session(
         curation_ran=None,
         operation_started_at=operation_started_at,
         warnings=tuple(warnings),
+    )
+
+
+def _require_initial_prompt_fits(
+    prompt: str, *, limit: int | None, strategy: str, curation_ran: bool, hook_capable: bool
+) -> None:
+    """Refuse, before launch, a positional prompt that exec would reject with E2BIG.
+
+    Raised inside the pre-launch rollback scope, so a refused start keeps no session or snapshot.
+    """
+    size = len(prompt.encode("utf-8"))
+    if limit is None or size <= limit:
+        return
+    alternatives = ["--context-delivery hook (trust-enrolled homes)"] if hook_capable else []
+    if strategy in ("structured", "full"):
+        alternatives.append("--strategy ai-curated")
+    if strategy != "minimal":
+        alternatives.append("--strategy minimal")
+    alternatives.append('--task "<instruction>" (stdin delivery with a headless first turn)')
+    fallback = (
+        " AI curation fell back to structured output; check its OpenRouter authentication and endpoint."
+        if strategy == "ai-curated" and not curation_ran
+        else ""
+    )
+    raise ForgeOpError(
+        f"The Codex initial prompt is {size:,} bytes, over this host's {limit:,}-byte command-line argument "
+        f"limit; the TUI was not launched.{fallback} Rerun with one of: {', '.join(alternatives)}."
     )
 
 

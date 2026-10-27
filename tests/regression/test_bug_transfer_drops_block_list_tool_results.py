@@ -49,8 +49,8 @@ def test_supported_results_do_not_hide_neighboring_user_text(tmp_path, block_lis
                 "message": {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Preserve this user note"},
                         {"type": "tool_result", "tool_use_id": "agent-review", "content": result},
+                        {"type": "text", "text": "Preserve this user note"},
                     ],
                 }
             }

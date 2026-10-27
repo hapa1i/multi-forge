@@ -258,7 +258,7 @@ class TestExtractTurnSummary:
         assert summary["tools"] == ["[result: " + "A" * 300 + "\n" + "B" * 199 + "...]"]
 
     @pytest.mark.parametrize("kind", ["string-result", "list-result", "Agent", "SendMessage"])
-    def test_escaped_surrogates_remain_within_the_existing_caps(self, kind):
+    def test_escaped_surrogates_remain_whole_within_the_existing_caps(self, kind):
         damaged = "\ud800" * 1000
         if kind.endswith("result"):
             result = damaged if kind == "string-result" else [{"type": "text", "text": damaged}]
@@ -270,10 +270,31 @@ class TestExtractTurnSummary:
             prefix, suffix, limit = f"{kind}({field}=", ")", 100
         summary = _extract_turn_summary({"message": {"role": "assistant", "content": [block]}})
         assert summary is not None
-        rendered = summary["tools"][0]
-        assert rendered.startswith(prefix + "\\ud800")
-        assert rendered.endswith("..." + suffix)
-        assert len(rendered.encode("utf-8")) == len(prefix) + limit + 3 + len(suffix)
+        assert summary["tools"] == [prefix + "\\ud800" * (limit // 6) + "..." + suffix]
+
+    @pytest.mark.parametrize(
+        ("result", "kept"),
+        [
+            pytest.param("x" * 494 + "\udc80" + "y" * 600, "x" * 494 + "\\udc80", id="escape-ends-at-cap"),
+            pytest.param("x" * 495 + "\udc80" + "y" * 600, "x" * 495, id="escape-crosses-cap"),
+            pytest.param("x" * 499 + "\udc80" + "y" * 600, "x" * 499, id="escape-starts-before-cap"),
+            pytest.param("x" * 500 + "\udc80" + "y" * 600, "x" * 500, id="escape-after-cap"),
+            pytest.param("x" * 496 + "\\temp" + "y" * 600, "x" * 496 + "\\tem", id="literal-backslash"),
+        ],
+    )
+    def test_truncation_never_splits_a_surrogate_escape(self, result, kept):
+        summary = _extract_turn_summary(
+            {"message": {"role": "user", "content": [{"type": "tool_result", "content": result}]}}
+        )
+        assert summary is not None
+        assert summary["tools"] == [f"[result: {kept}...]"]
+
+    def test_message_text_escapes_lone_surrogates(self):
+        summary = _extract_turn_summary(
+            {"message": {"role": "user", "content": [{"type": "text", "text": "before \ud800 after \U0001f30d"}]}}
+        )
+        assert summary is not None
+        assert summary["text"] == "before \\ud800 after \U0001f30d"
 
 
 class TestDelegationTransferStrategies:
@@ -684,6 +705,16 @@ class TestGenerateStructuredContext:
         # Message should be truncated (500 chars + "...")
         assert long_message not in content
         assert "..." in content
+
+    def test_message_cap_never_splits_a_surrogate_escape(self, tmp_path: Path) -> None:
+        transcript = tmp_path / "damaged.jsonl"
+        message = {"role": "user", "content": [{"type": "text", "text": "x" * 497 + "\udc80" + "tail"}]}
+        transcript.write_text(json.dumps({"requestId": "r1", "message": message}), encoding="utf-8")
+
+        content, warnings = _generate_structured_context("test", ["test"], transcript, None, None, None)
+
+        assert f"**User**: {'x' * 497}...\n" in content
+        assert warnings == []
 
     def test_includes_tool_summaries(self, sample_transcript: Path) -> None:
         """Should include tool call summaries."""

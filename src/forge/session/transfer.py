@@ -37,7 +37,6 @@ from forge.core.transcript import (
     group_entries_into_turns,
     parse_jsonl_transcript,
     resolve_entry_role,
-    truncate,
 )
 from forge.session.artifacts import (
     latest_transcript_artifact_path,
@@ -64,6 +63,8 @@ logger = logging.getLogger(__name__)
 MESSAGE_TRUNCATE_CHARS = 500
 TOOL_ARG_TRUNCATE_CHARS = 100
 TOOL_RESULT_TRUNCATE_CHARS = 500
+# The "backslashreplace" spelling of a lone surrogate, U+D800 through U+DFFF.
+_SURROGATE_ESCAPE_RE = re.compile(r"\\ud[89a-f][0-9a-f]{2}")
 
 # Transfer document schema. The transfer doc carries a child-agnostic YAML
 # frontmatter block (see _build_frontmatter); ``schema_version`` lets future
@@ -314,9 +315,24 @@ def parse_lineage_depth(value: str | int) -> int | None:
     return depth
 
 
+def _escape_lone_surrogates(text: str) -> str:
+    """Spell lone surrogates as literal escapes so transfer files remain valid UTF-8."""
+    return text.encode("utf-8", errors="backslashreplace").decode("utf-8")
+
+
+def _truncate_escaped(text: str, max_chars: int, *, suffix: str = "...") -> str:
+    """Truncate like ``truncate``, moving the cut before a surrogate escape it would split."""
+    if len(text) <= max_chars:
+        return text
+    # A six-character escape crosses the cut only when its backslash is among the last five kept characters.
+    start = text.rfind("\\", max(max_chars - 5, 0), max_chars)
+    cut = start if start != -1 and _SURROGATE_ESCAPE_RE.match(text, start) else max_chars
+    return text[:cut] + suffix
+
+
 def _truncate_tool_text(text: str, max_chars: int) -> str:
     """Escape lone surrogates before bounding tool text for UTF-8 transfer files."""
-    return truncate(text[: max_chars + 1].encode("utf-8", errors="backslashreplace").decode("utf-8"), max_chars)
+    return _truncate_escaped(_escape_lone_surrogates(text[: max_chars + 1]), max_chars)
 
 
 def _summarize_tool_use(name: str, tool_input: Any) -> str:
@@ -371,7 +387,7 @@ def _extract_turn_summary(entry: dict[str, Any]) -> dict[str, Any] | None:
         if block_type == "text":
             t = block.get("text")
             if isinstance(t, str) and t:
-                text_parts.append(t)
+                text_parts.append(_escape_lone_surrogates(t))
 
         elif block_type == "tool_use":
             tools.append(_summarize_tool_use(str(block.get("name", "unknown")), block.get("input", {})))
@@ -524,13 +540,13 @@ def _generate_structured_context(
 
                 if user_texts:
                     user_text = " ".join(user_texts)
-                    truncated = truncate(user_text, MESSAGE_TRUNCATE_CHARS)
+                    truncated = _truncate_escaped(user_text, MESSAGE_TRUNCATE_CHARS)
                     lines.append(f"**User**: {truncated}")
                     lines.append("")
 
                 if assistant_texts:
                     assistant_text = " ".join(assistant_texts)
-                    truncated = truncate(assistant_text, MESSAGE_TRUNCATE_CHARS)
+                    truncated = _truncate_escaped(assistant_text, MESSAGE_TRUNCATE_CHARS)
                     lines.append(f"**Assistant**: {truncated}")
                     lines.append("")
 

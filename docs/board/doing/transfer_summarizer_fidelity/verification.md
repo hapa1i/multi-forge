@@ -44,18 +44,56 @@ Restoring turn admission does not add an aggregate budget or change the launch c
 still carry raw result excerpts inside text-bearing groups. A size cap does not make those excerpts trusted or guarantee
 that every possible conversation fits a model or operating-system limit.
 
+## Second review correction
+
+A follow-up review of `4ae3d437` found three fixture entries that placed text before `tool_result`. All 36 mixed entries
+in the local native Claude Code transcripts lead with their results, so the fixtures now match. Rendering does not
+depend on block order, and no expected output changed.
+
+The same review found that the 500- and 100-character caps could cut an escape such as `\udc80` mid-sequence, and that
+lone surrogates in user or assistant text still crashed child writes before and after this PR. Message text is now
+escaped at extraction, so structured, full, the curation input and the rewind tail share the escaped text; every cap
+moves its cut before an escape it would split. Eight unit cases and six regressions failed before the change. The local
+native transcripts contain no lone surrogates, so this hardens transfers against damaged JSON rather than fixing an
+observed session.
+
+The 128,446-byte prompt recorded above sat 2,625 bytes below Linux's per-argument limit, and a `full` transfer of the
+same parent is about 837 KB. Interactive Codex bridges now check the framed prompt against `max_initial_prompt_bytes()`
+inside the pre-launch rollback scope: Linux `MAX_ARG_STRLEN` (32 pages including the NUL) and, on every host, `ARG_MAX`
+less the native arguments, sanitized child environment, NUL terminators, pointer arrays and 16 KiB of launch-metadata
+headroom. Sizing and invocation share their argument/environment builder. An oversized prompt refuses with only
+applicable alternatives and leaves no session or snapshot; four ops cases failed with the check disabled. Headless
+`--task` turns and hook delivery do not carry the transfer in argv. In Docker, a prompt of exactly the computed limit
+launches intact through the mock executable, and one more byte fails with `E2BIG`.
+
+The final review reproduced an aggregate-limit failure with a 32 KiB native config option: the old fixed-headroom
+calculation admitted a prompt that the kernel rejected. The revised budget counts that option and repeated-argument
+pointers explicitly, and the ops regression verifies refusal before announcement or invocation with session/snapshot
+rollback. A Docker check lowers Linux's stack soft limit so `ARG_MAX` binds, then verifies that the revised prompt
+launches intact while the budget that ignores native options fails with `E2BIG`. On macOS, a local `/usr/bin/true` probe
+with the same 32 KiB config option accepted the revised 996,371-byte prompt; the previous 1,029,736-byte budget failed
+with `E2BIG`. Neither probe invoked a model.
+
+The rewind tail's final 50,000-character cap now uses the same escape-aware cut as the field caps. Boundary regressions
+cover all five partial cuts of a surrogate escape and the complete-escape boundary, retaining the existing truncation
+notice. Restoring the reviewed budget and raw rewind cut in an isolated test process produces nine expected failures:
+three budget regressions, five split-escape boundaries and the pre-launch rollback case.
+
 ## Checks
 
 - The initial implementation reproduced 13 focused failures and two additional mixed-message failures. The review
-  correction added seven failing regressions: tool-traffic growth and six Unicode write cases.
-- `PYTHON_DOTENV_DISABLED=1 .venv/bin/pytest tests/regression/test_bug_structured_transfer_tool_expansion.py tests/regression/test_bug_transfer_drops_block_list_tool_results.py tests/src/session/test_transfer.py tests/src/search/test_extractor.py -q`:
-  **176 passed**.
+  correction added seven failing regressions: tool-traffic growth and six Unicode write cases. The second correction
+  added 14 failing Unicode cases and four launch-size cases that fail with the check disabled.
+- `PYTHON_DOTENV_DISABLED=1 .venv/bin/pytest tests/regression/test_bug_codex_prompt_budget_ignores_native_args.py tests/regression/test_bug_transfer_message_lone_surrogate.py tests/regression/test_bug_structured_transfer_tool_expansion.py tests/regression/test_bug_transfer_drops_block_list_tool_results.py tests/src/session/test_transfer.py tests/src/search/test_extractor.py tests/src/session/test_codex_invoke.py tests/src/core/ops/test_codex_interactive.py tests/src/session/test_rewind_strategy.py -q`:
+  **292 passed**.
 - `PYTHON_DOTENV_DISABLED=1 env -u GEMINI_API_KEY ./scripts/test-integration.sh tests/integration/cli/test_transfer_fidelity_integration.py tests/integration/cli/test_session_commands_integration.py::TestSessionResume -q`:
-  **8 passed**. Covers regenerate/show/edit/diff, reviewed fresh resume, frozen-child preservation and the Linux
-  argument-size regression with mock Claude/Codex executables.
-- `PYTHON_DOTENV_DISABLED=1 make test-unit`: **11,204 passed, 120 deselected**.
-- `PYTHON_DOTENV_DISABLED=1 make test-regression`: **2,187 passed**.
-- `make pre-commit`: **passed**, including formatting, both type checkers, file-size limits and Markdown links.
+  **10 passed**. Covers regenerate/show/edit/diff, reviewed fresh resume, frozen-child preservation, the tool-heavy
+  Linux launch, the exact Linux per-argument boundary and aggregate argument-budget consumption by native options with
+  mock Claude/Codex executables.
+- `PYTHON_DOTENV_DISABLED=1 make test-unit`: **11,223 passed, 120 deselected**.
+- `PYTHON_DOTENV_DISABLED=1 make test-regression`: **2,202 passed**.
+- `make pre-commit`: **passed**, including formatting, both type checkers, file-size limits and Markdown links. The
+  `docs/end-user/session.md` provider count was refreshed to 26,203 tokens, under its 30,000-token limit.
 
 No live model inference was required or performed. The synthetic transcripts use supported native block shapes; this
 card does not claim new native-runtime lifecycle or child-discovery coverage. Search coverage remains green without a

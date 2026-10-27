@@ -87,8 +87,8 @@ PY""")
         "message": {
             "role": "user",
             "content": [
-                {"type": "text", "text": "Additional review note"},
                 {"type": "tool_result", "content": [{"type": "text", "text": "Late transfer finding"}]},
+                {"type": "text", "text": "Additional review note"},
             ],
         },
     }
@@ -102,24 +102,14 @@ PY""")
     assert workspace.read_file(child_path) == child
 
 
-def test_tool_heavy_structured_transfer_launches_on_linux(clean_workspace: ContainerLike) -> None:
-    result = clean_workspace.exec(r"""cd /forge && PYTHON_DOTENV_DISABLED=1 /forge/.venv/bin/python - <<'CHECK'
-import json
+# Defines launch(prompt): the real interactive launcher against a shim that records its positional prompt.
+_MOCK_CODEX_LAUNCH = r"""
 import os
 from pathlib import Path
 
-from forge.core.ops.codex_bridge import compose_codex_interactive_context
 from forge.core.reactive.env import RunIdentity
 from forge.core.runtime.codex_preflight import CodexPreflight
-from forge.session.codex_invoke import invoke_codex_interactive
-from forge.session.transfer import _generate_structured_context
-from tests.fixtures.transcript_delegation import tool_heavy_transcript
-
-transcript = Path('/workspace/busy.jsonl')
-transcript.write_text('\n'.join(json.dumps(entry) for entry in tool_heavy_transcript()))
-content, warnings = _generate_structured_context('parent', ['parent'], transcript, None, None, None)
-assert not warnings
-prompt = compose_codex_interactive_context(content)
+from forge.session.codex_invoke import build_codex_interactive_launch, invoke_codex_interactive
 
 bin_dir = Path('/workspace/fidelity-bin')
 bin_dir.mkdir()
@@ -129,7 +119,8 @@ if [ "$1" = "--version" ]; then
     echo 'codex-cli 0.161.0'
     exit 0
 fi
-printf '%s' "$3" > /workspace/codex-prompt.txt
+for prompt do :; done
+printf '%s' "$prompt" > /workspace/codex-prompt.txt
 ''')
 shim.chmod(0o755)
 os.environ['PATH'] = str(bin_dir) + os.pathsep + os.environ['PATH']
@@ -139,14 +130,105 @@ preflight = CodexPreflight(
     ready=True, blocking_reason=None, hook_seam='enrollment_gated',
     proxy_responses='native_direct', doctor_status='ok',
 )
-code = invoke_codex_interactive(
-    preflight=preflight, session_name='fidelity-child', forge_root='/workspace', cwd='/workspace',
-    run_identity=RunIdentity(run_id='run_aaaaaaaaaaaa', parent_run_id=None, root_run_id='run_aaaaaaaaaaaa'),
-    initial_prompt=prompt,
-)
-assert code == 0
+
+
+def launch_options(extra_args=()):
+    return dict(
+        preflight=preflight, session_name='fidelity-child', forge_root='/workspace', cwd='/workspace',
+        run_identity=RunIdentity(run_id='run_aaaaaaaaaaaa', parent_run_id=None, root_run_id='run_aaaaaaaaaaaa'),
+        extra_args=extra_args,
+    )
+
+
+def launch(prompt, extra_args=()):
+    return invoke_codex_interactive(**launch_options(extra_args), initial_prompt=prompt)
+
+
+def prompt_limit(extra_args=()):
+    from forge.session.codex_invoke import max_initial_prompt_bytes
+    options = launch_options(extra_args)
+    del options['cwd']
+    argv, env = build_codex_interactive_launch(**options)
+    return max_initial_prompt_bytes(argv=argv, env=env)
+"""
+
+
+def _run_check(workspace: ContainerLike, script: str) -> None:
+    command = f"cd /forge && PYTHON_DOTENV_DISABLED=1 /forge/.venv/bin/python - <<'CHECK'\n{script}\nCHECK"
+    result = workspace.exec(command)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_tool_heavy_structured_transfer_launches_on_linux(clean_workspace: ContainerLike) -> None:
+    _run_check(
+        clean_workspace,
+        _MOCK_CODEX_LAUNCH + r"""
+import json
+
+from forge.core.ops.codex_bridge import compose_codex_interactive_context
+from forge.session.transfer import _generate_structured_context
+from tests.fixtures.transcript_delegation import tool_heavy_transcript
+
+transcript = Path('/workspace/busy.jsonl')
+transcript.write_text('\n'.join(json.dumps(entry) for entry in tool_heavy_transcript()))
+content, warnings = _generate_structured_context('parent', ['parent'], transcript, None, None, None)
+assert not warnings
+prompt = compose_codex_interactive_context(content)
+assert launch(prompt) == 0
 assert Path('/workspace/codex-prompt.txt').read_text() == prompt
 assert 'Review complete' in prompt
 assert 'raw output' not in prompt
-CHECK""")
-    assert result.returncode == 0, result.stdout + result.stderr
+""",
+    )
+
+
+def test_initial_prompt_limit_matches_linux_exec(clean_workspace: ContainerLike) -> None:
+    _run_check(
+        clean_workspace,
+        _MOCK_CODEX_LAUNCH + r"""
+import errno
+import subprocess
+
+limit = prompt_limit()
+assert limit == 32 * os.sysconf('SC_PAGE_SIZE') - 1, limit
+prompt = 'é' * (limit // 2) + 'x' * (limit % 2)
+assert len(prompt.encode('utf-8')) == limit
+assert launch(prompt) == 0
+assert Path('/workspace/codex-prompt.txt').read_bytes() == prompt.encode('utf-8')
+try:
+    subprocess.run(['/bin/true', 'x' * (limit + 1)], check=False)
+except OSError as error:
+    assert error.errno == errno.E2BIG, error
+else:
+    raise AssertionError('exec accepted an argument above the computed limit')
+""",
+    )
+
+
+def test_native_options_share_linux_argument_budget(clean_workspace: ContainerLike) -> None:
+    _run_check(
+        clean_workspace,
+        _MOCK_CODEX_LAUNCH + r"""
+import errno
+import resource
+
+# Linux ARG_MAX follows the stack soft limit, with a 128 KiB floor. This makes the
+# aggregate limit bind before MAX_ARG_STRLEN without depending on the Docker host.
+_, hard = resource.getrlimit(resource.RLIMIT_STACK)
+resource.setrlimit(resource.RLIMIT_STACK, (512 * 1024, hard))
+assert os.sysconf('SC_ARG_MAX') == 128 * 1024
+args = ('-c', 'developer_instructions="' + 'é' * 16_384 + '"')
+baseline = prompt_limit()
+limit = prompt_limit(args)
+assert baseline - limit > 32_768
+prompt = 'é' * (limit // 2) + 'x' * (limit % 2)
+assert launch(prompt, args) == 0
+assert Path('/workspace/codex-prompt.txt').read_bytes() == prompt.encode('utf-8')
+try:
+    launch('x' * baseline, args)
+except OSError as error:
+    assert error.errno == errno.E2BIG, error
+else:
+    raise AssertionError('exec accepted the prompt budget that ignored native options')
+""",
+    )

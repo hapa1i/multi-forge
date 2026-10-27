@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import logging
 import os
+import struct
 import subprocess
-from collections.abc import Sequence
+import sys
+from collections.abc import Mapping, Sequence
 
 from forge.core.invoker.codex import (
     _CODEX_CHILD_STRIP_VARS,
@@ -70,6 +72,31 @@ _CODEX_BARE_PROXY_STRIP_VARS: tuple[str, ...] = (
 _FORGE_CODEX_PROXY_TOKEN_VAR = "FORGE_CODEX_PROXY_TOKEN"
 _FORGE_CODEX_PROXY_TOKEN_VALUE = "forge-loopback"
 
+# Linux rejects any single exec argument longer than MAX_ARG_STRLEN: 32 pages, counting its NUL.
+_MAX_ARG_STRLEN_PAGES = 32
+# Room for the selected executable path, executor identity and authority marker added at launch.
+_ARG_MAX_HEADROOM_BYTES = 16 * 1024
+
+
+def max_initial_prompt_bytes(*, argv: Sequence[str], env: Mapping[str, str]) -> int | None:
+    """Return the largest UTF-8 prompt this host can pass as the TUI's positional argument.
+
+    ``argv`` excludes the prompt. Count the sanitized child environment, native options,
+    NUL terminators and pointer arrays explicitly; only bounded launch metadata uses headroom.
+    ``None`` means the host reports no argument limit.
+    """
+    limits: list[int] = []
+    if sys.platform.startswith("linux"):
+        limits.append(_MAX_ARG_STRLEN_PAGES * os.sysconf("SC_PAGE_SIZE") - 1)
+    arg_max = os.sysconf("SC_ARG_MAX")
+    if arg_max > 0:
+        environment = sum(len(os.fsencode(key)) + len(os.fsencode(value)) + 2 for key, value in env.items())
+        arguments = sum(len(os.fsencode(arg)) + 1 for arg in argv)
+        # One prompt pointer and two array terminators, plus the prompt's own NUL byte.
+        pointers = (len(argv) + len(env) + 3) * struct.calcsize("P")
+        limits.append(arg_max - environment - arguments - pointers - 1 - _ARG_MAX_HEADROOM_BYTES)
+    return min(limits) if limits else None
+
 
 def invoke_codex_interactive(
     *,
@@ -98,6 +125,36 @@ def invoke_codex_interactive(
     (``codex-session-start``, ``codex-policy-check``) resolve this session's store
     (both probe-verified to reach the hook env, stage 50c).
     """
+    argv, env = build_codex_interactive_launch(
+        preflight=preflight,
+        session_name=session_name,
+        forge_root=forge_root,
+        run_identity=run_identity,
+        sandbox=sandbox,
+        resume_thread_id=resume_thread_id,
+        initial_prompt=initial_prompt,
+        authority_marker=authority_marker,
+        extra_args=extra_args,
+    )
+    logger.debug("Launching interactive codex (cwd=%s, resume=%s)", cwd, resume_thread_id)
+    argv = prepare_executor_launch(argv, env, cwd=cwd)
+    result = subprocess.run(argv, env=env, cwd=cwd, stdin=None, stdout=None, stderr=None)
+    return result.returncode
+
+
+def build_codex_interactive_launch(
+    *,
+    preflight: CodexPreflight,
+    session_name: str,
+    forge_root: str,
+    run_identity: RunIdentity,
+    sandbox: CodexSandbox = "workspace-write",
+    resume_thread_id: str | None = None,
+    initial_prompt: str | None = None,
+    authority_marker: str | None = None,
+    extra_args: Sequence[str] = (),
+) -> tuple[list[str], dict[str, str]]:
+    """Build the same arguments and child environment for pre-launch sizing and invocation."""
     if resume_thread_id is not None and initial_prompt is not None:
         raise ValueError("resume_thread_id and initial_prompt are mutually exclusive")
 
@@ -113,6 +170,7 @@ def invoke_codex_interactive(
             # The positional prompt is visible to same-host process listings (ps,
             # /proc/<pid>/cmdline). For sensitive context on a shared host, prefer
             # --context-delivery hook (out-of-band additionalContext); see session.md.
+            # Callers check max_initial_prompt_bytes() first: exec rejects larger prompts with E2BIG.
             argv.append(initial_prompt)
 
     env = sanitize_codex_child_env(preflight)
@@ -133,10 +191,7 @@ def invoke_codex_interactive(
     if authority_marker is not None:
         env[FORGE_AUTHORITY_MARKER_VAR] = authority_marker
 
-    logger.debug("Launching interactive codex (cwd=%s, resume=%s)", cwd, resume_thread_id)
-    argv = prepare_executor_launch(argv, env, cwd=cwd)
-    result = subprocess.run(argv, env=env, cwd=cwd, stdin=None, stdout=None, stderr=None)
-    return result.returncode
+    return argv, env
 
 
 def invoke_codex_bare_proxy(

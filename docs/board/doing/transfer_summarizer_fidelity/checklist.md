@@ -1,7 +1,8 @@
 # Transfer summarizer fidelity checklist
 
 **Current focus:** Review the corrected M2 implementation in PR #283. Structured preserves text-bearing-group admission;
-the extraction fixes and UTF-8-safe tool summaries pass local verification. See [verification](verification.md).
+UTF-8-safe message and tool text and the Codex launch-size refusal pass local verification. See
+[verification](verification.md).
 
 M2 executes independently. Strategy selection, source discovery, curated JSON, child capture and the broader epic remain
 outside this card. Preserve the pre-existing `AGENTS.md` working-tree edit.
@@ -28,17 +29,33 @@ outside this card. Preserve the pre-existing `AGENTS.md` working-tree edit.
   restoring the reviewed condition separately reproduced `E2BIG` in a network-disabled container.
 - [x] Run aggregate unit/regression and full pre-commit checks on the revised implementation.
 
+## Second review correction
+
+- [x] Order mixed user entries as native transcripts do, with tool results before neighboring text, in the shared
+  fixture, both mixed-entry regressions and the late-result integration case.
+- [x] Keep surrogate escapes whole at every cap and escape lone surrogates in message text, covering structured/full
+  output and the curation and rewind inputs: 14 new or tightened cases failed before the change.
+- [x] Refuse an interactive Codex bridge whose initial prompt exceeds the host's exec argument limit inside the
+  pre-launch rollback scope, offering only applicable alternatives: four ops cases failed with the check disabled.
+- [x] Confirm in Docker that the computed limit is Linux's exact `E2BIG` boundary and rerun aggregate checks.
+- [x] Count native launch arguments, the sanitized child environment and pointer arrays in the aggregate prompt budget;
+  share argument/environment construction with invocation and retain pre-launch rollback on refusal.
+- [x] Apply escape-aware truncation to the rewind tail's final cap, preserving its existing truncation notice.
+- [x] Verify the final fixes with aggregate checks and the Linux aggregate argument-limit reproduction: 11,223 unit
+  tests, 2,202 regressions and 10 Docker tests passed.
+
 ## Acceptance
 
-| Test                  | Fixture and assertion                                                                             | Test home                                                                            |
-| --------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Result fidelity       | Text/image/text results retain ordered text; unsupported neighbors and image data stay absent     | `tests/regression/test_bug_transfer_drops_block_list_tool_results.py`                |
-| Delegation fields     | Agent type/description/prompt and SendMessage recipient/message fields remain labeled and bounded | `tests/src/session/test_transfer.py`                                                 |
-| Strategy input/output | Structured retains admitted groups; full and mocked curation also receive tool-only evidence      | `tests/src/session/test_transfer.py`                                                 |
-| Search parity         | The same list-form result remains searchable without an extractor rewrite                         | `tests/src/search/test_extractor.py`                                                 |
-| User-facing transfer  | Docker CLI regenerate/show and fresh resume preserve available tool evidence                      | `tests/integration/cli/test_transfer_fidelity_integration.py`                        |
-| Tool traffic volume   | 1,000 call/result pairs keep three text-bearing groups and launch through the Linux Codex path    | `tests/regression/test_bug_structured_transfer_tool_expansion.py`, Docker test above |
-| Unicode writes        | Lone surrogates become literal escapes within existing caps; valid Unicode survives child writes  | `tests/regression/test_bug_structured_transfer_tool_expansion.py`, unit tests above  |
+| Test                  | Fixture and assertion                                                                              | Test home                                                                             |
+| --------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Result fidelity       | Text/image/text results retain ordered text; unsupported neighbors and image data stay absent      | `tests/regression/test_bug_transfer_drops_block_list_tool_results.py`                 |
+| Delegation fields     | Agent type/description/prompt and SendMessage recipient/message fields remain labeled and bounded  | `tests/src/session/test_transfer.py`                                                  |
+| Strategy input/output | Structured retains admitted groups; full and mocked curation also receive tool-only evidence       | `tests/src/session/test_transfer.py`                                                  |
+| Search parity         | The same list-form result remains searchable without an extractor rewrite                          | `tests/src/search/test_extractor.py`                                                  |
+| User-facing transfer  | Docker CLI regenerate/show and fresh resume preserve available tool evidence                       | `tests/integration/cli/test_transfer_fidelity_integration.py`                         |
+| Tool traffic volume   | 1,000 call/result pairs keep three text-bearing groups and launch through the Linux Codex path     | `tests/regression/test_bug_structured_transfer_tool_expansion.py`, Docker test above  |
+| Unicode writes        | Message/tool lone surrogates become whole escapes within caps; valid Unicode survives child writes | `tests/regression/test_bug_transfer_message_lone_surrogate.py`, tool regression above |
+| Codex launch size     | Prompts up to the host's argument limit launch; larger ones refuse before launch and roll back     | `tests/src/core/ops/test_codex_interactive.py`, `test_codex_invoke.py`, Docker test   |
 
 ## Validation and review
 

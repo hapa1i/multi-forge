@@ -80,10 +80,10 @@ SendMessage(recipient=reviewer, summary=Transfer findings, content=Keep both tex
 [result: The parser preserves the first finding.]
 ```
 
-Each labeled argument is capped at 100 characters, plus `...` when truncated. Lone surrogates in tool text are rendered
-as literal Unicode escapes before truncation. AI curation receives these summaries within its existing input limit and
-chooses what reaches its output. Structured transfers preserve user text alongside tool results. The per-result and
-per-argument caps do not impose a total transfer limit.
+Each labeled argument is capped at 100 characters, plus `...` when truncated. Lone surrogates in message and tool text
+are rendered as literal Unicode escapes, such as `\ud800`, and truncation never splits one. AI curation receives these
+summaries within its existing input limit and chooses what reaches its output. Structured transfers preserve user text
+alongside tool results. The per-result and per-argument caps do not impose a total transfer limit.
 
 `rewind` is a resume/fork launch strategy, not a `forge session transfer regenerate` strategy. Use
 `forge session resume <parent> --fresh --strategy rewind --drop-last N` to resume a fresh child from a truncated native
@@ -124,6 +124,10 @@ trust-enrolled `codex-session-start` hook you can opt into SessionStart delivery
 which keeps the prompt as your task alone and injects the context as `additionalContext`; see
 [session.md](session.md#derive-a-codex-session-from-a-claude-parent-cross-runtime) and
 [hook.md](hook.md#codex-session-start-codex-sessionstart) for the registration and failure semantics.
+
+When you omit `--task` to launch the interactive Codex TUI, the transfer uses a positional command-line argument. Native
+launch options and the child environment reduce the space available for it. Forge refuses an oversized prompt before
+launch and removes the new session and snapshot; the error lists applicable delivery or strategy alternatives.
 
 **The manual recipe** stays available when you want the handoff without a Forge session:
 
