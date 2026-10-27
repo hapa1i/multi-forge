@@ -3,8 +3,9 @@
 **Epic**: [epic_native_multiagent](../../proposed/epic_native_multiagent/card.md) (M2 -- a bug fix that makes lossiness
 deliberate).
 
-**Lane**: `doing/`, accepted 2026-10-27. Standalone branch `codex/transfer-summarizer-fidelity`, based on `484dfe04`. No
-dependencies; M1 and the broader epic remain proposed. See [checklist](checklist.md).
+**Lane**: `done/`. Accepted 2026-10-27; [PR #283](https://github.com/hapa1i/multi-forge/pull/283) merged that day as
+`9751470b`, matching the verified head `fa4c53b6`. See the [merged closeout](checklist.md#merged-closeout). M2 shipped
+independently; M1 and the broader epic remain proposed.
 
 ## Problem (verified 2026-09-06)
 

@@ -99,8 +99,28 @@ No live model inference was required or performed. The synthetic transcripts use
 card does not claim new native-runtime lifecycle or child-discovery coverage. Search coverage remains green without a
 production extractor change.
 
+## Docker storage follow-up
+
+The user's full local integration run reported 534 passes and three failures. The guarded worker image's retained npm
+logs showed `ENOSPC`; the sidecar entrypoint likewise failed to create `/root/.claude` after proxy startup, leaving the
+audit test with a stopped container. The legacy-builder warning obscured the npm error because the assertion printed
+only stderr.
+
+Reclaiming 5.34 GB of unused, unshared Forge build-cache records restored the targeted run: **3 passed** in 48.70
+seconds, using Claude 2.1.245, Codex 0.149.1 and reviewer Claude 2.1.248. No source change was needed. This was a rerun
+of the three failures, not a second full integration run:
+
+```bash
+CLAUDE_VERSION=2.1.245 CODEX_VERSION=0.149.1 PYTHON_DOTENV_DISABLED=1 env -u GEMINI_API_KEY \
+  ./scripts/test-integration.sh \
+  tests/integration/docker/test_worker_native_controls.py::test_guarded_worker_with_inherited_helper_from_clean_wheel \
+  tests/integration/sidecar/test_audit_plumbing.py::test_sidecar_proxy_id_overlay_and_host_visible_audit_and_usage \
+  tests/integration/sidecar/test_sidecar_omit.py::test_sidecar_omit_withholds_key_from_claude_but_proxy_keeps_it -vv --tb=long
+```
+
 ## Review and closeout
 
-PR #283 remains open. The initial head passed CI, including unit/regression, pre-commit, CodeQL and the clean-wheel
-runtime check; revised-head CI and merged-tree closeout remain pending. The card stays in `doing/`; M1 and the broader
-epic remain proposed.
+[PR #283](https://github.com/hapa1i/multi-forge/pull/283) merged on 2026-10-27 as `9751470b`. Its tree matches reviewed
+head `fa4c53b6` exactly. All five CI checks passed, including unit/regression, pre-commit, CodeQL and the clean-wheel
+runtime check; [merged closeout](checklist.md#merged-closeout) links the runs. M2 is in `done/`; M1 and the broader epic
+remain proposed.

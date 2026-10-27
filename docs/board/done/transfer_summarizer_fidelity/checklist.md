@@ -1,11 +1,10 @@
 # Transfer summarizer fidelity checklist
 
-**Current focus:** Review the corrected M2 implementation in PR #283. Structured preserves text-bearing-group admission;
-UTF-8-safe message and tool text and the Codex launch-size refusal pass local verification. See
-[verification](verification.md).
+**Current focus:** Completed. [PR #283](https://github.com/hapa1i/multi-forge/pull/283) merged on 2026-10-27 as
+`9751470b`; its tree matches verified head `fa4c53b6`. See [verification](verification.md).
 
-M2 executes independently. Strategy selection, source discovery, curated JSON, child capture and the broader epic remain
-outside this card. Preserve the pre-existing `AGENTS.md` working-tree edit.
+M2 shipped independently. Strategy selection, source discovery, curated JSON, child capture and the broader epic remain
+outside this card.
 
 ## Implementation
 
@@ -64,5 +63,19 @@ outside this card. Preserve the pre-existing `AGENTS.md` working-tree edit.
 - [x] Run aggregate unit/regression, full pre-commit and board/link checks: 11,204 unit tests and 2,187 regressions
   passed; 120 integration-marked cases were deselected by the unit target.
 - [x] Record evidence and limitations, review the complete diff and prepare the standalone PR.
-- [ ] Address valid review findings and verify CI.
-- [ ] After merge, verify the merged tree, record closeout and move M2 to done.
+- [x] Address valid review findings and verify CI.
+- [x] After merge, verify the merged tree, record closeout and move M2 to done.
+
+## Merged closeout
+
+- PR #283 merged as `9751470b` on 2026-10-27. Its tree is identical to reviewed head `fa4c53b6`.
+- All five GitHub checks passed on that head. [Tests](https://github.com/hapa1i/multi-forge/actions/runs/40559557365)
+  passed unit/regression, dependency-pin and clean-wheel LiteLLM runtime gates.
+  [Pre-commit](https://github.com/hapa1i/multi-forge/actions/runs/40559557305) and
+  [CodeQL](https://github.com/hapa1i/multi-forge/actions/runs/40559553510) passed too.
+- Local checks passed 292 focused tests, 11,223 unit tests (120 deselected), 2,202 regressions, 10 Docker
+  transfer/resume/launch tests and full pre-commit. Three additional worker/sidecar integration tests passed after
+  resolving local Docker disk exhaustion; [verification](verification.md) separates that rerun from the full-suite
+  failure report.
+- Session-context design and end-user session/transfer guides reflect the retained evidence, Unicode caps and Codex
+  launch refusal. The broader epic stays proposed; M2 is removed from the optional future batch.

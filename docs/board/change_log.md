@@ -11,6 +11,18 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 
 ## 2026-10-27
 
+### Preserve tool evidence in transfer summaries
+
+List-form results retain ordered text and delegation calls retain labeled arguments within the existing field caps.
+Structured keeps its text-bearing-group admission rule; Unicode escapes stay whole, and oversized Codex initial prompts
+refuse before launch with session/snapshot rollback. Session-context design and end-user guides are synced.
+
+**Verification**: [PR #283](https://github.com/hapa1i/multi-forge/pull/283) merged as `9751470b`, matching reviewed head
+`fa4c53b6`, with all five CI checks passing. Local checks passed 11,223 unit tests, 2,202 regressions, 10 Docker
+transfer/resume/launch tests and full pre-commit. The
+[closeout](done/transfer_summarizer_fidelity/checklist.md#merged-closeout) retains size comparisons, launch-boundary
+evidence and the successful three-test Docker storage rerun. M2 is done.
+
 ### Disable native delegation and memory in Forge workers
 
 **Goal**: Keep Forge-owned reviews and consumers independent of inherited native delegation and memory settings.

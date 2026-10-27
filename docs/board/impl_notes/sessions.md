@@ -8,6 +8,20 @@ Durable session, transcript, transfer, memory, and Codex-session decisions.
 
 ## Notes
 
+### Transfer fidelity must preserve selection and delivery bounds (M2, shipped 2026-10-27)
+
+- Keep strategy admission separate from shared extraction. Retaining block-list results must not admit tool-only groups
+  into structured transfers; per-field caps do not bound growth in the number of groups. Test tool-heavy transcripts.
+- Escape lone surrogates before truncation, and keep the escape whole at every later cap, including the rewind tail.
+  Valid UTF-8 alone does not prove that the retained escape spelling is complete.
+- Size a positional Codex prompt against both the host's single-argument limit and total argument/environment space.
+  Share argument/environment construction with invocation, count native options and pointers, and refuse inside the
+  pre-launch rollback scope. A fixed allowance cannot cover arbitrary passthrough arguments.
+
+Sources: [reviewed closeout](../done/transfer_summarizer_fidelity/checklist.md#merged-closeout),
+[verification](../done/transfer_summarizer_fidelity/verification.md), and
+[session-context design](../../design_session_context.md).
+
 ### Codex feedback needs separate delivery, provenance, and launch identity (B3, reviewed 2026-10-11)
 
 - Allowed model feedback uses bare PreToolUse `additionalContext`, without explicit `permissionDecision=allow`. Operator
