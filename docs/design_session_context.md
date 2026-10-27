@@ -141,13 +141,19 @@ as a managed session — bare (no parent, no transfer, `context_delivery` stays 
 (`--resume-from` without `--task`; `--task` alone is rejected — headless turns need a parent). The bridge default rides
 the **positional initial prompt**: `[PROMPT]` starts a real model turn, so `compose_codex_interactive_context` wraps the
 body in explicit hold instructions (acknowledge and wait — no edits/commands/tools yet); `--context-delivery hook` stays
-the only truly passive path. Bare `forge session resume` reattaches via `codex resume <thread_id>` in the recorded
-worktree — active-session gated with **no** `--force` escape (two TUIs would interleave one rollout), and cross-CWD by
-design (Claude's project-scoped refusal is unchanged). The TUI owns stdout — no JSONL stream — so thread identity
-reconciles **post-exit**, receipts first: a trust-enrolled `codex-session-start` hook's delivery receipt (hook mode) or
-its nothing-staged **observation receipt** (`observation-receipt.json`, cleared pre-launch); otherwise filesystem
-discovery over rollouts created after a tight pre-launch timestamp, cwd-narrowed and requiring **exactly one** candidate
-— ambiguity refuses to guess and leaves the thread unrecorded (delete-and-retry guidance). Interactive turns emit **no
+the only truly passive path. The prompt must fit one exec argument: on Linux at most `MAX_ARG_STRLEN` (32 pages
+including the NUL; 131,071 bytes with 4 KiB pages), and everywhere within `ARG_MAX` after accounting for native launch
+arguments, the sanitized child environment, NUL terminators and pointer arrays. Launch sizing and invocation share the
+argument/environment builder, with 16 KiB reserved for the executable path and launch metadata. Forge measures inside
+the pre-launch rollback scope, so an oversized transfer refuses with only applicable alternatives — hook delivery on a
+hook-capable install, a smaller strategy, or headless `--task`, whose prompt rides stdin — and keeps no session or
+snapshot. Bare `forge session resume` reattaches via `codex resume <thread_id>` in the recorded worktree —
+active-session gated with **no** `--force` escape (two TUIs would interleave one rollout), and cross-CWD by design
+(Claude's project-scoped refusal is unchanged). The TUI owns stdout — no JSONL stream — so thread identity reconciles
+**post-exit**, receipts first: a trust-enrolled `codex-session-start` hook's delivery receipt (hook mode) or its
+nothing-staged **observation receipt** (`observation-receipt.json`, cleared pre-launch); otherwise filesystem discovery
+over rollouts created after a tight pre-launch timestamp, cwd-narrowed and requiring **exactly one** candidate —
+ambiguity refuses to guess and leaves the thread unrecorded (delete-and-retry guidance). Interactive turns emit **no
 usage event** (mirrors the reserved `claude_interactive` route); the bridge's transfer curation still emits, under the
 same run root the TUI inherits.
 
@@ -179,6 +185,17 @@ unset (§3.5). Field-by-field sources and the `rollout_source` provenance table:
 | `ai-curated` | AI-selected highlights from ancestry chain                     |
 
 Transfer accepts only these values before writes and persists the value used.
+
+`structured`, `full` and the input to `ai-curated` share bounded tool summaries. String results and ordered text blocks
+from list-form results retain up to 500 characters per result, followed by `...` when truncated; image payloads and
+unsupported blocks are omitted. `structured` emits only groups containing user or assistant text, retaining tool
+summaries within those groups; tool-only groups remain omitted. Agent calls label the subagent type, description and
+prompt; SendMessage calls label the recipient and available description, summary, prompt or content. Each argument
+retains up to 100 characters, plus a truncation marker. Lone surrogates in message and tool text become literal Unicode
+escapes before these caps are applied, and a cap never splits an escape; transfer files and the curation and rewind
+inputs stay valid UTF-8. Task/message fields remain separate from `[result: ...]` text. `full` preserves ordinary
+message text and tool-only groups but still uses these bounded tool summaries. These are per-field limits, not a total
+transfer budget.
 
 **Curated transfer is the primary cross-boundary substrate, not a lossy fallback.** Native resume is byte-faithful but
 same-runtime, same-CWD, and opaque (the user cannot inspect or prune the carried conversation); curated transfer is

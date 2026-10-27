@@ -522,6 +522,130 @@ class TestBridgeInteractiveStart:
         assert not (children / "impl.md").exists()
         assert not (children / "impl.notes.md").exists()
 
+    @pytest.mark.parametrize(
+        ("hook_seam", "strategy", "offered", "withheld"),
+        [
+            pytest.param(
+                "enrollment_gated",
+                "structured",
+                ("--context-delivery hook", "--strategy ai-curated", "--strategy minimal", "--task"),
+                (),
+                id="hook-capable",
+            ),
+            pytest.param(
+                "disabled",
+                "full",
+                ("--strategy ai-curated", "--strategy minimal", "--task"),
+                ("--context-delivery hook",),
+                id="hook-incapable",
+            ),
+        ],
+    )
+    def test_oversized_initial_prompt_refuses_before_launch(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        hook_seam: str,
+        strategy: str,
+        offered: tuple[str, ...],
+        withheld: tuple[str, ...],
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        children = proj / ".forge" / "prev_sessions" / "planner" / "children"
+        monkeypatch.setattr("forge.core.ops.codex_interactive.max_initial_prompt_bytes", lambda **kwargs: 100)
+        invoke = _FakeInvoke()
+        announced: list[Any] = []
+
+        with _interactive_mocks(hook_seam=hook_seam):
+            with pytest.raises(ForgeOpError, match="over this host's 100-byte command-line argument limit") as caught:
+                start_interactive_codex_session(
+                    ctx=ctx,
+                    name="impl",
+                    parent="planner",
+                    strategy=strategy,
+                    invoke=invoke,
+                    announce=announced.append,
+                )
+
+        message = str(caught.value)
+        assert all(option in message for option in offered)
+        assert not any(option in message for option in withheld)
+        assert invoke.calls == []
+        assert announced == []
+        assert not SessionStore(str(proj), "impl").exists()
+        assert not (children / "impl.md").exists()
+        assert not (children / "impl.notes.md").exists()
+
+    def test_oversized_fallback_names_curation_instead_of_reselecting_it(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _, ctx = _make_project(tmp_path, monkeypatch)
+        monkeypatch.setattr("forge.core.ops.codex_interactive.max_initial_prompt_bytes", lambda **kwargs: 100)
+
+        def _curation_unavailable() -> None:
+            raise RuntimeError("curation unavailable")
+
+        with _interactive_mocks(on_curation=_curation_unavailable):
+            with pytest.raises(ForgeOpError) as caught:
+                start_interactive_codex_session(ctx=ctx, name="impl", parent="planner", invoke=_FakeInvoke())
+
+        message = str(caught.value)
+        assert "AI curation fell back to structured output" in message
+        assert "--strategy ai-curated" not in message
+        assert "--strategy minimal" in message
+
+    @pytest.mark.parametrize(("limit", "launched"), [(100, True), (99, False), (None, True)])
+    def test_prompt_limit_counts_encoded_bytes_inclusively(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, limit: int | None, launched: bool
+    ) -> None:
+        _, ctx = _make_project(tmp_path, monkeypatch)
+        prompt = "é" * 50  # 100 UTF-8 bytes
+        monkeypatch.setattr("forge.core.ops.codex_interactive.compose_codex_interactive_context", lambda body: prompt)
+        monkeypatch.setattr("forge.core.ops.codex_interactive.max_initial_prompt_bytes", lambda **kwargs: limit)
+        invoke = _FakeInvoke(side_effect=lambda **kw: _make_rollout(_codex_home(tmp_path), _TID, cwd=kw["cwd"]))
+
+        with _interactive_mocks():
+            if launched:
+                start_interactive_codex_session(ctx=ctx, name="impl", parent="planner", invoke=invoke)
+            else:
+                with pytest.raises(ForgeOpError, match="100 bytes"):
+                    start_interactive_codex_session(ctx=ctx, name="impl", parent="planner", invoke=invoke)
+
+        assert [call["initial_prompt"] for call in invoke.calls] == ([prompt] if launched else [])
+
+    def test_native_options_reduce_prompt_budget_before_launch(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        original_sysconf = os.sysconf
+        monkeypatch.setattr(os, "sysconf", lambda key: 65_536 if key == "SC_ARG_MAX" else original_sysconf(key))
+        monkeypatch.setattr("forge.session.codex_invoke.sanitize_codex_child_env", lambda preflight: {})
+        monkeypatch.setattr(
+            "forge.core.ops.codex_interactive.compose_codex_interactive_context", lambda body: "x" * 32_768
+        )
+        launch_args = RuntimeLaunchArgs(passthrough=("-c", 'developer_instructions="' + "é" * 16_384 + '"'))
+        invoke = _FakeInvoke()
+        announced: list[Any] = []
+
+        with _interactive_mocks():
+            with pytest.raises(ForgeOpError, match="32,768 bytes"):
+                start_interactive_codex_session(
+                    ctx=ctx,
+                    name="impl",
+                    parent="planner",
+                    strategy="full",
+                    launch_args=launch_args,
+                    invoke=invoke,
+                    announce=announced.append,
+                )
+
+        assert invoke.calls == []
+        assert announced == []
+        assert not SessionStore(str(proj), "impl").exists()
+        children = proj / ".forge" / "prev_sessions" / "planner" / "children"
+        assert not (children / "impl.md").exists()
+        assert not (children / "impl.notes.md").exists()
+
     def test_invoke_raise_never_rolls_back(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Once the TUI launches, the session is the user's -- even a spawn failure
         must not delete it."""

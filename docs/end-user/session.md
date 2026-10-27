@@ -793,6 +793,12 @@ On a multi-user or shared host, prefer `--context-delivery hook` (trust-enrolled
 of band via `additionalContext` rather than on the command line. (Headless `--task` turns pass the prompt on stdin, so
 they are unaffected.)
 
+**Size limit:** the positional prompt must also fit one command-line argument: 131,071 bytes on Linux with 4 KiB pages,
+or about 1 MiB less your environment on macOS. Forge measures it before launch; an oversized transfer rolls back the new
+session and exits 1 without opening the TUI, naming the alternatives that apply: `--context-delivery hook` (hook-capable
+installs), a smaller `--strategy`, or `--task`, which sends the context on stdin in a headless first turn
+(`forge session resume <name>` then reattaches the TUI).
+
 Thread capture is automatic. In trust-enrolled homes the `codex-session-start` hook reports the thread directly; without
 enrollment Forge discovers the rollout file Codex wrote during the run. Discovery refuses to guess: if several Codex
 sessions were started concurrently in the same directory, the thread may stay unrecorded — the command warns, and

@@ -1,8 +1,10 @@
 # transfer_summarizer_fidelity -- retain tool results and delegation descriptions
 
-**Epic**: [epic_native_multiagent](../epic_native_multiagent/card.md) (M2 -- a bug fix that makes lossiness deliberate).
+**Epic**: [epic_native_multiagent](../../proposed/epic_native_multiagent/card.md) (M2 -- a bug fix that makes lossiness
+deliberate).
 
-**Lane**: `proposed/`. No dependencies; small enough for a single PR with a regression test.
+**Lane**: `doing/`, accepted 2026-10-27. Standalone branch `codex/transfer-summarizer-fidelity`, based on `484dfe04`. No
+dependencies; M1 and the broader epic remain proposed. See [checklist](checklist.md).
 
 ## Problem (verified 2026-09-06)
 
@@ -19,8 +21,15 @@ there. Preserve search coverage; do not introduce an unnecessary extractor rewri
 - Join text blocks from list-form tool results in order; omit image payloads and preserve existing result truncation
   limits. Empty or unsupported blocks must not fabricate text or discard supported neighboring blocks.
 - Render `Agent(type=<subagent_type>, description=<description>)`, with bounded description and available prompt. Render
-  `SendMessage` recipient and description/prompt where present. Keep fields labeled so task text cannot be confused with
-  a returned result.
+  `SendMessage` recipient and description/prompt where present, including native summary/content fields. Keep fields
+  labeled so task text cannot be confused with a returned result.
+- Preserve structured's text-bearing-group admission rule; tool-only groups must not expand the conversation skeleton.
+  Keep user text beside tool results within admitted groups.
+- Escape lone surrogates in message and tool text before truncation, never splitting an escape at a cap, so transfers
+  and their curation and rewind inputs remain UTF-8 writable.
+- Refuse an interactive Codex bridge whose positional initial prompt exceeds the host's exec argument limit before
+  launch, accounting for native options and the child environment, rolling back the new session and naming only
+  applicable alternatives.
 - Preserve string-form results and existing path/command formatting. This fixes accidental loss before strategy
   selection; it does not promise unbounded result carry.
 - Add a regression for a real list-form result shape and retain extractor parity coverage.
@@ -42,5 +51,6 @@ and child strategy semantics.
 
 ## Design-doc sync
 
-`docs/design_sessions.md` §3.9 (what transfer summaries retain); `docs/end-user/transfer.md` (Agent-line example, if
-present). Lossiness remains bounded and documented.
+`docs/design_session_context.md` §3.9 (what transfer summaries retain) and its interactive Codex delivery section;
+`docs/end-user/transfer.md` (Agent-line example, if present); `docs/end-user/session.md` (Codex prompt size limit).
+Lossiness remains bounded and documented.

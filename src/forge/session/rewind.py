@@ -25,6 +25,7 @@ from forge.session.transfer import (
     _call_llm_for_curation_prompt,
     _emit_curation_usage,
     _extract_turn_summary,
+    _truncate_escaped,
     _validate_decision_citations,
 )
 
@@ -309,7 +310,8 @@ def build_rewind_code_delta_source(entries: list[dict[str, Any]], *, kept_turns:
     text = "\n".join(lines)
     was_truncated = False
     if len(text) > MAX_TRANSCRIPT_CHARS:
-        text = text[:MAX_TRANSCRIPT_CHARS].rstrip() + "\n\n...(rewind tail truncated for length)"
+        text = _truncate_escaped(text, MAX_TRANSCRIPT_CHARS, suffix="").rstrip()
+        text += "\n\n...(rewind tail truncated for length)"
         was_truncated = True
 
     return RewindCodeDeltaSource(

@@ -11,7 +11,7 @@ import pytest
 
 from forge.core.transcript import parse_jsonl_transcript, truncate
 from forge.runtime_config import RuntimeConfig, RuntimeProviderTraceConfig
-from forge.session.models import SessionState
+from forge.session.models import SessionState, create_session_state
 from forge.session.transfer import (
     AI_CURATION_MODEL,
     AI_CURATION_PROVIDER,
@@ -21,7 +21,9 @@ from forge.session.transfer import (
     _build_frontmatter,
     _call_llm_for_curation_prompt,
     _citation_is_grounded,
+    _CurationCall,
     _emit_curation_usage,
+    _extract_turn_summary,
     _format_transcript_for_llm,
     _generate_ai_curated_context,
     _generate_minimal_context,
@@ -150,6 +152,219 @@ def malformed_transcript(tmp_path: Path) -> Path:
     ]
     transcript.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return transcript
+
+
+class TestExtractTurnSummary:
+    @pytest.mark.parametrize(
+        ("name", "tool_input", "expected"),
+        [
+            pytest.param(
+                "Agent",
+                {"subagent_type": "Explore", "description": "Inspect code", "prompt": "Find the caller"},
+                "Agent(type=Explore, description=Inspect code, prompt=Find the caller)",
+                id="agent",
+            ),
+            pytest.param(
+                "SendMessage",
+                {"recipient": "reviewer", "summary": "Review status", "content": "Ready to review"},
+                "SendMessage(recipient=reviewer, summary=Review status, content=Ready to review)",
+                id="message-native-fields",
+            ),
+            pytest.param(
+                "SendMessage",
+                {"recipient": "reviewer", "description": "Review task", "prompt": "Inspect the diff"},
+                "SendMessage(recipient=reviewer, description=Review task, prompt=Inspect the diff)",
+                id="message-description-prompt",
+            ),
+            pytest.param("Agent", {}, "Agent(...)", id="agent-missing-fields"),
+            pytest.param("SendMessage", {}, "SendMessage(...)", id="message-missing-fields"),
+            pytest.param(
+                "Agent",
+                {"subagent_type": None, "description": "Valid neighbor", "prompt": {"unexpected": "object"}},
+                "Agent(description=Valid neighbor)",
+                id="malformed-fields",
+            ),
+            pytest.param("Agent", [], "Agent(...)", id="malformed-input"),
+            pytest.param([], {"path": "/tmp/a"}, "[](path=/tmp/a)", id="malformed-name"),
+            pytest.param("Read", {"file_path": "/tmp/a.py"}, "Read(path=/tmp/a.py)", id="file"),
+            pytest.param("Read", {"path": "/tmp/b.py"}, "Read(path=/tmp/b.py)", id="path"),
+            pytest.param("Bash", {"command": "git status"}, "Bash(command=git status)", id="command"),
+            pytest.param("Custom", {"description": "Unrecognized"}, "Custom(...)", id="ordinary-tool"),
+        ],
+    )
+    def test_tool_arguments(self, name, tool_input, expected):
+        summary = _extract_turn_summary(
+            {"message": {"role": "assistant", "content": [{"type": "tool_use", "name": name, "input": tool_input}]}}
+        )
+        assert summary is not None
+        assert summary["tools"] == [expected]
+
+    @pytest.mark.parametrize(
+        ("name", "fields"),
+        [
+            ("Agent", ["subagent_type", "description", "prompt"]),
+            ("SendMessage", ["recipient", "description", "summary", "prompt", "content"]),
+        ],
+        ids=["agent", "message"],
+    )
+    def test_delegation_fields_are_bounded(self, name, fields):
+        summary = _extract_turn_summary(
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "tool_use", "name": name, "input": dict.fromkeys(fields, "x" * 101)}],
+                }
+            }
+        )
+        assert summary is not None
+        rendered = summary["tools"][0]
+        assert rendered.count("x" * 100 + "...") == len(fields)
+        assert "x" * 101 not in rendered
+
+    def test_result_skips_unsupported_neighbors(self):
+        result = [
+            {"type": "text", "text": "first"},
+            None,
+            "untyped text",
+            {},
+            {"type": "image", "text": "not an image caption", "source": {"data": "private-image"}},
+            {"type": "text", "text": None},
+            {"type": "text", "text": ""},
+            {"type": "text", "text": "last"},
+        ]
+        summary = _extract_turn_summary(
+            {"message": {"role": "user", "content": [{"type": "tool_result", "content": result}]}}
+        )
+        assert summary is not None
+        assert summary["tools"] == ["[result: first\nlast]"]
+
+    @pytest.mark.parametrize("result", [None, [], {}, ["untyped"], [{"type": "text", "text": 42}]])
+    def test_empty_or_unsupported_result_is_not_invented(self, result):
+        assert (
+            _extract_turn_summary(
+                {"message": {"role": "user", "content": [{"type": "tool_result", "content": result}]}}
+            )
+            is None
+        )
+
+    @pytest.mark.parametrize("block_list", [False, True], ids=["string", "block-list"])
+    def test_result_cap_applies_after_joining(self, block_list):
+        text = "A" * 300 + "\n" + "B" * 300
+        result = [{"type": "text", "text": "A" * 300}, {"type": "text", "text": "B" * 300}] if block_list else text
+        summary = _extract_turn_summary(
+            {"message": {"role": "user", "content": [{"type": "tool_result", "content": result}]}}
+        )
+        assert summary is not None
+        assert summary["tools"] == ["[result: " + "A" * 300 + "\n" + "B" * 199 + "...]"]
+
+    @pytest.mark.parametrize("kind", ["string-result", "list-result", "Agent", "SendMessage"])
+    def test_escaped_surrogates_remain_whole_within_the_existing_caps(self, kind):
+        damaged = "\ud800" * 1000
+        if kind.endswith("result"):
+            result = damaged if kind == "string-result" else [{"type": "text", "text": damaged}]
+            block = {"type": "tool_result", "content": result}
+            prefix, suffix, limit = "[result: ", "]", 500
+        else:
+            field = "prompt" if kind == "Agent" else "content"
+            block = {"type": "tool_use", "name": kind, "input": {field: damaged}}
+            prefix, suffix, limit = f"{kind}({field}=", ")", 100
+        summary = _extract_turn_summary({"message": {"role": "assistant", "content": [block]}})
+        assert summary is not None
+        assert summary["tools"] == [prefix + "\\ud800" * (limit // 6) + "..." + suffix]
+
+    @pytest.mark.parametrize(
+        ("result", "kept"),
+        [
+            pytest.param("x" * 494 + "\udc80" + "y" * 600, "x" * 494 + "\\udc80", id="escape-ends-at-cap"),
+            pytest.param("x" * 495 + "\udc80" + "y" * 600, "x" * 495, id="escape-crosses-cap"),
+            pytest.param("x" * 499 + "\udc80" + "y" * 600, "x" * 499, id="escape-starts-before-cap"),
+            pytest.param("x" * 500 + "\udc80" + "y" * 600, "x" * 500, id="escape-after-cap"),
+            pytest.param("x" * 496 + "\\temp" + "y" * 600, "x" * 496 + "\\tem", id="literal-backslash"),
+        ],
+    )
+    def test_truncation_never_splits_a_surrogate_escape(self, result, kept):
+        summary = _extract_turn_summary(
+            {"message": {"role": "user", "content": [{"type": "tool_result", "content": result}]}}
+        )
+        assert summary is not None
+        assert summary["tools"] == [f"[result: {kept}...]"]
+
+    def test_message_text_escapes_lone_surrogates(self):
+        summary = _extract_turn_summary(
+            {"message": {"role": "user", "content": [{"type": "text", "text": "before \ud800 after \U0001f30d"}]}}
+        )
+        assert summary is not None
+        assert summary["text"] == "before \\ud800 after \U0001f30d"
+
+
+class TestDelegationTransferStrategies:
+    @pytest.fixture
+    def delegation_transcript(self):
+        return Path(__file__).resolve().parents[2] / "fixtures" / "transcript_delegation.jsonl"
+
+    @pytest.mark.parametrize("strategy", [ResumeStrategy.STRUCTURED, ResumeStrategy.FULL])
+    def test_assembled_child_retains_strategy_selected_evidence(self, strategy, delegation_transcript, tmp_path):
+        parent = create_session_state("parent", worktree_path=str(tmp_path))
+        parent.confirmed.transcript_path = str(delegation_transcript)
+        result = assemble_transfer_context(
+            parent_name="parent",
+            parent_state=parent,
+            forge_root=tmp_path,
+            strategy=strategy,
+            depth=1,
+            get_session=lambda _: None,
+            child_name="child",
+        )
+        assert result.context_file is not None
+        assert result.context_file.name == "child.md"
+        content = result.context_file.read_text()
+        assert "[result: The parser preserves the first finding.\nThe second finding follows the image.]" in content
+        if strategy == ResumeStrategy.FULL:
+            assert "Agent(type=Explore" in content
+            assert "SendMessage(recipient=reviewer" in content
+            assert "[result: Message delivered.]" in content
+        else:
+            assert "Agent(" not in content
+            assert "SendMessage(" not in content
+            assert "Message delivered." not in content
+        assert "SU1BR0VfUEFZTE9BRA==" not in content
+        assert result.warnings == []
+
+    def test_structured_keeps_delegation_labels_in_text_bearing_groups(self, delegation_transcript, tmp_path):
+        entries = [json.loads(line) for line in delegation_transcript.read_text().splitlines()]
+        for entry in entries:
+            if entry["message"]["role"] == "assistant":
+                entry["message"]["content"].insert(0, {"type": "text", "text": "Delegating the review"})
+        transcript = tmp_path / "conversation.jsonl"
+        transcript.write_text("\n".join(json.dumps(entry) for entry in entries))
+        content, warnings = _generate_structured_context("parent", ["parent"], transcript, None, None, None)
+        assert "Agent(type=Explore, description=Inspect transfer fidelity, prompt=" in content
+        assert "SendMessage(recipient=reviewer, summary=Transfer findings, content=" in content
+        assert "[result: The parser preserves the first finding.\nThe second finding follows the image.]" in content
+        assert "Message delivered." not in content
+        assert warnings == []
+
+    def test_ai_curated_receives_available_tool_evidence(self, delegation_transcript, monkeypatch):
+        prompts = []
+
+        def curate(transcript_text):
+            prompts.append(transcript_text)
+            return _CurationCall(
+                curated={"goal": "Transfer review", "decisions": [], "files": [], "open_questions": []},
+                model_used="fixture-model",
+                usage=None,
+                latency_ms=0,
+            )
+
+        monkeypatch.setattr("forge.session.transfer._call_llm_for_curation", curate)
+        content, _, schema = _generate_ai_curated_context("parent", ["parent"], delegation_transcript, None, None, None)
+        assert schema == "full"
+        assert "Transfer review" in content
+        assert len(prompts) == 1
+        assert "[result: The parser preserves the first finding.\nThe second finding follows the image.]" in prompts[0]
+        assert "Agent(type=Explore, description=Inspect transfer fidelity, prompt=" in prompts[0]
+        assert "SendMessage(recipient=reviewer, summary=Transfer findings, content=" in prompts[0]
+        assert "SU1BR0VfUEFZTE9BRA==" not in prompts[0]
 
 
 class TestTruncate:
@@ -490,6 +705,16 @@ class TestGenerateStructuredContext:
         # Message should be truncated (500 chars + "...")
         assert long_message not in content
         assert "..." in content
+
+    def test_message_cap_never_splits_a_surrogate_escape(self, tmp_path: Path) -> None:
+        transcript = tmp_path / "damaged.jsonl"
+        message = {"role": "user", "content": [{"type": "text", "text": "x" * 497 + "\udc80" + "tail"}]}
+        transcript.write_text(json.dumps({"requestId": "r1", "message": message}), encoding="utf-8")
+
+        content, warnings = _generate_structured_context("test", ["test"], transcript, None, None, None)
+
+        assert f"**User**: {'x' * 497}...\n" in content
+        assert warnings == []
 
     def test_includes_tool_summaries(self, sample_transcript: Path) -> None:
         """Should include tool call summaries."""

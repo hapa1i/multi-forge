@@ -37,7 +37,6 @@ from forge.core.transcript import (
     group_entries_into_turns,
     parse_jsonl_transcript,
     resolve_entry_role,
-    truncate,
 )
 from forge.session.artifacts import (
     latest_transcript_artifact_path,
@@ -64,6 +63,8 @@ logger = logging.getLogger(__name__)
 MESSAGE_TRUNCATE_CHARS = 500
 TOOL_ARG_TRUNCATE_CHARS = 100
 TOOL_RESULT_TRUNCATE_CHARS = 500
+# The "backslashreplace" spelling of a lone surrogate, U+D800 through U+DFFF.
+_SURROGATE_ESCAPE_RE = re.compile(r"\\ud[89a-f][0-9a-f]{2}")
 
 # Transfer document schema. The transfer doc carries a child-agnostic YAML
 # frontmatter block (see _build_frontmatter); ``schema_version`` lets future
@@ -314,6 +315,52 @@ def parse_lineage_depth(value: str | int) -> int | None:
     return depth
 
 
+def _escape_lone_surrogates(text: str) -> str:
+    """Spell lone surrogates as literal escapes so transfer files remain valid UTF-8."""
+    return text.encode("utf-8", errors="backslashreplace").decode("utf-8")
+
+
+def _truncate_escaped(text: str, max_chars: int, *, suffix: str = "...") -> str:
+    """Truncate like ``truncate``, moving the cut before a surrogate escape it would split."""
+    if len(text) <= max_chars:
+        return text
+    # A six-character escape crosses the cut only when its backslash is among the last five kept characters.
+    start = text.rfind("\\", max(max_chars - 5, 0), max_chars)
+    cut = start if start != -1 and _SURROGATE_ESCAPE_RE.match(text, start) else max_chars
+    return text[:cut] + suffix
+
+
+def _truncate_tool_text(text: str, max_chars: int) -> str:
+    """Escape lone surrogates before bounding tool text for UTF-8 transfer files."""
+    return _truncate_escaped(_escape_lone_surrogates(text[: max_chars + 1]), max_chars)
+
+
+def _summarize_tool_use(name: str, tool_input: Any) -> str:
+    if not isinstance(tool_input, dict):
+        return f"{name}(...)"
+
+    delegation_fields = {
+        "Agent": ("subagent_type", "description", "prompt"),
+        "SendMessage": ("recipient", "description", "summary", "prompt", "content"),
+    }.get(name)
+    if delegation_fields is not None:
+        arguments = []
+        for key in delegation_fields:
+            value = tool_input.get(key)
+            if isinstance(value, str) and value:
+                label = "type" if key == "subagent_type" else key
+                arguments.append(f"{label}={_truncate_tool_text(value, TOOL_ARG_TRUNCATE_CHARS)}")
+        return f"{name}({', '.join(arguments) or '...'})"
+
+    path = tool_input.get("file_path") or tool_input.get("path")
+    command = tool_input.get("command")
+    if path:
+        return f"{name}(path={_truncate_tool_text(str(path), TOOL_ARG_TRUNCATE_CHARS)})"
+    if command:
+        return f"{name}(command={_truncate_tool_text(str(command), TOOL_ARG_TRUNCATE_CHARS)})"
+    return f"{name}(...)"
+
+
 def _extract_turn_summary(entry: dict[str, Any]) -> dict[str, Any] | None:
     """Extract a summarized turn from a transcript entry.
 
@@ -340,28 +387,24 @@ def _extract_turn_summary(entry: dict[str, Any]) -> dict[str, Any] | None:
         if block_type == "text":
             t = block.get("text")
             if isinstance(t, str) and t:
-                text_parts.append(t)
+                text_parts.append(_escape_lone_surrogates(t))
 
         elif block_type == "tool_use":
-            name = block.get("name", "unknown")
-            inp = block.get("input", {})
-            # Summarize key args
-            if isinstance(inp, dict):
-                path = inp.get("file_path") or inp.get("path")
-                cmd = inp.get("command")
-                if path:
-                    tools.append(f"{name}(path={truncate(str(path), TOOL_ARG_TRUNCATE_CHARS)})")
-                elif cmd:
-                    tools.append(f"{name}(command={truncate(str(cmd), TOOL_ARG_TRUNCATE_CHARS)})")
-                else:
-                    tools.append(f"{name}(...)")
-            else:
-                tools.append(f"{name}(...)")
+            tools.append(_summarize_tool_use(str(block.get("name", "unknown")), block.get("input", {})))
 
         elif block_type == "tool_result":
             result = block.get("content", "")
+            if isinstance(result, list):
+                result = "\n".join(
+                    part["text"]
+                    for part in result
+                    if isinstance(part, dict)
+                    and part.get("type") == "text"
+                    and isinstance(part.get("text"), str)
+                    and part["text"]
+                )
             if isinstance(result, str) and result:
-                tools.append(f"[result: {truncate(result, TOOL_RESULT_TRUNCATE_CHARS)}]")
+                tools.append(f"[result: {_truncate_tool_text(result, TOOL_RESULT_TRUNCATE_CHARS)}]")
 
     if not text_parts and not tools:
         return None
@@ -479,10 +522,8 @@ def _generate_structured_context(
                     continue
 
                 if summary["role"] == "user":
-                    # Skip tool_result entries for user text (they're just results)
-                    if summary["text"] and not summary["tools"]:
+                    if summary["text"]:
                         user_texts.append(summary["text"])
-                    # But collect tool results for display
                     if summary["tools"]:
                         all_tools.extend(summary["tools"])
                 else:
@@ -491,6 +532,7 @@ def _generate_structured_context(
                     if summary["tools"]:
                         all_tools.extend(summary["tools"])
 
+            # Tool-only request groups must not expand the conversation skeleton.
             if user_texts or assistant_texts:
                 turn_num += 1
                 lines.append(f"### Turn {turn_num}")
@@ -498,13 +540,13 @@ def _generate_structured_context(
 
                 if user_texts:
                     user_text = " ".join(user_texts)
-                    truncated = truncate(user_text, MESSAGE_TRUNCATE_CHARS)
+                    truncated = _truncate_escaped(user_text, MESSAGE_TRUNCATE_CHARS)
                     lines.append(f"**User**: {truncated}")
                     lines.append("")
 
                 if assistant_texts:
                     assistant_text = " ".join(assistant_texts)
-                    truncated = truncate(assistant_text, MESSAGE_TRUNCATE_CHARS)
+                    truncated = _truncate_escaped(assistant_text, MESSAGE_TRUNCATE_CHARS)
                     lines.append(f"**Assistant**: {truncated}")
                     lines.append("")
 
