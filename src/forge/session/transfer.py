@@ -314,6 +314,11 @@ def parse_lineage_depth(value: str | int) -> int | None:
     return depth
 
 
+def _truncate_tool_text(text: str, max_chars: int) -> str:
+    """Escape lone surrogates before bounding tool text for UTF-8 transfer files."""
+    return truncate(text[: max_chars + 1].encode("utf-8", errors="backslashreplace").decode("utf-8"), max_chars)
+
+
 def _summarize_tool_use(name: str, tool_input: Any) -> str:
     if not isinstance(tool_input, dict):
         return f"{name}(...)"
@@ -328,15 +333,15 @@ def _summarize_tool_use(name: str, tool_input: Any) -> str:
             value = tool_input.get(key)
             if isinstance(value, str) and value:
                 label = "type" if key == "subagent_type" else key
-                arguments.append(f"{label}={truncate(value, TOOL_ARG_TRUNCATE_CHARS)}")
+                arguments.append(f"{label}={_truncate_tool_text(value, TOOL_ARG_TRUNCATE_CHARS)}")
         return f"{name}({', '.join(arguments) or '...'})"
 
     path = tool_input.get("file_path") or tool_input.get("path")
     command = tool_input.get("command")
     if path:
-        return f"{name}(path={truncate(str(path), TOOL_ARG_TRUNCATE_CHARS)})"
+        return f"{name}(path={_truncate_tool_text(str(path), TOOL_ARG_TRUNCATE_CHARS)})"
     if command:
-        return f"{name}(command={truncate(str(command), TOOL_ARG_TRUNCATE_CHARS)})"
+        return f"{name}(command={_truncate_tool_text(str(command), TOOL_ARG_TRUNCATE_CHARS)})"
     return f"{name}(...)"
 
 
@@ -383,7 +388,7 @@ def _extract_turn_summary(entry: dict[str, Any]) -> dict[str, Any] | None:
                     and part["text"]
                 )
             if isinstance(result, str) and result:
-                tools.append(f"[result: {truncate(result, TOOL_RESULT_TRUNCATE_CHARS)}]")
+                tools.append(f"[result: {_truncate_tool_text(result, TOOL_RESULT_TRUNCATE_CHARS)}]")
 
     if not text_parts and not tools:
         return None
@@ -511,7 +516,8 @@ def _generate_structured_context(
                     if summary["tools"]:
                         all_tools.extend(summary["tools"])
 
-            if user_texts or assistant_texts or all_tools:
+            # Tool-only request groups must not expand the conversation skeleton.
+            if user_texts or assistant_texts:
                 turn_num += 1
                 lines.append(f"### Turn {turn_num}")
                 lines.append("")

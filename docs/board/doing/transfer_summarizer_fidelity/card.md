@@ -23,8 +23,10 @@ there. Preserve search coverage; do not introduce an unnecessary extractor rewri
 - Render `Agent(type=<subagent_type>, description=<description>)`, with bounded description and available prompt. Render
   `SendMessage` recipient and description/prompt where present, including native summary/content fields. Keep fields
   labeled so task text cannot be confused with a returned result.
-- Retain tool-only turns and user text beside tool results in structured output; recovering a result must not hide its
-  supported neighboring text.
+- Preserve structured's text-bearing-group admission rule; tool-only groups must not expand the conversation skeleton.
+  Keep user text beside tool results within admitted groups.
+- Escape lone surrogates in tool text before truncation so recovered results and delegation fields remain UTF-8
+  writable.
 - Preserve string-form results and existing path/command formatting. This fixes accidental loss before strategy
   selection; it does not promise unbounded result carry.
 - Add a regression for a real list-form result shape and retain extractor parity coverage.

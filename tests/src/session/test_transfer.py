@@ -257,6 +257,24 @@ class TestExtractTurnSummary:
         assert summary is not None
         assert summary["tools"] == ["[result: " + "A" * 300 + "\n" + "B" * 199 + "...]"]
 
+    @pytest.mark.parametrize("kind", ["string-result", "list-result", "Agent", "SendMessage"])
+    def test_escaped_surrogates_remain_within_the_existing_caps(self, kind):
+        damaged = "\ud800" * 1000
+        if kind.endswith("result"):
+            result = damaged if kind == "string-result" else [{"type": "text", "text": damaged}]
+            block = {"type": "tool_result", "content": result}
+            prefix, suffix, limit = "[result: ", "]", 500
+        else:
+            field = "prompt" if kind == "Agent" else "content"
+            block = {"type": "tool_use", "name": kind, "input": {field: damaged}}
+            prefix, suffix, limit = f"{kind}({field}=", ")", 100
+        summary = _extract_turn_summary({"message": {"role": "assistant", "content": [block]}})
+        assert summary is not None
+        rendered = summary["tools"][0]
+        assert rendered.startswith(prefix + "\\ud800")
+        assert rendered.endswith("..." + suffix)
+        assert len(rendered.encode("utf-8")) == len(prefix) + limit + 3 + len(suffix)
+
 
 class TestDelegationTransferStrategies:
     @pytest.fixture
@@ -264,7 +282,7 @@ class TestDelegationTransferStrategies:
         return Path(__file__).resolve().parents[2] / "fixtures" / "transcript_delegation.jsonl"
 
     @pytest.mark.parametrize("strategy", [ResumeStrategy.STRUCTURED, ResumeStrategy.FULL])
-    def test_assembled_child_retains_tool_only_turns(self, strategy, delegation_transcript, tmp_path):
+    def test_assembled_child_retains_strategy_selected_evidence(self, strategy, delegation_transcript, tmp_path):
         parent = create_session_state("parent", worktree_path=str(tmp_path))
         parent.confirmed.transcript_path = str(delegation_transcript)
         result = assemble_transfer_context(
@@ -279,12 +297,31 @@ class TestDelegationTransferStrategies:
         assert result.context_file is not None
         assert result.context_file.name == "child.md"
         content = result.context_file.read_text()
-        assert "Agent(type=Explore" in content
         assert "[result: The parser preserves the first finding.\nThe second finding follows the image.]" in content
-        assert "SendMessage(recipient=reviewer" in content
-        assert "[result: Message delivered.]" in content
+        if strategy == ResumeStrategy.FULL:
+            assert "Agent(type=Explore" in content
+            assert "SendMessage(recipient=reviewer" in content
+            assert "[result: Message delivered.]" in content
+        else:
+            assert "Agent(" not in content
+            assert "SendMessage(" not in content
+            assert "Message delivered." not in content
         assert "SU1BR0VfUEFZTE9BRA==" not in content
         assert result.warnings == []
+
+    def test_structured_keeps_delegation_labels_in_text_bearing_groups(self, delegation_transcript, tmp_path):
+        entries = [json.loads(line) for line in delegation_transcript.read_text().splitlines()]
+        for entry in entries:
+            if entry["message"]["role"] == "assistant":
+                entry["message"]["content"].insert(0, {"type": "text", "text": "Delegating the review"})
+        transcript = tmp_path / "conversation.jsonl"
+        transcript.write_text("\n".join(json.dumps(entry) for entry in entries))
+        content, warnings = _generate_structured_context("parent", ["parent"], transcript, None, None, None)
+        assert "Agent(type=Explore, description=Inspect transfer fidelity, prompt=" in content
+        assert "SendMessage(recipient=reviewer, summary=Transfer findings, content=" in content
+        assert "[result: The parser preserves the first finding.\nThe second finding follows the image.]" in content
+        assert "Message delivered." not in content
+        assert warnings == []
 
     def test_ai_curated_receives_available_tool_evidence(self, delegation_transcript, monkeypatch):
         prompts = []

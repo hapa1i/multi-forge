@@ -25,9 +25,16 @@ def test_transfer_retains_delegation_and_list_form_results(strategy):
 
     assert "[result: The parser preserves the first finding.\nThe second finding follows the image.]" in content
     assert "SU1BR0VfUEFZTE9BRA==" not in content
-    assert "Agent(type=Explore, description=Inspect transfer fidelity, prompt=Check list-form tool results" in content
-    assert "SendMessage(recipient=reviewer, summary=Transfer findings, content=Keep both text blocks" in content
-    assert "[result: Message delivered.]" in content
+    if strategy == "full":
+        assert (
+            "Agent(type=Explore, description=Inspect transfer fidelity, prompt=Check list-form tool results" in content
+        )
+        assert "SendMessage(recipient=reviewer, summary=Transfer findings, content=Keep both text blocks" in content
+        assert "[result: Message delivered.]" in content
+    else:
+        assert "Agent(" not in content
+        assert "SendMessage(" not in content
+        assert "Message delivered." not in content
     assert "Preserve the review note." in content
     assert warnings == []
 
