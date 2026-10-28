@@ -1,7 +1,7 @@
 # Derived-session override inheritance checklist
 
-**Current focus:** Decision selected by the maintainer on 2026-10-27; prepare the documentation PR. This card records
-the contract; runtime validation belongs to the separate follow-up. Base: `32df0219`.
+**Current focus:** Review corrections and bounded code fixes are verified for PR #284; await merge and closeout. Uniform
+derivation validation remains in the separate proposal. Base: `32df0219`.
 
 ## Evidence
 
@@ -27,9 +27,22 @@ the contract; runtime validation belongs to the separate follow-up. Base: `32df0
 
 ## Closeout
 
+- [x] Correct suspension, verification, reset limitations, side effects, live plan inheritance and admission timing.
+
+- [x] Fix fresh-resume proxy pairing, wildcard lane writes and malformed-supervisor reset diagnostics with regressions.
+
+- [x] Remove the unreachable relaunch fallback and retain coverage of active force, reattach and never-launched
+  sessions.
+
+- [x] Run focused regressions, aggregate unit/regression, targeted Docker and full pre-commit checks; prepare the
+  reviewed PR #284 update. See [revision verification](evidence.md#revision-verification).
+
 - [x] Document shipped inheritance/reset behavior in session and memory design plus the session/policy guides; retain
   the explicit unshipped validation limitation and its follow-up owner.
+
 - [x] Run Markdown formatting, link, file-size and diff checks: `make pre-commit-md` passed with the refreshed,
-  content-matched session-guide count. See [verification](evidence.md#documentation-verification).
-- [x] Review the complete decision package and prepare its PR; production behavior remains unchanged.
+  content-matched session-guide count. See [initial verification](evidence.md#initial-documentation-verification).
+
+- [x] Review the initial decision package and prepare PR #284.
+
 - [ ] After merge, record the decision outcome, repoint links and move this card to done.

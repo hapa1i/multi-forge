@@ -227,34 +227,44 @@ started_with_proxy:
 Inheritance follows the Forge lifecycle operation, independently of native versus transfer context transport. For valid
 parent configuration, the layer contract is:
 
-| Operation         | Baseline                                             | Generic overrides |
-| ----------------- | ---------------------------------------------------- | ----------------- |
-| Fork              | Selected raw intent plus effective memory activation | Empty             |
-| Fresh resume      | Selected raw intent plus effective memory activation | Empty             |
-| Relaunch as child | Selected raw intent                                  | Parent map copied |
-| Ordinary reattach | Same session                                         | Retained in place |
+| Operation         | Baseline                                                  | Generic overrides |
+| ----------------- | --------------------------------------------------------- | ----------------- |
+| Fork              | Selected baseline fields plus effective memory activation | Empty             |
+| Fresh resume      | Selected baseline fields plus effective memory activation | Empty             |
+| Relaunch as child | Selected baseline fields                                  | Parent map copied |
+| Ordinary reattach | Same session                                              | Retained in place |
 
-Fork/fresh copy baseline policy, verification, system prompt, subprocess proxy, requested consumer lanes and launch
-preferences, with existing explicit child routing/authority choices taking precedence. Their memory exception
-materializes the parent's effective `memory.auto_update` into fresh memory intent; other memory fields take defaults.
-The [memory contract](design_memory.md#54-memory-activation-on-fork-and-fresh-resume) owns explicit on/off flags.
-Authority inherits advisory roles only. Consumer lanes inherit requested intent, including a cleared request, without
-copying frozen bindings or degradation state. Execution facts and review allowances belong to the child.
+Fork/fresh copy selected baseline policy, system prompt, subprocess proxy, requested consumer lanes and launch
+preferences, with explicit child routing/authority choices taking precedence. Verification setup through `session set`
+lives entirely in overrides and is dropped, including bypass; only a manually authored baseline verification section
+would inherit. Both supervisor `off` commands write baseline suspension, so every child inherits it. The fork/fresh
+memory exception materializes the parent's effective `memory.auto_update` into fresh memory intent; other memory fields
+take defaults. The [memory contract](design_memory.md#54-memory-activation-on-fork-and-fresh-resume) owns explicit
+on/off flags. Every derivation, including relaunch, inherits advisory authority only; producer authority drops. Consumer
+lanes inherit requested intent, including a cleared request, without copying frozen bindings or degradation state. Each
+child owns its review allowances. The legacy `confirmed.is_sandboxed` projection supplies sidecar intent only when
+launch intent is absent. Fresh resume inherits the proxy template/URL pair from current intent, retaining historical
+confirmed proxy facts only in derivation metadata.
 
-Relaunch-as-child preserves the baseline and override layers, including temporary policy suspension and memory changes.
-It is the Claude resume path used for active `--force` and the existing non-resumable fallback, not ordinary inactive
-reattach. A same-directory native fork or fresh native resume still uses the fork/fresh rule. Codex reattach and the
-Claude-to-Codex start bridge retain their separate lifecycle contracts.
+Relaunch-as-child preserves selected baseline fields and the override layer, including temporary policy, verification
+and memory changes. Claude resume takes this path for active `--force`; inactive resume reattaches, and never-launched
+sessions launch in place. A same-directory native fork or fresh native resume still uses the fork/fresh rule. Codex
+reattach and the Claude-to-Codex start bridge retain their separate lifecycle contracts.
 
 Reset removes only the child's overrides. Fork/fresh memory activation is already baseline and survives `reset --all`;
-relaunch reset restores its copied baseline. Later parent changes never update an existing child. Do not materialize the
-entire effective configuration: that would turn temporary policy suspension into baseline and erase reset provenance.
+an admitted relaunch reset restores its copied baseline. Native-source changes and frozen supervisor identity changes
+require supervisor remove/reconfigure. Malformed supervisor overrides can also prevent reset and receive an actionable
+error. Baseline suspension requires supervisor `on`. Configuration edits do not update existing children; plan
+resolution is separate and reads the immediate parent's snapshots live until the child owns a plan. Do not materialize
+the entire effective configuration: it would erase reset provenance.
 
-Relaunch currently copies stored overrides without complete pre-publication value/path validation. Readable legacy
-overrides can therefore remain invalid or conflict with lifecycle-owned fields. Uniform refusal before derivation is
-tracked in [the validation proposal](board/proposed/validate_derived_session_overrides/card.md); this layer contract
-does not imply that guard has shipped. Existing strict reads and typed runtime, route, authority and lane owners remain
-in force.
+Uniform refusal before side effects is tracked in
+[the validation proposal](board/proposed/validate_derived_session_overrides/card.md). Relaunch can publish invalid
+overrides; fork/fresh can refuse only after transfer writes/inference or forced deletion of the old fork. CLI proxy
+startup also precedes manager validation. The proposed guard must run before routing realization and manager effects.
+Existing strict reads and typed owners remain in force, and wildcard writes now apply the same key validation as direct
+writes. Derivation readiness checks cover active native Codex sources; sidecar and Claude reviewer admission stay at
+launch.
 
 ### Session cleanup
 

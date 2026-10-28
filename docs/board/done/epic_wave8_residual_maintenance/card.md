@@ -28,8 +28,7 @@ It corrected the original report before creating members:
 - D043 and O075 are already resolved on current `main`; D045--D052 already shipped through earlier Wave 6 members.
 - D040 is real asymmetry but not executable yet: memory has an explicit effective-state inheritance contract while no
   authority says every live override should propagate to fork/resume children. Its decision remains in
-  [`decide_derived_session_override_inheritance`](../../doing/decide_derived_session_override_inheritance/card.md),
-  selected for independent design work on 2026-10-27.
+  [`decide_derived_session_override_inheritance`](../../doing/decide_derived_session_override_inheritance/card.md).
 - O078 is rejected as a bug because `config reset` is explicitly documented as top-level-only; dotted reset is a new
   feature, not missing conformance.
 - O079 is rejected as written: `logs show` inventories files under the log root while `logs clean` deliberately removes

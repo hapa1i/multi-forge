@@ -17,9 +17,11 @@ the child's baseline intent, or omitted except for explicitly inheritable fields
 ## Selected outcome
 
 The maintainer selected the [decision](decision.md): fork/fresh inherit selected baseline intent plus effective memory
-settings; relaunch retains valid live overrides as a separate, resettable layer. The 2026-10-27 recheck confirms the
-distinction and existing regressions that require relaunch to preserve disabled policy. [Evidence](evidence.md) records
-the current behavior and validation gaps. Uniform pre-derivation validation has not shipped.
+settings; relaunch retains valid live overrides as a separate layer, with reset subject to supervisor identity checks.
+The 2026-10-27 recheck confirms the distinction and existing regressions that require relaunch to preserve disabled
+policy. [Evidence](evidence.md) records current behavior and validation gaps. Pre-merge review also fixes proxy-pair
+inheritance, wildcard lane writes and malformed-supervisor reset diagnostics, and removes the unreachable relaunch
+fallback. Uniform pre-derivation validation has not shipped.
 
 ## Original evidence
 
@@ -33,7 +35,7 @@ the current behavior and validation gaps. Uniform pre-derivation validation has 
   propagation.
 
 The asymmetry is real, but D040's proposed correction is not grounded enough to execute: making every child inherit
-effective state could unexpectedly propagate temporary policy suspension, while dropping memory's effective value would
+effective state could unexpectedly propagate temporary policy toggles, while dropping memory's effective value would
 break an explicit contract.
 
 ## Decision considered
@@ -45,5 +47,6 @@ The original alternatives were:
 3. materialize effective values into a fresh child baseline and clear inherited overrides.
 
 The selected contract uses option 1 for fork/fresh and option 2 for relaunch, preserving memory's explicit exception. It
-specifies policy suspension, consumer lanes, lifecycle-owned fields, malformed legacy overrides and reset semantics. The
-follow-up card carries fixture-grounded acceptance tests; selecting this decision does not activate that proposal.
+specifies baseline supervisor suspension, override-only verification setup, consumer lanes, lifecycle-owned fields,
+malformed legacy overrides and reset limits. The follow-up card carries fixture-grounded acceptance tests; selecting
+this decision does not activate that proposal.

@@ -470,10 +470,10 @@ active registration, while the per-session authority lock prevents a concurrent 
 Stop the session, change it from another terminal, then resume. Generic `session set` and keyed `session reset` cannot
 mutate authority intent.
 
-Fresh resumes and forks inherit advisory authority and its tier. Producer authority is deliberately not inherited: a
-derived child is unmarked unless the human gives it an explicit role, and an explicit child role wins before launch.
-In-place resume rejects authority flags. `session adopt` also creates an unmarked session: stop the native client, adopt
-it, set authority while inactive, and only then resume through Forge.
+Fresh resumes, forks and relaunch children inherit advisory authority and its tier. Producer authority is deliberately
+not inherited: a derived child is unmarked unless the human gives it an explicit role, and an explicit child role wins
+before launch. In-place resume rejects authority flags. `session adopt` also creates an unmarked session: stop the
+native client, adopt it, set authority while inactive, and only then resume through Forge.
 
 `authority show` is read-only. It reports configured role/tier, exact covered/read/control inventories, the locally
 observed configuration epoch and denials, and one of four launch-support states: `verified`, `unverified`,
@@ -814,15 +814,9 @@ forge session fork auth-refactor --name auth-refactor-alt
 A fork creates a new named session that branches the parent's Claude conversation. By default the fork stays in the same
 directory, so Claude's `--resume --fork-session` finds the parent conversation and carries it over.
 
-**What carries over:**
-
-- Selected baseline settings, including policy, launch preferences and requested consumer lanes. Generic live overrides
-  do not carry into the fork.
-- Effective memory-writer settings become the child's baseline; `--memory on|off` selects activation explicitly.
-- Conversation context carries over via `--fork-session` in the same directory. The child records its own runtime facts,
-  frozen lane bindings and review state.
-
-See [configuration inheritance](#configuration-inheritance-and-reset) for policy suspension, authority and reset rules.
+The child records its own runtime facts, frozen lane bindings and review state. Until it has its own plan, it reads the
+immediate parent's draft and approved plan snapshots live, including later parent updates. `session show` and `%plan`
+label this inherited plan. See [configuration inheritance](#configuration-inheritance-and-reset) for settings and reset.
 
 **With `--worktree` (code isolation):**
 
@@ -1121,20 +1115,27 @@ forge session reset --all
 Fork and `resume --fresh` inherit selected **baseline** settings and start with no generic overrides. For example,
 `%policy disable` temporarily disables a parent's policy, but a fork/fresh child still uses the parent's baseline policy
 setting. The terminal `forge policy enable|disable` commands change that baseline and therefore affect later children.
-This distinction also applies to native-context forks and fresh resumes.
+Both `%policy supervisor off` and `forge policy supervisor off` persist baseline suspension: every child inherits it,
+and reset cannot undo it. Use supervisor `on`. These rules also apply to native-context forks and fresh resumes.
+
+Verification configured through `session set verification.*` lives in overrides. Fork/fresh drop that entire
+configuration, including bypass; configure verification on the child if needed. Relaunch preserves it.
 
 Memory is the explicit exception: the parent's current effective memory-writer configuration becomes the fork/fresh
 child's baseline. Other memory settings, such as tags, do not carry over. Resetting the child's overrides does not undo
 inherited memory activation; use `--memory on|off` when deriving the child or the session memory commands afterward.
 
 Ordinary inactive resume reattaches to the same session and retains its overrides. When Claude resume instead creates a
-relaunch child, such as `--force` against an active resumable session, it copies baseline and live overrides separately.
-Temporary policy suspension and memory changes remain effective, and `session reset --all --session <child>` restores
-the child's copied baseline. Reset never changes the parent, and later parent changes do not update existing children.
+relaunch child with `--force` against an active resumable session, it copies selected baseline fields and live overrides
+separately. Reset restores baseline only when supervisor identity checks permit it: native-source or frozen
+model/effort/auth changes require supervisor remove/reconfigure. A malformed configured supervisor can also block reset;
+use `forge policy supervisor remove --session <name>` and reconfigure it. If no baseline supervisor exists or the
+manifest cannot be decoded, restore valid saved configuration first. Configuration edits in either session do not update
+the other; [inherited plans](#fork-an-existing-claude-session) are read live.
 
 Children inherit requested consumer lanes, not the parent's frozen bindings; a cleared lane request remains cleared in
-the child. [Advisory authority](#assign-inherit-and-inspect-authority) inherits with its tier, while producer authority
-does not. Explicit child routing and authority choices take precedence.
+the child. All child paths follow [authority inheritance](#assign-inherit-and-inspect-authority). Explicit child routing
+and authority choices take precedence.
 
 ### Protected settings
 
@@ -1151,7 +1152,13 @@ Artifact authority is intent, not an override. `session set` rejects `authority`
 leaves; keyed `session reset` rejects the same paths. `session reset --all` only clears overrides and cannot remove
 authority intent. Use `forge session authority set|clear` from outside a managed session while the target is inactive.
 
-**Policy/TDD enforcement** is managed separately via the Policy CLI, not session set:
+Consumer lanes use the resolving lane commands; `session set` rejects both concrete `consumer_lanes` paths and
+`consumer_lanes.*`.
+
+### Policy controls
+
+Use the Policy CLI for bundle setup. Policy keys also accept generic session overrides; `%policy enable|disable` uses
+that layer.
 
 ```bash
 forge policy list                                   # Show available bundles and rules
