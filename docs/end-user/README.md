@@ -225,8 +225,8 @@ forge session start planner --proxy openrouter-anthropic
 forge session start exec --proxy openrouter-anthropic --model claude-opus-4-8 --supervise planner
 ```
 
-See [model_selection.md](model_selection.md) for per-role recommendations, the structural reasons context fidelity
-varies across model versions, cost optimization order, the Fable ZDR caveat, and a release-validation checklist.
+See [model_selection.md](model_selection.md) for per-role recommendations, model capabilities and upgrade notes,
+context-fidelity tradeoffs, cost optimization, Fable provider caveats and a release-validation checklist.
 
 ### Hooks -- Lifecycle & Artifacts
 

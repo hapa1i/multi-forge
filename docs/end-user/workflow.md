@@ -61,8 +61,8 @@ selects its own model; Forge does not pass a model pin.
 variants require OpenRouter. `gpt-5.6-sol` remains selectable for previous-model comparisons. Existing OpenRouter
 proxies can forward these explicit worker model IDs without changing their tier defaults. LiteLLM backends must serve
 the selected native GPT-6 route through Responses; see the
-[Astra upgrade steps](proxy.md#picking-up-gpt-6-astra-defaults-after-an-upgrade) for backend configuration and for
-adopting the new proxy tier defaults.
+[Astra upgrade steps](model_selection.md#picking-up-gpt-6-astra-defaults-after-an-upgrade) for backend configuration and
+for adopting the new proxy tier defaults.
 
 `gemini-3.8-flash` is also an explicit worker. Local and remote LiteLLM backends need their corresponding 3.8 route;
 upgrading Forge preserves previously materialized backend configurations.

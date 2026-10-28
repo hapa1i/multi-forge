@@ -70,7 +70,7 @@ the six live proxy cases passed after moving their fixture into `conftest.py`. T
 updated QA resources, verified from an isolated wheel installation with 687 parsed assertions and all three October
 alternatives. The catalog assertions now protect Kimi's forced-tool rejection flag. Workflow guidance and proxy examples
 are corrected; guide-size cleanup is tracked in the
-[partition proposal](../../proposed/proxy_model_guidance_partition/card.md). Full pre-commit passed; the refreshed
+[partition proposal](../../doing/proxy_model_guidance_partition/card.md). Full pre-commit passed; the refreshed
 proxy-guide count is 28,304 Opus tokens.
 
 ## Integration failure follow-up
