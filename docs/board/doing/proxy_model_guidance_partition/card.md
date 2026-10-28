@@ -1,12 +1,16 @@
 # Separate model refresh guidance from proxy operations
 
-**Status**: Proposed, 2026-10-25. Follow-up from review of [PR #281](https://github.com/hapa1i/multi-forge/pull/281).
+**Status**: Doing, accepted on 2026-10-28. Branch `codex/proxy-model-guidance-partition`, based on `6c8d0999`. Follow-up
+from review of [PR #281](https://github.com/hapa1i/multi-forge/pull/281). See [checklist](checklist.md).
 
 ## Problem
 
 At PR revision `0ec43a15`, `docs/end-user/proxy.md` contains 28,313 Opus tokens, above the repository's 25,000-token
 target and close to its 30,000-token hard limit. The October model refresh added about 700 tokens. Repeating that growth
 will exhaust the remaining space after a few refreshes.
+
+The current base has 28,304 Opus tokens with a matching cached hash; the partition retains the 23,000-token acceptance
+limit for both guides.
 
 ## Scope
 

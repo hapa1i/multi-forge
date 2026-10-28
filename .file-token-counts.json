@@ -80,11 +80,17 @@
       "family": "anthropic",
       "tokens": 27346
     },
-    "docs/end-user/proxy.md": {
-      "sha256": "38d2780a4f8d95a0183595353c2a29ee2acedd034f2e750b52e980d64bed30d1",
+    "docs/end-user/model_selection.md": {
+      "sha256": "0456b91a6722082f1fcf28d31cbfcf15724acdd969d1d51c12b2da130b3dd5d8",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 28304
+      "tokens": 13893
+    },
+    "docs/end-user/proxy.md": {
+      "sha256": "517e1508ab98b08c91bbd6accb710affec90ebabacad83bfe51b3915416cb1ff",
+      "method": "claude-opus-5",
+      "family": "anthropic",
+      "tokens": 22232
     },
     "docs/end-user/session.md": {
       "sha256": "4ede9ca7120e13a684125cc5bc110c436be12248a9eaacdf7ec5dd62258c7479",
