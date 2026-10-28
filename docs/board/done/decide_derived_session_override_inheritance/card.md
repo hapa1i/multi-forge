@@ -2,10 +2,11 @@
 
 **Origin**: D040 residual admission recheck on merged `main` at `bad273ef` (2026-08-19).
 
-**Lane**: `doing/` -- accepted for design work on 2026-10-27. Branch `codex/derived-session-override-inheritance`, based
-on `32df0219`. The maintainer selected the inheritance contract on 2026-10-27; runtime validation remains in the
-separate [implementation proposal](../../proposed/validate_derived_session_overrides/card.md). See
-[checklist](checklist.md).
+**Lane**: `done/` -- shipped on 2026-10-28 in [PR #284](https://github.com/hapa1i/multi-forge/pull/284), merged as
+`3ad15937` with the same tree as reviewed head `864cb926`. The maintainer selected the inheritance contract on
+2026-10-27. Uniform pre-derivation validation remains in the separate, unstarted
+[implementation proposal](../../proposed/validate_derived_session_overrides/card.md). See
+[merged closeout](checklist.md#merged-closeout).
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../done/epic_repo_maintenance_round/card.md) (completed provenance).
 
@@ -19,9 +20,9 @@ the child's baseline intent, or omitted except for explicitly inheritable fields
 The maintainer selected the [decision](decision.md): fork/fresh inherit selected baseline intent plus effective memory
 settings; relaunch retains valid live overrides as a separate layer, with reset subject to supervisor identity checks.
 The 2026-10-27 recheck confirms the distinction and existing regressions that require relaunch to preserve disabled
-policy. [Evidence](evidence.md) records current behavior and validation gaps. Pre-merge review also fixes proxy-pair
-inheritance, wildcard lane writes and malformed-supervisor reset diagnostics, and removes the unreachable relaunch
-fallback. Uniform pre-derivation validation has not shipped.
+policy. [Evidence](evidence.md) records the verified behavior and validation gaps. Pre-merge review also fixed
+proxy-pair inheritance, wildcard lane writes and malformed-supervisor reset diagnostics, and removed the unreachable
+relaunch fallback. Uniform pre-derivation validation has not shipped.
 
 ## Original evidence
 

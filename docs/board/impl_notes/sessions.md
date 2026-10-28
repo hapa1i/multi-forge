@@ -8,6 +8,20 @@ Durable session, transcript, transfer, memory, and Codex-session decisions.
 
 ## Notes
 
+### Derived configuration keeps layer provenance (reviewed 2026-10-28)
+
+- Select inheritance by operation: fork/fresh take selected baseline fields plus effective memory `auto_update`;
+  relaunch preserves the override layer. Native versus transfer context transport does not change those rules.
+- Check the command's write layer before calling a setting temporary. Both supervisor `off` commands persist baseline
+  suspension; verification setup writes overrides and therefore disappears on fork/fresh. Reset removes overrides only
+  and still enforces native-source and frozen-supervisor identity constraints.
+- Inherit a proxy template and URL from the same intent record. Historical confirmed routing can survive an explicit
+  direct resume and must not supply half of a new configuration. Configuration independence also does not imply plan
+  independence: a child without its own plan reads its immediate parent's plan live.
+
+Sources: [reviewed closeout](../done/decide_derived_session_override_inheritance/checklist.md#merged-closeout) and
+[session design](../../design_sessions.md#derived-session-configuration).
+
 ### Transfer fidelity must preserve selection and delivery bounds (M2, shipped 2026-10-27)
 
 - Keep strategy admission separate from shared extraction. Retaining block-list results must not admit tool-only groups

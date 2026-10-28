@@ -9,6 +9,22 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-28
+
+### Define derived-session configuration inheritance
+
+**Goal**: Preserve the selected fork/fresh versus relaunch contract and correct its exposed configuration defects.
+
+- Document baseline supervisor suspension, override-only verification, reset/admission limits and live inherited plans.
+- Fix fresh-resume proxy pairing, protected wildcard writes and malformed-supervisor reset diagnostics; remove the
+  unreachable relaunch fallback. Keep uniform pre-derivation validation in its separate proposed card.
+
+**Verification**: [PR #284](https://github.com/hapa1i/multi-forge/pull/284) merged as `3ad15937`, matching reviewed head
+`864cb926`, with all five CI checks passing. Local checks passed 11,226 unit tests, 2,212 regressions, 42 targeted
+Docker tests and full pre-commit. The
+[closeout](done/decide_derived_session_override_inheritance/checklist.md#merged-closeout) records the decision, evidence
+and remaining validation boundary.
+
 ## 2026-10-27
 
 ### Preserve tool evidence in transfer summaries

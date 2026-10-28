@@ -1,8 +1,9 @@
 # Derived-session override inheritance decision
 
-**Status:** Selected by the maintainer on 2026-10-27: keep the fork/fresh versus relaunch distinction. Current behavior
-was checked on `32df0219`; see [evidence](evidence.md). The layer contract already exists; uniform validation is
-unshipped work in [the implementation card](../../proposed/validate_derived_session_overrides/card.md).
+**Status:** Selected by the maintainer on 2026-10-27 and shipped with the reviewed corrections in
+[PR #284](https://github.com/hapa1i/multi-forge/pull/284) on 2026-10-28. Keep the fork/fresh versus relaunch
+distinction; [evidence](evidence.md) separates initial characterization from the verified fixes. Uniform validation
+remains unshipped work in [the implementation card](../../proposed/validate_derived_session_overrides/card.md).
 
 ## Selected contract
 

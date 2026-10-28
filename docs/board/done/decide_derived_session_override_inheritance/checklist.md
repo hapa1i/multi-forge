@@ -1,7 +1,7 @@
 # Derived-session override inheritance checklist
 
-**Current focus:** Review corrections and bounded code fixes are verified for PR #284; await merge and closeout. Uniform
-derivation validation remains in the separate proposal. Base: `32df0219`.
+**Status:** Complete. PR #284 merged on 2026-10-28 as `3ad15937`; the decision, bounded fixes and documentation are
+shipped and verified. Uniform derivation validation remains in the separate, unstarted proposal.
 
 ## Evidence
 
@@ -45,4 +45,21 @@ derivation validation remains in the separate proposal. Base: `32df0219`.
 
 - [x] Review the initial decision package and prepare PR #284.
 
-- [ ] After merge, record the decision outcome, repoint links and move this card to done.
+- [x] After merge, record the decision outcome, repoint links and move this card to done.
+
+## Merged closeout
+
+- [PR #284](https://github.com/hapa1i/multi-forge/pull/284) merged as `3ad15937` on 2026-10-28. Its tree is identical to
+  reviewed head `864cb926`.
+- All five GitHub checks passed on that head: [tests](https://github.com/hapa1i/multi-forge/actions/runs/40612468551),
+  [pre-commit](https://github.com/hapa1i/multi-forge/actions/runs/40612468529), both
+  [CodeQL analyses](https://github.com/hapa1i/multi-forge/actions/runs/40612464745) and the CodeQL result check.
+- Local verification passed 223 focused tests, 11,226 unit tests (120 integration tests deselected), 2,212 regressions,
+  42 targeted Docker lifecycle tests and full pre-commit. See
+  [revision verification](evidence.md#revision-verification).
+- Session/memory design and session/policy guides describe the selected layers, baseline supervisor suspension,
+  override-only verification setup, reset/admission limits and live inherited plans. The reviewed contract is recorded
+  in the
+  [session implementation notes](../../impl_notes/sessions.md#derived-configuration-keeps-layer-provenance-reviewed-2026-10-28).
+- [Uniform pre-derivation validation](../../proposed/validate_derived_session_overrides/card.md) stays proposed. It owns
+  refusal before proxy startup, transfer work and forced fork replacement; this closeout does not activate it.
