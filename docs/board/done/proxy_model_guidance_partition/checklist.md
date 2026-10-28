@@ -1,7 +1,7 @@
 # Proxy/model guidance partition checklist
 
-**Current focus:** Separate model release guidance from proxy operations without changing runtime behavior. Base:
-`6c8d0999`. Branch: `codex/proxy-model-guidance-partition`. See [verification evidence](evidence.md).
+**Status:** Complete, merged on 2026-10-28. Execution base: `6c8d0999`; branch: `codex/proxy-model-guidance-partition`.
+See [verification evidence](evidence.md).
 
 ## Ownership and preservation
 
@@ -34,4 +34,21 @@
   selection 13,893.
 - [x] Run `make pre-commit-md`, cache JSON hooks and staged diff checks.
 - [x] Prepare the card's PR diff with verification evidence and final token counts.
-- [ ] After merge, record closeout, repoint links and move the card to done.
+- [x] After merge, record closeout, repoint links and move the card to done.
+
+## Merged closeout
+
+- [PR #285](https://github.com/hapa1i/multi-forge/pull/285) merged as `fb803b92` on 2026-10-28. The merged tree matches
+  reviewed head `c52faac9`; all five CI checks passed: test, pre-commit, CodeQL, Analyze (python), and Analyze
+  (actions).
+- Local verification passed Markdown, file-size, link and cache JSON checks; 18 CLI help surfaces; all 20 bundled
+  templates; and isolated fresh/saved proxy fixtures. No live inference or runtime startup was required.
+- Final Opus counts are 22,232 for `proxy.md` and 13,893 for `model_selection.md`, both below 23,000. The merged guide
+  bytes match the cached hashes. No runtime behavior, model defaults or saved snapshots changed.
+- End-user guides now own model release guidance, proxy operations/transport/ZDR, and workflow worker inventory
+  separately, with old anchors preserved. No design contract changed; the template-reset correction matches the shipped
+  implementation and its verified snapshot ownership.
+- Reviewed the implementation notes: the existing
+  [fresh/saved backend verification guidance](../../impl_notes/runtime_telemetry.md#model-upgrades-must-verify-route-selection-loaded-deployments-and-termination-gemini_4_argon-shipped-2026-10-13)
+  already covers the snapshot lesson. Documentation ownership is recorded in the guides; no new runtime invariant needs
+  promotion. Closeout is recorded in the change log, and inbound board links now point to `done`.

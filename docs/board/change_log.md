@@ -11,6 +11,17 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 
 ## 2026-10-28
 
+### Separate model guidance from proxy operations
+
+Move model capabilities, alternatives and release migrations into the model-selection guide. Keep shared upgrade
+procedures, snapshot ownership, transport and ZDR policy in the proxy guide, and worker inventory in the workflow guide.
+Preserve old upgrade anchors and correct template reset to describe its effect on future proxies only.
+
+**Verification**: [PR #285](https://github.com/hapa1i/multi-forge/pull/285) merged as `fb803b92`, matching reviewed head
+`c52faac9`, with all five CI checks passing. Local Markdown/link/cache checks, 18 CLI help surfaces, 20 templates and
+isolated snapshot fixtures passed. Proxy/model guides measure 22,232/13,893 Opus tokens, each below 23,000. The
+[closeout](done/proxy_model_guidance_partition/checklist.md#merged-closeout) retains the evidence.
+
 ### Define derived-session configuration inheritance
 
 **Goal**: Preserve the selected fork/fresh versus relaunch contract and correct its exposed configuration defects.

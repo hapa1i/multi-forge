@@ -1,7 +1,8 @@
 # Separate model refresh guidance from proxy operations
 
-**Status**: Doing, accepted on 2026-10-28. Branch `codex/proxy-model-guidance-partition`, based on `6c8d0999`. Follow-up
-from review of [PR #281](https://github.com/hapa1i/multi-forge/pull/281). See [checklist](checklist.md).
+**Status**: Done on 2026-10-28. [PR #285](https://github.com/hapa1i/multi-forge/pull/285) merged as `fb803b92`, matching
+reviewed head `c52faac9`. Follow-up from review of [PR #281](https://github.com/hapa1i/multi-forge/pull/281). See the
+[merged closeout](checklist.md#merged-closeout) and [verification evidence](evidence.md).
 
 ## Problem
 

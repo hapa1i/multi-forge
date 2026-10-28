@@ -16,7 +16,7 @@ Current focus: completed; [PR #281](https://github.com/hapa1i/multi-forge/pull/2
 - [x] After merge, record closeout and move the card to done.
 
 Guide-size cleanup is tracked separately in the
-[proxy model guidance partition proposal](../../doing/proxy_model_guidance_partition/card.md).
+[proxy model guidance partition proposal](../../done/proxy_model_guidance_partition/card.md).
 
 | Fixture / path                         | Acceptance                                             |
 | -------------------------------------- | ------------------------------------------------------ |
