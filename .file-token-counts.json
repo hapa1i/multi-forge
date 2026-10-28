@@ -87,10 +87,10 @@
       "tokens": 28304
     },
     "docs/end-user/session.md": {
-      "sha256": "6859fdb82a91eae435f603b13f894a26cdc5a711a9bf0689ec5340b7f3782e69",
+      "sha256": "4ede9ca7120e13a684125cc5bc110c436be12248a9eaacdf7ec5dd62258c7479",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 26203
+      "tokens": 27053
     },
     "src/skills/qa/SKILL.md": {
       "sha256": "b77bbc8b673c69065d42d459615eae15d869e80acc5eede5119f7f97e2b22d75",

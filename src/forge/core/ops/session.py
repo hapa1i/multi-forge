@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import dacite
+
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import (
     ForgeSessionError,
@@ -540,6 +542,15 @@ def reset_session_overrides(
                 store.update(timeout_s=5.0, mutate=clear_checked)
             return ResetOverridesResult(cleared_all=True, key=None, was_present=had_overrides)
 
+    except dacite.DaciteError as e:
+        if resolved.state.intent.policy and resolved.state.intent.policy.supervisor:
+            recovery = (
+                f"Run 'forge policy supervisor remove --session {resolved.state.name}' "
+                "and reconfigure the supervisor."
+            )
+        else:
+            recovery = f"Restore valid policy.supervisor overrides in '{store.manifest_path}' before retrying."
+        raise ForgeOpError(f"Cannot reset overrides: invalid supervisor configuration ({e}). {recovery}") from e
     except InvalidOverrideKeyError as e:
         raise ForgeOpError(str(e)) from e
     except (StateCorruptedError, StateUnreadableError):

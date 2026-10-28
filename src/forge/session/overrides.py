@@ -317,8 +317,10 @@ def set_override(overrides: dict[str, Any], key: str, value: Any) -> None:
         expanded = expand_wildcard(key)
         if "launch.runtime" in expanded:
             _reject_launch_runtime_override(key)
-        for path in expanded:
-            _set_path(overrides, path.split("."), value)
+        # Validate the complete expansion before mutating any path.
+        parts_by_path = [validate_key(path) for path in expanded]
+        for parts in parts_by_path:
+            _set_path(overrides, parts, value)
         return
 
     parts = validate_key(key)
