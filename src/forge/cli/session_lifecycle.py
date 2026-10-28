@@ -1597,8 +1597,8 @@ def resume(
 
     enforce_target_project_compatibility(Path(target_forge_root))
 
-    # Validate against the session this resume will launch: a --fresh child takes
-    # explicit authority or inherits advisory authority; other modes keep the manifest's.
+    # A --fresh child can select authority explicitly. Active --force relaunch
+    # applies advisory-only inheritance when it creates the child below.
     launched_authority = manifest.intent.authority
     if fresh:
         launched_authority = authority if authority_explicit else inherited_authority(manifest.intent.authority)
@@ -1855,7 +1855,7 @@ def resume(
             render_model_route=render_model_route,
             launch_args=launch_args,
         )
-    elif _is_resumable_session(manifest):
+    else:
         active_entry = _get_active_session_entry(name, forge_root=manifest.forge_root)
         if active_entry is not None and not force:
             print_error(
@@ -1901,18 +1901,6 @@ def resume(
                 render_model_route=render_model_route,
                 launch_args=launch_args,
             )
-    else:
-        _launch_as_child(
-            manager=manager,
-            parent_name=name,
-            parent=manifest,
-            routing=routing,
-            direct=direct,
-            direct_model_override=normalized_direct_model,
-            model_route_selection=model_route_selection,
-            render_model_route=render_model_route,
-            launch_args=launch_args,
-        )
 
 
 def _launch_in_place(
