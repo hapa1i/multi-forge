@@ -1,8 +1,8 @@
 # LiteLLM streaming cost contract checklist
 
-**Current focus:** Review and merge the verified contract update, then record closeout. Results are recorded in
-[verification](verification.md). Base: `ee71ddd4`. Branch: `codex/litellm-streaming-cost-contract`. No paid provider
-calls are authorized.
+**Status:** Done on 2026-10-29. [PR #286](https://github.com/hapa1i/multi-forge/pull/286) is merged; results are
+recorded in [verification](verification.md). Base: `ee71ddd4`. Branch: `codex/litellm-streaming-cost-contract`. No paid
+provider inference was authorized or dispatched.
 
 ## Characterization and implementation
 
@@ -37,5 +37,25 @@ calls are authorized.
 - [x] Run aggregate tests and `make pre-commit`: 11,234 units and 2,212 regressions passed; all pre-commit hooks passed.
 - [x] Refresh final documentation token-cache entries and check board links: telemetry 23,461 and proxy 22,489 Claude
   Opus 5 tokens; all cached hashes and board links match.
-- [x] Prepare a reviewable PR with exact verification and limitations.
-- [ ] After merge, record closeout and move the card to done.
+- [x] Open a reviewable PR with exact verification and limitations:
+  [PR #286](https://github.com/hapa1i/multi-forge/pull/286).
+- [x] After merge, record closeout, repoint inbound links and move the card to done.
+
+## Merged closeout
+
+- [PR #286](https://github.com/hapa1i/multi-forge/pull/286) merged as `bbb9e269` on 2026-10-29. The merged tree matches
+  reviewed head `890173c4`; all five CI checks passed: test, pre-commit, CodeQL, Analyze (python), and Analyze
+  (actions).
+- Local verification passed 11,234 unit tests, 2,212 regressions, 89 focused cost tests, eight targeted proxy
+  integrations and full pre-commit. The [evidence](verification.md) retains the offline pinned-gateway probe, SDK
+  transport cases, telemetry/cap accounting and operator read surfaces. No paid provider inference ran.
+- [Telemetry design](../../../design_telemetry.md#314-cost-tracking-and-spend-caps) and
+  [end-user cost guidance](../../../end-user/proxy.md#cost-tracking-and-spend-caps) describe gateway-calculated streamed
+  cost, unavailable fallback and single cap increments. Final cached counts are 23,461 and 22,489 Opus tokens; content
+  hashes match. Production logic and the LiteLLM pin remain unchanged.
+- Existing
+  [ledger invariants](../../impl_notes/runtime_telemetry.md#upstreamdownstream-telemetry-ledgers-shipped-2026-06-18)
+  already cover nullable cost and per-attempt idempotency. The corrected streaming contract is recorded in the design
+  and user guides, so no duplicate implementation note is needed. The change log records closeout, and inbound board
+  links now point to `done`.
+- Closeout validation passed `make pre-commit-md`, cached-content hash checks and `git diff --cached --check`.

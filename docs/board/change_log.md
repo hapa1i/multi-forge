@@ -9,6 +9,23 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-29
+
+### Align LiteLLM streaming cost tests and documentation
+
+**Goal**: Match streaming cost expectations to the evidence supplied by the pinned gateway.
+
+- Replace the universal-unavailability assertion with deterministic gateway/SDK/proxy cases for positive cost, zero,
+  missing cost and missing final usage; verify tokens, provenance and one telemetry/cap increment per stream.
+- Correct cost guidance and client comments to distinguish gateway-calculated cost from unavailable cost. Runtime logic
+  and the dependency pin are unchanged.
+
+**Verification**: [PR #286](https://github.com/hapa1i/multi-forge/pull/286) merged as `bbb9e269`, matching reviewed head
+`890173c4`, with all five CI checks passing. Local checks passed 11,234 unit tests, 2,212 regressions, eight focused
+proxy integrations and full pre-commit without paid inference. The
+[closeout](done/litellm_streaming_cost_contract/checklist.md#merged-closeout) retains the characterization and cap
+evidence; design and end-user docs are synced.
+
 ## 2026-10-28
 
 ### Separate model guidance from proxy operations

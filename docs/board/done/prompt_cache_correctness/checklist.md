@@ -78,7 +78,7 @@ the bounded paid checks recorded below. [Merged closeout](#merged-closeout) reco
   headless cost contract. 66 passed, 1 failed. `test_local_litellm_streaming_cost_unavailable` asserts that a local
   LiteLLM gateway reports no streaming cost, but LiteLLM 1.102.0 (bumped in #255) stamps `usage.cost` on streamed usage
   (`_stamp_streaming_usage_cost`). The failure is independent of this card and LiteLLM-specific; the
-  [streaming-cost contract follow-up](../../doing/litellm_streaming_cost_contract/card.md) owns its tests and
+  [streaming-cost contract follow-up](../../done/litellm_streaming_cost_contract/card.md) owns its tests and
   documentation reconciliation.
 
 - [x] Paid end-to-end check, about $0.49 of the $1 budget. Headless Claude Code 2.1.296 ran a seven-request `Read` tool
@@ -133,7 +133,7 @@ pre-commit, and targeted integration with 66 passed and one deferred LiteLLM str
 additional model calls or tests.
 
 The pre-existing LiteLLM streaming-cost assertions in telemetry documentation remain part of the
-[separate follow-up](../../doing/litellm_streaming_cost_contract/card.md); this closeout verifies the cache changes.
+[separate follow-up](../../done/litellm_streaming_cost_contract/card.md); this closeout verifies the cache changes.
 
 The $0.59 synthetic probe and approximately $0.49 end-to-end check establish the recorded short-loop behavior, not a
 guaranteed cache rate or real-session saving. Provider-side cache misses, provider pinning and the role-semantics
