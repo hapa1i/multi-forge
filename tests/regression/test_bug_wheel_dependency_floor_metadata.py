@@ -41,6 +41,8 @@ def _assert_minimum(requirement: Requirement, expected: str) -> None:
         ("aiohttp", "3.14.4"),
         ("certifi", "2026.10.19"),
         ("cryptography", "50.0.0"),
+        ("dnspython", "2.9.0"),
+        ("filelock", "4.2.1"),
         ("multidict", "6.9.1"),
         ("oauthlib", "4.0.0"),
         ("pyjwt", "2.15.0"),
@@ -56,11 +58,14 @@ def test_distribution_metadata_preserves_litellm_runtime_contract() -> None:
     requirements = _distribution_requirements()
 
     assert "virtualenv" not in requirements
+    assert "black" not in requirements
     assert {"boto3", "expression", "redis", "uvloop"} <= requirements.keys()
     assert not requirements["fastapi"].specifier.contains("0.141.1")
     assert not requirements["starlette"].specifier.contains("1.4.1")
     litellm = requirements["litellm"]
     assert litellm.extras == set()
-    _assert_minimum(litellm, "1.102.0")
-    assert litellm.specifier.contains("1.102.0")
+    _assert_minimum(litellm, "1.102.2")
+    assert litellm.specifier.contains("1.102.2")
+    assert not litellm.specifier.contains("1.102.0")
     assert not litellm.specifier.contains("1.102.1")
+    assert not litellm.specifier.contains("1.102.3")

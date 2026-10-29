@@ -559,6 +559,9 @@ Why use sidecar mode:
 - Forge records sidecar mode, extra mounts, and image in the session manifest so `forge session resume <name>` can
   replay them later
 
+For dependency security updates, follow the [image rebuild procedure](proxy.md#applying-dependency-security-updates).
+Upgrading host Forge leaves sidecar dependencies unchanged; end the old container and resume using an updated image.
+
 To open a shell inside a running sidecar session:
 
 ```bash

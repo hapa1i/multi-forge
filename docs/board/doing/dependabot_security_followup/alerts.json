@@ -1,0 +1,29 @@
+{
+  "captured_on": "2026-10-29",
+  "alerts": [
+    {
+      "number": 62,
+      "url": "https://github.com/hapa1i/multi-forge/security/dependabot/62",
+      "package": "black",
+      "locked_requirement": "= 26.5.1",
+      "advisory": "GHSA-cg8m-r9f2-5wm2",
+      "cve": "CVE-2026-114134",
+      "severity": "high",
+      "affected_range": "< 26.10.1",
+      "patched_version": "26.10.1",
+      "upstream_advisory": "https://github.com/psf/black/security/advisories/GHSA-cg8m-r9f2-5wm2"
+    },
+    {
+      "number": 61,
+      "url": "https://github.com/hapa1i/multi-forge/security/dependabot/61",
+      "package": "virtualenv",
+      "locked_requirement": "= 21.14.12",
+      "advisory": "GHSA-cx6f-vjhg-g3cc",
+      "cve": "CVE-2026-115586",
+      "severity": "high",
+      "affected_range": ">= 21.14.9, < 21.14.13",
+      "patched_version": "21.14.13",
+      "upstream_advisory": "https://github.com/pypa/virtualenv/security/advisories/GHSA-cx6f-vjhg-g3cc"
+    }
+  ]
+}
