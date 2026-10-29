@@ -11,6 +11,20 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 
 ## 2026-10-29
 
+### Patch tooling and runtime security dependencies
+
+**Goal**: Resolve two Dependabot alerts and the 14 additional advisories found in the reviewed lock.
+
+- Upgrade Black, virtualenv, dnspython, filelock and LiteLLM; ship runtime security floors in wheel metadata.
+- Strengthen prompt/history and stale-lock regressions, and document host stop/upgrade/start plus sidecar image
+  rebuilds.
+
+**Verification**: [PR #288](https://github.com/hapa1i/multi-forge/pull/288) merged as `982e589b`, matching reviewed head
+`80fe298b`, with all five CI checks passing. Both alerts are fixed; Dependabot has zero open alerts, and the 138-package
+audit found no known vulnerabilities. Local checks passed 11,234 unit tests, 2,218 regressions, targeted integrations,
+build/clean-wheel/image checks and full pre-commit. See the
+[closeout](done/dependabot_security_followup/checklist.md#merged-closeout) for evidence and upgrade requirements.
+
 ### Align LiteLLM streaming cost tests and documentation
 
 **Goal**: Match streaming cost expectations to the evidence supplied by the pinned gateway.

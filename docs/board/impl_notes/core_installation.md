@@ -8,6 +8,18 @@ Durable core, state, extension, hook, and installation decisions.
 
 ## Notes
 
+### Security regressions must exercise the failure path (dependabot_security_followup, reviewed 2026-10-29)
+
+- Interactive Bash tests must isolate `HISTFILE` even when `HOME` is temporary, disable external startup files and drain
+  PTY output while waiting for exit. Unread PTY output can block macOS Bash 5 at exit; Linux reports PTY closure as
+  `EIO`. Assert that the payload prompt rendered as well as that its marker was not executed.
+- A stale-lock refusal fixture must remain satisfiable by the existing lock offline. An unresolvable version still fails
+  if `--locked` is removed, so it cannot prove the checker prevents lock rewrites.
+
+Sources: [review controls](../done/dependabot_security_followup/verification.md#review-controls),
+[Bash regression](../../../tests/regression/test_bug_virtualenv_bash_prompt_expansion.py), and
+[dependency checker tests](../../../tests/src/scripts/test_dependency_pins.py).
+
 ### Validate immutable candidates before activating editable updates (supply_chain_pins, reviewed 2026-10-22)
 
 - Capture the fetched commit and validate an isolated archive before touching the active editable checkout. Use that
