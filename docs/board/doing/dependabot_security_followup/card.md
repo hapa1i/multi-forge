@@ -35,5 +35,6 @@ findings. No model-provider inference is part of this maintenance task.
 - Review the lock and generated exports; keep development tools out of wheel runtime requirements.
 - Pass the complete dependency audit, unit/regression suites, focused proxy/backend integrations, full pre-commit, build
   and clean-wheel runtime smoke without paid inference.
-- Sync the current LiteLLM contract and explain that existing processes must restart after upgrading their installation.
+- Sync the current LiteLLM contract, document host stop/upgrade/start ordering, and require rebuilt sidecar images and
+  fresh containers for dependency updates.
 - Open one PR with evidence. Dependabot closure requires the merged default-branch graph; do not dismiss the alerts.

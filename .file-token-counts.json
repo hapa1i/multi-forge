@@ -87,16 +87,16 @@
       "tokens": 13893
     },
     "docs/end-user/proxy.md": {
-      "sha256": "63efc58c3b8228fbca68f4bd1cca30542b1c14c00c0b15c87b59047d89a64b78",
+      "sha256": "b83c0493d679609b56d4fe1d38821020b67876fb38b8a639999bd44943114724",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 22629
+      "tokens": 23153
     },
     "docs/end-user/session.md": {
-      "sha256": "4ede9ca7120e13a684125cc5bc110c436be12248a9eaacdf7ec5dd62258c7479",
+      "sha256": "a0740caa1758bd17ac7e89e1a54cc0dad57eaad1128dd3607fee6611e673323c",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 27053
+      "tokens": 27132
     },
     "src/skills/qa/SKILL.md": {
       "sha256": "b77bbc8b673c69065d42d459615eae15d869e80acc5eede5119f7f97e2b22d75",

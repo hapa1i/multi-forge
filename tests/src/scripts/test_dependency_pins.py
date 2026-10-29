@@ -60,7 +60,8 @@ def test_build_backend_must_match_locked_group(project: Path) -> None:
 
 def test_stale_lock_is_not_updated(project: Path, litellm_pin: str) -> None:
     metadata = project / "pyproject.toml"
-    metadata.write_text(metadata.read_text().replace(litellm_pin, "litellm==0.0.0"))
+    # The locked version satisfies this change offline; only --locked should refuse the metadata drift.
+    metadata.write_text(metadata.read_text().replace(litellm_pin, litellm_pin.replace("==", ">=", 1)))
     before = (project / "uv.lock").read_bytes()
     with pytest.raises(subprocess.CalledProcessError):
         PINS.check(project)

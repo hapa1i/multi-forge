@@ -53,13 +53,15 @@ dependencies = [
     # Exclude the compromised CA trust roots from clean installations too.
     "certifi>=2026.10.19",
     "cryptography>=50.0.0",
-    "dnspython>=2.9.0,<3",
+    # Keep email-validator's transitive DNS security floor in wheel metadata despite no direct Forge import.
+    "dnspython>=2.9.0",
     # LiteLLM 1.95 imports outbound-credential tagged unions at startup.
     "expression>=5.6.0,<6",
-    "filelock>=4.2.1,<5",
     # Keep FastAPI's lock-proven route-tree behavior; upgrade it separately.
     "fastapi>=0.136.3,<0.137",
     "fastapi-sso>=0.19.0,<1",
+    # Keep huggingface-hub's transitive file-lock security floor in wheel metadata despite no direct Forge import.
+    "filelock>=4.2.1",
     # Runtime security floors belong in wheel metadata, not only uv constraints.
     "multidict>=6.9.1,<7",
     "oauthlib>=4.0.0,<5",

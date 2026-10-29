@@ -53,14 +53,41 @@ mock response with outbound connections blocked. No model-provider inference was
 The final audit queried every registry package/version in `uv.lock` using
 `uvx pip-audit==2.10.1 --no-deps --disable-pip --progress-spinner off -r <inventory> --format json`. Its inventory
 SHA-256 is `f2b8f07eb073764f5c00f4c3c416afa0b90547f1f2827632907e2fe9a077aafc`; the reviewed lock SHA-256 is
-`d8079b101d5af67cd22015b97cc99718bde45c5c09a12b8c7b6ffa4b458029e6`. This is a known-advisory check, not a claim that
+`d2a81c061b4c1bee6e77478954d7010393aaf52859c6d46dd378419de20b5879`. This is a known-advisory check, not a claim that
 upstream code has no defects.
 
-The refreshed Anthropic counts are 23,461 tokens for `docs/design_telemetry.md` and 22,629 for `docs/end-user/proxy.md`;
-both cache entries match the final document bytes. `AGENTS.md` records the owner's standing authorization for routine
-token-count API calls and cache refreshes.
+The current Anthropic counts are 23,461 tokens for `docs/design_telemetry.md`, 23,153 for `docs/end-user/proxy.md` and
+27,132 for `docs/end-user/session.md`. All cache entries match the final document bytes. `AGENTS.md` records standing
+authorization for routine token-count API calls and cache refreshes.
+
+## Review controls
+
+Homebrew Bash 5.3.20 reproduced all three original PTY timeouts (31.12 seconds); system Bash 3.2.57 passed in 0.56
+seconds but truncated a disposable exported history file from 2,000 lines to 500. The revised test drains PTY output,
+closes the parent's slave handle, redirects history to its own file and checks the complete rendered payload. System
+startup files are disabled and the controlled setup is sourced explicitly. Readline is disabled so terminal width cannot
+hide the prompt; Bash's root `\$` rendering is accounted for.
+
+The updated prompt tests pass under both macOS Bash versions. In disposable copies, omitting activation or removing the
+history redirect makes all three cases fail their corresponding assertion. With virtualenv 21.14.12 substituted only in
+an isolated target, all three cases still execute the harmless marker and fail under both Bash versions. The reviewed
+environment remains on 21.14.13. Linux root and uid 1000 each pass the three prompt cases plus the filelock regression
+in the rebuilt sidecar, with networking disabled.
+
+Removing `--locked` in a disposable checker leaves the old unresolvable fixture failing without a lock change. With the
+new `==` to `>=` constraint fixture, the unlocked checker succeeds offline and rewrites the lock, proving that the
+regression now detects removal of the guard. Relaxing the dnspython/filelock upper bounds changed only project metadata;
+the audited 138-package version inventory is identical.
+
+The documented base-image and sidecar-image build commands both succeeded. The resulting image contains dnspython 2.9.0,
+filelock 4.2.1 and LiteLLM 1.102.2. A fresh clean-wheel smoke passed again. The standard integration runner passed all
+five selected cases in `tests/integration/sidecar/test_sidecar_omit.py` and
+`tests/integration/proxy/test_litellm_streaming_cost_e2e.py` without provider inference. The full unit suite passed
+again (11,234 tests), and the full regression suite passed with Homebrew Bash first on `PATH` (2,218 tests). Full
+pre-commit passed with the final shell harness and documentation counts.
 
 ## After merge
 
-The two Dependabot alerts remain open until the fixes merge and GitHub refreshes the default-branch graph. Existing
-installations need an upgrade and process restart; merging the lock does not update running deployments.
+The two Dependabot alerts remain open until the fixes merge and GitHub refreshes the default-branch graph. Existing host
+installations need stop/upgrade/start, and sidecars need updated images and fresh containers; merging the lock does not
+update running deployments.

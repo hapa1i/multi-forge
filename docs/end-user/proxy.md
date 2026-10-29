@@ -504,12 +504,35 @@ forge proxy show <proxy_id>
 forge proxy validate <proxy_id>
 ```
 
-### Updating saved proxy and backend configurations
+### Applying dependency security updates
 
-For dependency security updates, upgrade the Forge installation that launches your processes, then stop and restart its
-local backends and proxies. Local LiteLLM uses that installation's Python environment. Saved configurations can remain
-as they are when only packages change; a package upgrade does not restart running processes. Remote LiteLLM deployments
-must be upgraded by their operator. Use the backend and proxy lifecycle commands below for the restart.
+Stop affected host proxies and local backends **before** upgrading the Forge installation that launches them. Local
+LiteLLM uses that installation's Python environment; replacing packages while it runs can mix already-loaded modules
+with newly installed files. Use `forge proxy stop <proxy_id>` and `forge model backend stop <runtime-id>` after
+identifying the affected processes with `forge proxy list` and `forge model backend list`. Upgrade through your existing
+installation method, then start backends before their proxies using the lifecycle commands below. Saved configurations
+can remain as they are when only packages change.
+
+Sidecar images contain a separate Forge installation and dependency graph. End affected sidecar sessions, then rebuild
+the image or obtain an updated image from its operator. A host upgrade leaves the image unchanged, and restarting an
+existing container keeps its old packages. For repository-built images, use an updated, reviewed checkout containing the
+patched `uv.lock` and rebuild both layers:
+
+```bash
+read -r claude_version codex_version < <(uv run --locked python tests/fixtures/runtime_versions.py)
+docker build -f docker/Dockerfile.forge \
+  --build-arg CLAUDE_VERSION="$claude_version" --build-arg CODEX_VERSION="$codex_version" \
+  -t forge-claude-test:updated .
+docker build -f docker/Dockerfile.sidecar \
+  --build-arg BASE_IMAGE=forge-claude-test:updated -t forge-sidecar:latest .
+```
+
+Rebuilding only `Dockerfile.sidecar` from an old base retains its dependencies. Replace the sidecar output tag when the
+session has a recorded `--image` override or your `sidecar_image` setting differs from `forge-sidecar:latest`. Then
+`forge session resume <name>` creates a fresh container using that updated image. Remote LiteLLM deployments must be
+upgraded and restarted by their operator.
+
+### Updating saved proxy and backend configurations
 
 A saved `~/.forge/proxies/<proxy_id>/proxy.yaml`, local LiteLLM `~/.forge/backends/litellm/config.yaml`, and custom
 templates under `~/.forge/templates/` are user-owned snapshots. Upgrading Forge preserves them. Restarting loads the

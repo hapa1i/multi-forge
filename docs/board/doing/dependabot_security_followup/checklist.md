@@ -1,7 +1,7 @@
 # Dependency security follow-up checklist
 
-**Current focus:** [PR #288](https://github.com/hapa1i/multi-forge/pull/288) has passed local verification; review and
-merge remain. See [verification](verification.md).
+**Current focus:** Review fixes are verified and ready in [PR #288](https://github.com/hapa1i/multi-forge/pull/288).
+Await merge before checking default-branch alert closure. See [verification](verification.md).
 
 - [x] Read both open alerts and verify patched releases against upstream advisories.
 - [x] Trace development/runtime ownership and review the user-approved expansion to 14 additional advisories.
@@ -13,10 +13,19 @@ merge remain. See [verification](verification.md).
 - [x] Run unit/regression suites and focused proxy/backend integration checks without provider inference.
   - Unit: 11234 passed; regression: 2218 passed; integration: 19 passed.
 - [x] Pass full pre-commit, build and the clean-wheel runtime smoke; refresh final documentation counts.
-  - Both provider counts match the final document bytes. The owner authorized routine token-count API calls without
-    repeated confirmation; `AGENTS.md` records that standing permission.
+  - Provider counts match the final document bytes. The owner authorized routine token-count API calls without repeated
+    confirmation; `AGENTS.md` records that standing permission.
 - [x] Prepare the PR with exact verification and limitations.
 - [ ] After merge, verify default-branch alert closure and record card closeout.
+
+## Review follow-up
+
+- [x] Drain PTY output, isolate inherited history, and require the literal prompt; verify Bash 3.2 and 5.3 plus
+  fail-first controls.
+- [x] Make the stale-lock fixture resolvable offline and prove that removing `--locked` makes its regression fail.
+- [x] Explain the transitive runtime floors and remove extra major-version caps without changing the locked versions.
+- [x] Document stop-before-upgrade ordering and rebuilding sidecar base and final images before recreating containers.
+- [x] Refresh document counts, run relevant checks and update the PR evidence.
 
 ## Acceptance fixtures
 
