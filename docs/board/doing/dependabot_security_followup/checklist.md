@@ -1,7 +1,7 @@
 # Dependency security follow-up checklist
 
-**Current focus:** [PR #288](https://github.com/hapa1i/multi-forge/pull/288) is a draft; final document counts await
-approval. See [verification](verification.md).
+**Current focus:** [PR #288](https://github.com/hapa1i/multi-forge/pull/288) has passed local verification; review and
+merge remain. See [verification](verification.md).
 
 - [x] Read both open alerts and verify patched releases against upstream advisories.
 - [x] Trace development/runtime ownership and review the user-approved expansion to 14 additional advisories.
@@ -11,11 +11,10 @@ approval. See [verification](verification.md).
 - [x] Verify Bash prompt transitions, filelock/Hugging Face compatibility and wheel metadata separation.
 - [x] Regenerate/check dependency exports and repeat the complete lock audit with no skipped packages.
 - [x] Run unit/regression suites and focused proxy/backend integration checks without provider inference.
-  - Regression: 2218 passed; integration: 19 passed. Unit: 11233 passed, with only the stale documentation-cache check
-    failing until the approved refresh below.
-- [ ] Pass full pre-commit, build and the clean-wheel runtime smoke; refresh final documentation counts.
-  - Build and clean-wheel smoke passed. All other hooks pass with `SKIP=file-size-limits`. Counting the revised
-    telemetry/proxy guides awaits approval to send their contents to Anthropic; then rerun the complete checks.
+  - Unit: 11234 passed; regression: 2218 passed; integration: 19 passed.
+- [x] Pass full pre-commit, build and the clean-wheel runtime smoke; refresh final documentation counts.
+  - Both provider counts match the final document bytes. The owner authorized routine token-count API calls without
+    repeated confirmation; `AGENTS.md` records that standing permission.
 - [x] Prepare the PR with exact verification and limitations.
 - [ ] After merge, verify default-branch alert closure and record card closeout.
 

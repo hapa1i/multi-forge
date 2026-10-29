@@ -69,7 +69,7 @@
       "tokens": 24285
     },
     "docs/design_telemetry.md": {
-      "sha256": "9666f29a9dc4bb50aa33de6f4a99f9202b70919b417c4e5a2fb602309f83e187",
+      "sha256": "086d3a4f533f10cb1e1eca69f843c035ebd056490eeba582c36cf1547861df8b",
       "method": "claude-opus-5",
       "family": "anthropic",
       "tokens": 23461
@@ -87,10 +87,10 @@
       "tokens": 13893
     },
     "docs/end-user/proxy.md": {
-      "sha256": "6e43fa2a6e5c5f697d6472c2156475db71d378e85c47c932e0c124dc6429c1e7",
+      "sha256": "63efc58c3b8228fbca68f4bd1cca30542b1c14c00c0b15c87b59047d89a64b78",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 22489
+      "tokens": 22629
     },
     "docs/end-user/session.md": {
       "sha256": "4ede9ca7120e13a684125cc5bc110c436be12248a9eaacdf7ec5dd62258c7479",
