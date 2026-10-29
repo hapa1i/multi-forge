@@ -1,8 +1,10 @@
 .PHONY: help deps build test-unit test-integration test-regression test pre-commit pre-commit-md clean clean-docker clean-all
 
+export UV_BUILD_CONSTRAINT := $(CURDIR)/requirements/build.txt
+
 # uv includes the dev dependency group by default.
 deps:
-	@uv sync --quiet
+	@uv sync --locked --quiet
 
 help:
 	@echo "Multi Forge - Available Make targets:"
@@ -24,11 +26,13 @@ help:
 
 build:
 	@echo "Building source distribution and wheel..."
-	uv build
+	@build_python="$$(uv python find --no-project --no-config '>=3.11,<3.14')" && \
+		"$$build_python" -S scripts/check-dependency-pins.py && \
+		uv build --python "$$build_python" --build-constraints requirements/build.txt --require-hashes
 
 test-unit: deps
 	@echo "Running unit tests (excluding integration)..."
-	uv run pytest tests/src -m "not integration" -v
+	uv run --locked pytest tests/src -m "not integration" -v
 
 test-integration: deps
 	@echo "Running integration tests (requires Docker)..."
@@ -36,18 +40,18 @@ test-integration: deps
 
 test-regression: deps
 	@echo "Running regression tests..."
-	uv run pytest tests/regression -m regression -v
+	uv run --locked pytest tests/regression -m regression -v
 
 test: test-unit test-integration
 	@echo "All tests complete!"
 
 pre-commit: deps
 	@echo "Running pre-commit hooks..."
-	uv run pre-commit run --all-files
+	uv run --locked pre-commit run --all-files
 
 pre-commit-md: deps
 	@echo "Running pre-commit hooks for all not-ignored md files..."
-	uv run pre-commit run --files $$(git ls-files -- '*.md') $$(git ls-files --others --exclude-standard -- '*.md')
+	uv run --locked pre-commit run --files $$(git ls-files -- '*.md') $$(git ls-files --others --exclude-standard -- '*.md')
 
 clean:
 	@echo "Cleaning caches and build artifacts..."

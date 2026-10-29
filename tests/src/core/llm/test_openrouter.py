@@ -87,6 +87,73 @@ def client():
     )
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "model",
+    ["moonshotai/kimi-k3.1-pro", "minimax/minimax-m3.1-flash", "deepseek/deepseek-v4.1-flash-1017"],
+)
+@pytest.mark.parametrize("stream", [False, True])
+async def test_october_requests_keep_tools_effort_and_zdr_with_model_specific_sampling(
+    model: str, stream: bool
+) -> None:
+    client = OpenRouterClient(model=model, provider="openrouter")
+    sdk_client = MagicMock()
+
+    async def empty_stream():
+        for chunk in ():
+            yield chunk
+
+    create = AsyncMock(return_value=empty_stream() if stream else MagicMock())
+    if stream:
+        sdk_client.chat.completions.create = create
+    else:
+        sdk_client.chat.completions.with_raw_response.create = create
+    tools = [{"type": "function", "function": {"name": "lookup", "parameters": {"type": "object"}}}]
+    params = ModelHyperparameters(
+        max_tokens=4096,
+        temperature=0.7,
+        top_p=0.9,
+        reasoning_effort="max",
+        extra={
+            "openai": {
+                "tool_choice": "auto",
+                "extra_body": {"provider": {"zdr": True}, "temperature": 0.5, "top_p": 0.8, "top_k": 40},
+            }
+        },
+    )
+    before = params.model_dump()
+    with (
+        patch.object(client, "_get_client", new=AsyncMock(return_value=sdk_client)),
+        patch(
+            "forge.core.llm.clients.openrouter.openai_response_to_completion",
+            return_value=CompletionResponse(text="ok"),
+        ),
+    ):
+        messages = [Message(role="user", content="Call lookup")]
+        if stream:
+            assert [event async for event in client.stream(messages, tools=tools, hyperparams=params)]
+        else:
+            assert (await client.complete(messages, tools=tools, hyperparams=params)).text == "ok"
+
+    create.assert_awaited_once()
+    assert create.await_args is not None
+    request = create.await_args.kwargs
+    assert request["model"] == model
+    assert request["max_tokens"] == 4096
+    assert request["tools"] == tools
+    assert request["tool_choice"] == "auto"
+    assert request["extra_body"]["provider"] == {"zdr": True}
+    assert request["extra_body"]["reasoning"] == {"effort": "max"}
+    if model.startswith("moonshotai/"):
+        assert {"temperature", "top_p", "top_k"}.isdisjoint(request)
+        assert {"temperature", "top_p", "top_k"}.isdisjoint(request["extra_body"])
+    else:
+        assert request["temperature"] == 0.7
+        assert request["top_p"] == 0.9
+        assert request["extra_body"]["top_k"] == 40
+    assert params.model_dump() == before
+
+
 class TestOpenRouterClientInit:
     """Tests for client construction."""
 

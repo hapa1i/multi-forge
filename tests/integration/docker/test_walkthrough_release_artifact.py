@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.fixtures.release_artifact import build_wheel
+
 pytestmark = [pytest.mark.integration, pytest.mark.docker_host]
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -19,18 +21,8 @@ def test_walkthrough_setup_report_and_cleanup_resolve_from_one_wheel(
     tmp_path: Path, forge_test_image: str | None
 ) -> None:
     assert forge_test_image is not None, "walkthrough artifact isolation requires the Docker-host test lane"
-    built = subprocess.run(
-        ["uv", "build", "--wheel", "--out-dir", str(tmp_path), str(REPO_ROOT)],
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=180,
-    )
-    assert built.returncode == 0, built.stderr
-    wheels = list(tmp_path.glob("*.whl"))
-    assert len(wheels) == 1
-    wheel = wheels[0]
-    wheel_sha256 = hashlib.sha256(wheel.read_bytes()).hexdigest()
+    artifact = build_wheel(tmp_path)
+    wheel, wheel_sha256 = artifact.path, artifact.sha256
 
     wheel_resources: dict[str, str] = {}
     with zipfile.ZipFile(wheel) as archive:

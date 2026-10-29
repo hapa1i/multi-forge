@@ -14,6 +14,8 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from forge.core.invoker import (
     Attribution,
     CodexHeadlessInvoker,
@@ -275,6 +277,32 @@ class TestPrepareCodexRequest:
     def test_no_resume_subcommand_without_thread_id(self):
         req = prepare_codex_request(prompt="hi", preflight=_preflight(), attribution=Attribution(command="bridge"))
         assert "resume" not in req.argv
+
+    @pytest.mark.parametrize("resume_id", [None, "existing-worker"])
+    def test_worker_controls_override_caller_config_before_resume(self, resume_id):
+        req = prepare_codex_request(
+            prompt="review",
+            preflight=_preflight(),
+            attribution=Attribution(command="panel"),
+            worker=True,
+            resume_thread_id=resume_id,
+            extra_args=[
+                "-c",
+                "agents.enabled=true",
+                "-c",
+                "memories.use_memories=true",
+                "-c",
+                "memories.generate_memories=true",
+            ],
+        )
+        config = dict(value.split("=", 1) for flag, value in zip(req.argv, req.argv[1:]) if flag == "-c")
+        assert config == {
+            "agents.enabled": "false",
+            "memories.use_memories": "false",
+            "memories.generate_memories": "false",
+        }
+        if resume_id:
+            assert req.argv[-2:] == ["resume", resume_id]
 
     @patch("forge.core.invoker.codex.codex_api_key_for_subprocess", return_value="sk-test-key")
     def test_credential_file_auth_injects_key(self, _key):

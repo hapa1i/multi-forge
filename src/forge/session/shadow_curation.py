@@ -354,6 +354,7 @@ def run_shadow_curation(
     with track_verb_cost("curation", tracking_urls) as cost:
         result = run_claude_session(
             prompt,
+            worker=True,
             base_url=base_url,
             direct=direct,
             timeout_seconds=timeout_seconds,
@@ -467,6 +468,7 @@ def _dispatch_codex_shadow_curation(
             )
         request = prepare_codex_request(
             prompt=prompt,
+            worker=True,
             preflight=preflight,
             attribution=Attribution(
                 command="curation",

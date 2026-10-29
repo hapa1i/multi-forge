@@ -1,6 +1,6 @@
 [project]
 name = "multi-forge"
-version = "1.1.1"
+version = "1.1.3"
 description = "Multi-runtime agent toolkit: proxy routing, cost control, session management, policy enforcement, and workflow orchestration"
 readme = "README.md"
 license = "Apache-2.0"
@@ -42,7 +42,7 @@ dependencies = [
     # Proxy dependencies (previously optional, now core). Forge owns the
     # default-Uvicorn LiteLLM startup set because the upstream `proxy` extra
     # caps cryptography below Forge's patched floor. This set is start/health
-    # validated through LiteLLM 1.102.0; run scripts/test-wheel-runtime.sh before
+    # validated through LiteLLM 1.102.2; run scripts/test-wheel-runtime.sh before
     # raising the ceiling. Alternate servers, databases, and cloud integrations
     # remain outside Forge's runtime path.
     "aiohttp>=3.14.4,<4",
@@ -53,11 +53,15 @@ dependencies = [
     # Exclude the compromised CA trust roots from clean installations too.
     "certifi>=2026.10.19",
     "cryptography>=50.0.0",
+    # Keep email-validator's transitive DNS security floor in wheel metadata despite no direct Forge import.
+    "dnspython>=2.9.0",
     # LiteLLM 1.95 imports outbound-credential tagged unions at startup.
     "expression>=5.6.0,<6",
     # Keep FastAPI's lock-proven route-tree behavior; upgrade it separately.
     "fastapi>=0.136.3,<0.137",
     "fastapi-sso>=0.19.0,<1",
+    # Keep huggingface-hub's transitive file-lock security floor in wheel metadata despite no direct Forge import.
+    "filelock>=4.2.1",
     # Runtime security floors belong in wheel metadata, not only uv constraints.
     "multidict>=6.9.1,<7",
     "oauthlib>=4.0.0,<5",
@@ -75,7 +79,7 @@ dependencies = [
     "watchfiles>=0.20",
     "websockets>=15.0.1,<16",
     # Packaged Gemini 3.8 Flash metadata and the verified proxy runtime.
-    "litellm==1.102.0",
+    "litellm==1.102.2",
 ]
 
 [project.scripts]
@@ -88,7 +92,7 @@ Issues = "https://github.com/hapa1i/multi-forge/issues"
 Documentation = "https://github.com/hapa1i/multi-forge/tree/main/docs"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -154,9 +158,18 @@ disallow_untyped_calls = false
 
 # Security floor for transitive dependencies (Dependabot alerts)
 [tool.uv]
+# uv sync does not consume UV_BUILD_CONSTRAINT; keep its isolated builds pinned too.
+# scripts/check-dependency-pins.py checks this list against the build-group export.
+build-constraint-dependencies = [
+    "hatchling==1.32.4",
+    "packaging==26.3",
+    "pathspec==1.1.1",
+    "pluggy==1.6.0",
+    "tomlkit==0.15.2",
+    "trove-classifiers==2026.9.21.13",
+]
 constraint-dependencies = [
-    "filelock>=3.20.3",
-    "virtualenv>=21.14.12",
+    "virtualenv>=21.14.13",
     "mcp>=1.28.1",
     "Pygments>=2.20.0",
     "pyasn1>=0.6.4",
@@ -164,12 +177,19 @@ constraint-dependencies = [
 
 [dependency-groups]
 dev = [
+    "pre-commit-hooks==6.0.0",
+    "isort==9.0.1",
+    "mdformat==1.0.0",
+    "mdformat-gfm==1.0.0",
+    "mdformat-gfm-alerts==2.1.0",
+    "mdformat-simple-breaks==0.1.0",
+    "mdformat-frontmatter==2.1.2",
     "pytest>=9.0.3",
     "pytest-cov>=4.1.0",
     "pytest-asyncio>=0.23.0",
     "pytest-mock>=3.15.1",
     "ruff>=0.15.0",
-    "black>=26.5.0",
+    "black>=26.10.1",
     "mypy>=1.13.0",
     "pyright>=1.1.0",
     "pytest-rerunfailures>=14.0",
@@ -178,6 +198,7 @@ dev = [
     "types-requests>=2.31.0",
     "httpx2>=2.3.0",
 ]
+build = ["hatchling==1.32.4"]
 provider-check = [
     # scripts/count-tokens.py imports provider-specific count_tokens surfaces;
     # keep lock refreshes inside the API families verified by that script.

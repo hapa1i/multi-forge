@@ -9,20 +9,20 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from time import monotonic
 
 from forge.core.reactive.env import build_claude_env
-from forge.core.reactive.reviewer_runtime import (
-    READ_ONLY_FLAGS,
-    require_reviewer_runtime,
-)
+from forge.core.reactive.reviewer_runtime import READ_ONLY_FLAGS as READ_ONLY_FLAGS
+from forge.core.reactive.reviewer_runtime import require_reviewer_runtime
 from forge.core.reactive.watchdog import run_guarded
 
 _BLOCKED_PREFIXES = ("ANTHROPIC_", "CLAUDE_CODE_", "FORGE_SUBPROCESS_", "AWS_", "GOOGLE_", "AZURE_")
 _BLOCKED_NAMES = {
     "CLAUDECODE",
     "FORGE_PROXY_WIRE_SHAPE",
+    "FORGE_REVIEWER_API_KEY_HELPER",
     "HTTP_PROXY",
     "HTTPS_PROXY",
     "ALL_PROXY",
@@ -87,7 +87,9 @@ def validate_subscription_location(env: dict[str, str]) -> str | None:
     return organization_type
 
 
-def preflight_subscription(*, env: dict[str, str], cwd: str | None, deadline: float) -> str:
+def preflight_subscription(
+    *, env: dict[str, str], cwd: str | None, deadline: float, control_args: Sequence[str]
+) -> str:
     """Return the tested absolute CLI path, or refuse without model inference."""
     validate_subscription_location(env)
     binary = require_reviewer_runtime(env=env, deadline=deadline)
@@ -95,7 +97,7 @@ def preflight_subscription(*, env: dict[str, str], cwd: str | None, deadline: fl
     def run(argv: list[str]):
         return run_guarded(argv, input="", env=env, cwd=cwd, timeout=min(10.0, deadline - monotonic()))
 
-    result = run([binary, *READ_ONLY_FLAGS, "auth", "status", "--json"])
+    result = run([binary, *control_args, "auth", "status", "--json"])
     try:
         status = json.loads(result.stdout)
     except ValueError as exc:

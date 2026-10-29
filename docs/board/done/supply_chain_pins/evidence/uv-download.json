@@ -1,0 +1,8 @@
+{
+  "version": "0.9.18",
+  "artifact": "uv-x86_64-unknown-linux-gnu.tar.gz",
+  "sha256": "c2def3db178ade63933fa15ffc96e882c196ce53e06173dcee05b36c5f6f68f5",
+  "source": "https://github.com/astral-sh/uv/releases/download/0.9.18/uv-x86_64-unknown-linux-gnu.tar.gz.sha256",
+  "action_commit": "37802adc94f370d6bfd71619e3f0bf239e1f3b78",
+  "verification_source": "https://github.com/astral-sh/setup-uv/blob/37802adc94f370d6bfd71619e3f0bf239e1f3b78/src/download/checksum/checksum.ts"
+}

@@ -206,6 +206,9 @@ class TestResolveModelWithAlternatives:
             ),
             ("openrouter-glm", "glm-5.3-flash", "z-ai/glm-5.3-flash"),
             ("openrouter-glm", "glm-5.3-flashx", "z-ai/glm-5.3-flashx"),
+            ("openrouter-kimi", "kimi-k3.1-pro", "moonshotai/kimi-k3.1-pro"),
+            ("openrouter-minimax", "minimax-m3.1-flash", "minimax/minimax-m3.1-flash"),
+            ("openrouter-deepseek", "deepseek-v4.1-flash-1017", "deepseek/deepseek-v4.1-flash-1017"),
         ],
     )
     def test_refreshed_templates_route_explicit_models(self, monkeypatch, template, request_model, expected):

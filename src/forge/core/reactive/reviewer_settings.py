@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import json
-from contextlib import contextmanager
 from pathlib import Path
-from tempfile import TemporaryFile
-from typing import Iterator
+
+_HELPER_ENV = "FORGE_REVIEWER_API_KEY_HELPER"
 
 
 def inherited_auth_settings(
@@ -79,15 +78,16 @@ def inherited_auth_settings(
     return selected
 
 
-@contextmanager
-def auth_settings_descriptor(settings: dict[str, object]) -> Iterator[tuple[list[str], tuple[int, ...]]]:
-    """Keep settings off argv and disk paths, including if the hook is SIGKILLed."""
-    if not settings:
-        yield [], ()
-        return
-    with TemporaryFile(mode="w+") as handle:
-        json.dump(settings, handle)
-        handle.flush()
-        handle.seek(0)
-        descriptor = handle.fileno()
-        yield ["--settings", f"/dev/fd/{descriptor}"], (descriptor,)
+def project_auth_settings(settings: dict[str, object], env: dict[str, str]) -> tuple[dict[str, object], dict[str, str]]:
+    """Carry the trusted helper in child environment, with no credential file or secret argv."""
+    helper = settings.get("apiKeyHelper")
+    if helper is None:
+        return {}, env
+    if not isinstance(helper, str):
+        raise ValueError("Claude apiKeyHelper must be a command string")
+    # Claude canonicalizes --settings paths, so an unlinked /dev/fd file cannot
+    # survive its file checks. Inline only the fixed shell indirection; the
+    # trusted command itself stays in the child environment, like API keys.
+    child_env = {**env, _HELPER_ENV: helper}
+    projected: dict[str, object] = {"apiKeyHelper": f'eval "${_HELPER_ENV}"' if helper else ""}
+    return projected, child_env

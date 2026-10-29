@@ -52,6 +52,7 @@ from forge.core.runtime.codex_preflight import (
     codex_api_key_for_subprocess,
 )
 from forge.core.runtime.registry import get_runtime
+from forge.core.worker_controls import CODEX_WORKER_PROFILE
 
 CodexSandbox = Literal["read-only", "workspace-write", "danger-full-access"]
 
@@ -185,6 +186,7 @@ def prepare_codex_request(
     label: str | None = None,
     resume_thread_id: str | None = None,
     extra_args: Sequence[str] = (),
+    worker: bool = False,
 ) -> HeadlessRequest:
     """Shape one ``codex exec --json`` job into a :class:`HeadlessRequest`.
 
@@ -197,6 +199,8 @@ def prepare_codex_request(
     stdin (probe stage 61 verified the stdin-prompt + resume combination).
     ``extra_args`` (a managed launch's ``--effort`` and ``--`` tail) join the options
     before that subcommand.
+    Explicit ``worker=True`` applies native delegation/memory restrictions after
+    those overrides. Managed root callers keep their normal configuration.
 
     Codex runs DIRECT to OpenAI: no Forge proxy, no ``ANTHROPIC_*`` env, ``base_url`` is
     ``None``. The child env is **sanitized** so it cannot contradict the preflight: all
@@ -213,11 +217,13 @@ def prepare_codex_request(
     if model:
         argv += ["-m", model]
     argv += extra_args
-    if resume_thread_id:
-        argv += ["resume", resume_thread_id]
 
     env = sanitize_codex_child_env(preflight)
     stamp_run_identity(env, derive=True)
+    if worker:
+        CODEX_WORKER_PROFILE.apply(argv, env)
+    if resume_thread_id:
+        argv += ["resume", resume_thread_id]
 
     return HeadlessRequest(
         argv=argv,

@@ -87,7 +87,9 @@ def main() -> int:
                 time.sleep(90)
             elif mode in {"guarded-deadline", "guarded-native-expiry"}:
                 env = subscription_environment()
-                binary = preflight_subscription(env=env, cwd=payload["cwd"], deadline=time.monotonic() + 10)
+                binary = preflight_subscription(
+                    env=env, cwd=payload["cwd"], deadline=time.monotonic() + 10, control_args=READ_ONLY_FLAGS
+                )
                 try:
                     run_guarded(
                         [binary, *READ_ONLY_FLAGS],

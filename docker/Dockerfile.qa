@@ -23,13 +23,16 @@ RUN apt-get update \
     && printf '%s  %s\n' "${FORGE_WHEEL_SHA256}" "/tmp/forge-wheel/${FORGE_WHEEL_NAME}" \
         | sha256sum --check --strict - \
     && uv venv /opt/forge-qa \
-    && uv pip install --python /opt/forge-qa/bin/python "/tmp/forge-wheel/${FORGE_WHEEL_NAME}" \
+    && uv export --project /forge --locked --no-dev --no-emit-project --output-file /tmp/forge-runtime.txt > /dev/null \
+    && uv pip install --no-config --python /opt/forge-qa/bin/python --require-hashes --no-build -r /tmp/forge-runtime.txt \
+    && uv pip install --python /opt/forge-qa/bin/python --no-deps "/tmp/forge-wheel/${FORGE_WHEEL_NAME}" \
+    && uv pip check --python /opt/forge-qa/bin/python \
     && ln -s /opt/forge-qa/bin/forge /usr/local/bin/forge \
     && mkdir -p /workspace \
     && cd /workspace \
     && FORGE_EXPECTED_VERSION="${FORGE_VERSION}" /opt/forge-qa/bin/python -I -c \
         'import importlib.metadata as m; import importlib.resources as r; import os; import pathlib; import forge; from forge.install.installer import get_extensions_root; expected=os.environ["FORGE_EXPECTED_VERSION"]; assert m.version("multi-forge") == expected; assert forge.__version__ == expected; assert pathlib.Path(forge.__file__).is_relative_to("/opt/forge-qa"); root=pathlib.Path(str(r.files("forge"))); assert root.is_relative_to("/opt/forge-qa"); extensions=get_extensions_root(); assert extensions.is_relative_to("/opt/forge-qa"); qa=extensions / "skills" / "qa"; expected_files=("SKILL.md", "resources/checklist.md", "resources/coverage-map.md", "resources/execution-budget.json", "resources/report-template.md", "resources/runtime-matrix.json", "scripts/qa-artifact.py", "scripts/qa-run-metrics.py", "scripts/qa-selection.py", "scripts/start-container.sh", "scripts/walkthrough-state.py"); assert all((qa / path).is_file() for path in expected_files); assert len(list((qa / "resources/checklist").glob("*.md"))) == 21' \
-    && rm -rf /tmp/forge-wheel
+    && rm -rf /tmp/forge-wheel /tmp/forge-runtime.txt
 
 # The wheel remains isolated in /opt/forge-qa, while the lexical global path
 # gives the hook dispatcher a durable launcher that it may safely record.

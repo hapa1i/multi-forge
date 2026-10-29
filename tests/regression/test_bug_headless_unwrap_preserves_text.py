@@ -55,7 +55,7 @@ def _envelope(result_text: str = "VERDICT: aligned", **overrides: object) -> str
 @patch("forge.core.reactive.session_runner.subprocess.run")
 def test_success_unwraps_result_and_lifts_metrics(mock_run: MagicMock) -> None:
     mock_run.return_value = MagicMock(stdout=_envelope("VERDICT: aligned"), stderr="", returncode=0)
-    result = run_claude_session("prompt")
+    result = run_claude_session("prompt", worker=False)
 
     # Text consumers see the unwrapped model text, NOT the JSON envelope.
     assert result.stdout == "VERDICT: aligned"
@@ -72,7 +72,7 @@ def test_success_unwraps_result_and_lifts_metrics(mock_run: MagicMock) -> None:
 def test_nonzero_exit_keeps_raw_stdout_and_no_metrics(mock_run: MagicMock) -> None:
     # A non-zero exit is not parsed: raw stdout preserved, metrics stay None.
     mock_run.return_value = MagicMock(stdout="partial output", stderr="boom", returncode=1)
-    result = run_claude_session("prompt")
+    result = run_claude_session("prompt", worker=False)
 
     assert result.stdout == "partial output"
     assert result.envelope_parsed is False
@@ -86,7 +86,7 @@ def test_non_envelope_stdout_falls_back_to_raw(mock_run: MagicMock) -> None:
     # JSON was requested, but the CLI emitted plain prose (e.g. an old/odd build):
     # fall back to raw text, no metrics, no crash.
     mock_run.return_value = MagicMock(stdout="just plain prose", stderr="", returncode=0)
-    result = run_claude_session("prompt")
+    result = run_claude_session("prompt", worker=False)
 
     assert result.stdout == "just plain prose"
     assert result.envelope_parsed is False
@@ -98,7 +98,7 @@ def test_token_only_envelope_keeps_tokens_without_cost(mock_run: MagicMock) -> N
     # Direct OAuth: usage present but no dollar figure. envelope_parsed AND tokens
     # are set; cost is None (independent facts -- #1).
     mock_run.return_value = MagicMock(stdout=_envelope("text", total_cost_usd=None), stderr="", returncode=0)
-    result = run_claude_session("prompt")
+    result = run_claude_session("prompt", worker=False)
 
     assert result.envelope_parsed is True
     assert result.input_tokens == 300
@@ -110,7 +110,7 @@ def test_output_format_none_keeps_plain_text_path(mock_run: MagicMock) -> None:
     # output_format=None never requests JSON; stdout is the raw text untouched and
     # the --output-format token is absent from the argv.
     mock_run.return_value = MagicMock(stdout="raw model text", stderr="", returncode=0)
-    result = run_claude_session("prompt", output_format=None)
+    result = run_claude_session("prompt", worker=False, output_format=None)
 
     assert result.stdout == "raw model text"
     assert result.envelope_parsed is False

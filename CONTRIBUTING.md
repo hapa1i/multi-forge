@@ -9,7 +9,7 @@ Thanks for your interest in contributing to Multi-Forge!
 ```bash
 git clone <repo-url>
 cd multi-forge
-uv sync
+make deps
 pre-commit install
 
 # Persistent editable launcher. When FORGE_DEV is unset, eligible host hooks

@@ -1,18 +1,22 @@
-"""Tests for LiteLLM reported-cost capture (x-litellm-response-cost header)."""
+"""Tests for LiteLLM cost capture from response headers and streamed usage."""
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
+from openai import AsyncOpenAI
 
 from forge.core.llm.clients.litellm import (
     LITELLM_COST_HEADER,
     LiteLLMClient,
     cost_from_response_headers,
 )
+from forge.core.llm.detection import ProviderType
 from forge.core.llm.types import (
     CompletionResponse,
     Message,
@@ -51,7 +55,7 @@ class TestCostFromResponseHeaders:
 
 
 class TestMergeHeaderCost:
-    """Body cost (OpenRouter-style) wins; the gateway header fills the gap."""
+    """Body cost wins; the gateway header fills the gap."""
 
     def test_header_fills_when_body_reports_none(self):
         merged = _client()._merge_header_cost(
@@ -136,3 +140,73 @@ class TestCompleteReadsHeaderCost:
 
         assert result.cost_usd == 0.00088
         assert result.text == "hi"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider", ["litellm_local", "litellm_remote"])
+@pytest.mark.parametrize(
+    "cost,include_usage",
+    [(0.0007, True), (0.0, True), (None, True), (None, False)],
+    ids=["body-cost", "explicit-zero", "cost-omitted", "usage-omitted"],
+)
+async def test_stream_cost_through_sdk_transport(
+    provider: ProviderType, cost: float | None, include_usage: bool
+) -> None:
+    usage: dict[str, Any] = {
+        "prompt_tokens": 120,
+        "completion_tokens": 3,
+        "total_tokens": 123,
+        "prompt_tokens_details": {"cached_tokens": 40},
+    }
+    if cost is not None:
+        usage["cost"] = cost
+    chunk_base = {"id": "stream-cost", "model": "gemini/gemini-3.8-flash", "created": 0}
+    chunks = [
+        {**chunk_base, "choices": [{"index": 0, "delta": {"content": "ok"}}]},
+        {**chunk_base, "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]},
+    ]
+    if include_usage:
+        chunks.append({**chunk_base, "choices": [], "usage": usage})
+    payload = "".join(f"data: {json.dumps(chunk)}\n\n" for chunk in chunks) + "data: [DONE]\n\n"
+    requests: list[httpx.Request] = []
+
+    def serve(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        body = json.loads(request.content)
+        assert body["stream"] is True
+        assert body["stream_options"] == {"include_usage": True}
+        return httpx.Response(
+            200,
+            content=payload.encode(),
+            # Stream-start headers are not final spend evidence, even when the body has no cost.
+            headers={"content-type": "text/event-stream", LITELLM_COST_HEADER: "999"},
+        )
+
+    async with AsyncOpenAI(
+        api_key="fixture-key",
+        base_url="http://litellm.invalid/v1",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(serve)),
+    ) as sdk:
+        client = LiteLLMClient(model="gemini/gemini-3.8-flash", provider=provider)
+        client._client = sdk
+        events = [event async for event in client.stream([Message(role="user", content="cost fixture")])]
+
+    assert len(requests) == 1
+    assert not [event for event in events if event.type == "error"]
+    assert "".join(event.text or "" for event in events if event.type == "text_delta") == "ok"
+    terminal = [event for event in events if event.type == "response_end"]
+    usage_events = [event for event in events if event.type == "usage"]
+    assert len(terminal) == 1
+    assert len(usage_events) == int(include_usage)
+    for event in terminal + usage_events:
+        assert event.cost_usd == cost
+        assert event.usage == (
+            {
+                "prompt_tokens": 120,
+                "completion_tokens": 3,
+                "total_tokens": 123,
+                "cached_tokens": 40,
+            }
+            if include_usage
+            else None
+        )

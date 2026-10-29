@@ -135,7 +135,7 @@ class TestRunClaudeSessionGuard:
             lambda proxy_id: None,
         )
 
-        result = run_claude_session("test prompt")
+        result = run_claude_session("test prompt", worker=False)
         assert not result.success
         assert "dead-proxy" in (result.error or "")
         assert "not available" in (result.error or "")
@@ -149,7 +149,7 @@ class TestRunClaudeSessionGuard:
         )
         # This should NOT hit the guard (explicit base_url provided)
         # It will fail on the actual claude binary, but that's a different error
-        result = run_claude_session("test", base_url="http://localhost:9999", timeout_seconds=1)
+        result = run_claude_session("test", worker=False, base_url="http://localhost:9999", timeout_seconds=1)
         assert (
             result.error != "Subprocess proxy 'dead-proxy' not available. Start it with: forge proxy start dead-proxy"
         )
@@ -161,7 +161,7 @@ class TestRunClaudeSessionGuard:
             "forge.core.reactive.env._resolve_subprocess_proxy",
             lambda proxy_id: None,
         )
-        result = run_claude_session("test", direct=True, timeout_seconds=1)
+        result = run_claude_session("test", worker=False, direct=True, timeout_seconds=1)
         # Should fail with "claude not found" or timeout, NOT the proxy guard
         assert "not available" not in (result.error or "")
 

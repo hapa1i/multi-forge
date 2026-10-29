@@ -3,6 +3,12 @@
 Run structured analysis across multiple workers. `forge workflow` provides four runners that fan out prompts through
 Claude and Codex headless runtimes and collect results for synthesis.
 
+Forge workers disable native delegation and native memory. Claude workers also disable skills, including skills that
+fork a native child; Codex workers disable agents and memory use/generation. These defaults apply to resumed workers and
+all authentication routes. Your managed root session keeps its own delegation and memory settings. A resumed
+conversation can still contain previously recorded memory text. Claude reviews that use your current conversation fork
+it into separate worker sessions, leaving the original transcript unchanged.
+
 - Canonical architecture: [`docs/design.md`](../design.md)
 - Proxies (model routing): [`proxy.md`](proxy.md)
 - Policies (automatic gating): [`policy.md`](policy.md)
@@ -55,8 +61,8 @@ selects its own model; Forge does not pass a model pin.
 variants require OpenRouter. `gpt-5.6-sol` remains selectable for previous-model comparisons. Existing OpenRouter
 proxies can forward these explicit worker model IDs without changing their tier defaults. LiteLLM backends must serve
 the selected native GPT-6 route through Responses; see the
-[Astra upgrade steps](proxy.md#picking-up-gpt-6-astra-defaults-after-an-upgrade) for backend configuration and for
-adopting the new proxy tier defaults.
+[Astra upgrade steps](model_selection.md#picking-up-gpt-6-astra-defaults-after-an-upgrade) for backend configuration and
+for adopting the new proxy tier defaults.
 
 `gemini-3.8-flash` is also an explicit worker. Local and remote LiteLLM backends need their corresponding 3.8 route;
 upgrading Forge preserves previously materialized backend configurations.
@@ -68,10 +74,11 @@ compatible proxy found in the registry will work.
 Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, `claude-opus-4.8`, `claude-opus-5`,
 `claude-opus-5.5`, and `claude-fable` (most capable, currently Fable 5.1). Other family defaults include
 `deepseek-v4-pro`, `minimax-m3`, `qwen3.8-max`, `kimi-k3`, and `glm-5.3`; explicit alternatives now include
-`deepseek-v4.1-flash`, `deepseek-v4-pro-0813`, `qwen3.8-flash`, `qwen3.8-max-0902`, `glm-5.3-flash`, and
-`glm-5.3-flashx`. Under the default OpenRouter policy, both Qwen3.8 Max entries dispatch the text-only Qwen3.8 2.4T A95B
-fallback, while Qwen3.8 Flash dispatches Qwen3.8 27B; see [OpenRouter ZDR](proxy.md#openrouter-zero-data-retention-zdr)
-before reviewing image-bearing targets. Use `--proxy` to route proxy-backed workers through a specific proxy:
+`kimi-k3.1-pro`, `minimax-m3.1-flash`, `deepseek-v4.1-flash-1017`, `deepseek-v4.1-flash`, `deepseek-v4-pro-0813`,
+`qwen3.8-flash`, `qwen3.8-max-0902`, `glm-5.3-flash`, and `glm-5.3-flashx`. Under the default OpenRouter policy, both
+Qwen3.8 Max entries dispatch the text-only Qwen3.8 2.4T A95B fallback, while Qwen3.8 Flash dispatches Qwen3.8 27B; see
+[OpenRouter ZDR](proxy.md#openrouter-zero-data-retention-zdr) before reviewing image-bearing targets. Use `--proxy` to
+route proxy-backed workers through a specific proxy:
 
 ```bash
 # Route all workers through one proxy (single OPENROUTER_API_KEY setup)

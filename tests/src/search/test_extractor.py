@@ -136,6 +136,13 @@ class TestExtractToolUse:
 class TestExtractToolResult:
     """Tests for extracting and truncating tool results."""
 
+    def test_delegation_block_list_remains_searchable(self) -> None:
+        transcript = Path(__file__).resolve().parents[2] / "fixtures" / "transcript_delegation.jsonl"
+        doc = extract_document(transcript, session_name="parent", session_id="id", worktree_path="/workspace")
+        assert "The parser preserves the first finding." in doc.content
+        assert "The second finding follows the image." in doc.content
+        assert doc.content.index("first finding") < doc.content.index("second finding")
+
     def test_tool_result_truncated_to_500_chars(self, tmp_path: Path) -> None:
         """Tool results are truncated to TOOL_RESULT_TRUNCATE_CHARS."""
         long_result = "x" * 1000

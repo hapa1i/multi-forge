@@ -110,7 +110,7 @@ make test                   # ~3 min
 make pre-commit             # All hooks: ruff, black, isort, mypy, pyright, mdformat
 make clean                  # remove caches
 
-# Clean wheel install with the newest allowed LiteLLM, then start/health/stop it
+# Clean wheel install with hash-checked locked dependencies, then start/health/stop
 ./scripts/test-wheel-runtime.sh
 ```
 
@@ -121,8 +121,9 @@ make clean                  # remove caches
 - Uses `litellm-gemini-test` for isolation
 - Fails loudly on missing prereqs ("never skip")
 
-The clean-wheel smoke deliberately resolves dependencies outside `uv.lock`. Run it whenever the LiteLLM compatibility
-ceiling or Forge-owned proxy dependency set changes; pull-request CI also gates on it.
+The clean-wheel smoke uses hash-checked dependencies from `uv.lock`; `--unconstrained` explicitly exercises consumer
+resolution outside that lock. Run it whenever the LiteLLM compatibility ceiling or Forge-owned proxy dependency set
+changes; pull-request CI gates on the default. See [dependency security](dependency_security.md) for pin maintenance.
 
 ### When to Run Integration Tests
 

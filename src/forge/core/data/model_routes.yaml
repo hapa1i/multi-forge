@@ -986,6 +986,48 @@ models:
       - kind: direct
         runtime: claude_code
         model_ref: claude-haiku-4-5-20251001
+  deepseek-v4.1-flash-1017:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: deepseek/deepseek-v4.1-flash-1017
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: deepseek/deepseek-v4.1-flash-1017
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: deepseek/deepseek-v4.1-flash-1017
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: deepseek/deepseek-v4.1-flash-1017
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: deepseek/deepseek-v4.1-flash-1017
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: deepseek/deepseek-v4.1-flash-1017
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: deepseek/deepseek-v4.1-flash-1017
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: deepseek/deepseek-v4.1-flash-1017
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: deepseek/deepseek-v4.1-flash-1017
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: deepseek/deepseek-v4.1-flash-1017
   deepseek-v4.1-flash:
     routes:
       - kind: proxy
@@ -1136,6 +1178,48 @@ models:
         source_id: openrouter
         template: openrouter-kimi
         model_ref: moonshotai/kimi-k2.7-code
+  kimi-k3.1-pro:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: moonshotai/kimi-k3.1-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: moonshotai/kimi-k3.1-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: moonshotai/kimi-k3.1-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: moonshotai/kimi-k3.1-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: moonshotai/kimi-k3.1-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: moonshotai/kimi-k3.1-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: moonshotai/kimi-k3.1-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: moonshotai/kimi-k3.1-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: moonshotai/kimi-k3.1-pro
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: moonshotai/kimi-k3.1-pro
   kimi-k3:
     routes:
       - kind: proxy
@@ -1364,6 +1448,48 @@ models:
         source_id: openrouter
         template: openrouter-minimax
         model_ref: minimax/minimax-m2.7
+  minimax-m3.1-flash:
+    routes:
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-minimax
+        model_ref: minimax/minimax-m3.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-anthropic
+        model_ref: minimax/minimax-m3.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-deepseek
+        model_ref: minimax/minimax-m3.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini
+        model_ref: minimax/minimax-m3.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-gemini-flash
+        model_ref: minimax/minimax-m3.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-glm
+        model_ref: minimax/minimax-m3.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-kimi
+        model_ref: minimax/minimax-m3.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai
+        model_ref: minimax/minimax-m3.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-openai-codex
+        model_ref: minimax/minimax-m3.1-flash
+      - kind: proxy
+        source_id: openrouter
+        template: openrouter-qwen
+        model_ref: minimax/minimax-m3.1-flash
   minimax-m3:
     routes:
       - kind: proxy

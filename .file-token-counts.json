@@ -63,34 +63,40 @@
       "tokens": 20315
     },
     "docs/design_installation.md": {
-      "sha256": "aa8eb9cd4c02148eb555b625c41da3f8fcca70e1cb24aa28da2107d69c7bf9b4",
+      "sha256": "5b4bfce48199a9f4389d0a0ab1a06266c091a839706edf1231656bd8a5a42d1a",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 23772
+      "tokens": 24285
     },
     "docs/design_telemetry.md": {
-      "sha256": "90ef1def621fe78d2210c7bea493d1315824846c9f5a4d3d36dfdfed1882021c",
+      "sha256": "086d3a4f533f10cb1e1eca69f843c035ebd056490eeba582c36cf1547861df8b",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 23207
+      "tokens": 23461
     },
     "docs/design_workflows.md": {
-      "sha256": "dd0b4d59c53c3db17946be719415a84f14754d9b9fc9024e8453cbfd41290cac",
+      "sha256": "7b0b90e58d9b6f3e391e7e014c49aedb409bc5e1066ff0bdac4c5fc553602606",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 26368
+      "tokens": 27346
+    },
+    "docs/end-user/model_selection.md": {
+      "sha256": "0456b91a6722082f1fcf28d31cbfcf15724acdd969d1d51c12b2da130b3dd5d8",
+      "method": "claude-opus-5",
+      "family": "anthropic",
+      "tokens": 13893
     },
     "docs/end-user/proxy.md": {
-      "sha256": "210b36d19b36323d2a60edb943cc419f85eff4d6cafef338f3758d61a2494c3f",
+      "sha256": "b83c0493d679609b56d4fe1d38821020b67876fb38b8a639999bd44943114724",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 27615
+      "tokens": 23153
     },
     "docs/end-user/session.md": {
-      "sha256": "3de9f78f9c6b3b42772ba18f1907c6fc2e807cd1495b979564b377fddc24555c",
+      "sha256": "a0740caa1758bd17ac7e89e1a54cc0dad57eaad1128dd3607fee6611e673323c",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 26013
+      "tokens": 27132
     },
     "src/skills/qa/SKILL.md": {
       "sha256": "b77bbc8b673c69065d42d459615eae15d869e80acc5eede5119f7f97e2b22d75",

@@ -4,7 +4,7 @@
 
 **Lane**: `proposed/`. No functional dependencies on source capture, curation or review. Coordinate shared launcher
 edits with M0/M9; native-memory import is [M8b](../native_memory_import/card.md). Worker-only memory-off belongs to
-[M0](../worker_native_controls/card.md).
+[M0](../../done/worker_native_controls/card.md).
 
 ## Problem (verified 2026-09-06)
 

@@ -8,7 +8,7 @@ Setup, testing, and architecture reference for Multi-Forge contributors.
 # Clone and install dependencies
 git clone <repo-url>
 cd multi-forge
-uv sync
+make deps
 
 # Install pre-commit hooks
 pre-commit install
@@ -20,6 +20,9 @@ pre-commit install
 cp .env.example .env
 # Edit .env with your API keys and credentials (secrets only)
 ```
+
+Build and installer dependencies use reviewed pins. See [dependency security](dependency_security.md) for update
+commands, constrained global installs and the remaining upstream trust boundaries.
 
 ### Exercising unreleased hook code
 

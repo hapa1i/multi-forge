@@ -45,7 +45,7 @@ class TestRunIdentitySurfacing:
             {"FORGE_RUN_ID": "run_parent", "FORGE_ROOT_RUN_ID": "run_root"},
             clear=True,
         ):
-            result = run_claude_session("hi")
+            result = run_claude_session("hi", worker=False)
         assert result.parent_run_id == "run_parent"
         assert result.root_run_id == "run_root"
         assert result.run_id and result.run_id not in ("run_parent", "run_root")
@@ -59,7 +59,7 @@ class TestRunIdentitySurfacing:
             {"FORGE_RUN_ID": "run_parent", "FORGE_ROOT_RUN_ID": "run_root"},
             clear=True,
         ):
-            result = run_claude_session("hi", timeout_seconds=1)
+            result = run_claude_session("hi", worker=False, timeout_seconds=1)
         assert result.timed_out is True
         assert result.parent_run_id == "run_parent"
         assert result.run_id  # minted by build_claude_env even on the error path
@@ -74,7 +74,7 @@ class TestRunClaudeSession:
             returncode=0,
         )
         # output_format=None isolates base-flag construction from the JSON default tested below.
-        result = run_claude_session("hello", output_format=None)
+        result = run_claude_session("hello", worker=False, output_format=None)
         assert result.success
         assert result.stdout == "response text"
         assert result.returncode == 0
@@ -89,7 +89,7 @@ class TestRunClaudeSession:
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_resume_id_adds_flag(self, mock_run):
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", resume_id="abc-123", output_format=None)
+        run_claude_session("prompt", worker=False, resume_id="abc-123", output_format=None)
 
         cmd = mock_run.call_args[0][0]
         assert cmd == ["claude", "-p", "--resume", "abc-123"]
@@ -97,7 +97,7 @@ class TestRunClaudeSession:
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_model_adds_flag(self, mock_run):
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", resume_id="abc-123", model="opus", output_format=None)
+        run_claude_session("prompt", worker=False, resume_id="abc-123", model="opus", output_format=None)
 
         cmd = mock_run.call_args[0][0]
         assert cmd == ["claude", "-p", "--resume", "abc-123", "--model", "opus"]
@@ -105,7 +105,7 @@ class TestRunClaudeSession:
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_reasoning_effort_adds_flag_after_model(self, mock_run):
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", model="opus", reasoning_effort="high", output_format=None)
+        run_claude_session("prompt", worker=False, model="opus", reasoning_effort="high", output_format=None)
 
         cmd = mock_run.call_args[0][0]
         # --effort follows --model so it survives the --output-format json retry path.
@@ -120,7 +120,7 @@ class TestRunClaudeSession:
             stderr="error: unknown option '--effort'",
             returncode=2,
         )
-        result = run_claude_session("prompt", reasoning_effort="max", output_format=None)
+        result = run_claude_session("prompt", worker=False, reasoning_effort="max", output_format=None)
 
         assert result.success is False
         assert result.error is not None
@@ -131,7 +131,7 @@ class TestRunClaudeSession:
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_base_url_set_in_env(self, mock_run):
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", base_url="http://localhost:8085")
+        run_claude_session("prompt", worker=False, base_url="http://localhost:8085")
 
         env = mock_run.call_args.kwargs["env"]
         assert env["ANTHROPIC_BASE_URL"] == "http://localhost:8085"
@@ -139,14 +139,14 @@ class TestRunClaudeSession:
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_cwd_passed_through(self, mock_run):
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", cwd="/some/path")
+        run_claude_session("prompt", worker=False, cwd="/some/path")
 
         assert mock_run.call_args.kwargs["cwd"] == "/some/path"
 
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_nonzero_exit_code(self, mock_run):
         mock_run.return_value = MagicMock(stdout="", stderr="error output", returncode=2)
-        result = run_claude_session("prompt")
+        result = run_claude_session("prompt", worker=False)
 
         assert not result.success
         assert result.returncode == 2
@@ -156,7 +156,7 @@ class TestRunClaudeSession:
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_timeout(self, mock_run):
         mock_run.side_effect = subprocess.TimeoutExpired(cmd="claude", timeout=30)
-        result = run_claude_session("prompt", timeout_seconds=30)
+        result = run_claude_session("prompt", worker=False, timeout_seconds=30)
 
         assert not result.success
         assert result.timed_out is True
@@ -165,7 +165,7 @@ class TestRunClaudeSession:
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_file_not_found(self, mock_run):
         mock_run.side_effect = FileNotFoundError("No such file")
-        result = run_claude_session("prompt")
+        result = run_claude_session("prompt", worker=False)
 
         assert not result.success
         assert "not found" in result.error
@@ -173,7 +173,7 @@ class TestRunClaudeSession:
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_generic_exception(self, mock_run):
         mock_run.side_effect = RuntimeError("unexpected")
-        result = run_claude_session("prompt")
+        result = run_claude_session("prompt", worker=False)
 
         assert not result.success
         assert "unexpected" in result.error
@@ -181,7 +181,7 @@ class TestRunClaudeSession:
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_timeout_seconds_passed_through(self, mock_run):
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", timeout_seconds=120)
+        run_claude_session("prompt", worker=False, timeout_seconds=120)
 
         assert 0 < mock_run.call_args.kwargs["timeout"] <= 120
 
@@ -190,7 +190,7 @@ class TestRunClaudeSession:
         """Auto-detect: --bare added when ANTHROPIC_API_KEY is in env."""
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test"}):
-            run_claude_session("prompt")
+            run_claude_session("prompt", worker=False)
 
         cmd = mock_run.call_args[0][0]
         assert "--bare" in cmd
@@ -199,7 +199,7 @@ class TestRunClaudeSession:
     def test_bare_flag_skipped_without_api_key(self, mock_run):
         """Auto-detect: --bare omitted when ANTHROPIC_API_KEY is absent."""
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt")
+        run_claude_session("prompt", worker=False)
 
         cmd = mock_run.call_args[0][0]
         assert "--bare" not in cmd
@@ -223,7 +223,7 @@ class TestRunClaudeSession:
             lambda: type("C", (), {"auth_ignore_env": False})(),
         )
 
-        run_claude_session("prompt")
+        run_claude_session("prompt", worker=False)
 
         cmd = mock_run.call_args[0][0]
         env = mock_run.call_args.kwargs["env"]
@@ -249,7 +249,7 @@ class TestRunClaudeSession:
             lambda: type("C", (), {"auth_ignore_env": False})(),
         )
 
-        result = run_claude_session("prompt", bare=True)
+        result = run_claude_session("prompt", worker=False, bare=True)
 
         assert not result.success
         assert "ANTHROPIC_API_KEY" in (result.error or "")
@@ -262,7 +262,7 @@ class TestRunClaudeSession:
         """Explicit bare=True forces --bare regardless of env."""
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test"}):
-            run_claude_session("prompt", bare=True)
+            run_claude_session("prompt", worker=False, bare=True)
 
         cmd = mock_run.call_args[0][0]
         assert "--bare" in cmd
@@ -272,7 +272,7 @@ class TestRunClaudeSession:
         """Explicit bare=False suppresses --bare even with API key."""
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test"}):
-            run_claude_session("prompt", bare=False)
+            run_claude_session("prompt", worker=False, bare=False)
 
         cmd = mock_run.call_args[0][0]
         assert "--bare" not in cmd
@@ -282,7 +282,7 @@ class TestRunClaudeSession:
         """--bare appears before --resume when both active."""
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test"}):
-            run_claude_session("prompt", resume_id="abc-123", output_format=None)
+            run_claude_session("prompt", worker=False, resume_id="abc-123", output_format=None)
 
         cmd = mock_run.call_args[0][0]
         assert cmd == ["claude", "-p", "--bare", "--resume", "abc-123"]
@@ -291,7 +291,7 @@ class TestRunClaudeSession:
     def test_fork_session_flag_added_with_resume(self, mock_run):
         """--fork-session appears after --resume when both are set."""
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", resume_id="abc-123", fork_session=True, output_format=None)
+        run_claude_session("prompt", worker=False, resume_id="abc-123", fork_session=True, output_format=None)
 
         cmd = mock_run.call_args[0][0]
         assert cmd == ["claude", "-p", "--resume", "abc-123", "--fork-session"]
@@ -300,7 +300,7 @@ class TestRunClaudeSession:
     def test_fork_session_ignored_without_resume(self, mock_run):
         """--fork-session is not added when resume_id is None."""
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", fork_session=True)
+        run_claude_session("prompt", worker=False, fork_session=True)
 
         cmd = mock_run.call_args[0][0]
         assert "--fork-session" not in cmd
@@ -309,7 +309,7 @@ class TestRunClaudeSession:
     def test_fork_session_not_added_when_false(self, mock_run):
         """--fork-session is absent when fork_session=False (the default)."""
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", resume_id="abc-123", fork_session=False, output_format=None)
+        run_claude_session("prompt", worker=False, resume_id="abc-123", fork_session=False, output_format=None)
 
         cmd = mock_run.call_args[0][0]
         assert cmd == ["claude", "-p", "--resume", "abc-123"]
@@ -317,7 +317,7 @@ class TestRunClaudeSession:
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_extra_env_merged(self, mock_run):
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", extra_env={"CUSTOM_VAR": "value"})
+        run_claude_session("prompt", worker=False, extra_env={"CUSTOM_VAR": "value"})
 
         env = mock_run.call_args.kwargs["env"]
         assert env["CUSTOM_VAR"] == "value"
@@ -334,6 +334,7 @@ class TestRunClaudeSession:
         ):
             run_claude_session(
                 "prompt",
+                worker=False,
                 unset_env_vars=("ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL"),
             )
 

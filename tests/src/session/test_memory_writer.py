@@ -683,6 +683,7 @@ class TestRunHandoffAgent:
             assert "test" in args[0]  # prompt is first positional arg
             assert kwargs["cwd"] == str(workspace)
             assert kwargs["timeout_seconds"] == 120
+            assert kwargs["worker"] is True
 
     def test_failed_subprocess_preserves_zero_latency(self, workspace: Path) -> None:
         """A real 0.0ms duration is telemetry, not absence."""
@@ -1835,6 +1836,7 @@ class TestCodexMemoryWriter:
         mock_invoker_cls.return_value.run.assert_called_once()
         mock_claude.assert_not_called()
         assert mock_prepare.call_args.kwargs["sandbox"] == "read-only"
+        assert mock_prepare.call_args.kwargs["worker"] is True
         assert mock_prepare.call_args.kwargs["model"] is None
         assert mock_prepare.call_args.kwargs["cwd"] == str(workspace)
         # The invoker owns the upstream outcome after a successful spawn; the arm must not add a duplicate row.

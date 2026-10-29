@@ -871,9 +871,6 @@ class SessionManager:
 
         timestamp = now_iso()
 
-        parent_proxy_template = parent_state.intent.proxy.template if parent_state.intent.proxy else None
-        parent_proxy_base_url = parent_state.intent.proxy.base_url if parent_state.intent.proxy else None
-
         # --- Native resume guard: when fork --into targets different
         # forge_roots, reject native resume here. Claude Code's --resume only works
         # within the same CWD's .claude/ project. For now, child always inherits
@@ -887,9 +884,6 @@ class SessionManager:
                 parent_name=parent_name,
                 parent_state=parent_state,
                 parent_entry=parent_entry,
-                inherited_proxy=inherited_proxy,
-                parent_proxy_template=parent_proxy_template,
-                parent_proxy_base_url=parent_proxy_base_url,
                 memory_flag=memory_flag,
                 authority=authority,
                 authority_explicit=authority_explicit,
@@ -972,9 +966,6 @@ class SessionManager:
             parent_name=parent_name,
             parent_state=parent_state,
             parent_entry=parent_entry,
-            inherited_proxy=inherited_proxy,
-            parent_proxy_template=parent_proxy_template,
-            parent_proxy_base_url=parent_proxy_base_url,
             memory_flag=memory_flag,
             authority=authority,
             authority_explicit=authority_explicit,
@@ -1018,19 +1009,19 @@ class SessionManager:
         parent_name: str,
         parent_state: SessionState,
         parent_entry: SessionIndexEntry,
-        inherited_proxy: str | None,
-        parent_proxy_template: str | None,
-        parent_proxy_base_url: str | None,
         memory_flag: bool | None = None,
         warnings_sink: list[str] | None = None,
         authority: AuthorityIntent | None = None,
         authority_explicit: bool = False,
     ) -> SessionState:
         """Create a child SessionState for resume (shared by native and transfer)."""
+        # A confirmed proxy describes an earlier launch; current routing intent
+        # may already have been cleared or replaced by an explicit resume.
+        proxy = parent_state.intent.proxy
         child_state = create_session_state(
             name=child_name,
-            proxy_template=inherited_proxy or parent_proxy_template,
-            proxy_base_url=(parent_proxy_base_url if (inherited_proxy or parent_proxy_template) else None),
+            proxy_template=proxy.template if proxy else None,
+            proxy_base_url=proxy.base_url if proxy else None,
             is_incognito=parent_state.is_incognito,
             worktree_path=parent_entry.worktree_path,
             worktree_branch=(parent_state.worktree.branch if parent_state.worktree else None),

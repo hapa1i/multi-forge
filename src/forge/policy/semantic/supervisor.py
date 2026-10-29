@@ -640,6 +640,7 @@ def _dispatch_claude_supervisor(
     with track_verb_cost(usage_command, [tracking_url] if tracking_url else []) as cost:
         result = run_claude_session(
             prompt,
+            worker=True,
             resume_id=resolved.resume_id,
             fork_session=config.fork_session,
             model=model,
@@ -718,6 +719,7 @@ def _dispatch_codex_supervisor(
             )
         request = prepare_codex_request(
             prompt=prompt,
+            worker=True,
             preflight=preflight,
             # operation=None suppresses the invoker's upstream-outcome row (the usage event
             # still fires); the engine's policy.evaluate is this arm's only upstream row.

@@ -134,10 +134,12 @@ forge session resume parent --fresh          # inherit parent's memory on/off
 forge session resume parent --fresh --memory off
 ```
 
-Inheritance copies only `auto_update` (enabled, mode, min_turns, proxy). Other `MemoryIntent` fields do not propagate.
-`--memory off` writes an explicit `MemoryWriterConfig(enabled=False)` so the child is deliberately off even if later
-defaults change. `--memory on` reuses the parent's non-enabled config (mode, proxy, min_turns) or `MemoryWriterConfig`
-defaults.
+Inheritance copies only effective `auto_update` (enabled, mode, min_turns, proxy, direct and effort) into the child's
+baseline. Other `MemoryIntent` fields do not propagate. A generic child reset therefore does not undo inherited memory
+activation; [session inheritance](design_sessions.md#derived-session-configuration) distinguishes this from relaunch,
+which retains separate baseline and override layers. `--memory off` writes an explicit
+`MemoryWriterConfig(enabled=False)` so the child is deliberately off even if later defaults change. `--memory on` reuses
+the parent's other writer settings (mode, proxy, direct, min_turns and effort) or `MemoryWriterConfig` defaults.
 
 Memory docs are not inherited. Passports are git-tracked and discovered live by the detached writer in whatever checkout
 the child session runs in. This applies equally to same-checkout forks, `--worktree`, and `--into`.
@@ -161,6 +163,11 @@ in worktrees. Trackedness is controlled by path choice -- the writer doesn't dis
 (incremental, free-form); the memory writer synthesizes after sessions (retrospective, per-doc strategies). The memory
 writer deliberately does not read auto-memory — different targets, different information, occasional duplication is
 cheaper than cross-format deduplication.
+
+The writer and shadow curator explicitly select the worker native-control profile. Claude auto-memory is disabled; Codex
+memory use and generation are disabled. These restrictions also cover review and supervisor workers, regardless of the
+managed root's native-memory choice. Forge still reads the selected transcript and designated docs and writes its own
+memory artifacts. See [worker native controls](design_workflows.md#34-skill-execution-types) for the launch contract.
 
 > Strategy tables, example config, worktree resolution details, and full auto-memory comparison in
 > [§6](#6-memory-doc-reference).
@@ -335,6 +342,12 @@ standards evolution.
 input. It's outside the project root (containment guard), is free-form (hard to dedupe against structured strategies),
 and targets different information (preferences/patterns vs project state/standards). Occasional duplication is cheaper
 than cross-format deduplication. If overlap becomes painful, a small prompt tweak can address it.
+
+The exclusion is also enforced at worker launch through `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` or Codex's
+`memories.use_memories=false` and `memories.generate_memories=false` overrides. This governs the worker runtime's native
+memory facilities; it neither deletes existing native memory nor changes the parent session's preferences. A resumed
+worker can still receive memory text already present in its inherited conversation; disabling native memory does not
+redact that history.
 
 ### 6.5 Session activation (from §5.6)
 

@@ -34,6 +34,7 @@ import pytest
 from _pytest.nodes import Item
 
 from tests.fixtures.runtime_image import check_runtime_image
+from tests.fixtures.runtime_versions import integration_runtime_versions
 
 _active_container_id: str | None = None
 
@@ -51,33 +52,6 @@ chmod "$2" "$tmp"
 mv -f -- "$tmp" "$target"
 trap - EXIT
 """
-
-
-def _detect_claude_code_version() -> str:
-    """Detect installed Claude Code version via `claude --version`."""
-    try:
-        result = subprocess.run(["claude", "--version"], capture_output=True, text=True, timeout=10)
-        if result.returncode == 0 and result.stdout.strip():
-            # `claude --version` starts with the version number.
-            return result.stdout.strip().split()[0]
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
-    return "latest"
-
-
-def _detect_codex_cli_version() -> str:
-    """Detect installed Codex CLI version via ``codex --version``."""
-    try:
-        result = subprocess.run(["codex", "--version"], capture_output=True, text=True, timeout=10)
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip().split()[-1]
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
-    return "latest"
-
-
-CLAUDE_CODE_VERSION = _detect_claude_code_version()
-CODEX_CLI_VERSION = _detect_codex_cli_version()
 
 
 class ContainerLike(Protocol):
@@ -456,8 +430,8 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
 
     Returns None if running in local mode (inside container).
 
-    The image tag includes the Claude Code version to ensure cache invalidation
-    when the version changes. Version is detected from `claude --version`.
+    Version defaults come from the pinned QA track. Explicit CLAUDE_VERSION and
+    CODEX_VERSION environment overrides select compatibility builds.
     """
     if local_claude_available:
         return None
@@ -467,12 +441,15 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
             "Docker not available and not running inside test container. Install Docker or run inside container."
         )
 
+    claude_version, codex_version = integration_runtime_versions()
     repo_root = _find_repo_root()
     forge_revision = _get_forge_revision(repo_root)
 
-    image_name = f"forge-claude-test:{CLAUDE_CODE_VERSION}-codex-{CODEX_CLI_VERSION}"
+    image_name = f"forge-claude-test:{claude_version}-codex-{codex_version}"
 
-    needs_build = not _image_exists(image_name)
+    latest = "latest" in (claude_version, codex_version)
+    prepared = os.environ.get("FORGE_INTEGRATION_PREBUILT_IMAGE") == image_name
+    needs_build = (latest and not prepared) or not _image_exists(image_name)
     if not needs_build:
         image_revision = _get_image_revision(image_name)
         if image_revision != forge_revision:
@@ -494,20 +471,18 @@ def forge_test_image(docker_available: bool, local_claude_available: bool) -> st
     if not dockerfile.exists():
         pytest.fail(f"Dockerfile not found at {dockerfile}. Run from repo root or check docker/ directory.")
 
-    print(
-        f"\nBuilding Docker image {image_name} "
-        f"(Claude Code {CLAUDE_CODE_VERSION}, Codex CLI {CODEX_CLI_VERSION})..."
-    )
+    print(f"\nBuilding Docker image {image_name} " f"(Claude Code {claude_version}, Codex CLI {codex_version})...")
     result = subprocess.run(
         [
             "docker",
             "build",
+            *(["--pull", "--no-cache"] if latest else []),
             "-f",
             str(dockerfile),
             "--build-arg",
-            f"CLAUDE_VERSION={CLAUDE_CODE_VERSION}",
+            f"CLAUDE_VERSION={claude_version}",
             "--build-arg",
-            f"CODEX_VERSION={CODEX_CLI_VERSION}",
+            f"CODEX_VERSION={codex_version}",
             "--build-arg",
             f"FORGE_REV={forge_revision}",
             "-t",

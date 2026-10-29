@@ -1,0 +1,8 @@
+{
+  "date": "2026-10-22",
+  "tool": "pip-audit==2.10.1",
+  "source": "uv.lock registry packages, including development and build groups",
+  "dependencies": 138,
+  "known_vulnerabilities": 0,
+  "existing_package_versions_changed": 0
+}

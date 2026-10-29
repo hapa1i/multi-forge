@@ -6,6 +6,8 @@ To use different models, change reasoning effort, or switch providers: create or
 
 - Canonical architecture: [`docs/design.md`](../design.md)
 - Configuration overview: [`config.md`](config.md)
+- Model capabilities, alternatives and upgrades:
+  [`model_selection.md`](model_selection.md#model-capabilities-and-upgrades)
 - Sessions (workflow settings): [`session.md`](session.md)
 
 ---
@@ -27,15 +29,9 @@ If you want different model mappings or thinking defaults: use a different proxy
 
 ### API model capabilities
 
-Provider CLIs sometimes limit the models they serve. For example, OpenAI's Codex CLI caps GPT-5.5 at 400K tokens as a
-serving-budget decision, even though the model supports 1,050,000 tokens via the API. Forge proxies route through the
-API directly, so a proxy can use API context windows and reasoning effort levels that a product CLI may not expose.
-
-It can also route to API models that product CLIs don't expose at all -- like `gpt-5.5-pro` (1M context) -- or to
-different providers within a single workflow (GPT for planning, Claude for execution).
-
-The tradeoff is cost: you pay API rates instead of bundled subscription pricing. Use Forge
-[spend caps](#cost-tracking-and-spend-caps) when you want warn/reject limits on that spend.
+See [API model capabilities](model_selection.md#api-model-capabilities) for API versus product-CLI limits and the
+subscription/API cost tradeoff. Proxy [spend caps](#cost-tracking-and-spend-caps) provide warn/reject limits on API
+spend.
 
 ### System prompt addendums
 
@@ -119,194 +115,17 @@ expected -- there is one local LiteLLM process, not one per backend.
 
 ### Picking up GPT-6 Astra defaults after an upgrade
 
-New proxies created from the current built-in OpenAI templates use GPT-6 Astra as follows:
-
-| Template                     | GPT-6 Astra tiers |
-| ---------------------------- | ----------------- |
-| `openrouter-openai`          | sonnet, opus      |
-| `litellm-openai`             | sonnet, opus      |
-| `litellm-openai-local`       | sonnet, opus      |
-| `openrouter-openai-codex`    | opus              |
-| `litellm-openai-codex-local` | opus              |
-| `codex-responses-local`      | sonnet, opus      |
-
-The general Haiku tier remains GPT-5.4 Mini; Codex-specialized templates retain their coding Haiku/Sonnet models. GPT-6
-Sol and Luna, GPT-6.1 Sol, and GPT-5.6 Sol are explicit alternatives. The OpenRouter OpenAI templates also expose
-`gpt-6-astra-pro`, `gpt-6-sol-pro`, and `gpt-6-luna-pro`. For example:
-
-```bash
-forge session start astra-review --model astra-pro --proxy openrouter-openai
-```
-
-Both Astra variants require reasoning; supported efforts are `low`, `medium`, `high`, `xhigh`, and `max`. Replace
-`reasoning_effort: none` with `low` or another supported effort, and remove temperature overrides when migrating an
-older custom configuration. Forge routes standard Astra through Responses on LiteLLM backends. Pro is available through
-OpenRouter in Forge; OpenAI's native API uses a reasoning mode on `gpt-6-astra` rather than a separate Pro model ID. See
-the [OpenAI model reference](https://developers.openai.com/api/docs/models/gpt-6-astra) and
-[reasoning guide](https://developers.openai.com/api/docs/guides/reasoning).
-
-GPT-6.1 Sol is selectable with `--model gpt-6.1-sol`, `--model sol`, or `--model gpt-sol`; explicit `gpt-6-sol` pins
-retain the prior version. Astra remains the OpenAI tier default. Like Astra, 6.1 Sol requires reasoning (`low` through
-`max`, default `medium`) and rejects sampling overrides; `none` and `minimal` are unsupported. Forge uses Responses for
-its native tool calls. Cache reads cost $0.10 per million tokens, half GPT-6 Sol's rate. See the
-[GPT-6.1 Sol reference](https://developers.openai.com/api/docs/models/gpt-6.1-sol).
-
-GPT-6 Sol and Luna support `none` as well as `low`, `medium`, `high`, `xhigh`, and `max` reasoning effort, with `medium`
-as their model default. They accept temperature and `top_p` overrides only with `none` effort. A tier mapped to Sol or
-Luna must explicitly set `reasoning_effort: none` to configure a temperature override; otherwise proxy and template
-validation reject the configuration. When Sol or Luna is selected as a model alternative, request-time filtering still
-removes sampling overrides that may be valid for the tier's default model. Forge uses Responses for their native OpenAI
-routes because reasoning with tool calls requires that API; Chat Completions accepts tool calls only with
-`reasoning_effort: none`. Their Pro entries are OpenRouter-only alternatives, following Astra Pro's separate-slug
-convention. See the [Sol](https://developers.openai.com/api/docs/models/gpt-6-sol) and
-[Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) model references. Selecting them explicitly does not
-change the Astra tier defaults.
-
-An existing `proxy.yaml` is a user-owned snapshot, so upgrading Forge does not rewrite its tiers. Either edit the
-affected tiers to `openai/gpt-6-astra` with `forge proxy edit <proxy_id>`, or create a fresh proxy from the built-in
-template with `forge proxy create <template> --name <new_proxy_id>`. Then restart the affected proxy and verify real
-upstream access:
-
-```bash
-forge proxy stop <proxy_id>
-forge proxy start <proxy_id> --smoke-test
-```
-
-Local LiteLLM adapter configuration is also user-owned. For `litellm-openai-local`, `litellm-openai-codex-local`, or
-`codex-responses-local`, add the `openai/gpt-6-astra` route to `~/.forge/backends/litellm/config.yaml`; alternatively,
-back up customizations and recreate the adapter config from the current built-in default:
-
-```bash
-forge model backend list
-forge model backend stop <runtime-id> # for example, litellm-4000
-cp ~/.forge/backends/litellm/config.yaml ~/.forge/backends/litellm/config.yaml.bak
-forge model backend delete litellm
-forge model backend create litellm
-forge model backend start litellm --port 4000
-```
-
-After updating the local adapter, restart each affected proxy with `--smoke-test`. Custom templates under
-`~/.forge/templates/` are also preserved and must be updated explicitly.
-
-LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Argon, GPT-6.1 Sol, GPT-6 Sol/Luna, and Claude 5.5 require
-the bundled routes' `model_info` blocks for offline capability and cost support. Copy each complete deployment entry
-when editing an existing adapter, including its metadata; the GPT-6 entries cover cache tokens and the above-272K input
-premium. For remote LiteLLM, its operator must install compatible deployments using that server's upstream providers and
-credentials; the Gemini Vertex deployment differs from the bundled Google AI deployment as described below.
-
-Existing OpenRouter proxies can forward explicit GPT-6.1 Sol workflow requests. To select it as a session alternative,
-edit or recreate the proxy to include `gpt-6.1-sol: openai/gpt-6.1-sol` in the intended tier's `model_alternatives`.
-Existing LiteLLM backends also need the complete `openai/gpt-6.1-sol` deployment, including `use_responses_api: true`
-and `model_info`; upgrading Forge preserves saved proxy and backend files.
+The [OpenAI model upgrade notes](model_selection.md#picking-up-gpt-6-astra-defaults-after-an-upgrade) cover Astra tier
+defaults, Sol/Luna alternatives, effort limits and required backend routes. Apply those choices with the shared
+[saved-configuration upgrade procedure](#updating-saved-proxy-and-backend-configurations).
 
 ### Picking up current model defaults and alternatives after an upgrade
 
-New proxies created from the current built-in templates use these defaults:
-
-| Template                                            | New default tiers                                           |
-| --------------------------------------------------- | ----------------------------------------------------------- |
-| `openrouter-anthropic`, `litellm-anthropic(-local)` | sonnet -> Sonnet 5.5, opus -> Opus 5.5                      |
-| `anthropic-passthrough`                             | Sonnet 5.5 / Opus 5.5 (informational; client selects model) |
-| `openrouter-kimi`                                   | sonnet/opus -> Kimi K3                                      |
-| `openrouter-qwen`                                   | haiku/sonnet -> Qwen3.8 27B, opus -> Qwen3.8 Max            |
-| `openrouter-glm`                                    | sonnet/opus -> GLM 5.3                                      |
-| `openrouter-gemini-flash`                           | all tiers -> Gemini 3.8 Flash                               |
-| `openrouter-gemini`                                 | haiku -> Gemini 3.8 Flash, sonnet/opus -> Gemini 4 Argon    |
-| `litellm-gemini`, `litellm-gemini-local`            | haiku -> Gemini 3.8 Flash, sonnet/opus -> Gemini 4 Argon    |
-| `litellm-gemini-flash-local`                        | all tiers -> Gemini 3.8 Flash                               |
-
-Gemini 4 Argon replaces the older Gemini Pro models as the Sonnet/Opus default. Select it explicitly with
-`--model gemini-4-argon`; prior Pro models, including `gemini-3.1-pro-preview`, remain explicit selections. Argon has a
-unified 1,048,576-token context shared by input, thinking, and output. Forge uses its 65,536-token synchronous output
-limit on Google AI. Vertex allows 65,536 output tokens per streaming request and 32,768 per unary request. Choose `low`,
-`medium`, or `high` reasoning (`medium` is the model default); `temperature`, `top_p`, and `top_k` are ignored by Google
-and are not supported Forge overrides. Argon supports implicit caching but not explicit context caches. See Google's
-[model reference](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon) and
-[Vertex guide](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-argon).
-
-If an upstream response reaches its output limit, Forge preserves the cutoff as Anthropic `stop_reason: max_tokens` for
-both unary and streaming responses, including responses containing a partial tool call.
-
-The bundled LiteLLM entry uses Google's introductory Argon prices through November 30, 2026: $2 input, $10 output
-(including thinking), and $0.10 cached input per million tokens. Google doubles those rates on December 1. Saved backend
-configs retain their pricing metadata, so update the `model_info` rates explicitly when the promotion ends to keep cost
-reporting accurate. Google Cloud has the same introductory rates. See Google's
-[Gemini API pricing schedule](https://ai.google.dev/gemini-api/docs/latest-model#pricing) and
-[Cloud launch pricing](https://cloud.google.com/blog/products/ai-machine-learning/gemini-4-argon-available-on-google-cloud).
-
-To adopt Argon in an existing proxy, use `forge proxy edit <proxy_id>` and change its Sonnet/Opus tier models to
-`google/gemini-4-argon` for OpenRouter, `gemini/gemini-4-argon` for local LiteLLM, or `vertex_ai/gemini-4-argon` for
-remote LiteLLM. Remove sampling overrides from those tiers and retain older models under `model_alternatives` if you
-need explicit selections. Alternatively, create a fresh proxy from the updated family template. Upgrading Forge or
-restarting a saved proxy does not rewrite its tiers. LiteLLM also needs the corresponding deployment in its saved
-backend config. Current Forge supports Argon on pinned LiteLLM 1.102 by sending native `thinkingConfig` with the
-selected thinking level; no LiteLLM upgrade is required. Update Forge as well as the saved deployment metadata when
-adopting Argon, so requests avoid the adapter's generic reasoning conversion to an unsupported `thinkingBudget`.
-
-- **Local Google AI:** copy the complete bundled `gemini/gemini-4-argon` deployment into the saved backend config,
-  including `model_info`. It uses `GEMINI_API_KEY` and `prompt_cache_min_tokens: 4096`.
-- **Remote Vertex:** the server operator must configure a Vertex deployment. Set both `model_name` and
-  `litellm_params.model` to `vertex_ai/gemini-4-argon`. Replace the bundled Google AI `api_key` with the server's Vertex
-  authentication (ADC or `vertex_credentials`) and configure `vertex_project` and `vertex_location`. Retain the complete
-  capability and pricing metadata, changing `model_info.base_model` to `vertex_ai/gemini-4-argon` and
-  `prompt_cache_min_tokens` to `6144`. The 65,536 output limit describes streaming; unary requests are limited to
-  32,768. Forge's gateway connection still uses `LITELLM_BASE_URL` and `LITELLM_API_KEY`; Vertex credentials belong on
-  the server. See [LiteLLM's Vertex configuration](https://docs.litellm.ai/docs/providers/vertex) and Google's
-  [Vertex caching limits](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/4-argon).
-
-Restart the updated backend, then restart each affected proxy with `forge proxy stop <proxy_id>` followed by
-`forge proxy start <proxy_id> --smoke-test`. Existing OpenRouter proxies can forward an explicit Argon workflow request
-without changing their tier defaults.
-
-Argon workflow workers also send the model explicitly, so a saved LiteLLM proxy can keep its older tier defaults once
-the backend serves Argon. `forge workflow list-models --available --json` checks the loaded deployment inventory when
-the proxy's saved configuration is available locally. A backend snapshot without Argon makes that worker unavailable and
-fails workflow preflight with migration guidance; Forge does not silently select the older Pro model or rewrite the
-snapshot. Updating only the backend deployment requires a backend restart, not a proxy-tier change.
-
-Gemini 3.8 Flash is the current Gemini Flash default across OpenRouter and LiteLLM. It is a GA model with a
-1,048,576-token input limit, 65,536-token output limit, and `low`/`medium`/`high` thinking levels (`medium` by default).
-Google documents sampling parameters as deprecated and ignored, so Forge does not advertise sampling overrides. Gemini
-2.5, 3.5, 3.6, and 3.7 Flash remain selectable through the OpenRouter Flash template. See Google's
-[3.8 announcement](https://blog.google/innovation-and-ai/models-and-research/gemini-models/3-8-flash-and-3-8-flash-cyber/),
-[3.8 model reference](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash),
-[Gemini API release notes](https://ai.google.dev/gemini-api/docs/changelog).
-
-The tier-1 cascade checker also defaults to Gemini 3.8 Flash through OpenRouter, local LiteLLM as
-`gemini/gemini-3.8-flash`, and remote LiteLLM as `vertex_ai/gemini-3.8-flash` (see [policy.md](policy.md)). The Kimi
-template keeps K3 as its default and exposes the coding-specialized `kimi-k2.7-code` as an explicit Sonnet/Opus model
-alternative.
-
-The Anthropic templates use Opus 5.5 as their opus-tier default. The unversioned `opus` and `claude-opus` aliases also
-select 5.5; explicit `claude-opus-5` pins retain Opus 5. Opus 5.5 uses always-on adaptive thinking with a model default
-of `medium` effort. Custom integrations must use `auto` or `none` tool choice: forced tool choices and disabling
-thinking are rejected. See Anthropic's
-[migration guide](https://platform.claude.com/docs/en/models/opus-5-5/migration-guide). Fable 5.1 and Fable 5 remain
-explicit alternatives, with `fable` and `claude-fable` selecting Fable 5.1.
-
-The existing OpenRouter family templates also expose these explicit alternatives without changing their tier defaults:
-
-| Template              | New alternatives                              |
-| --------------------- | --------------------------------------------- |
-| `openrouter-deepseek` | `deepseek-v4.1-flash`, `deepseek-v4-pro-0813` |
-| `openrouter-qwen`     | `qwen3.8-flash`, `qwen3.8-max-0902`           |
-| `openrouter-glm`      | `glm-5.3-flash`, `glm-5.3-flashx`             |
-
-The dated Qwen Max entry preserves the explicit snapshot identity; `qwen3.8-max` remains separately selectable.
-
-Qwen3.8 27B is now both the Haiku and Sonnet default because it was the least-expensive multimodal Qwen with a ZDR
-endpoint in the audit. Qwen3.8 Max is the configured Opus model, but the default OpenRouter data policy resolves it to
-`qwen/qwen3.8-2.4t-a95b`. The September 23 audit also found no ZDR endpoint for the new Flash or Max 0902 routes. See
-[OpenRouter ZDR](#openrouter-zero-data-retention-zdr) for the effective route and explicit opt-out.
-
-Existing `proxy.yaml` files and the local LiteLLM adapter config are user-owned snapshots; upgrades preserve translated
-tier selections. Passthrough forwards the client's model; Forge does not inject context-estimator model pins there.
-Follow the same remediation as the GPT-6 Astra section above: edit the affected tiers with `forge proxy edit <proxy_id>`
-or recreate the proxy from the template, then restart with `--smoke-test`. For the local LiteLLM path, the required
-Gemini 4 Argon, Gemini 3.8 Flash, Claude Sonnet/Opus 5.5, and selected GPT-6 routes must exist in
-`~/.forge/backends/litellm/config.yaml` — update the materialized config or delete/recreate it, then restart the
-backend; restarting alone re-reads the old copy. A stale Anthropic proxy that does not expose Fable 5.1 fails explicitly
-on `--model fable`; it is never replaced implicitly.
+See
+[current model defaults and alternatives](model_selection.md#picking-up-current-model-defaults-and-alternatives-after-an-upgrade)
+for Gemini, Claude and OpenRouter family capabilities and migrations. Use the
+[saved-configuration upgrade procedure](#updating-saved-proxy-and-backend-configurations) to apply them. The
+[workflow guide](workflow.md#quick-start) owns the worker inventory and readiness requirements.
 
 ---
 
@@ -409,8 +228,11 @@ lack a compatible endpoint before dispatch.
 
 Forge checks the bundled OpenRouter routes against OpenRouter's
 [ZDR endpoint catalog](https://openrouter.ai/api/v1/endpoints/zdr). The September 2026 refresh confirmed eligible
-endpoints for Opus 5.5, Gemini 3.8 Flash, and the added DeepSeek and GLM models. Fable and the listed Qwen routes use
-these required-ZDR fallbacks:
+endpoints for Opus 5.5, Gemini 3.8 Flash, and the added DeepSeek and GLM models.
+
+Fable 5 had no eligible endpoint in the 2026-08-21 audit, nor Fable 5.1 in the 2026-09-02 check. The 2026-09-23 audit
+also found no ZDR endpoint for Qwen3.8 Flash or Max 0902. Fable and the listed Qwen routes use these required-ZDR
+fallbacks:
 
 ```yaml
 allow_non_zdr: false
@@ -485,22 +307,17 @@ provider host, and OpenRouter can route consecutive requests for multi-host mode
 
 ## Model alternatives
 
-Anthropic translated templates default to Opus/Sonnet 5.5; `model_alternatives` keeps other Claude versions selectable
-at the same tier. Passthrough forwards the client's model without an alternatives map. Use `--model` to select:
-
-```bash
-# Default: opus tier routes to Opus 5.5, sonnet tier to Sonnet 5.5
-forge session start my-session --proxy openrouter-anthropic
-
-# Select the current Fable family model
-forge session start my-session --proxy openrouter-anthropic --model claude-fable
-```
+`model_alternatives` keeps more than one model selectable at the same proxy tier. Passthrough forwards the client's
+model without an alternatives map or Forge-injected context-estimator model pins. See the
+[model selection examples](model_selection.md#use-model_alternatives-instead-of-multiple-proxies) and
+[Claude version mappings](model_selection.md#claude-alternatives-and-fable-retention) for current choices.
 
 The proxy resolves `model_alternatives[tier][model]` at request time. Catalog aliases and provider-prefixed spellings of
 the same model share one route identity; private model slugs not known to the catalog still work, but only by exact key.
 Forge rejects a tier whose equivalent catalog keys point at different backend models. Tier-level hyperparameters
-(reasoning_effort, etc.) still apply regardless of which alternative is selected. Under required ZDR, Fable 5.1 and
-Fable 5 resolve to Opus 5.5 because the dated endpoint checks found no Fable-compatible ZDR route.
+(reasoning_effort, etc.) still apply regardless of which alternative is selected. The
+[OpenRouter data policy](#openrouter-zero-data-retention-zdr) determines whether a configured selection requires a ZDR
+fallback.
 
 `forge session --model` accepts any Forge catalog model. Claude requests use the proxy's tiers and alternatives;
 non-Claude requests resolve a compatible source/template from the packaged route catalog, then select a serving proxy
@@ -510,46 +327,18 @@ explicit tier in a request model precedence, then uses the validated Forge heade
 `--model-tier haiku|sonnet|opus` only when tier selection is ambiguous; proxy-owned tier mappings and hyperparameters
 are not mutated.
 
-To add or edit alternatives, use `forge proxy edit <proxy_id>`:
+To add or edit alternatives, use `forge proxy edit <proxy_id>`. For example, retain a prior Sonnet version under the
+same tier:
 
 ```yaml
 model_alternatives:
-  opus:
-    claude-fable-5-1: anthropic/claude-fable-5.1
-    claude-fable-5: anthropic/claude-fable-5
-    claude-opus-5: anthropic/claude-opus-5
-    claude-opus-4-8: anthropic/claude-opus-4.8
-    claude-opus-4-6: anthropic/claude-opus-4.6
   sonnet:
     claude-sonnet-5: anthropic/claude-sonnet-5
-    claude-sonnet-4-6: anthropic/claude-sonnet-4.6
 ```
 
-OpenRouter slugs use dotted versions (`anthropic/claude-opus-5.5`); native Anthropic uses hyphens (`claude-opus-5-5`),
-prefixed with `anthropic/` on LiteLLM routes. Fresh templates supply these mappings; saved proxies require editing or
-recreation to gain alternatives.
-
-To adopt Sonnet 5.5 in an existing translated proxy, stop it with `forge proxy stop <proxy_id>`, run
-`forge proxy edit <proxy_id>`, and set its Sonnet tier to `anthropic/claude-sonnet-5.5` for OpenRouter or
-`anthropic/claude-sonnet-5-5` for LiteLLM. Add `claude-sonnet-5: anthropic/claude-sonnet-5` under
-`model_alternatives.sonnet` to keep the prior version selectable; older snapshots do not have this alternative.
-Passthrough uses the client's model, so select `--model claude-sonnet-5` to keep Sonnet 5. A saved LiteLLM backend must
-also expose the new native route and its pricing/effort metadata; upgrades do not rewrite that file. Stop its runtime ID
-from `forge model backend list`, then edit `~/.forge/backends/litellm/config.yaml` or back it up and recreate it with
-`forge model backend delete litellm` followed by `forge model backend create litellm`. Restart the backend and run
-`forge proxy start <proxy_id> --smoke-test`.
-
-Sonnet 5.5 rejects manual thinking budgets and sampling overrides. For native Messages requests, use adaptive thinking
-or `thinking: {type: between_tools}` to turn off up-front thinking. `between_tools` accepts no extra fields and works
-only at `low`, `medium`, or `high` effort; it cannot change effort mid-conversation. A passthrough override floor of
-`xhigh` or `max` returns HTTP 400 before mutation or forwarding: use adaptive thinking or lower the floor. Use `auto` or
-`none` tool choice; translated Sonnet/Opus 5.5 routes reject forced choices with HTTP 400. Preserve signed thinking
-blocks with append-only history. Forge's passthrough preserves those native controls; translated routes map
-`between_tools` to their lowest supported reasoning effort. See the
-[Sonnet 5.5 migration guide](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide).
-
-See [model_selection.md](model_selection.md) for supervisor/executor recommendations, cost comparisons, and MRCR
-multi-needle retrieval data.
+Follow [Updating saved proxy and backend configurations](#updating-saved-proxy-and-backend-configurations) to validate
+and load the change. Model-specific effort, sampling and thinking restrictions are in the
+[model upgrade notes](model_selection.md#model-capabilities-and-upgrades).
 
 ---
 
@@ -714,6 +503,84 @@ forge proxy show <proxy_id>
 # Validate the config
 forge proxy validate <proxy_id>
 ```
+
+### Applying dependency security updates
+
+Stop affected host proxies and local backends **before** upgrading the Forge installation that launches them. Local
+LiteLLM uses that installation's Python environment; replacing packages while it runs can mix already-loaded modules
+with newly installed files. Use `forge proxy stop <proxy_id>` and `forge model backend stop <runtime-id>` after
+identifying the affected processes with `forge proxy list` and `forge model backend list`. Upgrade through your existing
+installation method, then start backends before their proxies using the lifecycle commands below. Saved configurations
+can remain as they are when only packages change.
+
+Sidecar images contain a separate Forge installation and dependency graph. End affected sidecar sessions, then rebuild
+the image or obtain an updated image from its operator. A host upgrade leaves the image unchanged, and restarting an
+existing container keeps its old packages. For repository-built images, use an updated, reviewed checkout containing the
+patched `uv.lock` and rebuild both layers:
+
+```bash
+read -r claude_version codex_version < <(uv run --locked python tests/fixtures/runtime_versions.py)
+docker build -f docker/Dockerfile.forge \
+  --build-arg CLAUDE_VERSION="$claude_version" --build-arg CODEX_VERSION="$codex_version" \
+  -t forge-claude-test:updated .
+docker build -f docker/Dockerfile.sidecar \
+  --build-arg BASE_IMAGE=forge-claude-test:updated -t forge-sidecar:latest .
+```
+
+Rebuilding only `Dockerfile.sidecar` from an old base retains its dependencies. Replace the sidecar output tag when the
+session has a recorded `--image` override or your `sidecar_image` setting differs from `forge-sidecar:latest`. Then
+`forge session resume <name>` creates a fresh container using that updated image. Remote LiteLLM deployments must be
+upgraded and restarted by their operator.
+
+### Updating saved proxy and backend configurations
+
+A saved `~/.forge/proxies/<proxy_id>/proxy.yaml`, local LiteLLM `~/.forge/backends/litellm/config.yaml`, and custom
+templates under `~/.forge/templates/` are user-owned snapshots. Upgrading Forge preserves them. Restarting loads the
+saved bytes; it does not copy new defaults. Use the
+[model upgrade notes](model_selection.md#model-capabilities-and-upgrades) to choose the required model IDs, inference
+settings and backend metadata, then apply them here.
+
+1. Inspect the current template with `forge proxy template show <template> --raw` and the saved proxy with
+   `forge proxy show <proxy_id> --raw`. A user-customized template takes precedence over its built-in counterpart.
+2. Stop an affected proxy with `forge proxy stop <proxy_id>` and edit it with `forge proxy edit <proxy_id>`. Update
+   `tiers`, relevant `model_alternatives`, and incompatible `tier_overrides` together. Alternatively, create a separate
+   proxy with `forge proxy create <template> --name <new_proxy_id> --no-start`, then point sessions at that new ID.
+3. For LiteLLM routes, update the backend as well. Copy each **complete deployment entry**, including `litellm_params`
+   and `model_info`, into its saved config. A model name alone omits capability, pricing, caching or Responses settings.
+   Remote LiteLLM deployments belong to that server's operator and must use its providers and credentials.
+4. Restart an updated backend before starting the affected proxies. Validate and verify upstream access:
+
+```bash
+forge proxy validate <proxy_id>
+forge proxy start <proxy_id> --smoke-test
+```
+
+A health check alone confirms only that the local proxy is reachable; `--smoke-test` sends a small inference request to
+the configured upstream. If you created a new proxy, substitute its ID in these commands.
+
+For the shared local LiteLLM adapter, identify and stop its runtime before editing the config:
+
+```bash
+forge model backend list
+forge model backend stop <runtime-id> # for example, litellm-4000
+```
+
+Edit `~/.forge/backends/litellm/config.yaml` to retain custom deployments, or back up customizations and recreate from
+the current bundled default:
+
+```bash
+cp ~/.forge/backends/litellm/config.yaml ~/.forge/backends/litellm-config.yaml.bak
+forge model backend delete litellm
+forge model backend create litellm
+```
+
+Then start the adapter with `forge model backend start litellm --port 4000` and start each affected proxy with
+`--smoke-test`. All local LiteLLM backends share this adapter, so coordinate the restart with its other users.
+
+To change defaults for **future** proxies, use `forge proxy template edit <template>`. To discard a user customization
+and return to the built-in template, use `forge proxy template reset <template>` after preserving anything you need.
+Reset removes the custom template only; it does not update existing proxies or backend configs. A template with no
+built-in counterpart is deleted by reset.
 
 ### Proxy file format (user edit surface)
 
@@ -885,6 +752,13 @@ Proxy and direct request costs are logged as downstream telemetry under `~/.forg
 them manually if present. New request spend writes to downstream records, and the by-verb view joins those records to
 run ids instead of writing verb snapshot files.
 
+LiteLLM streams can include gateway-calculated cost in final `usage.cost`. Forge records it as `reporter=litellm`,
+`confidence=gateway_calculated`; it is gateway evidence, not a provider invoice. Older or remote gateways may omit cost.
+Reported tokens remain visible, but missing cost stays `unavailable` and does not increase dollar caps. An explicit zero
+remains distinct from missing cost. If final usage never arrives, Forge has no final usage or cost to record. Streaming
+headers cannot show the completed request's cost; cumulative cost headers reflect spend known before the stream
+completes.
+
 Without a proxy filter, `forge telemetry costs show` includes reported direct costs such as Jev attempts, whose records
 have `proxy_id: null`. Supplying a proxy ID limits the view to that proxy. A direct Jev attempt with session/run
 attribution also contributes to the session's `forge +$Y` total; the downstream cost and usage event count once.
@@ -934,12 +808,12 @@ question. Forge never prices a request from a local table — a missing cost sho
 the provenance column: `forge telemetry costs show` is reported-only; `forge telemetry activity` also includes
 best-effort verb-snapshot estimates):
 
-| Surface                                | Question it answers                               | Scope                                                                   | Cost provenance                                                                 |
-| -------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `forge telemetry costs show [id]`      | "What cost did the provider report?"              | all downstream requests, or the selected proxy                          | reported `$` or `unavailable`; **authoritative** spend view                     |
-| `forge telemetry activity [session]`   | "What did Forge's automation do this session?"    | one Forge session — operation outcomes + model calls joined by run tree | reported-or-estimated `$`, best-effort attribution                              |
-| status-line `cost` segment             | "What is my Claude session costing / quota left?" | one interactive launch; proxy mode subtracts the proxy launch baseline  | Claude's reported cost/quota, or proxy-reported `~$`; never recomputed by Forge |
-| status-line `forge +$Y` (`forge_cost`) | "What did Forge add on top of my session?"        | one Forge session, **excluding** the main interactive harness           | reported-or-nothing (subscription/OAuth → nothing)                              |
+| Surface                                | Question it answers                               | Scope                                                                   | Cost provenance                                                                    |
+| -------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `forge telemetry costs show [id]`      | "What cost did the route report?"                 | all downstream requests, or the selected proxy                          | reported or gateway-calculated `$`, or `unavailable`; **authoritative** spend view |
+| `forge telemetry activity [session]`   | "What did Forge's automation do this session?"    | one Forge session — operation outcomes + model calls joined by run tree | reported-or-estimated `$`, best-effort attribution                                 |
+| status-line `cost` segment             | "What is my Claude session costing / quota left?" | one interactive launch; proxy mode subtracts the proxy launch baseline  | Claude's reported cost/quota, or proxy-reported `~$`; never recomputed by Forge    |
+| status-line `forge +$Y` (`forge_cost`) | "What did Forge add on top of my session?"        | one Forge session, **excluding** the main interactive harness           | reported-or-nothing (subscription/OAuth → nothing)                                 |
 
 Set caps on the proxy:
 
@@ -951,7 +825,8 @@ forge proxy set openrouter-anthropic costs.on_cap_hit=warn
 
 Caps are enforced after each completed request: a request may cross a cap and complete, then the next request is blocked
 once logged spend reaches the cap. `on_cap_hit=reject` returns HTTP 429 with `spend_cap_exceeded`; `on_cap_hit=warn`
-lets the request continue and returns `X-Spend-Warning`.
+lets the request continue and returns `X-Spend-Warning`. LiteLLM cost received in final streamed usage contributes once
+when the stream completes, under the same cap rules.
 
 > Earlier versions had a `costs.cap_mode` setting (`post`/`strict`); it was removed and caps are now always post-event.
 > A leftover `cap_mode:` line — or any unrecognized key under `costs`/`costs.caps` — is now rejected with a config error
@@ -1055,6 +930,16 @@ forge session start demo --sidecar --proxy audit-test
 # after the session, on the host:
 forge proxy audit show audit-test        # records written inside the container are here
 ```
+
+### Translated response limits and history
+
+If an upstream response reaches its output limit, Forge preserves the cutoff as Anthropic `stop_reason: max_tokens` for
+both unary and streaming responses, including responses containing a partial tool call.
+
+Translated Messages routes retain tool calls and tool results but do not return or replay provider reasoning blocks,
+even when continuing with the same model. For Claude, use
+[Anthropic passthrough](#audit-and-intercept-optional-always-on) when native signed thinking history must be preserved.
+Model-specific implications are covered in the [upgrade notes](model_selection.md#model-capabilities-and-upgrades).
 
 ---
 

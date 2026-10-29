@@ -1,0 +1,49 @@
+{
+  "source_commit": "7245906fb61fa33a13554f9d5fb856fe61758086",
+  "resolved_image_tag": "ghcr.io/pypa/gh-action-pypi-publish:7245906fb61fa33a13554f9d5fb856fe61758086",
+  "image_digest": "sha256:411241df99067c98b6d08fd8e26d14e86740a22460599c2af571e6dc26e27ffc",
+  "manifest_media_type": "application/vnd.docker.distribution.manifest.v2+json",
+  "config_digest": "sha256:b992f35b1ae39fd270092c389f8926a32bb9719a0ea75b7e5e7782c400539463",
+  "verified": "Manifest and configuration SHA-256 values were recomputed from registry response bytes.",
+  "architecture": "amd64",
+  "os": "linux",
+  "entrypoint": [
+    "/app/twine-upload.sh"
+  ],
+  "image_source": "https://github.com/pypa/gh-action-pypi-publish",
+  "input_environment": {
+    "INPUT_USER": "__token__",
+    "INPUT_PASSWORD": "",
+    "INPUT_REPOSITORY_URL": "https://upload.pypi.org/legacy/",
+    "INPUT_PACKAGES_DIR": "dist",
+    "INPUT_VERIFY_METADATA": "true",
+    "INPUT_SKIP_EXISTING": "false",
+    "INPUT_VERBOSE": "true",
+    "INPUT_PRINT_HASH": "true",
+    "INPUT_ATTESTATIONS": "true"
+  },
+  "input_mapping": "Underscore aliases are accepted by get-normalized-input in twine-upload.sh and get_normalized_input in oidc-exchange.py; user, password and verbose are read directly.",
+  "sources": {
+    "action.yml": {
+      "url": "https://raw.githubusercontent.com/pypa/gh-action-pypi-publish/7245906fb61fa33a13554f9d5fb856fe61758086/action.yml",
+      "sha256": "4833fe3c15180e27fc7af77018b1d8c670abf1f17958d45d5e0feb4f9acc5d3d"
+    },
+    "create-docker-action.py": {
+      "url": "https://raw.githubusercontent.com/pypa/gh-action-pypi-publish/7245906fb61fa33a13554f9d5fb856fe61758086/create-docker-action.py",
+      "sha256": "28924f16b01d3a63e0a9ef5733d7d261329efcff255d8004a96d27d373d33e8c"
+    },
+    "twine-upload.sh": {
+      "url": "https://raw.githubusercontent.com/pypa/gh-action-pypi-publish/7245906fb61fa33a13554f9d5fb856fe61758086/twine-upload.sh",
+      "sha256": "38a2e6346416f7a39bd20d8d6e09aaba4d9bb3d7657579379436316ac66c5241"
+    },
+    "oidc-exchange.py": {
+      "url": "https://raw.githubusercontent.com/pypa/gh-action-pypi-publish/7245906fb61fa33a13554f9d5fb856fe61758086/oidc-exchange.py",
+      "sha256": "29d4c0ecc9c32e06ba18f9cd552f121a1c8b1b27620c55e82496e2ee4db7abef"
+    },
+    "attestations.py": {
+      "url": "https://raw.githubusercontent.com/pypa/gh-action-pypi-publish/7245906fb61fa33a13554f9d5fb856fe61758086/attestations.py",
+      "sha256": "8ef8df552918642a11f6549157c19c57c466d789e0c0fb9ca4d352b08a205748"
+    }
+  },
+  "execution_limit": "No upload, OIDC exchange or attestation signing was executed. These require an authorized release run."
+}

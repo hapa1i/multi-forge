@@ -2,11 +2,124 @@
 
 Completed-work record for Forge implementation sessions.
 
-Older entries are retained verbatim in [2026-08-20](archive/change_log_2026-08-20.md),
-[2026-08-19](archive/change_log_2026-08-19.md), [2026-08-18](archive/change_log_2026-08-18.md),
+Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-21.md),
+[2026-08-20](archive/change_log_2026-08-20.md), [2026-08-19](archive/change_log_2026-08-19.md),
+[2026-08-18](archive/change_log_2026-08-18.md),
 [2026-08-15 through 2026-08-17](archive/change_log_2026-08-15_to_2026-08-17.md),
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
+
+## 2026-10-29
+
+### Patch tooling and runtime security dependencies
+
+**Goal**: Resolve two Dependabot alerts and the 14 additional advisories found in the reviewed lock.
+
+- Upgrade Black, virtualenv, dnspython, filelock and LiteLLM; ship runtime security floors in wheel metadata.
+- Strengthen prompt/history and stale-lock regressions, and document host stop/upgrade/start plus sidecar image
+  rebuilds.
+
+**Verification**: [PR #288](https://github.com/hapa1i/multi-forge/pull/288) merged as `982e589b`, matching reviewed head
+`80fe298b`, with all five CI checks passing. Both alerts are fixed; Dependabot has zero open alerts, and the 138-package
+audit found no known vulnerabilities. Local checks passed 11,234 unit tests, 2,218 regressions, targeted integrations,
+build/clean-wheel/image checks and full pre-commit. See the
+[closeout](done/dependabot_security_followup/checklist.md#merged-closeout) for evidence and upgrade requirements.
+
+### Align LiteLLM streaming cost tests and documentation
+
+**Goal**: Match streaming cost expectations to the evidence supplied by the pinned gateway.
+
+- Replace the universal-unavailability assertion with deterministic gateway/SDK/proxy cases for positive cost, zero,
+  missing cost and missing final usage; verify tokens, provenance and one telemetry/cap increment per stream.
+- Correct cost guidance and client comments to distinguish gateway-calculated cost from unavailable cost. Runtime logic
+  and the dependency pin are unchanged.
+
+**Verification**: [PR #286](https://github.com/hapa1i/multi-forge/pull/286) merged as `bbb9e269`, matching reviewed head
+`890173c4`, with all five CI checks passing. Local checks passed 11,234 unit tests, 2,212 regressions, eight focused
+proxy integrations and full pre-commit without paid inference. The
+[closeout](done/litellm_streaming_cost_contract/checklist.md#merged-closeout) retains the characterization and cap
+evidence; design and end-user docs are synced.
+
+## 2026-10-28
+
+### Separate model guidance from proxy operations
+
+Move model capabilities, alternatives and release migrations into the model-selection guide. Keep shared upgrade
+procedures, snapshot ownership, transport and ZDR policy in the proxy guide, and worker inventory in the workflow guide.
+Preserve old upgrade anchors and correct template reset to describe its effect on future proxies only.
+
+**Verification**: [PR #285](https://github.com/hapa1i/multi-forge/pull/285) merged as `fb803b92`, matching reviewed head
+`c52faac9`, with all five CI checks passing. Local Markdown/link/cache checks, 18 CLI help surfaces, 20 templates and
+isolated snapshot fixtures passed. Proxy/model guides measure 22,232/13,893 Opus tokens, each below 23,000. The
+[closeout](done/proxy_model_guidance_partition/checklist.md#merged-closeout) retains the evidence.
+
+### Define derived-session configuration inheritance
+
+**Goal**: Preserve the selected fork/fresh versus relaunch contract and correct its exposed configuration defects.
+
+- Document baseline supervisor suspension, override-only verification, reset/admission limits and live inherited plans.
+- Fix fresh-resume proxy pairing, protected wildcard writes and malformed-supervisor reset diagnostics; remove the
+  unreachable relaunch fallback. Keep uniform pre-derivation validation in its separate proposed card.
+
+**Verification**: [PR #284](https://github.com/hapa1i/multi-forge/pull/284) merged as `3ad15937`, matching reviewed head
+`864cb926`, with all five CI checks passing. Local checks passed 11,226 unit tests, 2,212 regressions, 42 targeted
+Docker tests and full pre-commit. The
+[closeout](done/decide_derived_session_override_inheritance/checklist.md#merged-closeout) records the decision, evidence
+and remaining validation boundary.
+
+## 2026-10-27
+
+### Preserve tool evidence in transfer summaries
+
+List-form results retain ordered text and delegation calls retain labeled arguments within the existing field caps.
+Structured keeps its text-bearing-group admission rule; Unicode escapes stay whole, and oversized Codex initial prompts
+refuse before launch with session/snapshot rollback. Session-context design and end-user guides are synced.
+
+**Verification**: [PR #283](https://github.com/hapa1i/multi-forge/pull/283) merged as `9751470b`, matching reviewed head
+`fa4c53b6`, with all five CI checks passing. Local checks passed 11,223 unit tests, 2,202 regressions, 10 Docker
+transfer/resume/launch tests and full pre-commit. The
+[closeout](done/transfer_summarizer_fidelity/checklist.md#merged-closeout) retains size comparisons, launch-boundary
+evidence and the successful three-test Docker storage rerun. M2 is done.
+
+### Disable native delegation and memory in Forge workers
+
+**Goal**: Keep Forge-owned reviews and consumers independent of inherited native delegation and memory settings.
+
+**Key changes**:
+
+- Apply explicit Claude/Codex worker profiles across review panels, supervisors, the memory writer and shadow curation;
+  compose authentication helpers with the final controls before subscription verification.
+- Fork resumed Claude reviews into separate sessions, preserving source transcripts during parallel reviews.
+- Verify native admission from clean wheels on pinned/current runtimes and recognize Ubuntu's GNU timeout binary in the
+  probe harness. Managed-root delegation and memory choices remain separate.
+
+**Verification**: [PR #282](https://github.com/hapa1i/multi-forge/pull/282) merged as `ef6a41e1`, matching reviewed head
+`81586905`, with all five CI checks passing. CI passed 11,173 unit tests, 2,176 regressions, dependency pins and the
+clean-wheel runtime check. Local verification includes 16 targeted Docker cases, four live reviewer/cost cases, native
+probes on both version tracks, build, full pre-commit and live panels. The
+[closeout](done/worker_native_controls/checklist.md#merged-closeout) links evidence and limitations. M0 is done; the
+broader native-multiagent epic remains proposed.
+
+## 2026-10-25
+
+### Add the October open-model shortlist
+
+**Goal**: Support Kimi K3.1 Pro, MiniMax M3.1 Flash, and DeepSeek V4.1 Flash 1017 as explicit model choices.
+
+**Key changes**:
+
+- Add catalog entries, OpenRouter routes, template alternatives, and workflow workers while preserving existing defaults
+  and saved proxy snapshots.
+- Apply model-specific reasoning, sampling, and tool-choice constraints; document translated reasoning-history limits
+  and add release QA coverage.
+- Prevent OpenRouter request extras from leaking across requests, clean up workflow test health stubs, and restore
+  inherited reviewer helpers on supported Claude versions that reject anonymous settings paths.
+
+**Verification**: [PR #281](https://github.com/hapa1i/multi-forge/pull/281) merged as `30ad379b`, matching reviewed head
+`d1edbed9`, with both CI workflows passing. Local verification includes six live tool round trips, 2,158 regressions, 16
+workflow/auth integration cases, full pre-commit, build and clean-wheel checks. The
+[closeout](done/october_open_models/checklist.md#merged-closeout) preserves the evidence and corrected local
+unit-inventory failure; proxy-guide size cleanup remains a separate proposal.
 
 ## 2026-10-22
 
@@ -26,6 +139,25 @@ Older entries are retained verbatim in [2026-08-20](archive/change_log_2026-08-2
 regressions, pre-commit, build and Python 3.11 clean-wheel checks passed. The lock audit found zero known
 vulnerabilities across 126 packages. GitHub's dependency graph contains the patched versions and reports zero open
 Dependabot alerts. No alert was dismissed during this work.
+
+### Pin build and installation inputs
+
+**Goal**: Make Forge-owned build and installation inputs reviewable and refuse unverified source updates.
+
+**Key changes**:
+
+- Derive runtime constraints and hashed build requirements from the lock; pin CI Actions, bootstrap artifacts and Docker
+  defaults.
+- Validate immutable source candidates before changing the active editable installation, and scope build constraints to
+  Forge commands.
+- Document and test hash-verified global wheel installation; add a separate scheduled/manual unconstrained wheel
+  compatibility check. The [dependency security guide](../developer/dependency_security.md) records remaining limits.
+
+**Verification**: [PR #280](https://github.com/hapa1i/multi-forge/pull/280) merged as `50472bee`, matching reviewed head
+`12a033bb`, with all five CI checks passing. Local checks passed 11,151 unit tests, 2,152 regressions, 29 targeted
+Docker tests, full pre-commit, build and clean-wheel checks. The
+[closeout](done/supply_chain_pins/checklist.md#merged-closeout) links the evidence and retains the distinction between
+version constraints and hash verification.
 
 ### Separate session deletion from native purge
 
@@ -731,102 +863,3 @@ and journal chain inside disposable Docker identities.
 current-head canonical Docker-helper cases; 207 focused authority tests; 9,447 unit with 117 deselected; 1,057
 regression; full pre-commit, diff, and 1,227-link checks. PR #235 merged as `8e47f017` with all five GitHub checks
 passing; the card closed to `done/` on 2026-08-22.
-
-## 2026-08-21
-
-### Enforce managed-session artifact authority
-
-**Goal/outcome**: Give humans an explicit advisory/producer session designation with honest managed-tool enforcement and
-local evidence, while leaving route provenance, authorship, and admission outside the claim.
-
-**Key changes**:
-
-- Added strict session-owned authority intent, external inactive mutation controls, advisory-only inheritance, and one
-  authority-neutral durable event-journal seam reusable by later route provenance.
-- Preflighted and journaled one root launch attempt across Claude and Codex, enforced advisory requests before ordinary
-  policy, preserved producer/unmarked behavior, and exposed a read-only posture report plus the human-courier workflow.
-- Closed review-found enforcement gaps with exact Codex policy-row attestation, full-lifetime unmarked launch locking,
-  sidecar authority-row exclusion, marker isolation, and event-specific journal validation.
-
-**Verification**: 212 repaired authority-contract tests; 9,447 unit with 117 deselected; 1,053 regression; eight
-targeted Docker and CLI integration boundaries; full pre-commit; wheel/sdist build plus isolated packaged enable/sync;
-dispatcher p95 26.79 ms across 50 runs with 40 registry entries at depth 5. The design-size gate was intentionally
-deferred. PR #234 merged as `a1c54a05` with all five GitHub checks passing; M1 closed to `done/` on 2026-08-22.
-
-### Remove the experimental manifest WorkflowPolicy
-
-**Goal/outcome**: Retire the stale CLI-graduation proposal and remove a hidden semantic-policy pipeline whose blocking
-reviewer had no repository or other normative project authority.
-
-**Key changes**:
-
-- Deleted the manifest-only workflow package and behavior tests, then made unknown bundles and configuration owners fail
-  atomic engine construction with override-aware recovery for stale `workflow` state.
-- Preserved the documented shared reactive library, removed the caller-less reverse bundle lookup, and synchronized the
-  policy design, end-user, and repository-agent contracts.
-
-**Verification**: 574 focused policy/reactive/CLI tests; 9,302 unit with 117 deselected; 1,053 regression; one targeted
-Docker policy-hook boundary; both policy-check content modes; pre-commit/diff, board/link, and design-size gates. PR
-#233 merged as `4f95d88d` with all five GitHub checks passing.
-
-### Close Wave 8 Batch 5 and the repository maintenance round
-
-**Goal/outcome**: Close the final verified residuals and leave the whole-repository review with terminal dispositions
-without treating the separately proposed D040 design choice as accepted work.
-
-**Key changes**:
-
-- Removed every unexplained production type suppression, retained concrete reasons on the unavoidable remainder, and
-  added a source guard against recurrence.
-- Synchronized the conditional sidecar runtime-config mount, auth/workflow CLI inventory, and consensus precedence
-  comment, then closed Wave 8 at 23 findings across 19 members and the parent maintenance round.
-
-**Verification**: 446 focused suppression/touched-module tests; 203 focused auth/workflow documentation tests; 60 PR
-review follow-up tests; 9,332 unit with 124 deselected; 1,059 regression; three targeted integration boundaries;
-pre-commit/diff, board/link, and document-size gates. PR #230 merged as `7e5ea8c4` with all five GitHub checks passing.
-
-### Close daily-review regressions
-
-**Goal/outcome**: Keep provider traces, workflow integer controls, and Stop failure diagnostics aligned with their
-shipped contracts at local setup and terminal-control edge cases.
-
-**Key changes**:
-
-- Moved provider-attempt signaling after local credential/client setup and rejected booleans in all manifest integer
-  controls before workflow evaluation.
-- Sanitized terminal controls before pytest-summary selection, including line-bounded OSC/DCS strings and decoded C1
-  controls.
-
-**Verification**: 249 focused tests; targeted proxy, policy-hook, and Stop Docker boundaries; 9,331 unit with 124
-deselected; 1,059 regression; pre-commit/diff, board/link, and design-size gates. PR #229 merged as `da34bcb3` with all
-five GitHub checks passing.
-
-### Close Wave 8 Batch 4 isolated runtime fixes
-
-**Goal/outcome**: Reject invalid proxy-audit limits, expose best-effort info-probe degradation, and avoid repeated
-transcript-reference scans during native-relocate cleanup.
-
-**Key changes**:
-
-- Rejected zero and negative audit limits before shard or period reads while preserving positive/default ordering.
-- Added secret-safe debug evidence and uniform `uv_version` fallback for failed info probes, and resolved ordinary,
-  artifact, and relocated-parent transcript ownership in one shared scan.
-
-**Verification**: 165 focused card tests; three targeted Docker boundaries; 9,331 unit with 124 deselected; 1,035
-regression; pre-commit/diff and board/link gates. PR #228 merged as `559a3453` with all five GitHub checks passing.
-
-### Close Wave 8 Batch 3 policy CLI contracts
-
-**Goal/outcome**: Make missing supervisor prerequisites and ambiguous policy-check inputs fail explicitly while sharing
-one policy-bundle vocabulary across terminal and direct-command parsing.
-
-**Key changes**:
-
-- Returned non-zero stderr diagnostics for enabling supervisor actions without configured state while preserving
-  idempotent teardown commands.
-- Rejected simultaneous policy-check file and diff sources before either read, and replaced three residual bundle
-  literals with the shared registries without changing unknown-token behavior.
-
-**Verification**: 370 focused card tests; three direct container-boundary policy checks; 9,331 unit with 124 deselected;
-1,015 regression; pre-commit/diff and board/link gates. PR #227 merged as `f3353042` with all five GitHub checks
-passing.

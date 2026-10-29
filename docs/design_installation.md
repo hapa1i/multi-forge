@@ -164,6 +164,14 @@ again because its config location and command bytes changed.
 > [design_installation.md §C](design_installation.md#c-install-model-reference). Multi-scope installation behavior (dual
 > user + project) is documented in [§C.5](design_installation.md#c5-multi-scope-installation-skill-resolution).
 
+Source builds and CI use `uv.lock` plus generated `requirements/build.txt` and `requirements/runtime.txt` exports.
+`scripts/check-dependency-pins.py` rejects export drift; release builds require build-artifact hashes. Source updates
+validate an isolated candidate before changing the active checkout; global editable installs enforce version
+constraints. The optional verified-wheel recipe installs hashed runtime artifacts and publishes a persistent launcher
+after dependency checks. Ordinary PyPI tool installs still resolve metadata ranges; a separate scheduled compatibility
+job tests that path without gating merges. Docker scopes build constraints to Forge commands. The guarantees and update
+procedure live in [dependency security](developer/dependency_security.md).
+
 ### 5.3 Test Infrastructure (Docker-based)
 
 **Runtime architecture (host-based)**: Proxy runs on host (`subprocess.Popen`), Claude Code runs on host. End users do
@@ -178,6 +186,11 @@ NOT need Docker.
 The shell runner and pytest fixture share a source revision plus dirty-content fingerprint for image reuse. Both check
 the exported image's Claude and Codex startup in a bounded, network-disabled container before tests; a cached build-time
 check is insufficient. See [runtime startup recovery](developer/testing_guidelines.md#docker-runtime-startup-failures).
+
+Default runtime versions come from the pinned QA matrix, shared by the shell runner and pytest fixture. Explicit version
+or `latest` overrides select compatibility testing. The runner passes its prepared image to pytest so a latest run does
+not refresh the base a second time after building the sidecar. Python and uv image inputs are digest-pinned; the native
+Claude installer verifies a repository-pinned checksum before publishing the binary.
 
 **Test workflow**:
 
@@ -355,6 +368,7 @@ variables must be added here and documented in the relevant end-user guide befor
 | `FORGE_PARENT_SESSION`             | Internal wiring   | Fork/relaunch lineage metadata                                       |
 | `FORGE_PROXY_ID`                   | Internal wiring   | Sidecar/proxy runtime identity                                       |
 | `FORGE_PROXY_WIRE_SHAPE`           | Internal wiring   | Proxy wire-shape metadata propagated to children                     |
+| `FORGE_REVIEWER_API_KEY_HELPER`    | Internal wiring   | Trusted helper command projected into the reviewer environment       |
 | `FORGE_ROOT_RUN_ID`                | Internal wiring   | Run-tree attribution root id                                         |
 | `FORGE_RUN_ID`                     | Internal wiring   | Run-tree attribution id                                              |
 | `FORGE_SESSION`                    | Internal wiring   | Launcher-provided session identity for hooks/status/session tooling  |
@@ -370,6 +384,7 @@ variables must be added here and documented in the relevant end-user guide befor
 | `FORGE_SUBPROCESS_TEMPLATE`        | Internal wiring   | Child-process resolved proxy template                                |
 | `FORGE_TEMPLATE`                   | Internal wiring   | Sidecar template metadata                                            |
 | `FORGE_MANUAL_TEST_SYSTEM_PROMPT`  | Test/QA harness   | Manual QA fixture marker                                             |
+| `FORGE_INTEGRATION_PREBUILT_IMAGE` | Test/QA harness   | Runner-prepared runtime image reused by pytest                       |
 | `FORGE_QA_ARTIFACT_MODE`           | Test/QA harness   | Prebuilt release candidate or development-build label                |
 | `FORGE_QA_ANTHROPIC_PROXY`         | Test/QA harness   | QA container proxy fixture                                           |
 | `FORGE_QA_ANTHROPIC_TEMPLATE`      | Test/QA harness   | QA container template fixture                                        |

@@ -154,7 +154,7 @@ def test_stop_transport_does_not_retry_rejected_output_format(monkeypatch) -> No
     call = Mock(return_value=MagicMock(stdout="", stderr="error: unknown option '--output-format'", returncode=2))
     monkeypatch.setattr("forge.core.reactive.session_runner.subprocess.run", call)
     try:
-        result = run_claude_session("bounded review", retry_output_format=False)
+        result = run_claude_session("bounded review", worker=False, retry_output_format=False)
         assert result.returncode == 2
         assert call.call_count == 1
     finally:

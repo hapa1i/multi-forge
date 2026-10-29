@@ -213,6 +213,9 @@ session config even when enforcement is disabled — useful for verifying fixes 
 > **Note:** `%policy enable/disable` applies session overrides that persist until changed or reset. The CLI command
 > `forge policy enable/disable` mutates the session intent.
 
+See [configuration inheritance and reset](session.md#configuration-inheritance-and-reset) for child behavior and the
+baseline suspension written by both supervisor `off` commands.
+
 For the full list of `%` commands, see [`hook.md`](hook.md#in-session-commands-commands).
 
 ---
@@ -286,9 +289,10 @@ or quota decrement.
 For an explicit paid direct route, use `--auth-mode inherit --no-supervisor-proxy`; an existing environment or Forge
 credential remains available, as do user-settings `apiKeyHelper` and auth environment settings from user or explicitly
 trusted project settings. Move any project-only helper to user settings or export its credential; checkout-controlled
-helpers cannot run in the reviewer. Other customizations stay disabled. Select a proxy with
-`--supervisor-proxy <id-or-template>` and use its `opus`, `sonnet`, or `haiku` tier. For a Codex reviewer, run
-`forge runtime preflight codex`, then set
+helpers cannot run in the reviewer. Forge carries the trusted helper command in the reviewer's environment, so this
+works with supported Claude versions that reject anonymous settings-file paths. Other customizations stay disabled.
+Select a proxy with `--supervisor-proxy <id-or-template>` and use its `opus`, `sonnet`, or `haiku` tier. For a Codex
+reviewer, run `forge runtime preflight codex`, then set
 `--plan ... --runtime codex --model <supported-model> --supervisor-effort <level>` with inherited auth. Stale readiness
 produces an actionable unavailable result; hooks do not run readiness probes.
 

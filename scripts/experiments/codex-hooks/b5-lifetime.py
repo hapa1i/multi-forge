@@ -122,7 +122,9 @@ def run_stub(mode: str) -> int:
     if not fixture_login.exists():
         fixture_login.write_text('{"oauthAccount":{"organizationType":"claude_max"},"fixture":true}\n')
     env = subscription_environment({"PATH": str(stub_bin) + os.pathsep + os.environ["PATH"]})
-    admitted = preflight_subscription(env=env, cwd=str(root / "action"), deadline=time.monotonic() + 15)
+    admitted = preflight_subscription(
+        env=env, cwd=str(root / "action"), deadline=time.monotonic() + 15, control_args=READ_ONLY_FLAGS
+    )
     if Path(admitted) != binary:
         raise ValueError("The admitted reviewer must be the owned synthetic binary.")
     (capture / "stub-admission.json").write_text(

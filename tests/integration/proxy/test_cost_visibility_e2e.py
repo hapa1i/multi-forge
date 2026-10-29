@@ -182,48 +182,6 @@ def test_openrouter_streaming_cost_smoke(
     assert new_records[-1]["confidence"] == "reported"
 
 
-def test_local_litellm_streaming_cost_unavailable(
-    registered_proxy_server_local_gemini: RegisteredProxyServer,
-    module_forge_home: Path,
-) -> None:
-    """A LiteLLM gateway does NOT report cost on the streaming (SSE) path → unavailable.
-
-    Verified gap (card risk): LiteLLM's x-litellm-response-cost header is emitted at
-    stream start, before token counts/cost exist, and this gateway does not put cost
-    in the final usage chunk body. With the catalog removed (Step 3), streaming LiteLLM
-    cost is recorded as 'unavailable' (cost_micros=None) — never a fabricated figure.
-    Tokens are still captured.
-    """
-    proxy = registered_proxy_server_local_gemini
-    all_before = _request_records(module_forge_home)
-    before_matching = len([r for r in all_before if r.get("proxy_id") == proxy.proxy_id])
-
-    with httpx.Client(timeout=60) as client:
-        with client.stream(
-            "POST",
-            f"{proxy.base_url}/v1/messages",
-            json=_tiny_message_payload(stream=True),
-            headers={"x-api-key": "test", "user-agent": "claude-code/cost-e2e"},
-        ) as resp:
-            assert resp.status_code == 200
-            events = [line for line in resp.iter_lines() if line.startswith("data: ")]
-
-    assert events
-    new_records = _wait_for_matching_records(
-        lambda: _request_records(module_forge_home),
-        before_matching,
-        proxy_id=proxy.proxy_id,
-    )
-    assert new_records, f"No cost records for proxy_id={proxy.proxy_id}"
-    record = new_records[-1]
-    # Tokens are captured even when cost is unavailable.
-    assert record["output_tokens"] > 0
-    # No catalog fallback: streaming LiteLLM cost is explicitly unavailable, not invented.
-    assert record.get("cost_micros") is None
-    assert record.get("reporter") is None
-    assert record["confidence"] == "unavailable"
-
-
 def _install_proxying_claude_shim(tmp_path: Path) -> Path:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
