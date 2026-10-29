@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -24,17 +25,24 @@ def project(tmp_path: Path) -> Path:
     return tmp_path
 
 
+@pytest.fixture
+def litellm_pin(project: Path) -> str:
+    dependencies = tomllib.loads((project / "pyproject.toml").read_text())["project"]["dependencies"]
+    return next(dependency for dependency in dependencies if dependency.startswith("litellm=="))
+
+
 def test_committed_exports_match_reviewed_lock(project: Path) -> None:
     assert PINS.check(project) == []
 
 
-def test_changed_runtime_constraint_is_rejected_and_can_be_regenerated(project: Path) -> None:
+def test_changed_runtime_constraint_is_rejected_and_can_be_regenerated(project: Path, litellm_pin: str) -> None:
     runtime = project / "requirements/runtime.txt"
-    runtime.write_text(runtime.read_text().replace("litellm==1.102.0", "litellm==1.107.0"))
+    original = runtime.read_text()
+    runtime.write_text(original.replace(litellm_pin, "litellm==0.0.0"))
     assert PINS.check(project) == ["requirements/runtime.txt"]
     PINS.check(project, write=True)
     assert PINS.check(project) == []
-    assert "litellm==1.102.0" in runtime.read_text()
+    assert runtime.read_text() == original
 
 
 def test_changed_build_hash_is_rejected(project: Path) -> None:
@@ -50,9 +58,9 @@ def test_build_backend_must_match_locked_group(project: Path) -> None:
         PINS.check(project)
 
 
-def test_stale_lock_is_not_updated(project: Path) -> None:
+def test_stale_lock_is_not_updated(project: Path, litellm_pin: str) -> None:
     metadata = project / "pyproject.toml"
-    metadata.write_text(metadata.read_text().replace("litellm==1.102.0", "litellm==1.107.0"))
+    metadata.write_text(metadata.read_text().replace(litellm_pin, "litellm==0.0.0"))
     before = (project / "uv.lock").read_bytes()
     with pytest.raises(subprocess.CalledProcessError):
         PINS.check(project)

@@ -181,7 +181,7 @@ Caps are enforced after each completed request, from accumulated recorded spend:
 then the next request is blocked once spend has reached the cap. Because spend accrues only from reported cost, **dollar
 caps fire only for routes that report cost**. LiteLLM streaming counts when final usage carries `cost`: the completed
 stream contributes once to downstream telemetry and cap counters, even though the client exposes the same cost on both
-usage and response-end events. Pinned LiteLLM 1.102.0 can calculate this field; older or remote gateways may omit it.
+usage and response-end events. Pinned LiteLLM 1.102.2 can calculate this field; older or remote gateways may omit it.
 Missing cost remains unavailable while reported tokens are retained. Missing final usage retains the existing token
 fallback and unavailable cost; Forge does not estimate dollars. Anthropic passthrough likewise supplies no dollar cost.
 Streaming response headers are sent before final usage and do not supply final request cost. `reject` returns HTTP 429

@@ -506,6 +506,11 @@ forge proxy validate <proxy_id>
 
 ### Updating saved proxy and backend configurations
 
+For dependency security updates, upgrade the Forge installation that launches your processes, then stop and restart its
+local backends and proxies. Local LiteLLM uses that installation's Python environment. Saved configurations can remain
+as they are when only packages change; a package upgrade does not restart running processes. Remote LiteLLM deployments
+must be upgraded by their operator. Use the backend and proxy lifecycle commands below for the restart.
+
 A saved `~/.forge/proxies/<proxy_id>/proxy.yaml`, local LiteLLM `~/.forge/backends/litellm/config.yaml`, and custom
 templates under `~/.forge/templates/` are user-owned snapshots. Upgrading Forge preserves them. Restarting loads the
 saved bytes; it does not copy new defaults. Use the

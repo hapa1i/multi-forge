@@ -1,0 +1,155 @@
+{
+  "captured_on": "2026-10-29",
+  "service": "PyPI via pip-audit 2.10.1",
+  "distributions_audited": 138,
+  "additional_findings": [
+    {
+      "package": "dnspython",
+      "version_audited": "2.8.0",
+      "advisories": [
+        {
+          "id": "CVE-2026-114605",
+          "aliases": [
+            "GHSA-45c3-73f7-pv4m"
+          ],
+          "fix_versions": [
+            "2.9.0"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "filelock",
+      "version_audited": "3.32.5",
+      "advisories": [
+        {
+          "id": "CVE-2026-112940",
+          "aliases": [
+            "GHSA-v4x8-3wr5-3wq8"
+          ],
+          "fix_versions": [
+            "4.2.1"
+          ]
+        },
+        {
+          "id": "CVE-2026-112913",
+          "aliases": [
+            "GHSA-9vhv-jxww-xfm5"
+          ],
+          "fix_versions": [
+            "4.2.1"
+          ]
+        },
+        {
+          "id": "CVE-2026-112907",
+          "aliases": [
+            "GHSA-567q-5qvw-pf92"
+          ],
+          "fix_versions": [
+            "4.2.1"
+          ]
+        },
+        {
+          "id": "CVE-2026-112938",
+          "aliases": [
+            "GHSA-m462-7rxw-wvpg"
+          ],
+          "fix_versions": [
+            "4.2.1"
+          ]
+        },
+        {
+          "id": "CVE-2026-112936",
+          "aliases": [
+            "GHSA-j8f7-rjxc-mr56"
+          ],
+          "fix_versions": [
+            "4.0.9"
+          ]
+        },
+        {
+          "id": "CVE-2026-112910",
+          "aliases": [
+            "GHSA-8mx5-7m5m-r77g"
+          ],
+          "fix_versions": [
+            "4.2.1"
+          ]
+        },
+        {
+          "id": "CVE-2026-112909",
+          "aliases": [
+            "GHSA-69hj-f68j-2879"
+          ],
+          "fix_versions": [
+            "4.2.1"
+          ]
+        },
+        {
+          "id": "CVE-2026-112911",
+          "aliases": [
+            "GHSA-9c4x-gm8v-wgc4"
+          ],
+          "fix_versions": [
+            "4.2.1"
+          ]
+        },
+        {
+          "id": "CVE-2026-112939",
+          "aliases": [
+            "GHSA-rfpc-qcw5-3pc4"
+          ],
+          "fix_versions": [
+            "4.2.1"
+          ]
+        },
+        {
+          "id": "CVE-2026-112915",
+          "aliases": [
+            "GHSA-cwqr-hh33-gh44"
+          ],
+          "fix_versions": [
+            "4.2.1"
+          ]
+        },
+        {
+          "id": "CVE-2026-112935",
+          "aliases": [
+            "GHSA-fq56-3cx3-fjxp"
+          ],
+          "fix_versions": [
+            "4.2.1"
+          ]
+        },
+        {
+          "id": "CVE-2026-112908",
+          "aliases": [
+            "GHSA-6627-m3xw-93mp"
+          ],
+          "fix_versions": [
+            "4.2.1"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "litellm",
+      "version_audited": "1.102.0",
+      "advisories": [
+        {
+          "id": "CVE-2026-114612",
+          "aliases": [
+            "GHSA-7hp6-4w63-5g45"
+          ],
+          "fix_versions": [
+            "1.100.4",
+            "1.101.3",
+            "1.102.2",
+            "1.103.1",
+            "1.104.0rc2"
+          ]
+        }
+      ]
+    }
+  ]
+}
