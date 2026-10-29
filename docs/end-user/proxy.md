@@ -541,7 +541,7 @@ Edit `~/.forge/backends/litellm/config.yaml` to retain custom deployments, or ba
 the current bundled default:
 
 ```bash
-cp ~/.forge/backends/litellm/config.yaml ~/.forge/backends/litellm/config.yaml.bak
+cp ~/.forge/backends/litellm/config.yaml ~/.forge/backends/litellm-config.yaml.bak
 forge model backend delete litellm
 forge model backend create litellm
 ```
