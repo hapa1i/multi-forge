@@ -87,9 +87,8 @@ def selected_provider(payload: Any) -> str | None:
 def extract_reported_cost_usd(usage: object) -> float | None:
     """Extract route-reported cost (USD) from an OpenAI-shaped usage object.
 
-    OpenRouter includes ``usage.cost`` (total spend in USD) in the response
-    body when usage accounting is available; it is auto-included, so we read
-    it when present rather than depending on a request flag. The typed SDK
+    OpenRouter reports spend and LiteLLM can calculate it in ``usage.cost``.
+    Read the field when present; its absence does not imply a free request. The typed SDK
     surfaces it as an attribute (and in ``model_extra``); the dict path covers
     responses already serialized to JSON.
 

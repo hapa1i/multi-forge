@@ -51,11 +51,11 @@ and local bounds: telemetry permits naive-as-UTC, each CLI owns `all`, and `TZ` 
 POSIX forms with `/etc/localtime` fallback. Relative display selects compact/full-word styles.
 
 Downstream attempts are the proxy-spend source of truth. **Forge is not a cost oracle:** it records only route-reported
-cost (OpenRouter `usage.cost` or LiteLLM `x-litellm-response-cost`) with its reporter/confidence, and records
-`cost_micros:null`/`confidence="unavailable"` otherwise; no local price catalog infers dollars from tokens. Nullable
-`backend_id` names the logical backend instance, distinct from the telemetry-origin `source_id`/`source_kind`; direct
-emitters set it only when the mapping is unambiguous. Schema-v2 readers fence older records with a warning and expose
-skip counts rather than reattribute them.
+cost (OpenRouter `usage.cost`, LiteLLM body `usage.cost` or its non-streaming `x-litellm-response-cost` header) with its
+reporter/confidence, and records `cost_micros:null`/`confidence="unavailable"` otherwise; no local price catalog infers
+dollars from tokens. Nullable `backend_id` names the logical backend instance, distinct from the telemetry-origin
+`source_id`/`source_kind`; direct emitters set it only when the mapping is unambiguous. Schema-v2 readers fence older
+records with a warning and expose skip counts rather than reattribute them.
 
 **Token convention.** Attempt `input_tokens` is the provider's total prompt. `cached_tokens` (cache reads) and
 `cache_write_tokens` (cache writes) are subsets of it, so cache rates cannot exceed 100%. Anthropic-native usage — the
@@ -179,8 +179,13 @@ and is ignored.
 
 Caps are enforced after each completed request, from accumulated recorded spend: a request may cross a cap and complete,
 then the next request is blocked once spend has reached the cap. Because spend accrues only from reported cost, **dollar
-caps fire only for routes that report cost** (OpenRouter, LiteLLM non-streaming); Anthropic-passthrough and
-LiteLLM-streaming dollar caps are no-ops (their tokens are still tracked). `reject` returns HTTP 429 with:
+caps fire only for routes that report cost**. LiteLLM streaming counts when final usage carries `cost`: the completed
+stream contributes once to downstream telemetry and cap counters, even though the client exposes the same cost on both
+usage and response-end events. Pinned LiteLLM 1.102.0 can calculate this field; older or remote gateways may omit it.
+Missing cost remains unavailable while reported tokens are retained. Missing final usage retains the existing token
+fallback and unavailable cost; Forge does not estimate dollars. Anthropic passthrough likewise supplies no dollar cost.
+Streaming response headers are sent before final usage and do not supply final request cost. `reject` returns HTTP 429
+with:
 
 ```json
 {
@@ -532,9 +537,11 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
   tagger is `measurement_source=provider_usage_exact` with `confidence=unavailable`, *not* a contradiction). A null cost
   is `unavailable` regardless of any `source_refs`-joined cost record. `unknown` is legacy/default (provenance never
   recorded); a known-no-cost route is `unavailable`, not `unknown`. Proxy cost is `reported` (OpenRouter body
-  `usage.cost`) or `gateway_calculated` (LiteLLM `x-litellm-response-cost` header) when a route reports it, else
-  `unavailable` (Anthropic passthrough; LiteLLM streaming) — the price catalog was removed, so `inferred` is no longer
-  produced on the proxy cost path (the literal remains reserved).
+  `usage.cost`) or `gateway_calculated` (LiteLLM body `usage.cost` or its non-streaming `x-litellm-response-cost`
+  header) when a route supplies it, else `unavailable`. LiteLLM cost uses reporter `litellm`, including streaming cost;
+  this identifies gateway evidence rather than provider-reported billed spend. Missing cost has a null reporter on the
+  downstream attempt, while an explicit zero retains the route's reporter/confidence. The Forge price catalog was
+  removed, so `inferred` is no longer produced on the proxy cost path (the literal remains reserved).
 
 `source_refs` is null on native-runtime events (no proxy) and stays null on `claude -p` traffic: Phase 4g correlates a
 proxied `claude -p` run to its exact cost through the **run tree** (`forge_root_run_id` stamped on each cost record),

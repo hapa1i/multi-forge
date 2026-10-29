@@ -1,6 +1,7 @@
 # Align LiteLLM streaming cost tests and documentation
 
-**Status**: Proposed. Recorded on 2026-10-16 from the deferred integration failure in
+**Status**: Doing, accepted on 2026-10-28. Branch `codex/litellm-streaming-cost-contract`, based on `ee71ddd4`. See
+[checklist](checklist.md). Recorded on 2026-10-16 from the deferred integration failure in
 [prompt-cache correctness](../../done/prompt_cache_correctness/checklist.md#phase-5-verification).
 
 ## Problem
