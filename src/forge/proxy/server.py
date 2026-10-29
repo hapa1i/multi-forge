@@ -414,9 +414,10 @@ def _reported_cost_provenance() -> tuple[Reporter | None, Confidence]:
     """Map the proxy's resolved provider to (reporter, confidence) for a reported cost.
 
     OpenRouter returns actual spend in the response body (``usage.cost``) → a
-    directly *reported* figure. A LiteLLM gateway computes spend and returns it in
-    the ``x-litellm-response-cost`` header → *gateway_calculated*. Used only when a
-    reported cost is present; the provider value is otherwise irrelevant.
+    directly *reported* figure. Cost received through LiteLLM is labeled
+    *gateway_calculated*, whether carried in body usage or the non-streaming
+    ``x-litellm-response-cost`` header. This identifies the route's evidence,
+    not a provider invoice. Used only when a reported cost is present.
     """
     provider = getattr(config.proxy, "preferred_provider", "") or ""
     if provider == "openrouter":

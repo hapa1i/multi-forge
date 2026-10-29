@@ -371,8 +371,8 @@ class LiteLLMClient:
     def _merge_header_cost(self, completion: CompletionResponse, headers: Any) -> CompletionResponse:
         """Attach the LiteLLM-gateway header cost when the body reported none.
 
-        Body cost (OpenRouter-style usage.cost) wins; for a plain LiteLLM proxy
-        the body has no cost and the x-litellm-response-cost header supplies it.
+        Body usage.cost wins, including gateway-calculated cost. The
+        x-litellm-response-cost header supplies cost only when the body omits it.
         """
         if completion.cost_usd is not None:
             return completion
@@ -720,9 +720,9 @@ class LiteLLMClient:
                     cached = extract_cached_tokens(chunk.usage)
                     if cached:
                         usage_data["cached_tokens"] = cached
-                    # Cost when the gateway puts it in the final usage chunk body
-                    # (OpenRouter-via-LiteLLM). The x-litellm-response-cost header is
-                    # not reliably final on streams, so the stream carries body cost only.
+                    # The gateway may calculate cost in final usage or forward upstream cost.
+                    # Its x-litellm-response-cost header is not reliably final on streams,
+                    # so the stream carries body cost only.
                     chunk_cost = extract_reported_cost_usd(chunk.usage)
                     if chunk_cost is not None:
                         cost_usd = chunk_cost

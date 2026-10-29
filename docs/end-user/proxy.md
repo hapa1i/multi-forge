@@ -724,6 +724,13 @@ Proxy and direct request costs are logged as downstream telemetry under `~/.forg
 them manually if present. New request spend writes to downstream records, and the by-verb view joins those records to
 run ids instead of writing verb snapshot files.
 
+LiteLLM streams can include gateway-calculated cost in final `usage.cost`. Forge records it as `reporter=litellm`,
+`confidence=gateway_calculated`; it is gateway evidence, not a provider invoice. Older or remote gateways may omit cost.
+Reported tokens remain visible, but missing cost stays `unavailable` and does not increase dollar caps. An explicit zero
+remains distinct from missing cost. If final usage never arrives, Forge has no final usage or cost to record. Streaming
+headers cannot show the completed request's cost; cumulative cost headers reflect spend known before the stream
+completes.
+
 Without a proxy filter, `forge telemetry costs show` includes reported direct costs such as Jev attempts, whose records
 have `proxy_id: null`. Supplying a proxy ID limits the view to that proxy. A direct Jev attempt with session/run
 attribution also contributes to the session's `forge +$Y` total; the downstream cost and usage event count once.
@@ -773,12 +780,12 @@ question. Forge never prices a request from a local table — a missing cost sho
 the provenance column: `forge telemetry costs show` is reported-only; `forge telemetry activity` also includes
 best-effort verb-snapshot estimates):
 
-| Surface                                | Question it answers                               | Scope                                                                   | Cost provenance                                                                 |
-| -------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `forge telemetry costs show [id]`      | "What cost did the provider report?"              | all downstream requests, or the selected proxy                          | reported `$` or `unavailable`; **authoritative** spend view                     |
-| `forge telemetry activity [session]`   | "What did Forge's automation do this session?"    | one Forge session — operation outcomes + model calls joined by run tree | reported-or-estimated `$`, best-effort attribution                              |
-| status-line `cost` segment             | "What is my Claude session costing / quota left?" | one interactive launch; proxy mode subtracts the proxy launch baseline  | Claude's reported cost/quota, or proxy-reported `~$`; never recomputed by Forge |
-| status-line `forge +$Y` (`forge_cost`) | "What did Forge add on top of my session?"        | one Forge session, **excluding** the main interactive harness           | reported-or-nothing (subscription/OAuth → nothing)                              |
+| Surface                                | Question it answers                               | Scope                                                                   | Cost provenance                                                                    |
+| -------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `forge telemetry costs show [id]`      | "What cost did the route report?"                 | all downstream requests, or the selected proxy                          | reported or gateway-calculated `$`, or `unavailable`; **authoritative** spend view |
+| `forge telemetry activity [session]`   | "What did Forge's automation do this session?"    | one Forge session — operation outcomes + model calls joined by run tree | reported-or-estimated `$`, best-effort attribution                                 |
+| status-line `cost` segment             | "What is my Claude session costing / quota left?" | one interactive launch; proxy mode subtracts the proxy launch baseline  | Claude's reported cost/quota, or proxy-reported `~$`; never recomputed by Forge    |
+| status-line `forge +$Y` (`forge_cost`) | "What did Forge add on top of my session?"        | one Forge session, **excluding** the main interactive harness           | reported-or-nothing (subscription/OAuth → nothing)                                 |
 
 Set caps on the proxy:
 
@@ -790,7 +797,8 @@ forge proxy set openrouter-anthropic costs.on_cap_hit=warn
 
 Caps are enforced after each completed request: a request may cross a cap and complete, then the next request is blocked
 once logged spend reaches the cap. `on_cap_hit=reject` returns HTTP 429 with `spend_cap_exceeded`; `on_cap_hit=warn`
-lets the request continue and returns `X-Spend-Warning`.
+lets the request continue and returns `X-Spend-Warning`. LiteLLM cost received in final streamed usage contributes once
+when the stream completes, under the same cap rules.
 
 > Earlier versions had a `costs.cap_mode` setting (`post`/`strict`); it was removed and caps are now always post-event.
 > A leftover `cap_mode:` line — or any unrecognized key under `costs`/`costs.caps` — is now rejected with a config error
