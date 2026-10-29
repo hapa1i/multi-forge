@@ -1,6 +1,7 @@
 # Dependency security follow-up checklist
 
-**Current focus:** Draft PR preparation; final document counts await approval. See [verification](verification.md).
+**Current focus:** [PR #288](https://github.com/hapa1i/multi-forge/pull/288) is a draft; final document counts await
+approval. See [verification](verification.md).
 
 - [x] Read both open alerts and verify patched releases against upstream advisories.
 - [x] Trace development/runtime ownership and review the user-approved expansion to 14 additional advisories.
@@ -15,7 +16,7 @@
 - [ ] Pass full pre-commit, build and the clean-wheel runtime smoke; refresh final documentation counts.
   - Build and clean-wheel smoke passed. All other hooks pass with `SKIP=file-size-limits`. Counting the revised
     telemetry/proxy guides awaits approval to send their contents to Anthropic; then rerun the complete checks.
-- [ ] Prepare the PR with exact verification and limitations.
+- [x] Prepare the PR with exact verification and limitations.
 - [ ] After merge, verify default-branch alert closure and record card closeout.
 
 ## Acceptance fixtures

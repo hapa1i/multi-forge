@@ -2,7 +2,8 @@
 
 **Status**: Doing, accepted on 2026-10-29. Branch `codex/dependabot-security-followup`, based on `addf8f7e`. The owner
 requested the two open Dependabot fixes and approved including the additional runtime findings from the full lock audit.
-See [checklist](checklist.md), [alerts](alerts.json) and [audit findings](audit-findings.json).
+Draft [PR #288](https://github.com/hapa1i/multi-forge/pull/288) contains the fixes. See [checklist](checklist.md),
+[alerts](alerts.json) and [audit findings](audit-findings.json).
 
 ## Scope
 
