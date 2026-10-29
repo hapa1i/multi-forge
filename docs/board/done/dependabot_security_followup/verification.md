@@ -86,8 +86,13 @@ five selected cases in `tests/integration/sidecar/test_sidecar_omit.py` and
 again (11,234 tests), and the full regression suite passed with Homebrew Bash first on `PATH` (2,218 tests). Full
 pre-commit passed with the final shell harness and documentation counts.
 
-## After merge
+## Merged verification
 
-The two Dependabot alerts remain open until the fixes merge and GitHub refreshes the default-branch graph. Existing host
-installations need stop/upgrade/start, and sidecars need updated images and fresh containers; merging the lock does not
-update running deployments.
+[PR #288](https://github.com/hapa1i/multi-forge/pull/288) merged on 2026-10-29 as
+`982e589bbdd714fbdbd0e258b8bfdaefb26cb51e`. The merged tree matches reviewed head
+`80fe298b3017244fd0fb72112db03c27843d5498`; all five CI checks passed. GitHub marked virtualenv alert #61 fixed at
+`2026-10-29T17:00:11Z` and Black alert #62 fixed at `2026-10-29T17:00:12Z`. Neither was dismissed, and the
+default-branch query for open Dependabot alerts returned `[]`.
+
+Existing host installations need stop/upgrade/start, and sidecars need updated images and fresh containers; merging the
+lock does not update running deployments.

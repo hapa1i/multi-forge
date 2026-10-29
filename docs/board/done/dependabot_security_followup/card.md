@@ -1,9 +1,10 @@
 # Patch the late-October dependency advisories
 
-**Status**: Doing, accepted on 2026-10-29. Branch `codex/dependabot-security-followup`, based on `addf8f7e`. The owner
-requested the two open Dependabot fixes and approved including the additional runtime findings from the full lock audit.
-[PR #288](https://github.com/hapa1i/multi-forge/pull/288) contains the fixes. See [checklist](checklist.md),
-[alerts](alerts.json) and [audit findings](audit-findings.json).
+**Status**: Done on 2026-10-29. [PR #288](https://github.com/hapa1i/multi-forge/pull/288) merged as `982e589b`; both
+Dependabot alerts are fixed and the default branch has zero open alerts. Branch `codex/dependabot-security-followup` was
+based on `addf8f7e`. The owner requested the two alert fixes and approved the additional runtime findings from the full
+lock audit. See [closeout](checklist.md#merged-closeout), [alerts](alerts.json) and
+[audit findings](audit-findings.json).
 
 ## Scope
 
@@ -23,7 +24,7 @@ The runtime updates cover DNS name decompression, file-lock safety and LiteLLM a
 requires compatibility checks through Hugging Face and virtualenv; their declared ranges admit 4.2.1. LiteLLM remains on
 the 1.102 release line. Preserve existing model routes, saved configurations, FastAPI/Starlette bounds and build pins.
 
-The earlier [dependency card](../dependabot_october_2026/card.md) retains the evidence for
+The earlier [dependency card](../../doing/dependabot_october_2026/card.md) retains the evidence for
 [PR #279](https://github.com/hapa1i/multi-forge/pull/279). This card covers the newly reported alerts and audit
 findings. No model-provider inference is part of this maintenance task.
 
