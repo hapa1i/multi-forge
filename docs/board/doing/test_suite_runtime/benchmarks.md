@@ -62,6 +62,36 @@ log reported `created: 8/8 workers` and one passing test in 8.89 seconds.
 CI serial/parallel comparison and integration timings remain pending. These local results do not establish CI
 performance or complete the card's acceptance gates.
 
+## CI serial baseline
+
+The serial baseline for [Part A PR #290](https://github.com/hapa1i/multi-forge/pull/290), head
+`9dd4aadd9ac23bc63d0520c8f0755d6af5e41cb0`, completed successfully in
+[Tests run 40977896223](https://github.com/hapa1i/multi-forge/actions/runs/40977896223). It used the existing direct
+`uv run --locked pytest` commands, with the same suite selections as the local runs and no parallel or retry flags.
+
+The runner image was `ubuntu-26.04`, version `20261025.179.1`, with runner agent `2.338.0`. Although `setup-python`
+installed CPython 3.11.17, the pytest session headers confirm that uv ran both suites under Python 3.13.11 and pytest
+9.1.1. pytest-xdist 3.8.0 was installed but the suites ran serially.
+
+| Step                        | Wall seconds | Pytest seconds | Result                                          |
+| --------------------------- | ------------ | -------------- | ----------------------------------------------- |
+| Unit                        | 288          | 283.01         | 11,234 passed; 120 integration tests deselected |
+| Regression                  | 293          | 290.92         | 2,218 passed                                    |
+| Clean-wheel LiteLLM runtime | 16           | N/A            | Passed                                          |
+
+Step wall times come from the completed job metadata and have one-second resolution. The complete Tests job took 611
+seconds, including setup and cleanup. Both suites had no failures, skips or retries; the unit suite reported eight
+`multiprocessing` fork deprecation warnings. The verbose log contains 11,234 unique passing unit node IDs and 2,218
+unique passing regression node IDs, retained for the parallel comparison.
+
+[Pre-commit run 40977896302](https://github.com/hapa1i/multi-forge/actions/runs/40977896302) also passed, with 143
+seconds in its checks step. Completed job metadata, logs and extracted node IDs are saved locally under
+`/tmp/forge-test-suite-runtime-20261030/ci-before*`. The local Part A `make build`, clean-wheel runtime smoke and full
+`make pre-commit` also passed before the CI workflow candidate was prepared.
+
+The CI parallel candidate and adoption decision remain pending. Integration baseline and after-change measurements
+belong to Part B and are still pending.
+
 ## Dependency review
 
 The trial pins [pytest-xdist 3.8.0](https://pypi.org/project/pytest-xdist/3.8.0/) and
