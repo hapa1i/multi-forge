@@ -1,5 +1,11 @@
 # Python CI verification evidence
 
+The [successful CI run](ci-acceptance.json) on implementation commit `710dde86` passed all 11,471 unit tests and 2,260
+regressions on Python 3.11.17 and 3.13.17, plus both pinned wheel smokes and pre-commit. The retained
+[comparison summary](ci-comparison.json) proves exact selected-test identity parity and records both controllers and all
+four workers per suite. Python 3.13 emitted eight existing multiprocessing fork deprecation warnings; no tests were
+skipped or rerun. Earlier failures and local controls remain below.
+
 The local matrix uses Python 3.11.14 and 3.13.11 on macOS arm64, with uv 0.9.18 and the unchanged reviewed lock.
 `.python-version` remains `3.13`. The 3.11 project environment is isolated from the existing development environment.
 

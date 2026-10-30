@@ -89,7 +89,7 @@ arbitrary resource starvation.
 - [x] Reproduce delayed readiness after 12s and verify a never-ready process still receives one process-group kill.
 - [x] Update runtime design and operator guidance for the startup allowance.
 - [x] Verify real process-group integration and unmodified cold-wheel startup after the correction.
-- [ ] Pass full pre-commit and both complete CI lanes, including wheel smoke and exact test-selection comparison.
+- [x] Pass full pre-commit and both complete CI lanes, including wheel smoke and exact test-selection comparison.
 
 The smoke keeps its cold install and existing assertions. Missing-registry cleanup refusal after failed startup still
 preserves evidence; no cleanup ownership or retry policy changes are included.
@@ -98,3 +98,14 @@ The two real LiteLLM teardown integration cases passed. Fresh-wheel smoke passed
 Python 3.13.11 at 0.4 CPU without diagnostic overrides or warmup. Focused backend unit/regression checks passed all 13
 cases; independent review found no blocking issue. The controlled probe and check summaries retain the earlier failures
 alongside these results.
+
+## Ready for owner review
+
+[PR #293](https://github.com/hapa1i/multi-forge/pull/293) has a successful complete CI run on implementation commit
+`710dde86`: Python 3.11.17 and 3.13.17 each passed 11,471 unit tests, 2,260 regressions and the pinned cold-wheel smoke.
+The [retained comparison](evidence/ci-comparison.json) confirms exact selected identity parity and each
+controller/worker interpreter. [CI acceptance](evidence/ci-acceptance.json) retains run links, timings and artifact
+digests; Python 3.13's eight existing multiprocessing fork deprecation warnings are recorded. Pre-commit passed.
+
+The final evidence commit changes documentation only. Owner merge and the main/board closeout remain pending; this card
+stays in `doing` until then.
