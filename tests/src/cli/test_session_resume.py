@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import TypedDict
-from unittest.mock import patch
+from unittest.mock import DEFAULT, patch
 
+import pytest
 from click.testing import CliRunner
 
 import forge.cli.session as session_cli
@@ -14,7 +16,9 @@ from forge.cli.main import main
 from forge.config.loader import write_proxy_instance_config
 from forge.core.ops.session import ForgeOpError
 from forge.session import SessionManager, SessionStore, create_session_state
+from forge.session.active import ActiveSessionStore
 from forge.session.config import LAUNCH_MODE_HOST
+from forge.session.derived_overrides import validate_derived_session_overrides
 from forge.session.models import (
     LaneRecord,
     ModelRouteIntent,
@@ -1655,3 +1659,188 @@ class TestSupervisorLaunchControls:
         lanes = SessionStore(str(temp_env), "codex-start").read().intent.consumer_lanes
         assert lanes is not None
         assert lanes.supervisor == LaneRecord("codex", "chatgpt", "gpt-5-codex")
+
+
+class TestDerivedResumePreflight:
+    @pytest.mark.parametrize(
+        ("overrides", "path"),
+        [
+            ({"memory": {"auto_update": {"min_turns": "invalid"}}}, "memory.auto_update.min_turns"),
+            ({"launch": {"runtime": "codex"}}, "launch.runtime"),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "flags",
+        [
+            ["--fresh", "--strategy", "ai-curated"],
+            ["--fresh", "--resume-mode", "native"],
+            ["--fresh", "--strategy", "rewind", "--drop-last", "1"],
+            ["--force"],
+        ],
+    )
+    @pytest.mark.parametrize("route_flags", [["--proxy", "unstarted"], ["--model", "claude-opus-5"]])
+    def test_invalid_parent_refuses_before_route_or_child_preparation(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        flags: list[str],
+        route_flags: list[str],
+        overrides: dict[str, object],
+        path: str,
+    ) -> None:
+        parent = create_session_state("invalid-parent", worktree_path=str(temp_env))
+        parent.confirmed.claude_session_id = "parent-uuid"
+        parent.confirmed.confirmed_by = "hook:SessionStart:startup"
+        index = SessionManager().index_store
+        publish_session(index, parent, temp_env, forge_root=str(temp_env))
+        store = SessionStore(str(temp_env), parent.name)
+        # Simulate a legacy/manual invalid override after coherent publication.
+        stored = json.loads(store.manifest_path.read_text())
+        stored["overrides"] = overrides
+        store.manifest_path.write_text(json.dumps(stored))
+        if "--force" in flags:
+            ActiveSessionStore().upsert_session(
+                parent.name,
+                worktree_path=str(temp_env),
+                forge_root=str(temp_env),
+                launch_mode=LAUNCH_MODE_HOST,
+                launcher_pid=os.getpid(),
+            )
+        before_manifest = store.manifest_path.read_bytes()
+        before_index = index.index_path.read_bytes()
+
+        with (
+            patch("forge.cli.session_lifecycle._plan_interactive_session_model_route") as plan_route,
+            patch("forge.cli.session_lifecycle._realize_interactive_session_model_route") as realize_route,
+            patch("forge.cli.session_lifecycle._resolve_routing_from_cli") as resolve_proxy,
+            patch("forge.session.manager.assemble_transfer_context") as transfer,
+            patch("forge.cli.session_resume_modes._prepare_rewind_launch_artifacts") as rewind,
+            patch.object(SessionManager, "resume_session") as resume,
+            patch.object(SessionManager, "relaunch_session") as relaunch,
+        ):
+            result = runner.invoke(main, ["session", "resume", parent.name, *flags, *route_flags])
+
+        assert result.exit_code == 1, result.output
+        assert path in result.stderr
+        assert result.stdout == ""
+        for effect in (plan_route, realize_route, resolve_proxy, transfer, rewind, resume, relaunch):
+            effect.assert_not_called()
+        assert store.manifest_path.read_bytes() == before_manifest
+        assert index.index_path.read_bytes() == before_index
+        assert not (temp_env / ".forge" / "prev_sessions").exists()
+
+    def test_codex_resume_keeps_its_existing_dispatch(self, runner: CliRunner, temp_env: Path) -> None:
+        parent = create_session_state("codex-parent", worktree_path=str(temp_env), runtime="codex")
+        publish_session(SessionManager().index_store, parent, temp_env, forge_root=str(temp_env))
+        with (
+            patch("forge.cli.session_derived_preflight.validate_derived_session_overrides") as guard,
+            patch("forge.cli.session_lifecycle.run_codex_resume", return_value=0) as codex_resume,
+        ):
+            result = runner.invoke(main, ["session", "resume", parent.name])
+
+        assert result.exit_code == 0, result.output
+        codex_resume.assert_called_once()
+        guard.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("confirmed", "active", "flags", "expected_helper", "derives"),
+        [
+            (True, False, [], "_reconnect_in_place", False),
+            (True, False, ["--force"], "_reconnect_in_place", False),
+            (False, True, ["--force"], "_launch_in_place", False),
+            (True, True, ["--force"], "_launch_as_child", True),
+            (True, False, ["--fresh"], "_resume_fresh", True),
+            (True, False, ["--fresh", "--resume-mode", "native"], "_resume_fresh_native", True),
+            (
+                True,
+                False,
+                ["--fresh", "--strategy", "rewind", "--drop-last", "0"],
+                "_resume_fresh_native",
+                True,
+            ),
+            (
+                True,
+                False,
+                ["--fresh", "--strategy", "rewind", "--drop-last", "1"],
+                "_resume_fresh_rewind",
+                True,
+            ),
+        ],
+    )
+    def test_guard_preserves_resume_dispatch(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        confirmed: bool,
+        active: bool,
+        flags: list[str],
+        expected_helper: str,
+        derives: bool,
+    ) -> None:
+        parent = create_session_state("dispatch-parent", worktree_path=str(temp_env))
+        if confirmed:
+            parent.confirmed.claude_session_id = "parent-uuid"
+            parent.confirmed.confirmed_by = "hook:SessionStart:startup"
+        parent.overrides = {"verification": {"bypass": True}}
+        publish_session(SessionManager().index_store, parent, temp_env, forge_root=str(temp_env))
+        if active:
+            ActiveSessionStore().upsert_session(
+                parent.name,
+                worktree_path=str(temp_env),
+                forge_root=str(temp_env),
+                launch_mode=LAUNCH_MODE_HOST,
+                launcher_pid=os.getpid(),
+            )
+
+        with (
+            patch(
+                "forge.cli.session_derived_preflight.validate_derived_session_overrides",
+                wraps=validate_derived_session_overrides,
+            ) as guard,
+            patch.multiple(
+                "forge.cli.session_lifecycle",
+                _reconnect_in_place=DEFAULT,
+                _launch_in_place=DEFAULT,
+                _launch_as_child=DEFAULT,
+                _resume_fresh=DEFAULT,
+                _resume_fresh_native=DEFAULT,
+                _resume_fresh_rewind=DEFAULT,
+            ) as dispatch,
+        ):
+            result = runner.invoke(main, ["session", "resume", parent.name, "--no-proxy", *flags])
+
+        assert result.exit_code == 0, result.output
+        assert guard.call_count == int(derives)
+        for helper_name, helper in dispatch.items():
+            assert helper.call_count == int(helper_name == expected_helper)
+
+    @pytest.mark.parametrize(
+        "invalid_fields",
+        [
+            {"overrides": {"unknown": True}},
+            {"overrides": []},
+            {"schema_version": 999},
+        ],
+    )
+    @pytest.mark.parametrize("flags", [["--fresh"], ["--force"]])
+    def test_strict_manifest_failure_offers_only_repair_or_restore(
+        self, runner: CliRunner, temp_env: Path, invalid_fields: dict[str, object], flags: list[str]
+    ) -> None:
+        parent = create_session_state("strict-parent", worktree_path=str(temp_env))
+        publish_session(SessionManager().index_store, parent, temp_env, forge_root=str(temp_env))
+        store = SessionStore(str(temp_env), parent.name)
+        # Deliberately break the stored schema after publishing a valid parent.
+        data = json.loads(store.manifest_path.read_text())
+        data.update(invalid_fields)
+        store.manifest_path.write_text(json.dumps(data))
+        before = store.manifest_path.read_bytes()
+
+        result = runner.invoke(main, ["session", "resume", parent.name, *flags])
+
+        assert result.exit_code == 1, result.output
+        assert "Repair" in result.stderr and "restore" in result.stderr
+        assert result.stdout == ""
+        assert "delete" not in result.stderr.lower()
+        assert "forge clean" not in result.stderr
+        assert "reset" not in result.stderr
+        assert store.manifest_path.read_bytes() == before

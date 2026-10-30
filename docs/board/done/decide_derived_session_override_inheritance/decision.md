@@ -3,7 +3,7 @@
 **Status:** Selected by the maintainer on 2026-10-27 and shipped with the reviewed corrections in
 [PR #284](https://github.com/hapa1i/multi-forge/pull/284) on 2026-10-28. Keep the fork/fresh versus relaunch
 distinction; [evidence](evidence.md) separates initial characterization from the verified fixes. Uniform validation
-remains unshipped work in [the implementation card](../../proposed/validate_derived_session_overrides/card.md).
+remains unshipped work in [the implementation card](../../doing/validate_derived_session_overrides/card.md).
 
 ## Selected contract
 
@@ -111,9 +111,9 @@ boundaries. This decision does not promise an atomic snapshot across concurrent 
 
 ## Implementation handoff
 
-The [validation follow-up](../../proposed/validate_derived_session_overrides/card.md) owns pre-derivation admission and
-the fixture-grounded regression matrix. Current inheritance and reset behavior is documented in the session design and
-user guides with this decision. The follow-up must update their validation limitation when its code ships. It preserves
+The [validation follow-up](../../doing/validate_derived_session_overrides/card.md) owns pre-derivation admission and the
+fixture-grounded regression matrix. Current inheritance and reset behavior is documented in the session design and user
+guides with this decision. The follow-up must update their validation limitation when its code ships. It preserves
 memory, lane and supervisor ownership and requires targeted Docker lifecycle checks. This PR also fixes the exposed
 proxy-pair inheritance, wildcard lane authoring and reset-diagnostic bugs and removes the unreachable relaunch fallback;
 those corrections do not implement the full guard.

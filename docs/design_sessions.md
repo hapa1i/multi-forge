@@ -258,13 +258,21 @@ error. Baseline suspension requires supervisor `on`. Configuration edits do not 
 resolution is separate and reads the immediate parent's snapshots live until the child owns a plan. Do not materialize
 the entire effective configuration: it would erase reset provenance.
 
-Uniform refusal before side effects is tracked in
-[the validation proposal](board/proposed/validate_derived_session_overrides/card.md). Relaunch can publish invalid
-overrides; fork/fresh can refuse only after transfer writes/inference or forced deletion of the old fork. CLI proxy
-startup also precedes manager validation. The proposed guard must run before routing realization and manager effects.
-Existing strict reads and typed owners remain in force, and wildcard writes now apply the same key validation as direct
-writes. Derivation readiness checks cover active native Codex sources; sidecar and Claude reviewer admission stay at
-launch.
+`session/derived_overrides.py` validates the parent's effective typed configuration and rejects explicitly stored
+overrides of runtime, resolved route, authority, consumer lanes and native supervisor source identity. It inspects
+actual nested override entries; clearing a nullable parent does not invent an immutable descendant override. Fork
+planning and fresh/active-force resume run this pure guard before route realization. All three manager derivations also
+guard before legacy identity migration and recheck their parent read inside the existing cleanup lease, before
+replacement deletion, worktree creation, transfer writes/inference or child publication. This adds no concurrent
+snapshot protocol.
+
+The guard leaves parent state unchanged and reports the offending path. Recovery suggestions simulate the shared reset
+operation's supervisor snapshot and transition checks: keyed reset or reset-all is offered only when admitted and the
+remaining configuration passes validation. Otherwise configured supervisors require removal/reconfiguration; absent
+baseline supervisors and strict manifest-read failures require repair/restoration. Existing strict reads and allowlisted
+in-memory migrations remain in force. Structural validation adds no source/auth reads or reviewer preflight. Derivation
+readiness checks cover active native Codex sources; sidecar and Claude reviewer admission stay at launch, including fork
+`--no-launch`. Disabled relaunch policy does not acquire a new reviewer-readiness requirement.
 
 ### Session cleanup
 

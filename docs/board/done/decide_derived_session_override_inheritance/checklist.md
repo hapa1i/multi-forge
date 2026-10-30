@@ -22,7 +22,7 @@ shipped and verified. Uniform derivation validation remains in the separate, uns
 - [x] Specify immutable/lifecycle-owned keys, invalid legacy state and recovery without silent repair.
 - [x] Specify child reset semantics and distinguish reattach from a new session.
 - [x] Resolve the product choice with the maintainer: keep the fork/fresh versus relaunch distinction.
-- [x] Create [the validation implementation proposal](../../proposed/validate_derived_session_overrides/card.md) with
+- [x] Create [the validation implementation proposal](../../doing/validate_derived_session_overrides/card.md) with
   fixture-grounded acceptance after the decision; leave it unstarted.
 
 ## Closeout
@@ -61,5 +61,5 @@ shipped and verified. Uniform derivation validation remains in the separate, uns
   override-only verification setup, reset/admission limits and live inherited plans. The reviewed contract is recorded
   in the
   [session implementation notes](../../impl_notes/sessions.md#derived-configuration-keeps-layer-provenance-reviewed-2026-10-28).
-- [Uniform pre-derivation validation](../../proposed/validate_derived_session_overrides/card.md) stays proposed. It owns
+- [Uniform pre-derivation validation](../../doing/validate_derived_session_overrides/card.md) is now active. It owns
   refusal before proxy startup, transfer work and forced fork replacement; this closeout does not activate it.

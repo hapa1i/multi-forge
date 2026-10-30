@@ -1,13 +1,13 @@
 # Validate derived-session overrides before creating a child
 
-**Lane:** `proposed/` -- implementation follow-up; not started.
+**Lane:** `doing/` -- accepted for implementation on 2026-10-30.
 
 **Origin:** The maintainer selected the
 [derived-session inheritance decision](../../done/decide_derived_session_override_inheritance/decision.md) on
 2026-10-27; it shipped with reviewed corrections in PR #284 on 2026-10-28.
 [Evidence](../../done/decide_derived_session_override_inheritance/evidence.md) includes the initial `32df0219`
-characterization and the verified fixes. This implementation proposal remains unstarted. The completed maintenance epic
-is provenance, not an active coordinator.
+characterization and the verified fixes. Execution is tracked in [the checklist](checklist.md). The completed
+maintenance epic is provenance, not an active coordinator.
 
 ## Problem
 

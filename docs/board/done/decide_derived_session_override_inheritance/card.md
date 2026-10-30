@@ -5,7 +5,7 @@
 **Lane**: `done/` -- shipped on 2026-10-28 in [PR #284](https://github.com/hapa1i/multi-forge/pull/284), merged as
 `3ad15937` with the same tree as reviewed head `864cb926`. The maintainer selected the inheritance contract on
 2026-10-27. Uniform pre-derivation validation remains in the separate, unstarted
-[implementation proposal](../../proposed/validate_derived_session_overrides/card.md). See
+[implementation proposal](../../doing/validate_derived_session_overrides/card.md). See
 [merged closeout](checklist.md#merged-closeout).
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../done/epic_repo_maintenance_round/card.md) (completed provenance).

@@ -35,6 +35,7 @@ from .config import (
     LAUNCH_MODE_HOST,
     LAUNCH_MODE_SIDECAR,
 )
+from .derived_overrides import validate_derived_session_overrides
 from .exceptions import (
     CannotForkCodexParentError,
     CannotForkIncognitoError,
@@ -279,7 +280,9 @@ def _publish_created_session(
 _SessionOperation = TypeVar("_SessionOperation", bound=Callable[..., Any])
 
 
-def _with_parent_lease(parent_field: str = "parent_name") -> Callable[[_SessionOperation], _SessionOperation]:
+def _with_parent_lease(
+    parent_field: str = "parent_name", *, validate_overrides: bool = False
+) -> Callable[[_SessionOperation], _SessionOperation]:
     """Keep a derivation source alive through context preparation and child publication."""
 
     def decorate(operation: _SessionOperation) -> _SessionOperation:
@@ -300,6 +303,10 @@ def _with_parent_lease(parent_field: str = "parent_name") -> Callable[[_SessionO
                 root = str(discovered) if discovered is not None else None
             entry = manager.index_store.get_session(parent_name, forge_root=root)
             parent_root = entry.forge_root or entry.worktree_path
+            if validate_overrides:
+                # Identity migration writes durable state before the lease. Refuse
+                # invalid legacy parents first; the leased operation rechecks its read.
+                validate_derived_session_overrides(SessionStore(parent_root, parent_name).read())
             instance_id = manager.index_store.migrate_session_identity(parent_name, parent_root)
             from .workers import session_worker_lease
 
@@ -780,7 +787,7 @@ class SessionManager:
                 raise ForgeSessionError(f"{error}. Cleanup refused: {'; '.join(cleanup_errors)}") from error
             raise
 
-    @_with_parent_lease()
+    @_with_parent_lease(validate_overrides=True)
     def resume_session(
         self,
         parent_name: str,
@@ -842,6 +849,7 @@ class SessionManager:
             raise SessionNotFoundError(parent_name)
 
         parent_state = parent_store.read()
+        validate_derived_session_overrides(parent_state)
         from forge.policy.semantic.identity import validate_inherited_claude_trigger
 
         validate_inherited_claude_trigger(parent_state)
@@ -1208,7 +1216,7 @@ class SessionManager:
 
         return True
 
-    @_with_parent_lease()
+    @_with_parent_lease(validate_overrides=True)
     def fork_session(
         self,
         parent_name: str,
@@ -1266,6 +1274,7 @@ class SessionManager:
         if authority_explicit and os.environ.get("FORGE_SESSION"):
             raise ForgeSessionError("authority-bearing session creation is only available outside a managed session")
         parent = self.get_session(parent_name, forge_root=forge_root)
+        validate_derived_session_overrides(parent)
         from forge.policy.semantic.identity import validate_inherited_claude_trigger
 
         validate_inherited_claude_trigger(parent)
@@ -1708,7 +1717,7 @@ class SessionManager:
                 raise ForgeSessionError(f"{error}. {status}: {'; '.join(cleanup_errors)}") from error
             raise
 
-    @_with_parent_lease()
+    @_with_parent_lease(validate_overrides=True)
     def relaunch_session(
         self,
         parent_name: str,
@@ -1737,6 +1746,7 @@ class SessionManager:
             SessionNotFoundError: If parent doesn't exist.
         """
         parent = self.get_session(parent_name, forge_root=forge_root)
+        validate_derived_session_overrides(parent)
         from forge.policy.semantic.identity import validate_inherited_claude_trigger
 
         validate_inherited_claude_trigger(parent, preserve_overrides=True)

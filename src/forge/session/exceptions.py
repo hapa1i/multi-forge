@@ -324,6 +324,16 @@ class InvalidOverrideValueError(ForgeSessionError):
         super().__init__(f"invalid value for '{key}': expected {expected}, got {actual}")
 
 
+class InvalidDerivedSessionOverridesError(ForgeSessionError):
+    """Raised before deriving a child from invalid stored parent overrides."""
+
+    def __init__(self, session_name: str, key: str, reason: str, recovery: str) -> None:
+        self.key = key
+        self.reason = reason
+        self.recovery = recovery
+        super().__init__(f"Cannot derive from session '{session_name}': invalid override '{key}': {reason}. {recovery}")
+
+
 # --- Resume Exceptions ---
 
 
