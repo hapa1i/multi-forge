@@ -72,9 +72,15 @@ class TestStatusLineCommand:
 class TestStatusLineSourcePlan:
     """Installed-CLI instrumentation for registry-owned proxy/session acquisition."""
 
+    @pytest.mark.parametrize(
+        ("proxy_segment", "include_effort"),
+        [("model", True), ("cost", False)],
+    )
     def test_configured_layout_acquires_only_declared_sources(
         self,
         mock_claude_workspace: ContainerLike,
+        proxy_segment: str,
+        include_effort: bool,
     ) -> None:
         instrument_dir = "/tmp/d018-statusline-instrument"
         proxy_marker = "/tmp/d018-proxy-probes"
@@ -87,9 +93,9 @@ class TestStatusLineSourcePlan:
             """from pathlib import Path
 from forge.cli.statusline import sources
 
-def _detect_proxy():
+def _detect_proxy(*, include_effort=False):
     with Path('/tmp/d018-proxy-probes').open('a', encoding='utf-8') as handle:
-        handle.write('1')
+        handle.write(str(include_effort))
     return False, None, False
 
 def _discover_session():
@@ -118,21 +124,21 @@ sources.discover_session = _discover_session
             f"env PYTHONPATH={instrument_dir} forge status-line < /tmp/d018-statusline-input.json"
         )
 
-        assert zero_source.returncode == 0
+        assert zero_source.returncode == 0, zero_source.stderr
         assert "/workspace" in zero_source.stdout
         assert mock_claude_workspace.read_file(proxy_marker) == ""
         assert mock_claude_workspace.read_file(session_marker) == ""
 
         mock_claude_workspace.write_file(
             "$HOME/.forge/config.yaml",
-            "statusline:\n  segments: [model, breadcrumb]\n",
+            f"statusline:\n  segments: [{proxy_segment}, breadcrumb]\n",
         )
         mixed = mock_claude_workspace.exec(
             f"env PYTHONPATH={instrument_dir} forge status-line < /tmp/d018-statusline-input.json"
         )
 
-        assert mixed.returncode == 0
-        assert mock_claude_workspace.read_file(proxy_marker) == "1"
+        assert mixed.returncode == 0, mixed.stderr
+        assert mock_claude_workspace.read_file(proxy_marker) == str(include_effort)
         assert mock_claude_workspace.read_file(session_marker) == "1"
 
         reset = mock_claude_workspace.exec("forge config reset statusline")
