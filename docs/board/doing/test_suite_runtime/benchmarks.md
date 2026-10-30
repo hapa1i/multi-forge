@@ -31,7 +31,7 @@ same phrase check. Product behavior and the test count are unchanged.
 ## Local stability validation
 
 The adopted Make targets run `--dist=load -n auto --maxprocesses=4`, selecting four workers on this host. Each suite
-passed three consecutive complete runs after the final isolation changes. The corresponding serial commands are
+passed three consecutive complete runs after the initial isolation changes. The corresponding serial commands are
 `make test-unit TEST_WORKERS=0` and `make test-regression TEST_WORKERS=0`, so both sides include the Make prerequisites.
 
 | Suite      | Parallel wall seconds, in run order | Median wall seconds | Matching Make serial wall seconds | Result per parallel run |
@@ -59,7 +59,9 @@ The numeric override smoke used
 `PYTEST_ADDOPTS='-k test_proxy_relative_time_keeps_compact_compatibility_contract' make test-unit TEST_WORKERS=8`. Its
 log reported `created: 8/8 workers` and one passing test in 8.89 seconds.
 
-The CI comparison and Part B integration measurements below are separate from these local results.
+The CI comparison and Part B integration measurements below are separate from these local results. The later
+hook-emission ordering failure reopens unit stability validation; the unchanged regression suite's three passing runs
+remain accepted.
 
 ## CI serial baseline
 
@@ -143,10 +145,30 @@ seconds, versus 611 serial and 473 in the first parallel trial. The clean-wheel 
 [Pre-commit run 40982187659](https://github.com/hapa1i/multi-forge/actions/runs/40982187659) also passed; its checks
 step took 138 seconds.
 
-Adopt the Make targets' automatic four-worker cap for both CI suites: unit step wall time improved by 57.6% and
-regression by 58.7% against serial. The bounded-ID candidate meets the regression wall-time gate; this comparison does
-not establish output handling as the sole cause of the first trial's overhead. Raw logs, job metadata, passing IDs and
-the comparison summary are preserved under `/tmp/forge-test-suite-runtime-20261030/ci-bounded*`.
+This candidate supports the Make targets' automatic four-worker cap for both CI suites: unit step wall time improved by
+57.6% and regression by 58.7% against serial. The bounded-ID candidate meets the regression wall-time gate; this
+comparison does not establish output handling as the sole cause of the first trial's overhead. Raw logs, job metadata,
+passing IDs and the comparison summary are preserved under `/tmp/forge-test-suite-runtime-20261030/ci-bounded*`.
+
+## Subsequent CI hook-ordering failure
+
+[Tests run 40984039993](https://github.com/hapa1i/multi-forge/actions/runs/40984039993), at documentation-only head
+`327b1fc9359e7aa5a7d9dc06bc298a8d8241e373`, failed the unit step with 11,233 passed and one failed in 118.19 seconds.
+Regression and clean-wheel runtime steps were skipped after that failure.
+[Pre-commit run 40984039928](https://github.com/hapa1i/multi-forge/actions/runs/40984039928) passed.
+
+`TestGroupedParallel.test_uses_each_paired_invoker_hooks_and_preserves_input_order` expected Codex hook emissions in
+input order, but observed `x1`, then `x0`. The returned-result order and stdout assertions passed. The dispatcher emits
+each result inside its worker thread and restores input order only when constructing the returned list, so hook emission
+order is not guaranteed. The test fix sorts both invokers' emitted-label lists before comparison, preserving exact
+multiplicity and runtime pairing while retaining the returned-result order and stdout assertions. Product code and test
+counts are unchanged. The failed log is saved at
+`/tmp/forge-test-suite-runtime-20261030/ci-final-grouped-hook-failure.log`.
+
+All seven tests in the grouped-invoker file passed on four workers in 0.81 seconds, and full pre-commit passed. Three
+consecutive complete unit runs and CI must pass after this fix before unit stability and CI adoption are complete. The
+earlier unit measurements remain historical evidence; the unchanged regression three-run evidence and Part B validation
+remain accepted.
 
 ## Part B integration baseline
 
@@ -229,4 +251,5 @@ distribution, automatic workers capped by `--maxprocesses`, and `-n 0` for seria
 `auto` were the local candidates. The default is automatic selection capped at four workers, preserving an explicit
 numeric override. Ten workers saved 11 seconds on unit and 19 seconds on regression but used about 65% more CPU time
 than four; the cap leaves capacity for other work on shared hosts. Local stability and serial-debugging checks pass.
-Both CI suites meet the improvement gate, and Part B's clean integration validation passes.
+Regression CI meets the improvement gate, and Part B's clean integration validation passes. Unit stability and CI
+validation are reopened for the hook-ordering test fix.

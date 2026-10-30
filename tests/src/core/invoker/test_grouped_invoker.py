@@ -155,8 +155,9 @@ class TestGroupedParallel:
             "claude:raw-c1",
             "codex:raw-x1",
         ]
-        assert [result.label for result in claude.emitted] == ["c0", "c1"]
-        assert [result.label for result in codex.emitted] == ["x0", "x1"]
+        # Hooks run in worker threads; only returned results promise input order.
+        assert sorted(result.label for result in claude.emitted) == ["c0", "c1"]
+        assert sorted(result.label for result in codex.emitted) == ["x0", "x1"]
 
     @patch("forge.core.invoker._lifecycle._process_group_exists")
     @patch("forge.core.invoker._lifecycle.os.killpg")

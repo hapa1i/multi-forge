@@ -8,23 +8,26 @@ approved removal and retained command check.
 
 ## Current focus
 
-Await review and merge of both PRs. Implementation and validation pass: Part A's four-worker CI wall times are 122
-seconds unit and 121 seconds regression, versus 288 and 293 serial; Part B passes all 521 retained integration tests
-with one shared release-wheel build. Exact test-identity comparisons preserve coverage. The integration timing
-comparison retains the cache-warming caveat and failed disk-full attempt in [benchmarks](benchmarks.md). Keep the card
-in `doing/` until both PRs are shipped and verified.
+Validate the hook-emission ordering test fix after the final documentation head's CI run exposed one unit failure.
+Returned results retained input order; the test incorrectly required the same order from concurrent hook emissions. The
+grouped-invoker file and full pre-commit pass; three complete unit runs and CI are pending. Unchanged regression
+evidence and Part B's 521 passing integration cases remain accepted. Measurements, the failure and the integration cache
+caveat are recorded in [benchmarks](benchmarks.md). Keep the card in `doing/` until both PRs are shipped and verified.
 
 ## Part A -- parallel unit and regression runs
 
 - [x] Record serial wall time, collected/executed counts and failures for both suites on the unchanged test tree.
 - [x] Review pytest-xdist and its added dependencies; trial per-test distribution without changing the lock.
 - [x] Compare local worker counts and choose automatic workers capped at four, with numeric and serial overrides.
-- [x] Confirm four-worker unit CI improves wall time with an unchanged test count.
+- [ ] Reconfirm four-worker unit CI after the hook-ordering test fix, preserving all 11,234 tests and the measured
+  improvement over serial.
 - [x] Adopt the automatic four-worker cap for regression CI after the bounded-ID candidate improves step wall time from
   293 seconds serial to 121 seconds.
 - [x] Diagnose the parallel-only Rich line-wrap assertion and preserve its phrase check by normalizing whitespace.
-- [x] Require three consecutive green parallel runs per suite with unchanged test counts and no retries; all six JUnit
-  reports have matching test-case IDs within each suite, no failures and no skips.
+- [ ] Repeat three consecutive complete unit runs after the hook-ordering fix, with matching identities and all 11,234
+  tests passing without skips or retries. The earlier three unit passes remain recorded as historical evidence.
+- [x] Require three consecutive green regression runs with matching identities and all 2,218 tests passing without skips
+  or retries; the regression suite is unchanged by the hook-ordering fix.
 - [x] Confirm the 63 walkthrough cleanup regression cases spread across all four workers: 11 / 16 / 23 / 13 cases.
 - [x] Add pytest-xdist 3.8.0 and execnet 2.1.2 through the lock; runtime/build exports remain unchanged.
 - [x] Update Makefile and test instructions. Apply the four-worker cap only to `auto`/`logical`; numeric
@@ -45,8 +48,14 @@ in `doing/` until both PRs are shipped and verified.
 - [x] Pass full pre-commit for the label-only changes.
 - [x] Repeat CI: 11,234 unit and 2,218 regression tests pass with no failures, skips or retries. Identities match both
   earlier runs after exactly two unit and one regression name mappings; payloads, order and assertions are unchanged.
-- [x] Finalize CI Make commands with automatic workers capped at four: unit 122 seconds versus 288 serial; regression
-  121 seconds versus 293 serial. Clean-wheel runtime and CI pre-commit also pass.
+- [x] Record the subsequent CI failure: 11,233 unit tests passed and one failed because hook emission was asserted in
+  input order; returned result ordering and stdout passed. Regression/runtime steps were skipped; pre-commit passed.
+- [x] Correct both emitted-label assertions to ignore completion order while retaining exact multiplicity, runtime
+  pairing, returned-result order and stdout checks.
+- [x] Pass all seven grouped-invoker tests on four workers in 0.81 seconds and full pre-commit for the hook-ordering
+  fix.
+- [ ] Revalidate the CI Make commands after the fix; the earlier bounded-ID candidate measured unit 122 seconds versus
+  288 serial and regression 121 seconds versus 293 serial, with runtime/pre-commit passing.
 
 ## Part B -- integration trims
 
@@ -74,21 +83,22 @@ in `doing/` until both PRs are shipped and verified.
 
 ## Acceptance evidence
 
-| Check                  | Fixture                                       | Assertion                                             | Evidence                                                                                                                         |
-| ---------------------- | --------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Unit parallelism       | Full host unit suite                          | Same test count; three green runs; wall time improves | 11,234 passed each; walls 89.336 / 78.637 / 79.632 s; median 79.632 s versus 270.954 s serial                                    |
-| Regression parallelism | Full host regression suite                    | Per-test distribution; same count; three green runs   | 2,218 passed each; walls 99.525 / 97.558 / 97.849 s; median 97.849 s versus 295.250 s serial                                     |
-| Serial debugging       | Adopted runner with zero workers              | Same suite executes serially                          | Unit: 11,234 passed; regression: 2,218 passed; both with `TEST_WORKERS=0`                                                        |
-| CI adoption            | Same runner class and test behavior           | Parallel wall time improves over serial               | Four-worker unit 122 s vs 288 s serial; regression 121 s vs 293 s; identities match after exactly three intended ID renames      |
-| CLI removals           | Named unit twins and retained container tests | Assertions and real-process command coverage remain   | Clean run: 521 passed, exactly 543 baseline identities minus the 22 mapped removals; no failures, skips or reruns                |
-| Shared release wheel   | QA, walkthrough and native-worker consumers   | Same wheel identity; independent build tests retained | Three builds / 2.888 s become one / 0.463 s with the same SHA-256; all four consumer and two independent build-policy cases pass |
+| Check                  | Fixture                                       | Assertion                                             | Evidence                                                                                                                                          |
+| ---------------------- | --------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit parallelism       | Full host unit suite                          | Same test count; three green runs; wall time improves | Earlier median 79.632 s versus 270.954 s serial; three new unit passes pending after hook-ordering fix                                            |
+| Regression parallelism | Full host regression suite                    | Per-test distribution; same count; three green runs   | 2,218 passed each; walls 99.525 / 97.558 / 97.849 s; median 97.849 s versus 295.250 s serial                                                      |
+| Serial debugging       | Adopted runner with zero workers              | Same suite executes serially                          | Unit: 11,234 passed; regression: 2,218 passed; both with `TEST_WORKERS=0`                                                                         |
+| CI adoption            | Same runner class and test behavior           | Parallel wall time improves over serial               | Earlier unit 122 s vs 288 s serial; latest head failed one hook-order assertion, so revalidation is pending. Unchanged regression: 121 s vs 293 s |
+| CLI removals           | Named unit twins and retained container tests | Assertions and real-process command coverage remain   | Clean run: 521 passed, exactly 543 baseline identities minus the 22 mapped removals; no failures, skips or reruns                                 |
+| Shared release wheel   | QA, walkthrough and native-worker consumers   | Same wheel identity; independent build tests retained | Three builds / 2.888 s become one / 0.463 s with the same SHA-256; all four consumer and two independent build-policy cases pass                  |
 
 ## Closeout
 
 - [x] Record benchmark commands, environment, counts, timings and non-passing results.
-- [x] Run applicable unit/regression, integration, build/runtime and pre-commit checks.
-- [x] Open Part A [PR #290](https://github.com/hapa1i/multi-forge/pull/290); bounded-ID CI, runtime and pre-commit
-  checks pass, and both suites meet their measured CI wall-time adoption gates.
+- [ ] Complete the reopened unit stability, targeted, pre-commit and CI checks; unchanged regression and Part B
+  integration/build/runtime evidence remain accepted.
+- [x] Open Part A [PR #290](https://github.com/hapa1i/multi-forge/pull/290); earlier bounded-ID CI measured both suites'
+  improvement, with unit validation now reopened after the hook-ordering failure.
 - [x] Open Part B [PR #291](https://github.com/hapa1i/multi-forge/pull/291); full pre-commit, static review, CI and
   clean integration validation pass.
 - [x] Review the implementation diffs and open both authorized PRs with validation evidence.
