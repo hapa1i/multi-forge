@@ -10,7 +10,13 @@ def question():
     return NoulQuestion(instructions="Match?", criteria={"true": "Match", "false": "No match"})
 
 
-@pytest.mark.parametrize("state", ["x" * MAX_INPUT_BYTES, "\u4e2d" * (MAX_INPUT_BYTES // 3)])
+@pytest.mark.parametrize(
+    "state",
+    [
+        pytest.param("x" * MAX_INPUT_BYTES, id="ascii-byte-limit"),
+        pytest.param("\u4e2d" * (MAX_INPUT_BYTES // 3), id="utf8-byte-limit"),
+    ],
+)
 def test_serialized_bytes_include_envelope(state):
     with pytest.raises(JudgmentError) as caught:
         build_payload("typesafe/jev-1.13", state, {"q": question()})

@@ -81,7 +81,10 @@ def test_executor_ancestry_reads_only_bounded_headers_and_follows_deeper_lineage
         source._ancestry_ids(source_home, parent)
 
 
-@pytest.mark.parametrize("header", [b"{}\n", b"[]\n", b"x" * (source.MAX_HEADER_BYTES + 1)])
+@pytest.mark.parametrize(
+    "header",
+    [b"{}\n", b"[]\n", pytest.param(b"x" * (source.MAX_HEADER_BYTES + 1), id="oversized-header")],
+)
 def test_malformed_executor_headers_remain_unavailable(source_home, header):
     path = write_rollout(source_home, synthetic_rows())
     path.write_bytes(header)
