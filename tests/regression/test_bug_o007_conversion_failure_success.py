@@ -117,7 +117,6 @@ def _stub_route(
     monkeypatch.setattr(server, "_backend_instance_id", lambda: "openrouter")
     monkeypatch.setattr(server, "_inject_provider_user_enabled", lambda: False)
     monkeypatch.setattr(server, "_get_tier_override", lambda _tier: None)
-    monkeypatch.setattr(server, "resolve_reasoning_effort", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(server, "_check_client_tool_failures", AsyncMock())
     monkeypatch.setattr(
         server,

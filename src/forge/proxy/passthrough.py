@@ -162,6 +162,7 @@ async def forward(
     on_complete: OnComplete | None = None,
     extra_headers: Mapping[str, str] | None = None,
     provider_trace_ctx: Mapping[str, Any] | None = None,
+    on_provider_dispatch: Callable[[], None] | None = None,
 ) -> Response:
     """Forward a raw Anthropic request to ``{base_url}{path}`` and return the response.
 
@@ -182,6 +183,8 @@ async def forward(
         try:
             client = await client_cm.__aenter__()
             stream_cm = client.stream("POST", url, headers=headers, json=raw_body)
+            if on_provider_dispatch is not None:
+                on_provider_dispatch()
             resp = await stream_cm.__aenter__()
         except httpx.HTTPError as e:
             logger.warning("[%s] passthrough upstream stream failed: %s", request_id, e)
@@ -248,6 +251,8 @@ async def forward(
 
     try:
         async with httpx.AsyncClient(timeout=_PASSTHROUGH_TIMEOUT) as client:
+            if on_provider_dispatch is not None:
+                on_provider_dispatch()
             resp = await client.post(url, headers=headers, json=raw_body)
     except httpx.HTTPError as e:
         logger.warning("[%s] passthrough upstream request failed: %s", request_id, e)

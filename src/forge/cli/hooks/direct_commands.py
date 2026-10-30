@@ -213,10 +213,7 @@ def _handle_session_model(argv: list[str]) -> None:
 
     from forge.core.ops.context import ExecutionContext
     from forge.core.ops.session import ForgeOpError
-    from forge.core.ops.session_model import (
-        MODEL_REPORT_LIMITATIONS,
-        get_session_model_report,
-    )
+    from forge.core.ops.session_model import get_session_model_report
     from forge.session.exceptions import ForgeSessionError
 
     try:
@@ -232,10 +229,11 @@ def _handle_session_model(argv: list[str]) -> None:
         return
     from forge.cli.session_model import session_model_summary_rows
 
+    payload = report.to_dict()
     lines = ["Session model:"]
-    lines.extend(f"  {field}: {value}" for field, value in session_model_summary_rows(report.to_dict()))
+    lines.extend(f"  {field}: {value}" for field, value in session_model_summary_rows(payload))
     lines.append("Limitations:")
-    lines.extend(f"  - {limitation}" for limitation in MODEL_REPORT_LIMITATIONS)
+    lines.extend(f"  - {limitation}" for limitation in payload["limitations"])
     click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
 
 

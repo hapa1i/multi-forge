@@ -5,8 +5,42 @@ from __future__ import annotations
 from typing import Any
 
 from forge.core.identifiers import is_lowercase_identifier
+from forge.core.wire_shapes import VALID_WIRE_SHAPES
 
 _TIER_KEYS = frozenset({"haiku", "sonnet", "opus"})
+_EFFORT_LEVELS = frozenset({"none", "disable", "minimal", "low", "medium", "high", "xhigh", "max"})
+_EFFORT_SOURCES = frozenset({"explicit", "client", "thinking", "floor", "passthrough", "override"})
+_EFFORT_WIRES = frozenset(
+    {
+        "reasoning_effort",
+        "reasoning.effort",
+        "thinkingConfig.thinkingLevel",
+        "output_config.effort",
+        "dropped",
+    }
+)
+_EFFORT_FIELDS = frozenset(
+    {
+        "tier",
+        "tier_source",
+        "client_model",
+        "mapped_model",
+        "requested",
+        "thinking",
+        "opt_in",
+        "client_applicable",
+        "derived",
+        "floor",
+        "pre_clamp",
+        "supported",
+        "resolved",
+        "source",
+        "applied",
+        "wire",
+        "note",
+        "observed_at",
+    }
+)
 
 
 class ProxyRuntimeTruth:
@@ -15,6 +49,8 @@ class ProxyRuntimeTruth:
     def __init__(self, raw: dict[str, Any]):
         self.raw = raw
         self.is_proxy = raw.get("is_proxy") is True
+        wire_shape = raw.get("wire_shape")
+        self.wire_shape = wire_shape if isinstance(wire_shape, str) and wire_shape in VALID_WIRE_SHAPES else None
 
         proxy = raw.get("proxy", {})
         proxy = proxy if isinstance(proxy, dict) else {}
@@ -39,6 +75,11 @@ class ProxyRuntimeTruth:
         self.context_windows = context_windows if isinstance(context_windows, dict) else {}
         self.tier_mappings = _string_map(runtime.get("tier_mappings"))
         self.model_alternatives = _nested_string_map(runtime.get("model_alternatives"))
+        effort = runtime.get("effort")
+        self.effort = _effort_map(effort)
+        self.has_effort_observations = isinstance(effort, dict) and len(self.effort) == len(effort)
+        if not self.has_effort_observations:
+            self.effort = {}
 
         tiers = raw.get("tiers", {})
         self.tiers = tiers if isinstance(tiers, dict) else {}
@@ -81,6 +122,51 @@ def _nested_string_map(value: object) -> dict[str, dict[str, str]]:
     return {
         key: mapped for key, item in value.items() if isinstance(key, str) and key and (mapped := _string_map(item))
     }
+
+
+def _effort_map(value: object) -> dict[str, dict[str, Any]]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        tier: {key: record[key] for key in _EFFORT_FIELDS}
+        for tier, record in value.items()
+        if tier in _TIER_KEYS and isinstance(record, dict) and _valid_effort_record(tier, record)
+    }
+
+
+def _valid_effort_record(tier: str, record: dict[str, Any]) -> bool:
+    if not _EFFORT_FIELDS.issubset(record) or record["tier"] != tier:
+        return False
+    for field in ("tier_source", "client_model", "mapped_model", "observed_at"):
+        value = record[field]
+        if not isinstance(value, str) or not value or not value.isprintable():
+            return False
+    for field in ("thinking", "note"):
+        value = record[field]
+        if value is not None and (not isinstance(value, str) or not value.isprintable()):
+            return False
+    for field in ("opt_in", "client_applicable"):
+        if not isinstance(record[field], bool):
+            return False
+    for field in ("requested", "derived", "floor", "pre_clamp", "resolved", "applied"):
+        value = record[field]
+        if value is not None and (not isinstance(value, str) or value not in _EFFORT_LEVELS):
+            return False
+    supported = record["supported"]
+    if supported is not None and (
+        not isinstance(supported, list)
+        or not all(isinstance(level, str) and level in _EFFORT_LEVELS for level in supported)
+    ):
+        return False
+    source, wire = record["source"], record["wire"]
+    valid_wire = (
+        isinstance(source, str)
+        and source in _EFFORT_SOURCES
+        and (wire is None or (isinstance(wire, str) and wire in _EFFORT_WIRES))
+    )
+    if not valid_wire:
+        return False
+    return (record["applied"] is None) == (wire is None or wire == "dropped")
 
 
 def _has_authoritative_route_truth(runtime: dict[str, Any]) -> bool:

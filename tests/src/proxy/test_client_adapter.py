@@ -121,6 +121,7 @@ def _make_adapter_with_mock_client() -> CoreLLMClientAdapter:
 async def test_create_completion_forwards_provider_dispatch_callback_to_core_client() -> None:
     adapter = _make_adapter_with_mock_client()
     callback = MagicMock()
+    effort_callback = MagicMock()
     complete = AsyncMock(return_value=CompletionResponse(text="ok"))
     adapter._client = MagicMock(complete=complete)  # type: ignore[assignment]
 
@@ -128,10 +129,13 @@ async def test_create_completion_forwards_provider_dispatch_callback_to_core_cli
         {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
         request_id="req-dispatch",
         on_provider_dispatch=callback,
+        on_effort_applied=effort_callback,
     )
 
     assert complete.await_args is not None
     assert complete.await_args.kwargs["on_provider_dispatch"] is callback
+    assert complete.await_args.kwargs["on_effort_applied"] is effort_callback
+    assert "on_effort_applied" not in complete.await_args.kwargs["hyperparams"].model_dump()
     callback.assert_not_called()
 
 
@@ -139,11 +143,14 @@ async def test_create_completion_forwards_provider_dispatch_callback_to_core_cli
 async def test_create_streaming_completion_forwards_provider_dispatch_callback_to_core_client() -> None:
     adapter = _make_adapter_with_mock_client()
     callback = MagicMock()
+    effort_callback = MagicMock()
     captured_callback = None
+    captured_effort_callback = None
 
     async def _stream(*_args: Any, **kwargs: Any) -> AsyncIterator[StreamEvent]:
-        nonlocal captured_callback
+        nonlocal captured_callback, captured_effort_callback
         captured_callback = kwargs["on_provider_dispatch"]
+        captured_effort_callback = kwargs["on_effort_applied"]
         yield StreamEvent(type="response_end")
 
     adapter._client = MagicMock(stream=_stream)  # type: ignore[assignment]
@@ -154,10 +161,12 @@ async def test_create_streaming_completion_forwards_provider_dispatch_callback_t
             {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
             request_id="req-stream-dispatch",
             on_provider_dispatch=callback,
+            on_effort_applied=effort_callback,
         )
     ]
 
     assert captured_callback is callback
+    assert captured_effort_callback is effort_callback
     callback.assert_not_called()
 
 

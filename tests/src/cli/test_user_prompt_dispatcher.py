@@ -137,6 +137,7 @@ class TestUserPromptSubmitDispatcher:
                 "live_proxy_entries": [{"large": "payload"}] * 30,
             },
             "limitations": ["route commitment only", "no per-request or authorship attestation"],
+            "effort": {"status": "unknown", "reason": "no_observation_for_launch"},
         }
         monkeypatch.setattr(
             "forge.core.ops.session_model.get_session_model_report",
@@ -156,7 +157,8 @@ class TestUserPromptSubmitDispatcher:
         assert "Launch marking entries: 20" in payload["reason"]
         assert "Live marking entries: 30" in payload["reason"]
         assert "large" not in payload["reason"]
-        assert len(payload["reason"].splitlines()) == 15
+        assert "Effort: unknown (no observation for launch)" in payload["reason"]
+        assert len(payload["reason"].splitlines()) == 16
 
     @pytest.mark.parametrize(
         "prompt",

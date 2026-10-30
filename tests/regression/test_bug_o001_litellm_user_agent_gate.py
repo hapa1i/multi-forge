@@ -61,7 +61,6 @@ async def test_bug_o001_translated_litellm_route_carries_user_agent(monkeypatch:
     monkeypatch.setattr(server, "_backend_instance_id", lambda: None)
     monkeypatch.setattr(server, "_inject_provider_user_enabled", lambda: False)
     monkeypatch.setattr(server, "_get_tier_override", lambda _tier: None)
-    monkeypatch.setattr(server, "resolve_reasoning_effort", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(server, "_calc_and_log_cost", lambda **_kwargs: 0)
     monkeypatch.setattr(server.proxy_metrics, "record_request", lambda **_kwargs: None)
     monkeypatch.setattr(server, "record_provider_trace", lambda **_kwargs: None)

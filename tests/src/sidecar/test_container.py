@@ -14,7 +14,9 @@ import pytest
 from forge.core.reactive.env import (
     CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
     FORGE_PROXY_WIRE_SHAPE_VAR,
+    RunIdentity,
 )
+from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR, read_launch_id
 from forge.sidecar.container import (
     ContainerExistsError,
     container_exists,
@@ -29,6 +31,41 @@ from forge.sidecar.docker import (
     remove_container,
     stop_container,
 )
+
+
+def test_sidecar_launch_header_preserves_multiline_headers_and_committed_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(ANTHROPIC_CUSTOM_HEADERS_VAR, "X-Forge-Launch: run_cccccccccccc")
+    identity = RunIdentity("run_aaaaaaaaaaaa", None, "run_aaaaaaaaaaaa")
+    supplied = {
+        ANTHROPIC_CUSTOM_HEADERS_VAR: "X-User: secret\nx-forge-launch: run_bbbbbbbbbbbb\nX-Forge-Effort-Source: client"
+    }
+    with (
+        patch("forge.sidecar.container.container_exists", return_value=False),
+        patch(
+            "forge.sidecar.container.subprocess.run",
+            return_value=MagicMock(returncode=0),
+        ) as run,
+    ):
+        run_sidecar_session(
+            image="forge-sidecar:latest",
+            template="litellm-openai",
+            session_name="test",
+            project_dir=Path("/code"),
+            env_vars=supplied,
+            run_identity=identity,
+        )
+    cmd = run.call_args.args[0]
+    headers = run.call_args.kwargs["env"][ANTHROPIC_CUSTOM_HEADERS_VAR]
+    assert read_launch_id(headers) == identity.run_id
+    assert f"FORGE_RUN_ID={identity.run_id}" in cmd
+    assert "X-User: secret" in headers
+    assert "X-Forge-Effort-Source: client" in headers
+    assert "secret" not in " ".join(cmd)
+    assert cmd[cmd.index(ANTHROPIC_CUSTOM_HEADERS_VAR) - 1] == "-e"
+    assert "--env-file" not in cmd
+    assert "run_bbbbbbbbbbbb" in supplied[ANTHROPIC_CUSTOM_HEADERS_VAR]
 
 
 class TestParseMounts:
@@ -238,7 +275,9 @@ class TestRunSidecarSession:
             assert run_id == root_id
             assert not any(isinstance(p, str) and p.startswith("FORGE_PARENT_RUN_ID=") for p in cmd)
 
-    def test_run_sidecar_session_omits_attribution_header_for_anthropic_passthrough(self) -> None:
+    def test_run_sidecar_session_omits_attribution_header_for_anthropic_passthrough(
+        self,
+    ) -> None:
         """Anthropic passthrough sidecars keep the classifier-sensitive attribution block."""
         with (
             patch("forge.sidecar.container.container_exists", return_value=False),

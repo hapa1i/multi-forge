@@ -1,6 +1,8 @@
 # Show the effective reasoning effort
 
-**Lane:** `todo/` -- accepted on 2026-10-29; parked until execution starts.
+**Lane:** `doing/` -- started on 2026-10-30 on `codex/effective-effort-visibility`, based on `d32e7b1d`.
+
+**Execution:** [Checklist](checklist.md).
 
 **Origin:** Owner request on 2026-10-29. The effort a session actually runs at is hard to see, and on proxied routes it
 can differ from Claude Code's own setting without any visible signal. Research used Claude Code 2.1.312 and the current
@@ -41,8 +43,10 @@ bar that already ends in `47%/1M`, and `tier_color` encodes extended context a t
 ## Evidence
 
 - **Status-line stdin:** documented `effort.level` (`low`..`max`; live, including mid-session `/effort`; absent when the
-  model does not support effort), `thinking.enabled` and `fast_mode`. Whether stdin reports the configured or the
-  clamped level is not documented.
+  model does not support effort), `thinking.enabled` and `fast_mode`. The
+  [current documentation](https://code.claude.com/docs/en/statusline#available-data), rechecked on 2026-10-30, specifies
+  the substituted supported level, except that `CLAUDE_CODE_EFFORT_LEVEL` is shown directly. This clarifies the original
+  research, which could not establish configured-versus-clamped semantics.
 - **Transcripts:** assistant entries carry undocumented `effort` and `perTurnEffort` fields in every local 2.1.281 to
   2.1.312 sample. Observed pairs include `(None, "max")` and `("xhigh", None)`, consistent with per-turn changes.
 - **Session correlation:** interactive launches send no session or run identity to the proxy. `invoke.py` builds their

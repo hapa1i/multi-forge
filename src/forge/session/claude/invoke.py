@@ -217,6 +217,7 @@ def _build_environment(
         FORGE_PARENT_RUN_ID_VAR,
         apply_attribution_header_policy,
         apply_forge_effort_source_header,
+        apply_forge_launch_header,
         apply_forge_model_tier_header,
         apply_interactive_api_key,
         build_claude_env,
@@ -233,6 +234,7 @@ def _build_environment(
         env.pop(key, None)
     apply_forge_model_tier_header(env, projected_model_tier)
     apply_forge_effort_source_header(env, client=client_effort_source)
+    apply_forge_launch_header(env, root.run_id)
     apply_attribution_header_policy(env)
     # Finalize ANTHROPIC_API_KEY LAST -- after extra_vars and unset_vars -- so the
     # interactive_anthropic_api_key policy wins over anything merged above.

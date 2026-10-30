@@ -2,6 +2,8 @@
 
 from typing import Any, AsyncGenerator, Callable, Protocol
 
+from forge.core.effort_observation import AppliedEffort
+
 from .types import CompletionResponse, Message, ModelHyperparameters, StreamEvent
 
 
@@ -24,6 +26,7 @@ class LLMClient(Protocol):
         tools: list[dict[str, Any]] | None = None,
         hyperparams: ModelHyperparameters | None = None,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> CompletionResponse:
         """Non-streaming completion.
 
@@ -32,6 +35,7 @@ class LLMClient(Protocol):
             tools: Optional list of tool definitions (JSON Schema format).
             hyperparams: Optional hyperparameters to override client defaults.
             on_provider_dispatch: Optional callback fired immediately before provider I/O.
+            on_effort_applied: Optional callback describing the final outbound effort before provider I/O.
 
         Returns:
             CompletionResponse with text, optional tool_calls, and usage.
@@ -45,6 +49,7 @@ class LLMClient(Protocol):
         tools: list[dict[str, Any]] | None = None,
         hyperparams: ModelHyperparameters | None = None,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Streaming completion.
 
@@ -59,6 +64,7 @@ class LLMClient(Protocol):
             tools: Optional list of tool definitions (JSON Schema format).
             hyperparams: Optional hyperparameters to override client defaults.
             on_provider_dispatch: Optional callback fired immediately before provider I/O.
+            on_effort_applied: Optional callback describing the final outbound effort before provider I/O.
 
         Yields:
             StreamEvent objects (text_delta, tool_call_delta, response_end, usage, error).

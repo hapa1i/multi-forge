@@ -19,6 +19,7 @@ from forge.core.run_id import (
     FORGE_COMMAND_HEADER,
     FORGE_EFFORT_SOURCE_CLIENT,
     FORGE_EFFORT_SOURCE_HEADER,
+    FORGE_LAUNCH_HEADER,
     FORGE_MODEL_TIER_HEADER,
     FORGE_ROOT_RUN_ID_HEADER,
     FORGE_RUN_ID_HEADER,
@@ -465,7 +466,7 @@ def _apply_correlation_headers(env: dict[str, str]) -> None:
     the run-tree ids (``X-Forge-Run-ID``/``-Root-Run-ID``) and the provider grouping ids
     (``X-Forge-Session`` -- an opaque hash of the session name + role, always emittable via
     the ``forge_run_<hash>`` fallback; ``X-Forge-Command`` -- the sanitized role, only when
-    a role is set). Inherited ``X-Forge-Model-Tier`` and ``X-Forge-Effort-Source`` lines
+    a role is set). Inherited ``X-Forge-Launch``, ``X-Forge-Model-Tier``, and ``X-Forge-Effort-Source`` lines
     are also scrubbed here: they describe the interactive launch that set them, not this
     child, and the launch layer re-stamps them only for its own process. All other (user) header
     lines are preserved. Forge-owned headers are consumed by the proxy and never forwarded
@@ -478,6 +479,7 @@ def _apply_correlation_headers(env: dict[str, str]) -> None:
         FORGE_COMMAND_HEADER.lower(),
         FORGE_MODEL_TIER_HEADER.lower(),
         FORGE_EFFORT_SOURCE_HEADER.lower(),
+        FORGE_LAUNCH_HEADER.lower(),
     }
     kept: list[str] = []
     for raw in env.get(ANTHROPIC_CUSTOM_HEADERS_VAR, "").split("\n"):
@@ -521,6 +523,22 @@ def apply_forge_model_tier_header(env: dict[str, str], tier: str | None) -> None
 def apply_forge_effort_source_header(env: dict[str, str], *, client: bool) -> None:
     """Set or clear the Forge-owned effort-source opt-in while preserving user lines."""
     _replace_custom_header(env, FORGE_EFFORT_SOURCE_HEADER, FORGE_EFFORT_SOURCE_CLIENT if client else None)
+
+
+def apply_forge_launch_header(env: dict[str, str], launch_id: str | None, *, owned_sidecar_proxy: bool = False) -> None:
+    """Replace launch identity only for a proven Forge proxy, scrubbing inherited values.
+
+    ``owned_sidecar_proxy`` is for the sidecar launcher whose entrypoint starts and
+    health-checks the local Forge proxy before invoking Claude. Host launches use
+    the selected URL's existing registry or injected-metadata proof.
+    """
+    from forge.core.run_id import is_valid_run_id
+
+    proven = owned_sidecar_proxy or _target_is_proven_forge_proxy(env)
+    if proven and launch_id is not None and not is_valid_run_id(launch_id):
+        raise ValueError("launch identity must be a valid Forge run id")
+    value = launch_id if proven else None
+    _replace_custom_header(env, FORGE_LAUNCH_HEADER, value)
 
 
 def _replace_custom_header(env: dict[str, str], header: str, value: str | None) -> None:

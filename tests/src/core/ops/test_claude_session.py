@@ -11,6 +11,7 @@ from forge.core.ops import claude_session as claude_session_ops
 from forge.core.ops import session_fork_execution as fork_execution_ops
 from forge.core.ops.claude_session import SupervisorWiring, launch_claude_session
 from forge.core.ops.session import ForgeOpError
+from forge.core.reactive.env import RunIdentity
 from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.session import IndexStore, SessionState, SessionStore, create_session_state
 from forge.session.authority import read_authority_events
@@ -252,6 +253,7 @@ def test_prelaunch_payload_callback_precedes_commit_and_child_with_same_object(
     publish_session(IndexStore(), state, tmp_path)
     payload = {"sentinel": "exact-route-object"}
     observed: list[tuple[str, object]] = []
+    launch_identities: list[RunIdentity] = []
 
     monkeypatch.setattr(
         claude_session_ops,
@@ -261,9 +263,15 @@ def test_prelaunch_payload_callback_precedes_commit_and_child_with_same_object(
 
     def commit(**kwargs: object) -> None:
         observed.append(("commit", kwargs["payload"]))
+        root = kwargs["root"]
+        assert isinstance(root, RunIdentity)
+        launch_identities.append(root)
 
-    def invoke(**_kwargs: object) -> int:
+    def invoke(**kwargs: object) -> int:
         observed.append(("child", payload))
+        root = kwargs["run_identity"]
+        assert isinstance(root, RunIdentity)
+        launch_identities.append(root)
         return 0
 
     monkeypatch.setattr(claude_session_ops, "commit_launch_routing", commit)
@@ -283,6 +291,8 @@ def test_prelaunch_payload_callback_precedes_commit_and_child_with_same_object(
 
     assert result.exit_code == 0
     assert [name for name, _value in observed] == ["route_line", "commit", "child"]
+    assert len(launch_identities) == 2
+    assert launch_identities[0] is launch_identities[1]
     assert all(value is payload for _name, value in observed)
 
 

@@ -45,7 +45,7 @@ SEGMENT_NAMES: tuple[str, ...] = (
     "marking",
 )
 
-# Default render order — reproduces the pre-enhancement status line exactly.
+# Default render order — guarded by the status-line golden snapshots.
 # Notably EXCLUDES ``rate_limits`` (it was gated off by default via the old
 # ``show_rate_limits`` flag) and every opt-in segment. An empty configured
 # ``segments`` list falls back to this order.
@@ -57,7 +57,6 @@ DEFAULT_ORDER: tuple[str, ...] = (
     "cost",
     "lines",
     "tokens",
-    "think",
     "loop",
     "sidecar",
 )

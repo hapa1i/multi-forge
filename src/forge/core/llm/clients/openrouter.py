@@ -13,6 +13,8 @@ from typing import Any, AsyncGenerator, Callable
 from openai import AsyncOpenAI
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
+from forge.core.effort_observation import AppliedEffort
+
 from ..credentials import CredentialManager
 from ..detection import ProviderType
 from ..errors import AuthenticationError, ProviderError
@@ -25,6 +27,7 @@ from ..types import (
     ToolCallDelta,
 )
 from .base import estimate_message_tokens, merge_hyperparams
+from .effort import applied_effort
 from .openai_compat import (
     ToolCallAccumulator,
     build_chat_completion_kwargs,
@@ -118,6 +121,7 @@ class OpenRouterClient:
         tools: list[dict[str, Any]] | None,
         merged_params: ModelHyperparameters,
         on_provider_dispatch: Callable[[], None] | None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> CompletionResponse:
         kwargs = build_chat_completion_kwargs(self._model, messages, tools, merged_params)
         kwargs = self._translate_params(kwargs)
@@ -126,6 +130,8 @@ class OpenRouterClient:
         # LiteLLM path. Plain .create() discards headers, which is the gap review #R3 flagged.
         if on_provider_dispatch is not None:
             on_provider_dispatch()
+        if on_effort_applied is not None:
+            on_effort_applied(applied_effort(kwargs, "reasoning.effort"))
         raw = await client.chat.completions.with_raw_response.create(**kwargs)
         completion = openai_response_to_completion(raw.parse(), self._provider)
         return merge_provider_headers(completion, raw.headers, self._provider)
@@ -137,6 +143,7 @@ class OpenRouterClient:
         tools: list[dict[str, Any]] | None = None,
         hyperparams: ModelHyperparameters | None = None,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> CompletionResponse:
         merged_params = merge_hyperparams(self._default_hyperparams, hyperparams)
         client = await self._get_client()
@@ -148,6 +155,7 @@ class OpenRouterClient:
                 tools,
                 merged_params,
                 on_provider_dispatch,
+                **({"on_effort_applied": on_effort_applied} if on_effort_applied is not None else {}),
             )
         except (ProviderError, AuthenticationError):
             raise
@@ -180,6 +188,7 @@ class OpenRouterClient:
         tools: list[dict[str, Any]] | None = None,
         hyperparams: ModelHyperparameters | None = None,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         merged_params = merge_hyperparams(self._default_hyperparams, hyperparams)
         client = await self._get_client()
@@ -205,6 +214,8 @@ class OpenRouterClient:
 
             if on_provider_dispatch is not None:
                 on_provider_dispatch()
+            if on_effort_applied is not None:
+                on_effort_applied(applied_effort(kwargs, "reasoning.effort"))
             stream_resp = await client.chat.completions.create(**kwargs)
 
             async for chunk in stream_resp:

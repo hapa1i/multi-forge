@@ -7,6 +7,7 @@ import json
 import pytest
 import yaml
 
+from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR, read_launch_id
 from tests.fixtures.docker import ContainerLike
 
 pytestmark = [pytest.mark.integration, pytest.mark.docker_in]
@@ -22,6 +23,7 @@ if [ "${1:-}" = "--version" ]; then
 fi
 echo "$(date -Iseconds) claude $*" >> /tmp/claude_invocations.log
 env | sort | tee /tmp/model_route_latest_env.log > "/tmp/model_route_claude_env_$$.log"
+python3 -c 'import json, os; print(json.dumps({key: os.environ.get(key) for key in ("FORGE_RUN_ID", "ANTHROPIC_CUSTOM_HEADERS")}))' > /tmp/model_route_latest_identity.json
 exit 0
 """,
     )
@@ -157,7 +159,15 @@ def _register_proxy(workspace: ContainerLike, *, proxy_id: str, port: int, nativ
         ),
     )
 
-    payload = json.dumps({"is_proxy": True, "template": template, "proxy": {"proxy_id": proxy_id}})
+    payload = json.dumps(
+        {
+            "is_proxy": True,
+            "template": template,
+            "proxy": {"proxy_id": proxy_id},
+            "wire_shape": "anthropic_passthrough" if native_passthrough else "openai_translated",
+            "runtime": {"llm_defaults_by_tier": {"sonnet": {"reasoning_effort": "high"}}},
+        }
+    )
     server_path = "/tmp/model-route-health.py"
     pid_path = "/tmp/model-route-health.pid"
     workspace.write_file(
@@ -223,6 +233,9 @@ def test_direct_parent_forks_to_proxy_model_and_bare_resume_reuses_route(
     direct = forge_workspace.exec("cd /workspace && forge session start model-route-parent --model claude-opus-4-8")
     assert direct.returncode == 0, direct.stdout + direct.stderr
     assert "Route: provider=direct" in direct.stderr
+    assert "Effort is derived" not in direct.stderr
+    direct_identity = forge_workspace.read_json("/tmp/model_route_latest_identity.json")
+    assert read_launch_id(direct_identity[ANTHROPIC_CUSTOM_HEADERS_VAR]) is None
     parent = json.loads(forge_workspace.read_file("/workspace/.forge/sessions/model-route-parent/forge.session.json"))
     assert parent["intent"]["launch"]["model_route"] == {
         "requested_model": "claude-opus-4-8",
@@ -240,6 +253,8 @@ def test_direct_parent_forks_to_proxy_model_and_bare_resume_reuses_route(
             f"--model gpt-5.6-sol --proxy {proxy_id}"
         )
         assert forked.returncode == 0, forked.stdout + forked.stderr
+        assert forked.stderr.count("Effort is derived") == 1
+        assert "sonnet: high" in forked.stderr
         assert (
             f"Route: provider=openrouter template=openrouter-openai proxy={proxy_id} "
             "tier=sonnet model=openai/gpt-5.6-sol billing_mode=unknown" in forked.stderr
@@ -247,6 +262,9 @@ def test_direct_parent_forks_to_proxy_model_and_bare_resume_reuses_route(
 
         child_path = "/workspace/.forge/sessions/model-route-child/forge.session.json"
         child = json.loads(forge_workspace.read_file(child_path))
+        fork_identity = forge_workspace.read_json("/tmp/model_route_latest_identity.json")
+        fork_launch_id = read_launch_id(fork_identity[ANTHROPIC_CUSTOM_HEADERS_VAR])
+        assert fork_launch_id == child["confirmed"]["route_commit"]["run_id"] == fork_identity["FORGE_RUN_ID"]
         assert child["intent"]["proxy"] == {
             "template": "openrouter-openai",
             "base_url": f"http://127.0.0.1:{port}",
@@ -276,7 +294,13 @@ def test_direct_parent_forks_to_proxy_model_and_bare_resume_reuses_route(
         resumed = forge_workspace.exec("cd /workspace && forge session resume model-route-child")
         assert resumed.returncode == 0, resumed.stdout + resumed.stderr
         assert "Route:" not in resumed.stderr
+        assert resumed.stderr.count("Effort is derived") == 1
+        assert "forge session resume model-route-child --effort '<level>'" in resumed.stderr
         replayed = json.loads(forge_workspace.read_file(child_path))
+        resume_identity = forge_workspace.read_json("/tmp/model_route_latest_identity.json")
+        resume_launch_id = read_launch_id(resume_identity[ANTHROPIC_CUSTOM_HEADERS_VAR])
+        assert resume_launch_id == replayed["confirmed"]["route_commit"]["run_id"] == resume_identity["FORGE_RUN_ID"]
+        assert resume_launch_id != fork_launch_id
         assert replayed["intent"]["launch"]["model_route"] == child["intent"]["launch"]["model_route"]
     finally:
         forge_workspace.exec(f"kill $(cat {pid_path}) 2>/dev/null || true")
@@ -304,6 +328,7 @@ def test_saved_passthrough_launches_preserve_native_model_selection(forge_worksp
         for command, expected_pin in commands:
             launched = forge_workspace.exec(f"cd /workspace && forge {command}")
             assert launched.returncode == 0, launched.stdout + launched.stderr
+            assert "Effort is derived" not in launched.stderr, command
             env = dict(
                 line.split("=", 1)
                 for line in forge_workspace.read_file("/tmp/model_route_latest_env.log").splitlines()

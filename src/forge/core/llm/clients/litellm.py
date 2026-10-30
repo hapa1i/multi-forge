@@ -16,13 +16,9 @@ from typing import Any, AsyncGenerator, Callable
 
 import httpx
 from openai import AsyncOpenAI
-from tenacity import (
-    retry,
-    retry_if_exception,
-    stop_after_attempt,
-    wait_exponential,
-)
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
+from forge.core.effort_observation import AppliedEffort
 from forge.core.models.catalog import get_model_spec, model_exists
 from forge.runtime_config import get_runtime_config
 
@@ -38,6 +34,7 @@ from ..types import (
     ToolCallDelta,
 )
 from .base import estimate_message_tokens, merge_hyperparams
+from .effort import applied_effort
 from .openai_compat import (
     ToolCallAccumulator,
     build_chat_completion_kwargs,
@@ -425,6 +422,26 @@ class LiteLLMClient:
 
         return kwargs
 
+    def _chat_applied_effort(
+        self,
+        kwargs: dict[str, Any],
+        tools: list[dict[str, Any]] | None,
+        hyperparams: ModelHyperparameters,
+    ) -> AppliedEffort:
+        if self._model in ("gemini/gemini-4-argon", "vertex_ai/gemini-4-argon", "gemini-4-argon"):
+            return applied_effort(kwargs, "thinkingConfig.thinkingLevel")
+        observation = applied_effort(kwargs, "reasoning_effort")
+        extra_body = kwargs.get("extra_body")
+        extra_overrides_effort = isinstance(extra_body, dict) and "reasoning_effort" in extra_body
+        original_effort = hyperparams.extra.get("openai", {}).get("reasoning_effort", hyperparams.reasoning_effort)
+        if tools and self._is_gpt5_model() and original_effort is not None and not extra_overrides_effort:
+            return AppliedEffort(
+                applied=None,
+                wire="dropped",
+                note="GPT-5 Chat Completions drops reasoning_effort when function tools are present.",
+            )
+        return observation
+
     async def _complete_with_responses_api(
         self,
         client: AsyncOpenAI,
@@ -432,6 +449,7 @@ class LiteLLMClient:
         hyperparams: ModelHyperparameters,
         tools: list[dict[str, Any]] | None = None,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> CompletionResponse:
         """Complete using the Responses API.
 
@@ -491,6 +509,8 @@ class LiteLLMClient:
 
         if on_provider_dispatch is not None:
             on_provider_dispatch()
+        if on_effort_applied is not None:
+            on_effort_applied(applied_effort(request_params, "reasoning.effort"))
         raw = await client.responses.with_raw_response.create(**request_params)
         completion = self._parse_responses_output(raw.parse(), self._model)
         return self._merge_response_metadata(completion, raw.headers)
@@ -508,6 +528,7 @@ class LiteLLMClient:
         tools: list[dict[str, Any]] | None,
         merged_params: ModelHyperparameters,
         on_provider_dispatch: Callable[[], None] | None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> CompletionResponse:
         """Make the completion request with retry logic.
 
@@ -522,6 +543,7 @@ class LiteLLMClient:
                 merged_params,
                 tools=tools,
                 on_provider_dispatch=on_provider_dispatch,
+                **({"on_effort_applied": on_effort_applied} if on_effort_applied is not None else {}),
             )
 
         kwargs = self._build_request_kwargs(messages, tools, merged_params)
@@ -542,6 +564,8 @@ class LiteLLMClient:
         # .create() drops; .parse() returns the same ChatCompletion model.
         if on_provider_dispatch is not None:
             on_provider_dispatch()
+        if on_effort_applied is not None:
+            on_effort_applied(self._chat_applied_effort(kwargs, tools, merged_params))
         raw = await client.chat.completions.with_raw_response.create(**kwargs)
         completion = self._openai_to_completion(raw.parse())
         return self._merge_response_metadata(completion, raw.headers)
@@ -553,6 +577,7 @@ class LiteLLMClient:
         tools: list[dict[str, Any]] | None = None,
         hyperparams: ModelHyperparameters | None = None,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> CompletionResponse:
         """Non-streaming completion.
 
@@ -563,6 +588,7 @@ class LiteLLMClient:
             tools: Optional list of tool definitions.
             hyperparams: Optional hyperparameters to override defaults.
             on_provider_dispatch: Optional callback fired immediately before provider I/O.
+            on_effort_applied: Optional callback describing the final outbound effort before provider I/O.
 
         Returns:
             CompletionResponse with text, optional tool_calls, and usage.
@@ -581,6 +607,7 @@ class LiteLLMClient:
                 tools,
                 merged_params,
                 on_provider_dispatch,
+                **({"on_effort_applied": on_effort_applied} if on_effort_applied is not None else {}),
             )
         except (ProviderError, AuthenticationError):
             # Already wrapped, re-raise as-is
@@ -615,6 +642,7 @@ class LiteLLMClient:
         tools: list[dict[str, Any]] | None = None,
         hyperparams: ModelHyperparameters | None = None,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Streaming completion.
 
@@ -628,6 +656,7 @@ class LiteLLMClient:
             tools: Optional list of tool definitions.
             hyperparams: Optional hyperparameters to override defaults.
             on_provider_dispatch: Optional callback fired immediately before provider I/O.
+            on_effort_applied: Optional callback describing the final outbound effort before provider I/O.
 
         Yields:
             StreamEvent objects (text_delta, tool_call_delta, response_end, usage, error).
@@ -647,6 +676,7 @@ class LiteLLMClient:
                     merged_params,
                     tools=tools,
                     on_provider_dispatch=on_provider_dispatch,
+                    **({"on_effort_applied": on_effort_applied} if on_effort_applied is not None else {}),
                 )
 
                 # Carry the provider_meta computed by _complete_with_responses_api onto the
@@ -707,6 +737,8 @@ class LiteLLMClient:
 
             if on_provider_dispatch is not None:
                 on_provider_dispatch()
+            if on_effort_applied is not None:
+                on_effort_applied(self._chat_applied_effort(kwargs, tools, merged_params))
             stream = await client.chat.completions.create(**kwargs)
 
             async for chunk in stream:

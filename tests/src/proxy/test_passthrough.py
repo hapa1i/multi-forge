@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from forge.core.run_id import FORGE_MODEL_TIER_HEADER
+from forge.core.run_id import FORGE_LAUNCH_HEADER, FORGE_MODEL_TIER_HEADER
 from forge.proxy import passthrough
 from tests.fixtures.proxy_transport import FakeResponse, FakeStream, ProxyTransportFake
 
@@ -49,6 +49,7 @@ def test_build_upstream_headers_injects_key_and_forwards_flags():
         "anthropic-beta": "prompt-caching-2024-07-31",
         "user-agent": "claude-cli/2.1",
         FORGE_MODEL_TIER_HEADER: "opus",
+        FORGE_LAUNCH_HEADER: "run_aaaaaaaaaaaa",
     }
     headers = passthrough.build_upstream_headers(inbound, "UPSTREAM-KEY")
 
@@ -58,6 +59,58 @@ def test_build_upstream_headers_injects_key_and_forwards_flags():
     # Client credentials are never forwarded upstream.
     assert "authorization" not in headers
     assert FORGE_MODEL_TIER_HEADER.lower() not in headers
+    assert FORGE_LAUNCH_HEADER.lower() not in headers
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize(
+    "mode,requested,applied,source",
+    [
+        ("passthrough", "low", "low", "passthrough"),
+        ("override", "low", "high", "override"),
+        ("override", "high", "high", "passthrough"),
+    ],
+)
+async def test_passthrough_effort_observes_exact_post_override_body(
+    monkeypatch,
+    proxy_runtime_ready,
+    anthropic_transport,
+    stream,
+    mode,
+    requested,
+    applied,
+    source,
+):
+    from forge.proxy.effort_observation import EffortObservations
+
+    server = proxy_runtime_ready
+    monkeypatch.setattr(server, "effort_observations", EffortObservations())
+    monkeypatch.setattr(server.config, "proxy", _passthrough_config(intercept_mode=mode, reasoning_effort="high").proxy)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "UPSTREAM-KEY")
+    body = {
+        "model": "claude-opus-4-6[1m]",
+        "max_tokens": 100,
+        "stream": stream,
+        "thinking": {"type": "adaptive"},
+        "output_config": {"effort": requested},
+        "messages": [],
+    }
+    response = await server._handle_anthropic_passthrough(
+        _RawReq(body, headers={FORGE_LAUNCH_HEADER: "run_aaaaaaaaaaaa"}),
+        "req_effort",
+    )
+    if stream:
+        async for _ in response.body_iterator:
+            pass
+    observed = server.effort_observations.snapshot("run_aaaaaaaaaaaa")["opus"]
+    assert observed["requested"] == requested
+    assert observed["applied"] == applied == anthropic_transport.captured.json["output_config"]["effort"]
+    assert observed["source"] == source
+    assert observed["tier_source"] == "request"
+    assert observed["wire"] == "output_config.effort"
+    assert observed["mapped_model"] == "claude-opus-4-6"
+    assert FORGE_LAUNCH_HEADER.lower() not in anthropic_transport.captured.headers
 
 
 def test_build_upstream_headers_defaults_anthropic_version():

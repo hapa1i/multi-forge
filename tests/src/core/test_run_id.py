@@ -16,6 +16,9 @@ from forge.core.run_id import (
     is_valid_provider_session_id,
     is_valid_run_id,
     mint_run_id,
+    read_custom_header,
+    read_launch_id,
+    read_projected_model_tier,
     sanitize_label,
 )
 
@@ -46,6 +49,7 @@ def test_mint_is_unique() -> None:
         "run_7e81a1bb765g",  # non-hex char
         " run_7e81a1bb765d",  # leading space
         "run_7e81a1bb765d ",  # trailing space
+        "run_7e81a1bb765d\n",  # regex '$' must not accept a final newline
         "run_7e81a1bb765d\nX-Evil: injected",  # header injection
         "x: y\nX-Forge-Run-ID: run_7e81a1bb765d",  # spoof attempt
     ],
@@ -54,12 +58,41 @@ def test_rejects_malformed_and_injection(value: str | None) -> None:
     assert not is_valid_run_id(value)
 
 
+@pytest.mark.parametrize("value", [None, 123, {}, "", "X-Other: value", "X-Forge-Launch:", "X-Forge-Launch"])
+def test_header_reader_rejects_missing_or_malformed_values(value: object) -> None:
+    assert read_launch_id(value) is None
+
+
+@pytest.mark.parametrize("second", ["run_aaaaaaaaaaaa", "run_bbbbbbbbbbbb", ""])
+def test_header_reader_rejects_duplicate_values(second: str) -> None:
+    headers = f"X-Forge-Launch: run_aaaaaaaaaaaa\nx-forge-launch: {second}"
+    assert read_custom_header(headers, "X-Forge-Launch") is None
+    assert read_launch_id(headers) is None
+
+
+def test_header_reader_accepts_case_insensitive_names_and_whitespace() -> None:
+    headers = "X-User: keep\n x-FoRgE-LaUnCh : run_aaaaaaaaaaaa \nX-Forge-Model-Tier: opus\n"
+    assert read_launch_id(headers) == "run_aaaaaaaaaaaa"
+    assert read_projected_model_tier(headers) == "opus"
+
+
+@pytest.mark.parametrize("tier", ["", "Opus", "unknown", "opus: sonnet", "opus\nX-Forge-Model-Tier: opus"])
+def test_projected_tier_reader_is_strict(tier: str) -> None:
+    assert read_projected_model_tier(f"X-Forge-Model-Tier: {tier}") is None
+
+
 # Provider session and command labels
 
 
 @pytest.mark.parametrize(
     "raw",
-    ["memory_writer", "memory-writer", "memory writer", "Memory  Writer", " memory.writer "],
+    [
+        "memory_writer",
+        "memory-writer",
+        "memory writer",
+        "Memory  Writer",
+        " memory.writer ",
+    ],
 )
 def test_sanitize_label_canonicalizes_separators(raw: str) -> None:
     # One role string must normalize one way regardless of separator/casing, so the

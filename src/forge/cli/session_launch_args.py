@@ -20,6 +20,7 @@ from forge.core.runtime.launch_args import (
 from forge.session.models import AuthorityIntent
 
 PASSTHROUGH_META_KEY = "forge.runtime_passthrough"
+LIFECYCLE_ARGV_META_KEY = "forge.lifecycle_argv"
 
 
 class RuntimePassthroughCommand(click.Command):
@@ -31,6 +32,7 @@ class RuntimePassthroughCommand(click.Command):
     """
 
     def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        ctx.meta[LIFECYCLE_ARGV_META_KEY] = tuple(args)
         passthrough: tuple[str, ...] = ()
         if "--" in args:
             split = args.index("--")
@@ -72,7 +74,11 @@ def checked_launch_args(
         print_error("--effort and runtime arguments after '--' apply only to a launch; drop them or --no-launch")
         sys.exit(1)
     try:
-        return validate_launch_args(args, runtime=runtime, advisory=authority is not None and authority.is_advisory)
+        return validate_launch_args(
+            args,
+            runtime=runtime,
+            advisory=authority is not None and authority.is_advisory,
+        )
     except LaunchArgsError as e:
         print_error(str(e))
         sys.exit(1)

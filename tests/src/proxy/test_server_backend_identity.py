@@ -77,8 +77,20 @@ def test_inspect_route_uses_backend_not_source(monkeypatch: pytest.MonkeyPatch) 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "query,scoped_launch",
+    [
+        (b"", None),
+        (b"forge_launch=run_aaaaaaaaaaaa", "run_aaaaaaaaaaaa"),
+        (b"forge_launch=bad", None),
+        (b"forge_launch=run_aaaaaaaaaaaa%0A", None),
+        (b"forge_launch=run_aaaaaaaaaaaa&forge_launch=run_bbbbbbbbbbbb", None),
+    ],
+)
 async def test_root_exposes_effective_backend_and_model_alternatives(
     monkeypatch: pytest.MonkeyPatch,
+    query: bytes,
+    scoped_launch: str | None,
 ) -> None:
     import forge.proxy.proxy_identity as identity
 
@@ -128,6 +140,13 @@ async def test_root_exposes_effective_backend_and_model_alternatives(
     monkeypatch.setenv("PREFERRED_PROVIDER", "openrouter")
     monkeypatch.setenv("ACTIVE_PORT", "8085")
     monkeypatch.setenv("FORGE_PROXY_ID", "qwen-1")
+    queried_launches = []
+
+    def scoped_snapshot(launch):
+        queried_launches.append(launch)
+        return {}
+
+    monkeypatch.setattr(server, "effort_observations", SimpleNamespace(snapshot=scoped_snapshot))
     request = Request(
         {
             "type": "http",
@@ -136,12 +155,18 @@ async def test_root_exposes_effective_backend_and_model_alternatives(
             "server": ("localhost", 8085),
             "path": "/",
             "raw_path": b"/",
-            "query_string": b"",
+            "query_string": query,
             "headers": [],
         }
     )
 
     response = await server.root(request)
+    if scoped_launch is None:
+        assert "effort" not in response["runtime"]
+        assert queried_launches == []
+    else:
+        assert response["runtime"]["effort"] == {}
+        assert queried_launches == [scoped_launch]
 
     assert response["runtime"]["backend_id"] == "openrouter"
     assert response["runtime"]["tier_mappings"] == {

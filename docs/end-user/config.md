@@ -275,8 +275,8 @@ Code preset). Set keys with `forge config set statusline.<key>=<value>`:
 | `cache_hit_ttl`  | seconds                       | `12`          | Direct-mode cache-hit recompute throttle window      |
 | `forge_cost_ttl` | seconds                       | `10`          | `forge_cost` segment recompute throttle window       |
 
-**Segments.** The default bar is `path, branch, breadcrumb, model, cost, lines, tokens, think, loop, sidecar`. Opt-in
-segments (add to `segments` to enable): `rate_limits`, `cache_hit`, and the Forge-unique `supervisor`, `policy`,
+**Segments.** The default bar is `path, branch, breadcrumb, model, cost, lines, tokens, loop, sidecar`. Opt-in segments
+(add to `segments` to enable): `think`, `rate_limits`, `cache_hit`, and the Forge-unique `supervisor`, `policy`,
 `audit`, `drift`, `spend_cap`, `launch`, `forge_cost`, `hooks`, `marking`. `forge config set` rejects unknown names; an
 empty list restores the default bar. The `hooks` segment shows `HOOK!` for legacy cleanup-required state and `HOOKx2`
 only for an actual duplicate event/matcher/handler. The `launch` segment shows how the session reached the model
@@ -292,11 +292,35 @@ render `?`. A missing stdin model omits only this segment. `mark:no` means a mat
 unmarked—it is not a content scan, an admission decision, or proof of authorship. The production declaration catalog
 ships empty, so current results are intentionally `?` until a separately source-reviewed declaration is added.
 
+**Reasoning effort.** Direct sessions include Claude's reported session effort in the model label, such as
+`[Opus 5.5 @xhigh]`. Older clients or models that omit the field have no annotation. Context size appears only beside
+the context bar; the model label and color do not repeat it. The `think` segment is still available when explicitly
+selected.
+
+On a Forge proxy, only the active tier gets an annotation, using the last observed model and effort for this launch:
+
+| Annotation        | Meaning                                            |
+| ----------------- | -------------------------------------------------- |
+| `@high`           | Forge sent high; Claude requested high or no level |
+| `@high<-xhigh`    | Forge sent high from a Claude request for xhigh    |
+| `@high (stale)`   | Effort, client model or proven route changed       |
+| `@dropped<-xhigh` | Client construction removed the effort parameter   |
+| `@unknown`        | No usable observation for this launch              |
+
+`<-` reads "from"; a tier minimum can raise a level as well as a model limit lowering it. These are Forge's outbound
+values, not a measurement of provider-side reasoning. Use `forge session model show <name>` (or `%session model show`)
+to inspect requested, derived, minimum, pre-clamp, supported and applied levels separately. `--json` includes the
+observations by tier.
+
+Observations are temporary: a new launch, proxy restart or cache eviction starts at `unknown`. Relaunch sessions that
+predate the launch header to enable observation. Background work on the same launch and tier can replace its latest
+record. Model alternatives display the model actually observed; unsupported or unproven routes never supply a guessed
+effort or a route-based stale verdict.
+
 Source discovery follows the selected fields. A `path,branch` layout never contacts a proxy or reads the Forge session
 index/manifest; fields that need proxy or managed-session facts acquire each source once per refresh and share it. The
-default bar still reads both sources so its output and fail-open behavior are unchanged. This optimization concerns
-proxy/session discovery only: selected fields can still perform their own git, transcript/cache, or hook-diagnostic
-work.
+default bar still reads both sources and retains fail-open behavior. This optimization concerns proxy/session discovery
+only: selected fields can still perform their own git, transcript/cache, or hook-diagnostic work.
 
 ```bash
 forge config set statusline.segments=path,model,cost,cache_hit,spend_cap,marking

@@ -50,12 +50,9 @@ BOLD = "\033[1m"
 RESET_GLYPH = "↻"  # ↻
 
 # Per-tier model colors (Option 4: navy family)
-# 1M variants use a deeper shade of the same hue
 TIER_HAIKU = "\033[38;5;67m"  # steel blue
 TIER_SONNET = "\033[38;5;69m"  # cornflower
-TIER_SONNET_DEEP = "\033[38;5;26m"  # deeper cornflower (1M context)
 TIER_OPUS = "\033[38;5;75m"  # vivid blue
-TIER_OPUS_DEEP = "\033[38;5;32m"  # deeper vivid blue (1M context)
 DARK_GRAY = "\033[90m"
 DIM = "\033[2m"
 RESET = "\033[0m"
@@ -106,22 +103,23 @@ def compact_model_name(model: str) -> str:
     return get_compact_name(model)
 
 
-def tier_color(tier: str, runtime: status_types.ProxyRuntimeTruth | None) -> str:
-    """Pick color for a tier, using deep variant for extended context (>200K)."""
-    extended = False
-    if runtime:
-        ctx = runtime.get_context_window_for_tier(tier)
-        if ctx and ctx > 200_000:
-            extended = True
-
+def tier_color(tier: str) -> str:
+    """Pick a tier color independently of its context window."""
     if tier == "opus":
-        return TIER_OPUS_DEEP if extended else TIER_OPUS
+        return TIER_OPUS
     elif tier == "sonnet":
-        return TIER_SONNET_DEEP if extended else TIER_SONNET
+        return TIER_SONNET
     return TIER_HAIKU
 
 
-def get_tier_display(runtime: status_types.ProxyRuntimeTruth | None) -> str | None:
+def get_tier_display(
+    runtime: status_types.ProxyRuntimeTruth | None,
+    *,
+    active_tier: str | None = None,
+    active_model: str | None = None,
+    effort: str | None = None,
+    warning: bool = False,
+) -> str | None:
     """Get tier display string showing all mappings.
 
     Format: "O:model S:model H:model" with per-tier coloring.
@@ -130,29 +128,27 @@ def get_tier_display(runtime: status_types.ProxyRuntimeTruth | None) -> str | No
         return None
 
     # Prefer runtime.tier_mappings (authoritative), fallback to legacy tiers
-    tier_mappings = runtime.tier_mappings
+    tier_mappings = dict(runtime.tier_mappings)
     if not tier_mappings:
-        tier_mappings = {k: v.get("model", "") for k, v in runtime.tiers.items()}
+        tier_mappings = {
+            k: v["model"] for k, v in runtime.tiers.items() if isinstance(v, dict) and isinstance(v.get("model"), str)
+        }
+    if active_tier and active_model:
+        tier_mappings[active_tier] = active_model
 
     if not tier_mappings:
         return None
 
-    h_model = tier_mappings.get("haiku", "")
-    s_model = tier_mappings.get("sonnet", "")
-    o_model = tier_mappings.get("opus", "")
-
-    if not any([h_model, s_model, o_model]):
+    if not any(tier_mappings.get(tier) for tier in ("opus", "sonnet", "haiku")):
         return None
-
-    h_name = compact_model_name(h_model)
-    s_name = compact_model_name(s_model)
-    o_name = compact_model_name(o_model)
-
-    oc = tier_color("opus", runtime)
-    sc = tier_color("sonnet", runtime)
-    hc = tier_color("haiku", runtime)
-
-    return f"{oc}O:{o_name}{RESET} {sc}S:{s_name}{RESET} {hc}H:{h_name}{RESET}"
+    slots = []
+    for tier, label in (("opus", "O"), ("sonnet", "S"), ("haiku", "H")):
+        name = compact_model_name(tier_mappings.get(tier, ""))
+        active = tier == active_tier
+        suffix = f"@{effort}" if active and effort else ""
+        color = YELLOW if active and warning else tier_color(tier)
+        slots.append(f"{color}{label}:{name}{suffix}{RESET}")
+    return " ".join(slots)
 
 
 # Context window info is sourced from:
@@ -264,12 +260,9 @@ def get_effective_context_window(
     return None
 
 
-def format_model_label(display_name: str, context_window: int | None) -> str:
-    """Clean Claude's display name and append non-default context size when useful."""
-    base_name = re.sub(r"\s*\([^)]*context[^)]*\)", "", display_name).strip()
-    if context_window and context_window > 200_000:
-        return f"{base_name} ({format_context_size(context_window)})"
-    return base_name
+def format_model_label(display_name: str) -> str:
+    """Remove context-size annotations; the context bar owns that display."""
+    return re.sub(r"\s*\((?:[^)]*context[^)]*|\d+(?:\.\d+)?[kKmM])\)", "", display_name).strip()
 
 
 def format_context_size(size: int) -> str:
@@ -861,8 +854,10 @@ def format_drift(stdin_model_id: str, backend_model: str) -> str | None:
     short name) don't false-positive. Returns None when aligned — the segment is
     an alert, so no news is good news.
     """
-    shown = compact_model_name(stdin_model_id)
-    served = compact_model_name(backend_model)
+    from forge.core.models.model_reference import strip_transport_model_suffix
+
+    shown = compact_model_name(strip_transport_model_suffix(stdin_model_id))
+    served = compact_model_name(strip_transport_model_suffix(backend_model))
     if shown == served:
         return None
     return f"{YELLOW}drift:{shown}!={served}{RESET}"

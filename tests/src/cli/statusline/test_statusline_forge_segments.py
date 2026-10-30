@@ -374,7 +374,13 @@ class TestDriftProducer:
     def test_mismatch_renders(self):
         raw = {
             "is_proxy": True,
-            "runtime": {"active_tier": "opus", "tier_mappings": {"opus": "o3"}},
+            "wire_shape": "openai_translated",
+            "runtime": {
+                "backend_id": "openrouter",
+                "model_alternatives": {},
+                "active_tier": "opus",
+                "tier_mappings": {"opus": "o3"},
+            },
             "proxy": {"template": "litellm-openai"},
         }
         ctx = _ctx(is_proxy=True, runtime=_proxy(raw))
@@ -383,7 +389,10 @@ class TestDriftProducer:
     def test_aligned_is_quiet(self):
         raw = {
             "is_proxy": True,
+            "wire_shape": "openai_translated",
             "runtime": {
+                "backend_id": "openrouter",
+                "model_alternatives": {},
                 "active_tier": "opus",
                 "tier_mappings": {"opus": "claude-opus-4-8"},
             },
@@ -396,7 +405,13 @@ class TestDriftProducer:
         # display_name only (no model.id) -> can't normalize -> hidden, not a guess.
         raw = {
             "is_proxy": True,
-            "runtime": {"active_tier": "opus", "tier_mappings": {"opus": "o3"}},
+            "wire_shape": "openai_translated",
+            "runtime": {
+                "backend_id": "openrouter",
+                "model_alternatives": {},
+                "active_tier": "opus",
+                "tier_mappings": {"opus": "o3"},
+            },
         }
         ctx = _ctx(
             data={"workspace": {}, "model": {"display_name": "Opus"}},
@@ -412,7 +427,10 @@ class TestDriftProducer:
         # against the sonnet default would have false-positived.
         raw = {
             "is_proxy": True,
+            "wire_shape": "openai_translated",
             "runtime": {
+                "backend_id": "openrouter",
+                "model_alternatives": {},
                 "active_tier": "sonnet",
                 "tier_mappings": {
                     "sonnet": "claude-sonnet-4-5",
@@ -435,7 +453,13 @@ class TestDriftProducer:
         # A bare backend model id (no haiku/sonnet/opus) -> route by proxy default.
         raw = {
             "is_proxy": True,
-            "runtime": {"active_tier": "sonnet", "tier_mappings": {"sonnet": "gpt-4o"}},
+            "wire_shape": "openai_translated",
+            "runtime": {
+                "backend_id": "openrouter",
+                "model_alternatives": {},
+                "active_tier": "sonnet",
+                "tier_mappings": {"sonnet": "gpt-4o"},
+            },
             "proxy": {"template": "litellm-openai"},
         }
         ctx = _ctx(

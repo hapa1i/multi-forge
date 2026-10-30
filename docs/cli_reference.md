@@ -157,7 +157,7 @@ update of an already tracked package can be repaired by sync.
 | `forge session authority show [name]`   | Show the configured role, exact coverage inventory, journal support, and live launch support (`--json`)                                                                                                                 |
 | `forge session authority set <name>`    | Assign `--role advisory\|producer` to an inactive session; advisory `--tier` defaults to `shell_closed`                                                                                                                 |
 | `forge session authority clear <name>`  | Remove the complete authority designation from an inactive session                                                                                                                                                      |
-| `forge session model show [name]`       | Show route intent, latest supported route commitment, labelled live-proxy fallback, and provider-declared marking (`--json`)                                                                                            |
+| `forge session model show [name]`       | Show route intent, latest supported route commitment, labelled live-proxy fallback, provider-declared marking, and launch-scoped outbound effort (`--json`)                                                             |
 | `forge session model history [name]`    | Show every strictly validated routing event in append order and its `supported\|unproven\|null` status (`--json`)                                                                                                       |
 | `forge session delete <name>...`        | Delete Forge content and preserve native conversations (`--all` for current-project bulk deletion)                                                                                                                      |
 | `forge session purge <name>...`         | Preview Forge and verified native content removal; `--yes` applies, `--json` previews, `--all` selects the current project                                                                                              |
@@ -208,6 +208,12 @@ Codex levels are `none/minimal/low/medium/high/xhigh/max` (`-c model_reasoning_e
 Advisory-authority launches refuse any `--` tail, `--no-launch` refuses both, and route-recovery commands reproduce
 both. On translated proxy routes `--effort` stamps `X-Forge-Effort-Source: client` so the proxy honors Claude's
 per-request effort over the tier floor ([proxy guide](end-user/proxy.md#launch-effort-on-translated-routes)).
+
+`session model show` adds an `effort` block with `status`, `reason`, `launch_id`, `backend_id`, and tier-keyed
+`observations`. It queries a launch only when its routing commitment is proven; missing, legacy and unproven evidence
+remain `unknown`. Human and `%` reads show the requested, applicable, derived, minimum, pre-clamp, supported, resolved
+and applied levels, plus the tier source, wire parameter and model. These are temporary outbound observations, not
+provider execution evidence.
 
 Rewind resume is available on Claude sessions with `--strategy rewind --drop-last N`.
 `forge session resume <parent> --fresh --strategy rewind --drop-last N` may create a same-directory child: Forge writes
@@ -589,8 +595,8 @@ Shared commands (mirrors CLI syntax):
 
 - `%session list` (calls the same command-core op as `forge session list`)
 - `%session show [name]` (defaults to the current session)
-- `%session model show [name]` (fixed-size read-only route/marking summary; defaults to the current session; no maps or
-  history dump)
+- `%session model show [name]` (bounded read-only route/marking/effort summary; defaults to the current session; no maps
+  or history dump)
 - `%plan` (shows the current session's recorded plan file path)
 - `%proxy list` (read-only: shows available proxies)
 - `%proxy show <id>` (read-only: shows proxy details and tier mappings)

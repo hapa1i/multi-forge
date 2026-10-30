@@ -42,6 +42,7 @@ def print_tip(
     *lines: str,
     commands: Sequence[str] | None = None,
     blank_before: bool = True,
+    soft_wrap: bool = False,
     console: Console | None = None,
 ) -> None:
     """Print a dim ``Tip:`` block.
@@ -50,6 +51,7 @@ def print_tip(
     continuations. ``commands`` render as an indented, copy-pasteable block
     (plain, so they stand out as runnable). ``blank_before`` emits a leading
     blank line for visual separation (the common case after an error or table).
+    ``soft_wrap`` preserves a single physical line for inline launch guidance.
     """
     out = _resolve(console)
     if not lines and not commands:
@@ -58,9 +60,9 @@ def print_tip(
         out.print()
     if lines:
         first, *rest = lines
-        out.print(f"[dim]Tip: {first}[/dim]")
+        out.print(f"[dim]Tip: {first}[/dim]", soft_wrap=soft_wrap)
         for line in rest:
-            out.print(f"[dim]{line}[/dim]")
+            out.print(f"[dim]{line}[/dim]", soft_wrap=soft_wrap)
     for cmd in commands or ():
         # Commands are user-copyable payloads, not Rich markup. In particular,
         # valid paths can contain bracketed components such as ``[release]``.

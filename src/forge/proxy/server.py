@@ -50,6 +50,7 @@ from forge.core.run_id import (
     FORGE_COMMAND_HEADER,
     FORGE_EFFORT_SOURCE_CLIENT,
     FORGE_EFFORT_SOURCE_HEADER,
+    FORGE_LAUNCH_HEADER,
     FORGE_MODEL_TIER_HEADER,
     FORGE_ROOT_RUN_ID_HEADER,
     FORGE_RUN_ID_HEADER,
@@ -84,6 +85,7 @@ from forge.proxy.data_models import (
     TokenCountResponse,
     map_model_name,
 )
+from forge.proxy.effort_observation import EffortObservations
 from forge.proxy.error_hints import enrich_error_content
 from forge.proxy.metrics import proxy_metrics
 from forge.proxy.model_routes import (
@@ -99,7 +101,7 @@ from forge.proxy.ports import (
     find_available_loopback_port as _find_available_loopback_port,
 )
 from forge.proxy.provider_trace_logger import record_provider_trace
-from forge.proxy.reasoning import resolve_reasoning_effort
+from forge.proxy.reasoning import resolve_reasoning_effort_record
 from forge.proxy.request_id import is_valid_request_id
 from forge.proxy.responses_ingress import (
     advertise_responses_ingress,
@@ -125,6 +127,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 client_factory = TierClientFactory()
+effort_observations = EffortObservations()
 
 PREFERRED_PROVIDER = None
 
@@ -1153,13 +1156,23 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
         # launch opted into client effort; the result is normalized against the
         # catalog's effort levels for the mapped model (explicit unsupported
         # values reject, client and derived ones clamp).
-        openai_request_dict["reasoning_effort"] = resolve_reasoning_effort(
+        effort_resolution = resolve_reasoning_effort_record(
             request_data,
             tier_override=tier_override,
             model_id=actual_model_id,
             request_id=request_id,
             honor_client_effort=_client_effort_requested(raw_request),
         )
+        openai_request_dict["reasoning_effort"] = effort_resolution.resolved
+        effort_observer = effort_observations.observer(
+            getattr(raw_request, "headers", {}).get(FORGE_LAUNCH_HEADER),
+            tier=resolved_tier,
+            tier_source=resolved_tier_source,
+            client_model=original_model_name or request_data.model,
+            mapped_model=actual_model_id,
+            resolution=effort_resolution,
+        )
+        effort_kwargs = {"on_effort_applied": effort_observer} if effort_observer is not None else {}
 
         # Note: the raw `thinking` dict is NOT forwarded — it's Anthropic-specific.
         # Litellm controls thinking via reasoning_effort (mapped above).
@@ -1303,6 +1316,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                         openai_request_dict,
                         request_id,
                         on_provider_dispatch=_mark_provider_dispatch,
+                        **effort_kwargs,
                     ):
                         yield chunk
                 except ProxyStreamError as e:
@@ -1427,6 +1441,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     openai_request_dict,
                     request_id,
                     on_provider_dispatch=_mark_provider_dispatch,
+                    **effort_kwargs,
                 )
                 provider_response_received = True
                 anthropic_response = convert_openai_to_anthropic(openai_response, original_model_name)
@@ -1538,6 +1553,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     openai_request_dict,
                     request_id,
                     on_provider_dispatch=_mark_provider_dispatch,
+                    **effort_kwargs,
                 )
                 provider_response_received = True
                 anthropic_response = convert_openai_to_anthropic(openai_response, original_model_name)
@@ -1904,6 +1920,9 @@ async def root(request: Request):
         # Proxy-owned hyperparameter defaults actually used by proxy clients (post-merge)
         "llm_defaults_by_tier": llm_defaults_by_tier,
     }
+    launch_queries = request.query_params.getlist("forge_launch")
+    if len(launch_queries) == 1 and is_valid_run_id(launch_queries[0]):
+        runtime_section["effort"] = effort_observations.snapshot(launch_queries[0])
 
     proxy_section = {
         "proxy_id": proxy_identity.proxy_id,

@@ -12,6 +12,7 @@ the sibling ``statusline.formatting`` module; neither layer imports the command.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Any
@@ -24,8 +25,11 @@ from forge.cli.statusline.palette import (
     resolve_glyphs,
     resolve_palette,
 )
+from forge.cli.statusline.routing import PredictedRoute, predict_route
 from forge.cli.statusline.types import ProxyRuntimeTruth, TranscriptStats
+from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.ops.usage_summary import SupervisorHealth
+from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR, read_projected_model_tier
 from forge.runtime_config import RuntimeConfig
 
 _COST_MICROS_PER_USD = 1_000_000
@@ -61,7 +65,21 @@ class RenderContext:
 
     @property
     def raw_model_name(self) -> str:
-        return self.data.get("model", {}).get("display_name", "Claude")
+        model = self.data.get("model")
+        name = model.get("display_name") if isinstance(model, dict) else None
+        return name if isinstance(name, str) and name else "Claude"
+
+    @property
+    def model_id(self) -> str | None:
+        model = self.data.get("model")
+        value = model.get("id") if isinstance(model, dict) else None
+        return value if isinstance(value, str) and value else None
+
+    @property
+    def requested_effort(self) -> str | None:
+        effort = self.data.get("effort")
+        value = effort.get("level") if isinstance(effort, dict) else None
+        return value if isinstance(value, str) and value in CLAUDE_EFFORT_LEVELS else None
 
     @property
     def transcript_path(self) -> str:
@@ -151,6 +169,15 @@ class RenderContext:
         return "ambiguous"
 
     # --- Lazy derivations (run once, only if accessed) ---
+
+    @cached_property
+    def route(self) -> PredictedRoute:
+        return predict_route(
+            self.model_id,
+            self.runtime,
+            authoritative=self.is_proxy_authoritative,
+            projected_tier=read_projected_model_tier(os.environ.get(ANTHROPIC_CUSTOM_HEADERS_VAR)),
+        )
 
     @cached_property
     def transcript_stats(self) -> TranscriptStats:

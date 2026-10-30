@@ -25,6 +25,7 @@ from typing import Callable, Optional
 from forge.cli.statusline import formatting as fmt
 from forge.cli.statusline import sources
 from forge.cli.statusline.context import RenderContext
+from forge.cli.statusline.effort import observation_label
 from forge.cli.statusline.names import DEFAULT_ORDER
 
 logger = logging.getLogger(__name__)
@@ -98,14 +99,35 @@ def _produce_breadcrumb(ctx: RenderContext) -> Optional[str]:
 def _produce_model(ctx: RenderContext) -> Optional[str]:
     info = ctx.context_info
     glyphs = (ctx.glyphs.filled, ctx.glyphs.empty)
-    model_name = fmt.format_model_label(ctx.raw_model_name, ctx.effective_context_window)
-
-    tier_display = fmt.get_tier_display(ctx.runtime) if ctx.is_proxy else None
+    model_name = fmt.format_model_label(ctx.raw_model_name)
+    effort = ctx.requested_effort
+    warning = False
+    tier_display = None
+    if ctx.is_proxy:
+        route = ctx.route
+        record = (
+            ctx.runtime.effort.get(route.tier) if ctx.runtime and route.tier and ctx.is_proxy_authoritative else None
+        )
+        effort, warning = observation_label(
+            record,
+            requested=ctx.requested_effort,
+            model_id=ctx.model_id,
+            route_model=route.model,
+        )
+        tier_display = fmt.get_tier_display(
+            ctx.runtime,
+            active_tier=route.tier,
+            active_model=record["mapped_model"] if record else route.model,
+            effort=effort,
+            warning=warning,
+        )
     if tier_display:
         model_segment = f"[{tier_display}] {fmt.get_context_display(info, glyphs)}"
     else:
         detected_tier = fmt.get_tier_from_display_name(ctx.raw_model_name)
-        model_color = fmt.tier_color(detected_tier, ctx.runtime)
+        model_color = fmt.YELLOW if warning else fmt.tier_color(detected_tier)
+        if effort:
+            model_name += f" @{effort}"
         model_segment = f"{model_color}[{model_name}]{fmt.RESET} {fmt.get_context_display(info, glyphs)}"
 
     if ctx.is_proxy and ctx.runtime and ctx.runtime.template and ctx.runtime.template != "unknown":
@@ -255,27 +277,9 @@ def _produce_audit(ctx: RenderContext) -> Optional[str]:
 
 
 def _produce_drift(ctx: RenderContext) -> Optional[str]:
-    # Proxy-only: compare the backend this request actually routes to against the
-    # model Claude Code reports. Routing prefers an explicit tier in the model
-    # name over the proxy default (server.py:779), and runtime.active_tier is only
-    # the *default* tier — so derive the route tier from stdin model.id first and
-    # fall back to active_tier, mirroring the proxy. Needs model.id (not
-    # display_name) to normalize.
-    if not ctx.is_proxy or ctx.runtime is None:
+    if not ctx.is_proxy or not ctx.model_id or not ctx.route.model:
         return None
-    mappings = ctx.runtime.tier_mappings
-    if not isinstance(mappings, dict) or not mappings:
-        return None
-    model_id = (ctx.data.get("model") or {}).get("id")
-    if not model_id:
-        return None
-    route_tier = fmt.explicit_tier_from_model(str(model_id)) or ctx.runtime.active_tier
-    if not route_tier:
-        return None
-    backend = mappings.get(route_tier)
-    if not backend:
-        return None
-    return fmt.format_drift(str(model_id), str(backend))
+    return fmt.format_drift(ctx.model_id, ctx.route.model)
 
 
 def _produce_spend_cap(ctx: RenderContext) -> Optional[str]:
@@ -356,37 +360,15 @@ def _produce_marking(ctx: RenderContext) -> Optional[str]:
         load_model_practices,
         resolve_model_practice,
     )
-    from forge.core.models.model_reference import strip_transport_model_suffix
 
     try:
         catalog = load_model_practices()
         if ctx.is_proxy:
-            if ctx.runtime is None or not ctx.is_proxy_authoritative:
-                return fmt.format_marking("unknown")
-            if not ctx.runtime.has_authoritative_route_truth:
-                return fmt.format_marking("unknown")
-            request_model = strip_transport_model_suffix(model_id)
-            if "/" in request_model:
-                # The proxy may preserve provider/model requests as explicit
-                # backend pass-through routes. Runtime defaults cannot prove
-                # which provider-specific path handled one.
-                return fmt.format_marking("unknown")
-            tier = fmt.explicit_tier_from_model(model_id) or ctx.runtime.active_tier
-            if not isinstance(tier, str) or not tier:
-                return fmt.format_marking("unknown")
-            alternatives = ctx.runtime.model_alternatives.get(tier, {})
-            if not isinstance(alternatives, dict):
-                return fmt.format_marking("unknown")
-            from forge.core.models.model_routes import resolve_model_alternative
-
-            route_model = resolve_model_alternative(request_model, alternatives)
-            if not isinstance(route_model, str) or not route_model:
-                route_model = ctx.runtime.tier_mappings.get(tier)
-            if not isinstance(route_model, str) or not route_model:
+            if ctx.runtime is None or ctx.route.model is None:
                 return fmt.format_marking("unknown")
             from forge.core.models.model_reference import normalize_model_reference
 
-            canonical = normalize_model_reference(route_model)
+            canonical = normalize_model_reference(ctx.route.model)
             scope: list[str] = ["route:proxy", "runtime:claude_code"]
             if ctx.runtime.backend_id:
                 scope.append(f"backend:{ctx.runtime.backend_id}")

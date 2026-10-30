@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from forge.config.loader import load_config
 from forge.core.models.model_practices import (
@@ -13,6 +13,7 @@ from forge.core.models.model_practices import (
     resolve_model_practice,
 )
 from forge.core.models.model_reference import normalize_model_reference
+from forge.core.run_id import is_valid_run_id
 from forge.proxy.model_routes import effective_proxy_model_maps
 from forge.proxy.runtime_truth import ProxyRuntimeTruth
 from forge.session.models import SessionState, session_runtime
@@ -61,7 +62,8 @@ def get_session_model_report(*, ctx: ExecutionContext, session_name: str | None 
     history = derive_routing_history(resolved.store.forge_root, state)
     intent = _route_intent(state)
     route_commit = _route_commit(state, history)
-    live_proxy = _live_proxy(state, intent, route_commit)
+    launch_id = _effort_launch_id(route_commit)
+    live_proxy, proxy_runtime = _live_proxy(state, intent, route_commit, launch_id=launch_id)
     marking = _marking(route_commit, live_proxy, history, catalog)
     return SessionModelReport(
         {
@@ -76,7 +78,11 @@ def get_session_model_report(*, ctx: ExecutionContext, session_name: str | None 
             "current_request_source": "unavailable",
             "history_status": history.status,
             "marking": marking,
-            "limitations": list(MODEL_REPORT_LIMITATIONS),
+            "effort": _effort_report(route_commit, proxy_runtime),
+            "limitations": [
+                *MODEL_REPORT_LIMITATIONS,
+                "effort describes Forge's outbound parameter, not provider-side execution",
+            ],
         }
     )
 
@@ -233,10 +239,12 @@ def _live_proxy(
     state: SessionState,
     intent: dict[str, Any],
     route_commit: dict[str, Any] | None,
-) -> dict[str, Any]:
+    *,
+    launch_id: str | None,
+) -> tuple[dict[str, Any], ProxyRuntimeTruth | None]:
     route_kind = route_commit.get("kind") if route_commit and route_commit.get("kind") else intent["kind"]
     if route_kind != "proxy":
-        return _empty_live_proxy("not_applicable")
+        return _empty_live_proxy("not_applicable"), None
 
     proxy_id = _first_string(
         route_commit.get("proxy_id") if route_commit else None,
@@ -254,7 +262,12 @@ def _live_proxy(
         state.intent.proxy.base_url if state.intent.proxy is not None else None,
     )
 
-    runtime = _probe_proxy_runtime(base_url, expected_proxy_id=proxy_id, expected_template=template)
+    runtime = _probe_proxy_runtime(
+        base_url,
+        expected_proxy_id=proxy_id,
+        expected_template=template,
+        launch_id=launch_id,
+    )
     runtime_reachable = runtime is not None
     if runtime is not None and _runtime_has_route_truth(runtime):
         return {
@@ -266,7 +279,7 @@ def _live_proxy(
             "default_tier": runtime.active_tier,
             "tier_mappings": runtime.tier_mappings,
             "model_alternatives": runtime.model_alternatives,
-        }
+        }, runtime
 
     if proxy_id is not None or template is not None:
         try:
@@ -281,7 +294,7 @@ def _live_proxy(
                 "default_tier": config.proxy.default_tier,
                 "tier_mappings": tier_mappings,
                 "model_alternatives": alternatives,
-            }
+            }, None
         except Exception:
             pass
 
@@ -295,10 +308,44 @@ def _live_proxy(
             "default_tier": route_commit["default_tier"],
             "tier_mappings": route_commit["tier_mappings"],
             "model_alternatives": route_commit["model_alternatives"],
-        }
+        }, None
     unavailable = _empty_live_proxy("unavailable")
     unavailable.update({"reachable": runtime_reachable, "proxy_id": proxy_id, "template": template})
-    return unavailable
+    return unavailable, None
+
+
+def _effort_launch_id(route_commit: dict[str, Any] | None) -> str | None:
+    if not route_commit or route_commit["evidence_source"] != "route_commit" or route_commit["kind"] != "proxy":
+        return None
+    launch_id = route_commit.get("run_id")
+    return launch_id if isinstance(launch_id, str) and is_valid_run_id(launch_id) else None
+
+
+def _effort_report(route_commit: dict[str, Any] | None, runtime: ProxyRuntimeTruth | None) -> dict[str, Any]:
+    launch_id = _effort_launch_id(route_commit)
+    observations: dict[str, Any] = {}
+    if route_commit is None:
+        reason: str | None = "no_route_commitment"
+    elif route_commit["evidence_source"] != "route_commit":
+        reason = route_commit["evidence_source"]
+    elif route_commit["kind"] != "proxy":
+        reason = "not_proxy_route"
+    elif launch_id is None:
+        reason = "invalid_launch_id"
+    elif runtime is None:
+        reason = "proxy_unavailable"
+    elif not runtime.has_effort_observations:
+        reason = "proxy_effort_unavailable"
+    else:
+        observations = runtime.effort
+        reason = None if observations else "no_observation_for_launch"
+    return {
+        "status": "observed" if observations else "unknown",
+        "reason": reason,
+        "launch_id": launch_id,
+        "backend_id": runtime.backend_id if launch_id and runtime else None,
+        "observations": observations,
+    }
 
 
 def _empty_live_proxy(evidence_source: str) -> dict[str, Any]:
@@ -319,6 +366,7 @@ def _probe_proxy_runtime(
     *,
     expected_proxy_id: str | None,
     expected_template: str | None,
+    launch_id: str | None = None,
 ) -> ProxyRuntimeTruth | None:
     if base_url is None:
         return None
@@ -331,6 +379,8 @@ def _probe_proxy_runtime(
         port = f":{parsed.port}" if parsed.port is not None else ""
         host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
         query_url = f"{parsed.scheme}://{host}{port}/"
+        if launch_id is not None and is_valid_run_id(launch_id):
+            query_url += "?" + urlencode({"forge_launch": launch_id})
         with httpx.Client(timeout=httpx.Timeout(0.5)) as client:
             response = client.get(query_url)
         if response.status_code != 200:

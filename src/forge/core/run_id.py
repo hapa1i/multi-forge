@@ -29,6 +29,9 @@ FORGE_ROOT_RUN_ID_HEADER = "X-Forge-Root-Run-ID"
 # Model-route projection metadata consumed by the Forge proxy and never forwarded.
 FORGE_MODEL_TIER_HEADER = "X-Forge-Model-Tier"
 
+# Interactive launch identity, distinct from headless run-tree correlation.
+FORGE_LAUNCH_HEADER = "X-Forge-Launch"
+
 # Launch opt-in consumed by the Forge proxy and never forwarded: with this header set
 # to ``client``, a translated route treats the request's ``output_config.effort`` as
 # an explicit effort request. Stamped only for a managed launch that passed ``--effort``.
@@ -73,7 +76,33 @@ def is_valid_run_id(value: str | None) -> bool:
     """
     if not value:
         return False
-    return RUN_ID_RE.match(value) is not None
+    return RUN_ID_RE.fullmatch(value) is not None
+
+
+def read_custom_header(value: object, name: str) -> str | None:
+    """Read one unambiguous header from Claude's newline-separated environment value."""
+    if not isinstance(value, str):
+        return None
+    matches = []
+    for line in value.split("\n"):
+        key, separator, header_value = line.partition(":")
+        if key.strip().lower() == name.lower():
+            if not separator:
+                return None
+            matches.append(header_value.strip())
+    return matches[0] if len(matches) == 1 and matches[0] else None
+
+
+def read_launch_id(value: object) -> str | None:
+    """Return the validated launch id from ANTHROPIC_CUSTOM_HEADERS, if unambiguous."""
+    launch_id = read_custom_header(value, FORGE_LAUNCH_HEADER)
+    return launch_id if is_valid_run_id(launch_id) else None
+
+
+def read_projected_model_tier(value: object) -> str | None:
+    """Return a strict projected tier from ANTHROPIC_CUSTOM_HEADERS, if unambiguous."""
+    tier = read_custom_header(value, FORGE_MODEL_TIER_HEADER)
+    return tier if tier in {"haiku", "sonnet", "opus"} else None
 
 
 def sanitize_label(value: str | None) -> str | None:

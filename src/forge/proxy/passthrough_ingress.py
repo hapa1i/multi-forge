@@ -23,6 +23,12 @@ from typing import Any
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from forge.core.effort_observation import AppliedEffort, EffortResolution
+from forge.core.models.model_reference import strip_transport_model_suffix
+from forge.core.run_id import FORGE_LAUNCH_HEADER
+from forge.proxy.intercept import _native_effort_support
+from forge.proxy.reasoning import max_effort
+
 logger = logging.getLogger(__name__)
 
 _REASONING_OVERRIDE_PUBLIC_MESSAGE = (
@@ -243,6 +249,15 @@ async def handle_anthropic_passthrough(raw_request: Request, request_id: str, *,
             headers={"X-Request-ID": request_id},
         )
     resolved_tier = explicit_tier or projected_tier or getattr(server.config.proxy, "default_tier", None) or "sonnet"
+    tier_source = (
+        "request"
+        if explicit_tier
+        else (
+            "forge.model_tier_header"
+            if projected_tier
+            else "proxy.default_tier" if getattr(server.config.proxy, "default_tier", None) else "fallback"
+        )
+    )
     req_headers = dict(raw_request.headers)
 
     # Spend-cap check — same cross-request accumulation as the translated path, so caps
@@ -274,12 +289,58 @@ async def handle_anthropic_passthrough(raw_request: Request, request_id: str, *,
     # AFTER the inspect record, BEFORE forwarding. Signature-safe — historical messages
     # are never touched. A guard block short-circuits with a 403.
     _intercept = getattr(server.config.proxy, "intercept", None)
+    original_output = raw_body.get("output_config")
+    requested_effort = original_output.get("effort") if isinstance(original_output, dict) else None
+    requested_effort = requested_effort if isinstance(requested_effort, str) else None
+    original_thinking = raw_body.get("thinking")
+    thinking_type = original_thinking.get("type") if isinstance(original_thinking, dict) else None
+    thinking_type = thinking_type if isinstance(thinking_type, str) else None
     if _intercept is not None and getattr(_intercept, "mode", "passthrough") == "override":
         blocked_response = await _apply_passthrough_override(raw_body, request_id, resolved_tier, ctx)
         if blocked_response is not None:
             return blocked_response
 
     streaming = bool(raw_body.get("stream"))
+    final_output = raw_body.get("output_config")
+    applied_effort = final_output.get("effort") if isinstance(final_output, dict) else None
+    applied_effort = applied_effort if isinstance(applied_effort, str) else None
+    tier_override = server._get_tier_override(resolved_tier)
+    effort_floor = tier_override.reasoning_effort if tier_override else None
+    effort_mutated = applied_effort != requested_effort
+    budget_mutated = original_thinking != raw_body.get("thinking")
+    native_support = _native_effort_support(model, original_thinking)
+    effort_observer = server.effort_observations.observer(
+        raw_request.headers.get(FORGE_LAUNCH_HEADER),
+        tier=resolved_tier,
+        tier_source=tier_source,
+        client_model=model,
+        mapped_model=strip_transport_model_suffix(model),
+        resolution=EffortResolution(
+            requested=requested_effort,
+            thinking=thinking_type,
+            opt_in=server._client_effort_requested(raw_request),
+            client_applicable=requested_effort is not None,
+            derived=None,
+            floor=effort_floor,
+            pre_clamp=max_effort(requested_effort, effort_floor) if effort_mutated else applied_effort,
+            supported=native_support[0] if native_support is not None else None,
+            resolved=applied_effort,
+            source="override" if effort_mutated or budget_mutated else "passthrough",
+        ),
+    )
+    effort_dispatch = {}
+    if effort_observer is not None:
+        effort_dispatch["on_provider_dispatch"] = lambda: effort_observer(
+            AppliedEffort(
+                applied=applied_effort,
+                wire="output_config.effort" if applied_effort is not None else None,
+                note=(
+                    "Override changed thinking.budget_tokens; no effort-level parameter was sent."
+                    if budget_mutated and applied_effort is None
+                    else None
+                ),
+            )
+        )
 
     def _on_complete(usage: dict[str, int], response_body: dict[str, Any] | None, failed: bool) -> None:
         elapsed = (time.time() - start_time) * 1000
@@ -374,4 +435,5 @@ async def handle_anthropic_passthrough(raw_request: Request, request_id: str, *,
         on_complete=_on_complete,
         extra_headers=extra_headers,
         provider_trace_ctx=provider_trace_ctx,
+        **effort_dispatch,
     )

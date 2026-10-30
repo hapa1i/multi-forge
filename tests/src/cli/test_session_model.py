@@ -105,3 +105,86 @@ def test_session_model_history_human_output_keeps_ids_slots_and_limitations(
     assert event["run_id"] in result.output
     assert "direct=claude-opus-5" in result.output
     assert "route commitment only" in result.output
+
+
+@pytest.mark.parametrize("surface", ["human", "json", "direct"])
+def test_session_model_effort_explains_distinct_resolution_inputs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any, surface: str
+) -> None:
+    from forge.cli.hooks import hooks
+
+    monkeypatch.chdir(tmp_path)
+    observation = {
+        "tier": "opus",
+        "tier_source": "header",
+        "client_model": "gemini-4-argon",
+        "mapped_model": "gemini/gemini-4-argon",
+        "requested": "max",
+        "thinking": "between_tools",
+        "opt_in": True,
+        "client_applicable": False,
+        "derived": "none",
+        "floor": "high",
+        "pre_clamp": "high",
+        "supported": ["low", "medium", "high"],
+        "resolved": "high",
+        "source": "floor",
+        "applied": "high",
+        "wire": "thinkingConfig.thinkingLevel",
+        "note": None,
+        "observed_at": "2026-10-30T12:00:00Z",
+    }
+    payload = {
+        "session": "planner",
+        "runtime": "claude_code",
+        "active": True,
+        "route_intent": {"kind": "proxy"},
+        "route_commit": {"kind": "proxy", "evidence_source": "route_commit"},
+        "live_proxy": {"evidence_source": "runtime", "default_tier": "sonnet"},
+        "history_status": "supported",
+        "marking": {"launch_entries": [], "live_proxy_entries": []},
+        "effort": {
+            "status": "observed",
+            "reason": None,
+            "launch_id": "run_0123456789ab",
+            "backend_id": "litellm",
+            "observations": {"opus": observation},
+        },
+        "limitations": ["effort describes Forge's outbound parameter, not provider-side execution"],
+    }
+
+    def report(**_kwargs: Any) -> SimpleNamespace:
+        return SimpleNamespace(to_dict=lambda: payload)
+
+    monkeypatch.setattr("forge.cli.session_model.get_session_model_report", report)
+    monkeypatch.setattr("forge.core.ops.session_model.get_session_model_report", report)
+    if surface == "direct":
+        result = CliRunner().invoke(
+            hooks,
+            ["user-prompt-submit"],
+            input=json.dumps({"prompt": "%session model show"}),
+        )
+        output = json.loads(result.stdout)["reason"]
+    else:
+        arguments = ["session", "model", "show"] + (["--json"] if surface == "json" else [])
+        result = CliRunner().invoke(main, arguments, terminal_width=300)
+        output = result.stdout
+    assert result.exit_code == 0, result.output
+    assert result.stderr == ""
+    if surface == "json":
+        assert json.loads(output)["effort"]["observations"]["opus"] == observation
+    else:
+        assert "opt-in: yes; applicable: no; used: no" in output
+        for field in (
+            "derived",
+            "minimum",
+            "pre-clamp",
+            "supported",
+            "tier source",
+            "wire",
+            "model",
+        ):
+            assert f"Opus {field}" in output
+        assert "thinkingConfig.thinkingLevel" in output
+        assert "gemini/gemini-4-argon" in output
+        assert "not provider-side execution" in output
