@@ -2,27 +2,26 @@
 
 Started 2026-10-30 from `f9faedd9` on `codex/test-suite-runtime`.
 
-Part A draft: [PR #290](https://github.com/hapa1i/multi-forge/pull/290). Part B draft:
+Part A: [PR #290](https://github.com/hapa1i/multi-forge/pull/290). Part B:
 [PR #291](https://github.com/hapa1i/multi-forge/pull/291). The [CLI coverage map](cli_coverage.md) records every
 approved removal and retained command check.
 
 ## Current focus
 
-Resolve the regression CI wall-time overhead before adopting it, and rerun Part B integration after recovering Docker
-disk space. The five cases affected by the bounded parameter IDs pass; the CI recheck is pending. Part B's first
-after-change run was interrupted with a full Docker filesystem and cannot supply comparison timings. Unit CI improved
-from 288 to 116 seconds; regression passed but took 328 seconds versus 293 serial despite a lower pytest-reported
-duration. Local three-run stability, matching serial runs and Part A's build/runtime/pre-commit checks all pass. Keep
-the card in `doing/` until both PRs are shipped and verified. Measurements and trial failures are recorded in
-[benchmarks](benchmarks.md).
+Await review and merge of both PRs. Implementation and validation pass: Part A's four-worker CI wall times are 122
+seconds unit and 121 seconds regression, versus 288 and 293 serial; Part B passes all 521 retained integration tests
+with one shared release-wheel build. Exact test-identity comparisons preserve coverage. The integration timing
+comparison retains the cache-warming caveat and failed disk-full attempt in [benchmarks](benchmarks.md). Keep the card
+in `doing/` until both PRs are shipped and verified.
 
 ## Part A -- parallel unit and regression runs
 
 - [x] Record serial wall time, collected/executed counts and failures for both suites on the unchanged test tree.
 - [x] Review pytest-xdist and its added dependencies; trial per-test distribution without changing the lock.
 - [x] Compare local worker counts and choose automatic workers capped at four, with numeric and serial overrides.
-- [x] Confirm four-worker unit CI improves wall time with the same exact test IDs.
-- [ ] Choose the regression CI default after resolving its first candidate's wall-time overhead.
+- [x] Confirm four-worker unit CI improves wall time with an unchanged test count.
+- [x] Adopt the automatic four-worker cap for regression CI after the bounded-ID candidate improves step wall time from
+  293 seconds serial to 121 seconds.
 - [x] Diagnose the parallel-only Rich line-wrap assertion and preserve its phrase check by normalizing whitespace.
 - [x] Require three consecutive green parallel runs per suite with unchanged test counts and no retries; all six JUnit
   reports have matching test-case IDs within each suite, no failures and no skips.
@@ -44,10 +43,10 @@ the card in `doing/` until both PRs are shipped and verified. Measurements and t
 - [x] Validate the three label-only parameter IDs (`ascii-byte-limit`, `utf8-byte-limit`, `oversized-header`): all five
   affected-function cases passed on four workers in 1.27 seconds (`bounded-ids.log` and `bounded-ids.xml`).
 - [x] Pass full pre-commit for the label-only changes.
-- [ ] Repeat CI and compare identities using exactly those two unit and one regression name mappings; payloads, order,
-  assertions and suite counts remain unchanged.
-- [ ] Finalize CI commands only where measured step wall time supports adoption; unit meets the gate, regression remains
-  pending.
+- [x] Repeat CI: 11,234 unit and 2,218 regression tests pass with no failures, skips or retries. Identities match both
+  earlier runs after exactly two unit and one regression name mappings; payloads, order and assertions are unchanged.
+- [x] Finalize CI Make commands with automatic workers capped at four: unit 122 seconds versus 288 serial; regression
+  121 seconds versus 293 serial. Clean-wheel runtime and CI pre-commit also pass.
 
 ## Part B -- integration trims
 
@@ -63,29 +62,34 @@ the card in `doing/` until both PRs are shipped and verified. Measurements and t
 - [x] Preserve the interrupted first after-change run: Docker filesystem full; guarded-worker npm build `ENOSPC`;
   sidecar audit container exited with cause unproven by its trace. The incomplete 393 passed / 2 failed / 5 reruns and
   1,028.04-second runner wall time are invalid comparison evidence.
-- [x] Reclaim 6.636 GB of unused build cache and remove only two owned, idle fixture containers; Docker has 6.2 GiB
+- [x] Reclaim 6.636 GB of unused build cache and remove only two owned, idle fixture containers, restoring 6.2 GiB
   available. No Part B code changed.
-- [x] Pass all three targeted recovery checks without retries: 55.80 seconds on unchanged code; 5.8 GiB remains free.
-- [ ] Run the clean full integration suite and compare wall time and expected test-count reduction.
+- [x] Pass all three targeted recovery checks without retries: 55.80 seconds on unchanged code; 5.8 GiB free afterward.
+- [x] Pass the clean full integration suite: 521 passed, 13,613 deselected, no failures, errors, skips or reruns; runner
+  842.31 seconds and pytest 833.73 seconds. The exact multiset equals the baseline minus the 22 mapped removals.
+- [x] Confirm all four release-consumer cases and both independent build-policy cases pass. Wheel builds fall from three
+  to one with the same SHA-256; both distinct QA image builds remain.
+- [x] Record the timing limit: directly removed baseline work totals 21.211 seconds; the full 70.03-second runner
+  reduction also includes image reuse and cache warming. Docker ends with 5.70 GiB free and no running containers.
 
 ## Acceptance evidence
 
-| Check                  | Fixture                                       | Assertion                                             | Evidence                                                                                                                                                  |
-| ---------------------- | --------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit parallelism       | Full host unit suite                          | Same test count; three green runs; wall time improves | 11,234 passed each; walls 89.336 / 78.637 / 79.632 s; median 79.632 s versus 270.954 s serial                                                             |
-| Regression parallelism | Full host regression suite                    | Per-test distribution; same count; three green runs   | 2,218 passed each; walls 99.525 / 97.558 / 97.849 s; median 97.849 s versus 295.250 s serial                                                              |
-| Serial debugging       | Adopted runner with zero workers              | Same suite executes serially                          | Unit: 11,234 passed; regression: 2,218 passed; both with `TEST_WORKERS=0`                                                                                 |
-| CI adoption            | Same runner class and test tree               | Parallel wall time improves over serial               | Four-worker unit 116 s vs 288 s serial; regression 328 s vs 293 s, adoption pending; exact IDs match                                                      |
-| CLI removals           | Named unit twins and retained container tests | Assertions and real-process command coverage remain   | Coverage map and static review pass; baseline 543 passed; first after-change run selected 521 but was interrupted by disk exhaustion; clean rerun pending |
-| Shared release wheel   | QA, walkthrough and native-worker consumers   | Same wheel identity; independent build tests retained | Baseline three builds total 2.888 s; interrupted run observed one build in 0.636 s with the same SHA-256; complete consumer validation pending            |
+| Check                  | Fixture                                       | Assertion                                             | Evidence                                                                                                                         |
+| ---------------------- | --------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Unit parallelism       | Full host unit suite                          | Same test count; three green runs; wall time improves | 11,234 passed each; walls 89.336 / 78.637 / 79.632 s; median 79.632 s versus 270.954 s serial                                    |
+| Regression parallelism | Full host regression suite                    | Per-test distribution; same count; three green runs   | 2,218 passed each; walls 99.525 / 97.558 / 97.849 s; median 97.849 s versus 295.250 s serial                                     |
+| Serial debugging       | Adopted runner with zero workers              | Same suite executes serially                          | Unit: 11,234 passed; regression: 2,218 passed; both with `TEST_WORKERS=0`                                                        |
+| CI adoption            | Same runner class and test behavior           | Parallel wall time improves over serial               | Four-worker unit 122 s vs 288 s serial; regression 121 s vs 293 s; identities match after exactly three intended ID renames      |
+| CLI removals           | Named unit twins and retained container tests | Assertions and real-process command coverage remain   | Clean run: 521 passed, exactly 543 baseline identities minus the 22 mapped removals; no failures, skips or reruns                |
+| Shared release wheel   | QA, walkthrough and native-worker consumers   | Same wheel identity; independent build tests retained | Three builds / 2.888 s become one / 0.463 s with the same SHA-256; all four consumer and two independent build-policy cases pass |
 
 ## Closeout
 
-- [ ] Record benchmark commands, environment, counts, timings and non-passing results.
-- [ ] Run applicable unit/regression, integration, build/runtime and pre-commit checks.
-- [x] Open Part A draft [PR #290](https://github.com/hapa1i/multi-forge/pull/290); serial and first parallel CI checks
-  are green, with regression wall-time adoption still pending.
-- [x] Open Part B draft [PR #291](https://github.com/hapa1i/multi-forge/pull/291); full pre-commit, static review and CI
-  pass.
-- [ ] Review the complete diff and open the authorized PR or PRs with concise validation evidence.
+- [x] Record benchmark commands, environment, counts, timings and non-passing results.
+- [x] Run applicable unit/regression, integration, build/runtime and pre-commit checks.
+- [x] Open Part A [PR #290](https://github.com/hapa1i/multi-forge/pull/290); bounded-ID CI, runtime and pre-commit
+  checks pass, and both suites meet their measured CI wall-time adoption gates.
+- [x] Open Part B [PR #291](https://github.com/hapa1i/multi-forge/pull/291); full pre-commit, static review, CI and
+  clean integration validation pass.
+- [x] Review the implementation diffs and open both authorized PRs with validation evidence.
 - [ ] After merge, sync completed-work records and move the card to `done/` only when all accepted scope has shipped.

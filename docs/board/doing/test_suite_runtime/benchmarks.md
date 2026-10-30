@@ -106,11 +106,11 @@ walkthrough cleanup cases also span all four workers: `gw0=9`, `gw1=29`, `gw2=8`
 473 seconds, including the 16-second successful runtime smoke. Pre-commit's checks step took 88 seconds.
 
 Unit step wall time fell by 59.7%, meeting its CI improvement gate. Regression step wall time increased by 11.9%, so
-regression adoption remains pending despite the lower pytest-reported duration. The candidate log prints the 262 KB
+regression adoption was deferred despite the lower pytest-reported duration. The candidate log prints the 262 KB
 generated node ID for the oversized executor-header parameter twice, with long timestamp gaps around those lines. The
-same case took 0.004-0.005 seconds in the local stability reports. Output handling is the leading explanation for the
-extra wall time, but the current evidence does not establish the cause or justify claiming a regression CI speedup.
-Logs, metadata, exact node IDs and comparison data are saved under `/tmp/forge-test-suite-runtime-20261030/ci-after*`.
+same case took 0.004-0.005 seconds in the local stability reports. Output handling was the leading explanation for the
+extra wall time, but this trial alone did not establish the cause or justify claiming a regression CI speedup. Logs,
+metadata, exact node IDs and comparison data are saved under `/tmp/forge-test-suite-runtime-20261030/ci-after*`.
 
 A follow-up replaces three generated payload IDs with explicit labels:
 
@@ -123,10 +123,30 @@ A follow-up replaces three generated payload IDs with explicit labels:
 Only the IDs change: payload values, parameter order, assertions and test counts remain unchanged, including the first
 two executor-header IDs. The recorded local three-pass stability evidence still covers that behavior. All five
 affected-function cases (two unit and three regression) passed on four workers in 1.27 seconds; evidence is saved in
-`/tmp/forge-test-suite-runtime-20261030/bounded-ids.log` and `bounded-ids.xml`. Full pre-commit passed; a new CI
-wall-time comparison remains pending. The next identity comparison must apply exactly these three name mappings, with no
-other additions or removals, while preserving the 11,234-unit and 2,218-regression counts. Regression CI adoption
-remains pending that result.
+`/tmp/forge-test-suite-runtime-20261030/bounded-ids.log` and `bounded-ids.xml`. Full pre-commit passed.
+
+## Bounded-ID CI validation and adoption
+
+[Tests run 40982187613](https://github.com/hapa1i/multi-forge/actions/runs/40982187613), head
+`b567e2e1d690dc5708c26f4394f2be045d770a9f`, passed on the same Ubuntu 26.04 image version `20261025.179.1`, runner agent
+`2.338.0`, Python 3.13.11 and pytest 9.1.1 as the earlier runs. Both Make targets created four workers.
+
+| Suite      | Serial step wall seconds | First parallel step wall seconds | Bounded-ID step wall seconds | Bounded-ID pytest seconds | Result        |
+| ---------- | ------------------------ | -------------------------------- | ---------------------------- | ------------------------- | ------------- |
+| Unit       | 288                      | 116                              | 122                          | 119.42                    | 11,234 passed |
+| Regression | 293                      | 328                              | 121                          | 120.53                    | 2,218 passed  |
+
+Passing test identities match both the serial baseline and first parallel trial after applying exactly the two unit and
+one regression name mappings above. There are no other additions or removals, and no failures, skips or retries. The 63
+walkthrough cleanup cases span all four workers: `gw0=21`, `gw1=27`, `gw2=8`, `gw3=7`. The complete Tests job took 274
+seconds, versus 611 serial and 473 in the first parallel trial. The clean-wheel runtime smoke passed in 16 seconds.
+[Pre-commit run 40982187659](https://github.com/hapa1i/multi-forge/actions/runs/40982187659) also passed; its checks
+step took 138 seconds.
+
+Adopt the Make targets' automatic four-worker cap for both CI suites: unit step wall time improved by 57.6% and
+regression by 58.7% against serial. The bounded-ID candidate meets the regression wall-time gate; this comparison does
+not establish output handling as the sole cause of the first trial's overhead. Raw logs, job metadata, passing IDs and
+the comparison summary are preserved under `/tmp/forge-test-suite-runtime-20261030/ci-bounded*`.
 
 ## Part B integration baseline
 
@@ -135,8 +155,8 @@ listed in the [coverage map](cli_coverage.md) and shares one release wheel acros
 now preserve the removed stdout assertions. The full pre-commit check passed, and an independent static review found no
 remaining issues. [CI tests](https://github.com/hapa1i/multi-forge/actions/runs/40979801953) passed all 11,234 unit and
 2,218 regression cases plus the clean-wheel runtime smoke;
-[CI pre-commit](https://github.com/hapa1i/multi-forge/actions/runs/40979801879) also passed. The full after-change
-integration comparison remains pending.
+[CI pre-commit](https://github.com/hapa1i/multi-forge/actions/runs/40979801879) also passed. The clean full integration
+comparison below completes the runtime validation.
 
 The fixed-checkout integration baseline passed all 543 selected tests in 912.34 seconds runner wall time and 884.37
 seconds reported by pytest, with 13,613 deselected and no failures, errors or skips. The 22 approved removals account
@@ -163,8 +183,37 @@ The interrupted run's build probe recorded one wheel build in 0.636 seconds with
 two QA image builds in 76.411 and 18.575 seconds. This confirms the observed build count and identity, but does not
 establish that all shared-wheel consumers pass. Cleanup reclaimed 6.636 GB of unused build cache and removed only two
 owned, idle fixture containers; Docker then had 6.2 GiB available. No Part B code changed. The three targeted recovery
-checks passed in 55.80 seconds with retries disabled, leaving 5.8 GiB available. A complete clean after-change run is
-still required before claiming a runtime result.
+checks passed in 55.80 seconds with retries disabled, leaving 5.8 GiB available.
+
+## Part B clean integration comparison
+
+The clean full run at `e624890706ff4c68eed2e9a5beaea3c0472fa89f` passed all 521 selected tests, with 13,613 deselected
+and no failures, errors, skips or reruns. Its passing test multiset is exactly the baseline's 543 tests minus the 22
+mapped removals, with no unexpected identity changes. All four release-consumer cases and both independent build-policy
+cases passed.
+
+| Measurement                     | Baseline   | Clean after-change |
+| ------------------------------- | ---------- | ------------------ |
+| Runner wall seconds             | 912.34     | 842.31             |
+| Pytest seconds                  | 884.37     | 833.73             |
+| Wheel builds / total seconds    | 3 / 2.888  | 1 / 0.463          |
+| QA image builds / total seconds | 2 / 97.007 | 2 / 79.082         |
+
+The shared wheel has the same SHA-256 as every baseline wheel. The two QA image builds remain separate, preserving their
+distinct runtime metadata. Docker had 5.70 GiB free at both the start and end of the clean run, with a lowest observed
+3.64 GiB free; no containers remained running afterward.
+
+The observed runner reduction is 70.03 seconds (7.7%), but it is not an isolated measurement of the code change. The
+baseline built the integration image; the clean retry reused it, and the targeted recovery checks warmed the worker
+image build, which fell from 18.856 to 2.010 seconds. The directly removed baseline work totals 21.211 seconds: 19.359
+seconds in the 22 removed tests plus 1.852 seconds in the two avoided wheel builds. The intervening disk-full run and
+cache cleanup also changed cache state, so the remaining whole-run and image-build variation must not be attributed to
+the implementation.
+
+Exact identity, timing, build-count and disk evidence is summarized in
+`/tmp/forge-test-suite-runtime-20261030/integration-part-b-comparison.json`; the clean run's log, JUnit report, build
+probe and disk samples are preserved under `integration-part-b-after-clean*` in that directory. The interrupted run
+remains separate evidence and is excluded from the comparison.
 
 ## Dependency review
 
@@ -180,4 +229,4 @@ distribution, automatic workers capped by `--maxprocesses`, and `-n 0` for seria
 `auto` were the local candidates. The default is automatic selection capped at four workers, preserving an explicit
 numeric override. Ten workers saved 11 seconds on unit and 19 seconds on regression but used about 65% more CPU time
 than four; the cap leaves capacity for other work on shared hosts. Local stability and serial-debugging checks pass.
-Unit CI meets the improvement gate; regression CI adoption and Part B after-change validation remain pending.
+Both CI suites meet the improvement gate, and Part B's clean integration validation passes.
