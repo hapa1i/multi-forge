@@ -230,8 +230,8 @@ During review, [CI at `5a30b345`](https://github.com/hapa1i/multi-forge/actions/
 and 2,218 regression tests, including the strengthened stdout assertion. The wheel start/health smoke also passed, then
 temporary-venv removal failed with `Directory not empty`. This repeats the earlier Part A cleanup failure under Part B's
 serial CI. The [retained recurrence summary](evidence/ci-review-part-b-cleanup-summary.json) records the failed job,
-which has not been rerun; a [separate proposed card](../../proposed/wheel_runtime_cleanup_failure/card.md) tracks
-diagnosis and repair. The writer and cause remain unproven.
+which has not been rerun; the [cleanup follow-up](../wheel_runtime_cleanup_failure/card.md) tracks diagnosis and repair.
+The writer and cause remain unproven.
 
 The fixed-checkout integration baseline passed all 543 selected tests in 912.34 seconds runner wall time and 884.37
 seconds reported by pytest, with 13,613 deselected and no failures, errors or skips. The 22 approved removals account
@@ -305,3 +305,12 @@ numeric override. Ten workers saved 11 seconds on unit and 19 seconds on regress
 than four; the cap leaves capacity for other work on shared hosts. Local stability and serial-debugging checks pass.
 Both CI suites meet the improvement gate, renewed unit stability passes, and Part B's clean integration validation
 passes.
+
+## Cleanup fix after review
+
+At the user's request, Part B commit `acdb6503` adds bounded shutdown verification to the wheel smoke before temporary
+venv deletion. All 16 focused regressions, real macOS/Linux Python 3.13.11 smokes, and full pre-commit passed. The
+[CI Tests run](https://github.com/hapa1i/multi-forge/actions/runs/41038139225) and
+[CI pre-commit](https://github.com/hapa1i/multi-forge/actions/runs/41038139528) then passed on the first attempt,
+including runtime cleanup. The [cleanup checklist](../wheel_runtime_cleanup_failure/checklist.md) retains the validation
+details. These checks do not change the earlier timing measurements or identify the writer in the historical failures.

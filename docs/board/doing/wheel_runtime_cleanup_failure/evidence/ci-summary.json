@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "repository": "hapa1i/multi-forge",
+  "pull_request": 291,
+  "pull_request_url": "https://github.com/hapa1i/multi-forge/pull/291",
+  "head_sha": "acdb6503d13b96d1410a15986556af71930ae694",
+  "tests": {
+    "run_id": 41038139225,
+    "run_url": "https://github.com/hapa1i/multi-forge/actions/runs/41038139225",
+    "attempt": 1,
+    "job_id": 124003977595,
+    "job_url": "https://github.com/hapa1i/multi-forge/actions/runs/41038139225/job/124003977595",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-10-30T10:05:19Z",
+    "completed_at": "2026-10-30T10:15:21Z",
+    "job_wall_seconds": 602,
+    "python": "3.13.11",
+    "pytest": "9.1.1",
+    "execution": "serial",
+    "unit": {
+      "passed": 11234,
+      "deselected": 120,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "reruns": 0,
+      "pytest_seconds": 280.09,
+      "step_wall_seconds": 285
+    },
+    "regression": {
+      "passed": 2230,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "reruns": 0,
+      "pytest_seconds": 288.35,
+      "step_wall_seconds": 290,
+      "new_cleanup_cases_passed": 12
+    },
+    "changed_stdout_test": {
+      "node_id": "tests/src/cli/test_session_start_delete.py::TestSessionStart::test_start_defaults_to_direct",
+      "conclusion": "passed"
+    },
+    "wheel_runtime": {
+      "step_conclusion": "success",
+      "step_wall_seconds": 16,
+      "cleanup_result": "success",
+      "smoke_success_excerpt": "2026-10-30T10:15:17.7297386Z Clean wheel install and LiteLLM start/health smoke passed.",
+      "stop_request_excerpt": "2026-10-30T10:15:17.7533233Z Stopping wheel smoke backend litellm-49176 (process group 26544).",
+      "stop_success_excerpt": "2026-10-30T10:15:18.6676816Z Stopped managed process 'litellm-49176'",
+      "group_exit_excerpt": "2026-10-30T10:15:18.8860845Z Wheel smoke backend process group 26544 has exited.",
+      "cleanup_failure_recurred": false
+    },
+    "suite_summary_excerpts": [
+      "2026-10-30T10:10:11.2022481Z ============== 11234 passed, 120 deselected in 280.09s (0:04:40) ===============",
+      "2026-10-30T10:15:02.8188013Z ======================= 2230 passed in 288.35s (0:04:48) ======================="
+    ]
+  },
+  "precommit": {
+    "run_id": 41038139528,
+    "run_url": "https://github.com/hapa1i/multi-forge/actions/runs/41038139528",
+    "job_id": 124003979443,
+    "job_url": "https://github.com/hapa1i/multi-forge/actions/runs/41038139528/job/124003979443",
+    "conclusion": "success"
+  },
+  "interpretation": "The patched wheel smoke waited for its owned backend group to exit and completed cleanup successfully on this run. This verifies the teardown ordering fix; the earlier ENOTEMPTY logs did not identify the original writer.",
+  "timing_note": "Step and job wall durations use GitHub metadata with one-second timestamp resolution; pytest durations are suite-reported.",
+  "rerun_requested": false
+}

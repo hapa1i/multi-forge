@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-10-30",
+  "pull_request": "https://github.com/hapa1i/multi-forge/pull/291",
+  "execution_branch": "codex/test-suite-runtime-integration",
+  "scope_authorization": "The user explicitly requested this cleanup fix in the existing Part B PR; this is an exception to the separate-follow-up-PR default.",
+  "implementation": {
+    "owner": "scripts/test-wheel-runtime.sh and scripts/wheel-smoke-cleanup.py",
+    "captures_verified_isolated_group_before_stop": true,
+    "backend_stop_timeout_seconds": 10,
+    "live_group_exit_timeout_seconds": 10,
+    "inspection": "ps snapshots filtered to the recorded group; zombie-only groups cannot write and do not block cleanup",
+    "failure_behavior": "Retain temporary tree and diagnostics when stop or live-group exit cannot be verified; report deletion failure; preserve an earlier smoke failure status.",
+    "product_backend_changed": false,
+    "additional_signals_added": false,
+    "commit": "acdb6503d13b96d1410a15986556af71930ae694"
+  },
+  "historical_failures": {
+    "run_attempt_urls": [
+      "https://github.com/hapa1i/multi-forge/actions/runs/40985566400/attempts/1",
+      "https://github.com/hapa1i/multi-forge/actions/runs/41034722366/attempts/1"
+    ],
+    "writer_identity": "unknown",
+    "interpretation": "The controlled delayed-writer regression demonstrates the ordering gap; it does not prove which process caused either historical ENOTEMPTY failure."
+  },
+  "real_smokes": {
+    "macos": {
+      "status": "passed",
+      "python": "3.13.11",
+      "log_confirms_health_and_group_exit": true,
+      "source_log": {
+        "file": "cleanup-fix-macos.log",
+        "sha256": "88e3c0d7b8029750dcd2cb9e14d6c27b49ac8c2fbd500fda91dd5c426dbeccc9",
+        "bytes": 3449
+      },
+      "reported_exit_code": 0
+    },
+    "linux": {
+      "status": "passed",
+      "python": "3.13.11",
+      "image_used": "981f02144006",
+      "log_confirms_health_and_group_exit": true,
+      "source_log": {
+        "file": "cleanup-fix-linux.log",
+        "sha256": "18ea56cf53868a672e70995aea1854c9107b0877e59f222313b49e5f17b2e6f7",
+        "bytes": 3593
+      },
+      "earlier_container_launch": {
+        "status": "failed_before_smoke",
+        "exit_code": 125,
+        "reason": "Requested image tag unavailable; retried using an existing local image."
+      },
+      "reported_exit_code": 0
+    }
+  },
+  "tests": {
+    "focused_run": {
+      "status": "passed",
+      "passed": 16,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "reruns": 0,
+      "pytest_seconds": 4.59,
+      "source_log": {
+        "file": "wheel-cleanup-regressions-final.log",
+        "sha256": "e2cbee5adae7fe0ce42492c655eb274ed8c29db5f3c4898ca85a0023705d2d0c",
+        "bytes": 2826
+      },
+      "source_junit": {
+        "file": "wheel-cleanup-regressions-final.xml",
+        "sha256": "c247cbc8474654282754087e05205264e9609276650776f7435d376582b03b12",
+        "bytes": 2691
+      }
+    },
+    "old_script_control": {
+      "expected_result": "failure",
+      "failed": 1,
+      "pytest_seconds": 0.59,
+      "script_exit_code": 17,
+      "diagnostic": "removal raced the backend writer",
+      "finalizer_error": false,
+      "source_log": {
+        "file": "wheel-cleanup-baseline-failure-final.log",
+        "sha256": "e2d2ee85574f71513d144b69f304f5106cd644373f2200ee7c983b3958a3648c",
+        "bytes": 4392
+      }
+    }
+  },
+  "precommit": {
+    "final_run_after_test_revision": "passed",
+    "command": "make pre-commit",
+    "source_log": {
+      "file": "cleanup-fix-precommit-final.log",
+      "sha256": "caf86003fb50766132d2e1d806f52b5c747041714fe9a5915d13f0d0a8859e9f",
+      "bytes": 1591
+    }
+  },
+  "ci_status": "passed on first attempt",
+  "closeout_status": "doing; not merged",
+  "provenance": {
+    "local_source_directory": "/tmp/forge-test-suite-runtime-20261030",
+    "raw_logs_retained_in_repository": false,
+    "note": "Logs were read to verify the listed excerpts and original hashes. The executing root agent reported successful macOS/Linux command completion. No suites were rerun to produce this summary."
+  },
+  "ci_evidence": "ci-summary.json"
+}
