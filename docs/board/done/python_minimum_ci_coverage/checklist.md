@@ -2,7 +2,7 @@
 
 Started 2026-10-30 on `codex/python-minimum-ci`, based on main `849de170`.
 
-## Current focus
+## Completed scope
 
 Make Python 3.11 and 3.13 explicit CI lanes while retaining the local 3.13 pin, locked dependencies and existing
 parallel unit/regression runners. Prove the controller and worker interpreters, compare exact selected test identities,
@@ -33,7 +33,7 @@ and verify the clean-wheel runtime on each selected version.
 - [x] Check locked dependencies and run both pinned clean-wheel smoke checks without provider inference.
 - [x] Pass full pre-commit, board links and documentation size checks; retain compact acceptance summaries.
 - [x] Complete independent review and prepare the PR with retained local evidence.
-- [ ] After owner merge, confirm final matrix/comparison CI, verify main, retain CI summaries, record the change log and
+- [x] After owner merge, confirm final matrix/comparison CI, verify main, retain CI summaries, record the change log and
   move this card to done.
 
 Dependency compatibility failures, if any, must be resolved through the existing dependency-security workflow. No
@@ -52,9 +52,9 @@ changes. [Check summaries](evidence/local-checks.json) retain input/log hashes a
 [evidence guide](evidence/README.md) describes retention and the failure cases covered.
 
 Full pre-commit passed. Independent review found two evidence issues, both corrected: a nested collection probe now
-preserves its parent's report, and failed comparison summaries are uploaded in CI. Matrix/comparison CI remains the PR
-merge gate. The initial implementation changed test infrastructure and maintainer workflow; the cold-start correction
-below also adjusts the existing backend readiness allowance.
+preserves its parent's report, and failed comparison summaries are uploaded in CI. Matrix/comparison CI was the PR merge
+gate. The initial implementation changed test infrastructure and maintainer workflow; the cold-start correction below
+also adjusts the existing backend readiness allowance.
 
 ## CI fixture correction
 
@@ -68,7 +68,8 @@ All 217 focused cases from the affected modules and the new regression pass unde
 full-unit runs each had one unrelated failure: an evidence file not yet staged when the Markdown-link test ran, and a
 Git probe exceeding its 0.5s deadline under load. Both cases and the new regression passed isolated sequential checks on
 each version. Full pre-commit passed, and independent review found no issue with the scoped fixture repair.
-[Correction evidence](evidence/local-fixture-correction.json) records all outcomes; final clean CI remains required.
+[Correction evidence](evidence/local-fixture-correction.json) records all outcomes; successful final CI is recorded in
+the [merged closeout](#merged-closeout).
 
 The [second CI attempt](evidence/ci-second-attempt.json) passed all 11,471 unit tests in both lanes. Both regression
 lanes then failed one cross-project session assertion because the CI temporary path split `subproject` across lines. The
@@ -99,13 +100,20 @@ Python 3.13.11 at 0.4 CPU without diagnostic overrides or warmup. Focused backen
 cases; independent review found no blocking issue. The controlled probe and check summaries retain the earlier failures
 alongside these results.
 
-## Ready for owner review
+## Merged closeout
 
-[PR #293](https://github.com/hapa1i/multi-forge/pull/293) has a successful complete CI run on implementation commit
-`710dde86`: Python 3.11.17 and 3.13.17 each passed 11,471 unit tests, 2,260 regressions and the pinned cold-wheel smoke.
-The [retained comparison](evidence/ci-comparison.json) confirms exact selected identity parity and each
-controller/worker interpreter. [CI acceptance](evidence/ci-acceptance.json) retains run links, timings and artifact
-digests; Python 3.13's eight existing multiprocessing fork deprecation warnings are recorded. Pre-commit passed.
+[PR #293](https://github.com/hapa1i/multi-forge/pull/293) merged on 2026-10-30 as `7ed8b5e9`. Its complete tree is
+identical to reviewed head `af2c1990`; no implementation changes entered during merge. Final-head
+[Tests CI](https://github.com/hapa1i/multi-forge/actions/runs/41094455627) and
+[Pre-commit CI](https://github.com/hapa1i/multi-forge/actions/runs/41094455822) passed. Python 3.11.17 and 3.13.17 each
+passed 11,471 unit tests, 2,260 regressions and the pinned cold-wheel install/start/health/cleanup checks.
 
-The final evidence commit changes documentation only. Owner merge and the main/board closeout remain pending; this card
-stays in `doing` until then.
+The final comparison is identical to the [retained summary](evidence/ci-comparison.json), including exact test-ID
+multisets and all controller/worker identities. [Closeout evidence](evidence/closeout-summary.json) ties those results
+to the tested head and merge. No tests were skipped or rerun; Python 3.13's eight existing multiprocessing fork
+deprecation warnings remain recorded. Earlier CI and local failures are preserved in their original evidence files.
+
+Runtime design, operator guidance, testing guidelines and AGENTS instructions already reflect the shipped behavior. The
+Python range, development pin and dependency lock are unchanged. This closeout moves the card to `done`, resolves the
+earlier test-suite card's follow-up, and records the change log. Documentation, link, evidence-JSON and size checks
+passed; implementation verification is reused from the identical merged tree. No work remains for this card.

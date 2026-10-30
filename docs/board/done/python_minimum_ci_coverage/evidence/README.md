@@ -1,5 +1,9 @@
 # Python CI verification evidence
 
+PR #293 merged as `7ed8b5e9` with the exact tree of final tested head `af2c1990`.
+[Closeout evidence](closeout-summary.json) records the final-head CI results and merge verification. Its exact identity
+comparison is identical to [ci-comparison.json](ci-comparison.json); the earlier acceptance run below is retained.
+
 The [successful CI run](ci-acceptance.json) on implementation commit `710dde86` passed all 11,471 unit tests and 2,260
 regressions on Python 3.11.17 and 3.13.17, plus both pinned wheel smokes and pre-commit. The retained
 [comparison summary](ci-comparison.json) proves exact selected-test identity parity and records both controllers and all
@@ -35,7 +39,8 @@ The [fixture correction checks](local-fixture-correction.json) retain the 217 pa
 outcomes under `COLUMNS=80`. Concurrent full-unit reruns each hit one unrelated failure: a Markdown-link test observed
 an evidence file before staging, and a Git probe exceeded its 0.5s deadline under load. Both cases and the new
 regression passed sequential isolated checks on each version. The initial passing local matrix remains in
-`local-checks.json` and `local-comparison.json`; final complete matrix evidence must come from the clean CI run.
+`local-checks.json` and `local-comparison.json`; the successful complete CI matrix is retained in
+[closeout-summary.json](closeout-summary.json).
 
 Both pinned wheel smokes use an explicit `FORGE_WHEEL_SMOKE_PYTHON`, isolated environments and separate local ports.
 They check hash-constrained dependency installation, local LiteLLM startup/health, process-group shutdown and temporary

@@ -1,7 +1,7 @@
 # Exercise the minimum supported Python version in CI
 
-**Status:** Doing. Accepted for execution on 2026-10-30 on `codex/python-minimum-ci`, based on main `849de170`. See
-[checklist](checklist.md).
+**Status:** Done. [PR #293](https://github.com/hapa1i/multi-forge/pull/293) merged on 2026-10-30 as `7ed8b5e9`, with a
+tree identical to tested head `af2c1990`. See the [merged closeout](checklist.md#merged-closeout).
 
 ## Problem
 

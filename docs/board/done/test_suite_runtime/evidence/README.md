@@ -40,3 +40,8 @@ summary records the failed job without a retry; diagnosis belongs to the
 
 The [merged closeout summary](closeout-summary.json) records verification of combined main after both PRs merged. It is
 separate from the 15 historical benchmark summaries above.
+
+The Python 3.11 coverage follow-up recorded as open in that snapshot subsequently shipped in
+[PR #293](https://github.com/hapa1i/multi-forge/pull/293). Its
+[closeout](../../../done/python_minimum_ci_coverage/checklist.md#merged-closeout) retains the explicit 3.11/3.13
+interpreter and exact test-identity evidence. The earlier snapshot remains unchanged.

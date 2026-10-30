@@ -11,6 +11,20 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 
 ## 2026-10-30
 
+### Verify the supported Python CI lanes
+
+**Goal**: Exercise Python 3.11 and 3.13 explicitly while retaining the reviewed lock and local development default.
+
+- Select each lane's interpreter for locked dependency sync, full unit/regression runs and clean-wheel smoke.
+- Verify every controller and xdist worker, compare exact test-ID multisets, and retain acceptance summaries.
+- Correct CLI test width assumptions and give cold LiteLLM startup a bounded 30-second monotonic readiness budget,
+  preserving process-group failure cleanup. Runtime design and operator/testing guidance are synced.
+
+**Verification**: [PR #293](https://github.com/hapa1i/multi-forge/pull/293) merged as `7ed8b5e9`, with a tree identical
+to tested head `af2c1990`. Final CI passed 11,471 unit tests and 2,260 regressions on each Python version, both pinned
+wheel smokes, exact identity comparison and pre-commit. Two real process-group integration cases passed locally; the
+[closeout](done/python_minimum_ci_coverage/checklist.md#merged-closeout) retains results, warnings and earlier failures.
+
 ### Close the LiteLLM backup documentation fix
 
 **Goal**: Preserve custom backend configuration through the documented adapter recreation procedure.
@@ -53,8 +67,8 @@ and end-user docs are synced.
 [PR #290](https://github.com/hapa1i/multi-forge/pull/290) as `aa02a4fc`. Combined local checks passed 11,234 unit tests,
 2,230 regressions and clean-wheel installation, health and teardown; combined-main CI and full pre-commit also passed.
 Earlier integration verification passed all 521 retained cases with exact identity subtraction. Historical timing
-comparisons and failures remain in the [closeout](done/test_suite_runtime/checklist.md#merged-closeout); the Python 3.11
-coverage proposal remains open.
+comparisons and failures remain in the [closeout](done/test_suite_runtime/checklist.md#merged-closeout). The separate
+Python 3.11 coverage follow-up was later [completed](done/python_minimum_ci_coverage/checklist.md#merged-closeout).
 
 ## 2026-10-29
 

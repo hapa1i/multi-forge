@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-30",
+  "pr": "https://github.com/hapa1i/multi-forge/pull/293",
+  "merged_at": "2026-10-30T17:42:28Z",
+  "merge_commit": "7ed8b5e9508b2dd1d5aacd203feb611ad0d46981",
+  "tested_head": "af2c1990a9f52c125394388f7292f360967b5df9",
+  "merged_tree_matches_tested_head": true,
+  "final_ci": {
+    "tests_run": "https://github.com/hapa1i/multi-forge/actions/runs/41094455627",
+    "pre_commit_run": "https://github.com/hapa1i/multi-forge/actions/runs/41094455822",
+    "result": "passed",
+    "comparison_job_id": 124199475815,
+    "comparison_matches_retained_summary": true,
+    "comparison_summary": "ci-comparison.json",
+    "lanes": {
+      "3.11": {
+        "python_version": "3.11.17",
+        "job_id": 124196471555,
+        "unit": {
+          "passed": 11471,
+          "warnings": 0,
+          "seconds": 155.95
+        },
+        "regression": {
+          "passed": 2260,
+          "warnings": 0,
+          "seconds": 154.97
+        },
+        "wheel_smoke": "passed_install_start_health_process_group_exit_cleanup"
+      },
+      "3.13": {
+        "python_version": "3.13.17",
+        "job_id": 124196471321,
+        "unit": {
+          "passed": 11471,
+          "warnings": 8,
+          "seconds": 142.88
+        },
+        "regression": {
+          "passed": 2260,
+          "warnings": 0,
+          "seconds": 134.99
+        },
+        "wheel_smoke": "passed_install_start_health_process_group_exit_cleanup"
+      }
+    }
+  },
+  "notes": [
+    "The final comparison was checked against ci-comparison.json and matches the exact selected node-ID multisets and all controller/worker identities.",
+    "No skips, reruns or version-specific test-selection exceptions were used. The eight Python 3.13 unit warnings are existing multiprocessing fork deprecations.",
+    "Earlier local controls and unsuccessful CI attempts remain in their original evidence files.",
+    "Runtime design, end-user proxy guidance, testing guidelines and AGENTS.md already reflect the merged implementation.",
+    "Closeout changes documentation only; implementation verification is reused from the identical merged tree."
+  ]
+}
