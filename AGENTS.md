@@ -80,6 +80,11 @@ worker count with `make test-unit TEST_WORKERS=8` or `make test-regression TEST_
 the automatic four-worker cap. Use `TEST_WORKERS=0` for serial debugging, or pass `-n 0` to direct pytest commands, such
 as `uv run --locked pytest tests/src/session/test_store.py -n 0 -v`. Integration remains serial.
 
+CI tests Python 3.11 and 3.13 explicitly via `UV_PYTHON`, including controller/worker interpreter checks and exact
+test-selection comparison. See `docs/developer/testing_guidelines.md` for isolated local reproduction and evidence
+retention. Keep `.python-version` at the development default; installing a Python version alone does not select it for
+`uv`.
+
 The configured global pre-commit hook normalizes staged text, including replacing emoji with ASCII. Use `\U` escapes for
 emoji that must survive in source strings. If a hook reformats a staged file, review and restage it before retrying the
 commit.

@@ -84,17 +84,22 @@ def test_nonexact_runtime_overrides_refuse(value):
 
 @pytest.mark.parametrize("name", ["CLAUDE_VERSION", "CODEX_VERSION"])
 @pytest.mark.parametrize("value", ["stable", ""])
-def test_invalid_integration_override_does_not_abort_unit_collection(name, value):
+def test_invalid_integration_override_does_not_abort_unit_collection(name, value, tmp_path, monkeypatch):
+    parent_evidence = tmp_path / "parent-evidence.json"
+    parent_evidence.write_text("parent evidence\n")
+    monkeypatch.setenv("PYTEST_ADDOPTS", f'--python-evidence="{parent_evidence}"')
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "--collect-only", "-q", "tests/src/scripts/test_dependency_pins.py"],
         cwd=REPO_ROOT,
-        env={**os.environ, name: value, "PYTHON_DOTENV_DISABLED": "1"},
+        # This collection probe must not inherit its caller's reporting destination or selection flags.
+        env={**os.environ, name: value, "PYTHON_DOTENV_DISABLED": "1", "PYTEST_ADDOPTS": ""},
         capture_output=True,
         text=True,
         timeout=30,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "test_committed_exports_match_reviewed_lock" in result.stdout
+    assert parent_evidence.read_text() == "parent evidence\n"
 
 
 @pytest.mark.parametrize("name", ["CLAUDE_VERSION", "CODEX_VERSION"])

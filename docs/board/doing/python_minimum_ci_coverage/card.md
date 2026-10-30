@@ -1,5 +1,8 @@
 # Exercise the minimum supported Python version in CI
 
+**Status:** Doing. Accepted for execution on 2026-10-30 on `codex/python-minimum-ci`, based on main `849de170`. See
+[checklist](checklist.md).
+
 ## Problem
 
 The project declares Python `>=3.11,<3.14` and targets Python 3.11, but the unit and regression CI suites run under

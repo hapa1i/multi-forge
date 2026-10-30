@@ -43,7 +43,7 @@ Part B also shipped the bounded wheel-smoke teardown fix at the user's request. 
 - [x] Record the successful CI serial baseline: unit 288 seconds / 11,234 passed; regression 293 seconds / 2,218 passed;
   clean-wheel runtime and pre-commit also passed. Actual suite Python is 3.13.11 despite setup-python installing
   3.11.17. Track minimum-version coverage separately in the
-  [Python CI proposal](../../proposed/python_minimum_ci_coverage/card.md).
+  [Python CI follow-up](../../doing/python_minimum_ci_coverage/card.md).
 - [x] Run local `make build`, `./scripts/test-wheel-runtime.sh` and full `make pre-commit` for Part A before the CI
   workflow candidate.
 - [x] Compare the first CI parallel candidate with the serial baseline: both suites used four workers and retained exact
@@ -112,7 +112,7 @@ Part B also shipped the bounded wheel-smoke teardown fix at the user's request. 
 - [x] Retain the small acceptance summaries and source provenance under [evidence/](evidence/README.md), including the
   exact identity comparisons and the cleanup failure followed by its successful same-commit retry.
 - [x] Record the pre-existing Python 3.11 coverage gap in a separate
-  [proposed card](../../proposed/python_minimum_ci_coverage/card.md).
+  [follow-up card](../../doing/python_minimum_ci_coverage/card.md).
 - [x] Record the repeated wheel-cleanup failure at Part B head `5a30b345` in a separate
   [cleanup record](../../retired/wheel_runtime_cleanup_failure/card.md). Both suites and runtime health passed, but
   cleanup left that CI job red. The fix at `acdb6503` passed a fresh CI run without retrying the failed attempt.
@@ -134,4 +134,4 @@ formatting and the changelog token-cache refresh.
 
 The [closeout summary](evidence/closeout-summary.json) retains combined verification. Testing guidelines document the
 worker defaults, immutable shared wheel and bounded smoke teardown. Product architecture and end-user behavior are
-unchanged. The [Python minimum-version CI proposal](../../proposed/python_minimum_ci_coverage/card.md) remains open.
+unchanged. The [Python minimum-version CI follow-up](../../doing/python_minimum_ci_coverage/card.md) remains open.

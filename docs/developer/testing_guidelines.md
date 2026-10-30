@@ -157,6 +157,42 @@ tree and prints its path and diagnostics. Inspect these before removing the tree
 otherwise successful smoke fail; an earlier failure keeps its original exit status. Use the script's final exit status
 as the result—the start/health success message precedes cleanup.
 
+### Supported Python versions
+
+The Tests workflow runs the complete unit and regression suites on Python 3.11 and 3.13. Each job sets `UV_PYTHON` for
+locked dependency sync and every `uv run` invoked by Make. The local development pin in `.python-version` remains 3.13;
+`actions/setup-python` alone does not override it. A pre-test check and the opt-in pytest `--expected-python` guard
+refuse an unexpected interpreter. Pytest records the controller and each xdist worker's actual version and executable,
+including when they share an executable.
+
+To reproduce a lane locally without replacing the default development environment:
+
+```bash
+export UV_PYTHON=3.11
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv-python-3.11"
+PYTEST_ADDOPTS="--expected-python=3.11 --python-evidence=.test-evidence/python-3.11/unit.json" make test-unit
+PYTEST_ADDOPTS="--expected-python=3.11 --python-evidence=.test-evidence/python-3.11/regression.json" make test-regression
+FORGE_WHEEL_SMOKE_PYTHON=3.11 ./scripts/test-wheel-runtime.sh
+unset UV_PYTHON UV_PROJECT_ENVIRONMENT
+```
+
+Repeat with `3.13` in the version and paths to reproduce the second lane. Both use `uv.lock`; dependency
+incompatibilities require the normal [dependency review](dependency_security.md), not an unlocked install or a reduced
+suite. The clean-wheel smoke uses the lane's explicit interpreter for its isolated runtime environment.
+
+Each suite's JSON report retains the exact selected node IDs, exit status, and controller/worker evidence. CI uploads
+these as `python-3.11` and `python-3.13` artifacts for 30 days. The comparison job rejects missing, incomplete, failed
+or mismatched evidence and requires identical selected test identity multisets across versions. Run the same comparison
+locally after both lanes:
+
+```bash
+python3 scripts/check-python-matrix.py .test-evidence --output .test-evidence/summary.json
+```
+
+CI also uploads the compact `python-matrix-summary` artifact. Retain acceptance summaries with the board card when
+closing work; local reports and expiring Actions artifacts are not archival evidence. Version-specific selection
+exceptions require explicit review rather than silently filtering the comparison.
+
 ### When to Run Integration Tests
 
 Docker is expected to be running locally — `make test-integration` is a routine command, not a special occasion. Run
