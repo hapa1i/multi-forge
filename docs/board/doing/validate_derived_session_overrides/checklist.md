@@ -1,7 +1,8 @@
 # Derived-session override validation checklist
 
-**Current focus:** Aggregate verification and PR review. Parent validation now precedes derivation side effects while
-preserving the selected [inheritance contract](../../done/decide_derived_session_override_inheritance/decision.md).
+**Current focus:** [PR #294](https://github.com/hapa1i/multi-forge/pull/294) review and CI. Parent validation now
+precedes derivation side effects while preserving the selected
+[inheritance contract](../../done/decide_derived_session_override_inheritance/decision.md).
 
 **Execution:** `codex/derived-session-override-validation`, based on `04c9620d` (`main`), accepted 2026-10-30.
 
@@ -44,7 +45,7 @@ remain the owners of their respective rules; the regression matrix exercises per
 - [x] Aggregate `make test-unit` and `make test-regression` pass on the integrated branch.
 - [x] Replace the session design validation limitation and document user-facing refusal/recovery.
 - [x] Full `make pre-commit`, board/link checks and independent diff review pass.
-- [ ] Open the implementation PR with recorded local acceptance evidence; require green CI before merge.
+- [x] Open the implementation PR with recorded local acceptance evidence; require green CI before merge.
 
 ### Recorded local evidence (2026-10-30)
 
