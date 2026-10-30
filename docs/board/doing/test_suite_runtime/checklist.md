@@ -17,6 +17,9 @@ and 95 seconds regression. Part B passes all 521 retained integration tests with
 earlier failures and the integration cache caveat are recorded in [benchmarks](benchmarks.md). Keep the card in `doing/`
 until both PRs are shipped and verified.
 
+Part B's review-head CI passed both suites and runtime health but failed wheel cleanup again. The
+[cleanup follow-up](../../proposed/wheel_runtime_cleanup_failure/card.md) records this unresolved check separately.
+
 ## Part A -- parallel unit and regression runs
 
 - [x] Record serial wall time, collected/executed counts and failures for both suites on the unchanged test tree.
@@ -111,6 +114,8 @@ until both PRs are shipped and verified.
 - [x] Retain the small acceptance summaries and source provenance under [evidence/](evidence/README.md), including the
   exact identity comparisons and the cleanup failure followed by its successful same-commit retry.
 - [x] Record the pre-existing Python 3.11 coverage gap in a separate
-  [proposed card](../../proposed/python_minimum_ci_coverage/card.md). Keep the cleanup incident disclosed; propose a
-  separate cleanup card if it recurs.
+  [proposed card](../../proposed/python_minimum_ci_coverage/card.md).
+- [x] Record the repeated wheel-cleanup failure at Part B head `5a30b345` in a separate
+  [proposed card](../../proposed/wheel_runtime_cleanup_failure/card.md). Both suites and runtime health passed, but
+  cleanup left the CI job red. That attempt has not been rerun.
 - [ ] After merge, sync completed-work records and move the card to `done/` only when all accepted scope has shipped.

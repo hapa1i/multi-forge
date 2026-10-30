@@ -226,6 +226,13 @@ revision, which passed pre-commit and its initial static review.
 [CI pre-commit](https://github.com/hapa1i/multi-forge/actions/runs/40979801879) also passed. The clean full integration
 comparison below completes the runtime validation.
 
+During review, [CI at `5a30b345`](https://github.com/hapa1i/multi-forge/actions/runs/41034722366) passed all 11,234 unit
+and 2,218 regression tests, including the strengthened stdout assertion. The wheel start/health smoke also passed, then
+temporary-venv removal failed with `Directory not empty`. This repeats the earlier Part A cleanup failure under Part B's
+serial CI. The [retained recurrence summary](evidence/ci-review-part-b-cleanup-summary.json) records the failed job,
+which has not been rerun; a [separate proposed card](../../proposed/wheel_runtime_cleanup_failure/card.md) tracks
+diagnosis and repair. The writer and cause remain unproven.
+
 The fixed-checkout integration baseline passed all 543 selected tests in 912.34 seconds runner wall time and 884.37
 seconds reported by pytest, with 13,613 deselected and no failures, errors or skips. The 22 approved removals account
 for 19.359 seconds of measured test time.

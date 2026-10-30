@@ -163,6 +163,11 @@
       "file": "ci-final-grouped-hook-failure.log",
       "bytes": 3248819,
       "sha256": "0b573134fe39b92a210805803b7c40d10b37397d1c54393910835b9c48db4f55"
+    },
+    {
+      "file": "ci-review-part-b-cleanup-test.log",
+      "bytes": 2569973,
+      "sha256": "c9779e55218c878a2de1f142d9b279e99f4c6fdf674f57fe9d2bb5c3ed0934b7"
     }
   ],
   "notes": [
@@ -241,6 +246,11 @@
       "file": "ci-final-evidence-attempt2-summary.json",
       "bytes": 1008,
       "sha256": "73f06fa407b668f7a3a060c4f5a0fccd137c1f1ed41ce53561e1e9819a929c82"
+    },
+    {
+      "file": "ci-review-part-b-cleanup-summary.json",
+      "bytes": 4681,
+      "sha256": "0eb0445a6447e35e1b3f11570bc79a6c73ea25dcc0f6b0f880a115f9cc95d76e"
     }
   ],
   "verification": {
