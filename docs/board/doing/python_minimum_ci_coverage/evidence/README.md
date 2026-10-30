@@ -19,6 +19,12 @@ override that explicit width. An 80-column local control reproduced the wrapping
 The session and activity fixtures now set their intended console widths directly and restore the exact prior value.
 Existing assertions are preserved, and a subprocess regression covers the three affected fixture surfaces.
 
+The [second CI attempt](ci-second-attempt.json) passed all unit tests in both lanes, then exposed the same late-width
+setup in a cross-project session regression. Its CI temporary path split `subproject` across lines. Both complete local
+regression runs passed 2,258 cases under `COLUMNS=80`; different path lengths hid that assertion failure locally. The
+helper now fixes the shared console width, and the subprocess guard uses an initial width narrower than `subproject` so
+a different temporary path cannot hide the failure.
+
 The [fixture correction checks](local-fixture-correction.json) retain the 217 passing focused cases and subsequent local
 outcomes under `COLUMNS=80`. Concurrent full-unit reruns each hit one unrelated failure: a Markdown-link test observed
 an evidence file before staging, and a Git probe exceeded its 0.5s deadline under load. Both cases and the new

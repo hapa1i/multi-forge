@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-30",
+  "head_commit": "29efb3cbf5c743ceff46910b41390fa713c16519",
+  "run_url": "https://github.com/hapa1i/multi-forge/actions/runs/41089203128",
+  "pre_commit_url": "https://github.com/hapa1i/multi-forge/actions/runs/41089203370",
+  "pre_commit_result": "passed",
+  "comparison": "skipped_after_lane_failures",
+  "lanes": {
+    "3.11": {
+      "python_version": "3.11.17",
+      "job_id": 124178297518,
+      "unit_passed": 11471,
+      "unit_seconds": 151.58,
+      "regression_failed": 1,
+      "regression_passed": 2257,
+      "regression_seconds": 145.19,
+      "wheel_smoke": "not_run_after_regression_failure"
+    },
+    "3.13": {
+      "python_version": "3.13.17",
+      "job_id": 124178296874,
+      "unit_passed": 11471,
+      "unit_seconds": 93.33,
+      "unit_warning_count": 8,
+      "regression_failed": 1,
+      "regression_passed": 2257,
+      "regression_seconds": 101.49,
+      "wheel_smoke": "not_run_after_regression_failure"
+    }
+  },
+  "failed_node_ids": [
+    "tests/regression/test_bug_cross_project_show_delete.py::test_list_shows_session_and_show_can_reach_it"
+  ],
+  "diagnosis": "Both lanes fail the same substring assertion because Rich wraps the CI temporary path between 'su' and 'bproject'. The test helper sets COLUMNS after the shared console has already captured its initial width. Both complete local regression suites pass under COLUMNS=80 because their temporary path lengths differ.",
+  "repair": "Set the helper's intended width directly on the shared console, preserving every assertion. Extend the subprocess guard with an initial width narrower than 'subproject' so any temporary path exposes the missing override."
+}

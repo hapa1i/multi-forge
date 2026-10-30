@@ -69,3 +69,9 @@ full-unit runs each had one unrelated failure: an evidence file not yet staged w
 Git probe exceeding its 0.5s deadline under load. Both cases and the new regression passed isolated sequential checks on
 each version. Full pre-commit passed, and independent review found no issue with the scoped fixture repair.
 [Correction evidence](evidence/local-fixture-correction.json) records all outcomes; final clean CI remains required.
+
+The [second CI attempt](evidence/ci-second-attempt.json) passed all 11,471 unit tests in both lanes. Both regression
+lanes then failed one cross-project session assertion because the CI temporary path split `subproject` across lines. The
+helper now overrides the existing console width, and the subprocess guard starts narrower than `subproject`. Before this
+additional repair, sequential full local regression runs already passed all 2,258 cases on both versions under
+`COLUMNS=80` (95.88s on 3.11 and 104.85s on 3.13); the CI failure depended on the temporary path length.
