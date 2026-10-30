@@ -24,7 +24,7 @@ The runtime updates cover DNS name decompression, file-lock safety and LiteLLM a
 requires compatibility checks through Hugging Face and virtualenv; their declared ranges admit 4.2.1. LiteLLM remains on
 the 1.102 release line. Preserve existing model routes, saved configurations, FastAPI/Starlette bounds and build pins.
 
-The earlier [dependency card](../../doing/dependabot_october_2026/card.md) retains the evidence for
+The earlier [dependency card](../../done/dependabot_october_2026/card.md) retains the evidence for
 [PR #279](https://github.com/hapa1i/multi-forge/pull/279). This card covers the newly reported alerts and audit
 findings. No model-provider inference is part of this maintenance task.
 
