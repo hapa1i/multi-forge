@@ -1,0 +1,100 @@
+{
+  "date": "2026-10-30",
+  "base_commit": "849de170",
+  "platform": "macOS arm64",
+  "uv": "0.9.18",
+  "development_python_pin": "3.13",
+  "dependency_changes": false,
+  "notes": [
+    "The Python 3.11 lane used UV_PROJECT_ENVIRONMENT=/tmp/forge-python-minimum-ci-20261030/venv-3.11; Python 3.13 reused the development environment.",
+    "Both lanes passed locked dependency-export checks and uv pip check.",
+    "No failed full-suite attempts, skips, reruns or version-specific identity exceptions were needed.",
+    "Raw logs and full local node-ID reports are temporary; local-comparison.json retains verified exact equality, counts, hashes and interpreter identities."
+  ],
+  "input_sha256": {
+    ".github/workflows/test.yaml": "1b7dd28e3fe516a4d465b9704deb9d57f1112d80e1b291509d399815acbd56a0",
+    "Makefile": "0b80366490a61eb309b3c9d1ed132e8d0abea4f8d2d0f0f3c555cdd072e242f7",
+    ".python-version": "02e735b3dfe1c32833eb550b7ff8ffa17f5f2bc3fa1e7bae61a8f5a3883ce398",
+    "pyproject.toml": "6a3194c5c46995c359719a31467369e876a54984e3755a09a82b363eab93f28f",
+    "uv.lock": "3746a492092468ee6bf3b4f03147dc1e5fdf20976e7865d47e28047c0a3d459f",
+    "scripts/check-python-matrix.py": "69ee6e6bada85cfb7fe191a5fbbe50bd9b7eab1ad4666649c87460bfb73200d4",
+    "tests/conftest.py": "c421e7dacc7ecf13c83524ea0036f9a8384e4f3c2161b4721fe0baedfd63e35f",
+    "tests/fixtures/python_matrix.py": "66e82d9efdb04794caa4dbe5cf03f170c2ff8ae540b80b5f16dece17dfd203ba",
+    "tests/src/scripts/test_python_matrix.py": "bf3b9f3b03d2bbab818bcfac604fe4184d800f6ca890f2ea33040ae87fd3bfb3",
+    "tests/src/scripts/test_check_python_matrix.py": "266604e7b0e767ddf1706846536e2d5e04c6e050dacdd7bd8f1d55b79bc1f9b4",
+    "tests/regression/test_bug_python_ci_interpreter.py": "b669a988da737defb3ef6d58134a1d6ae997aab4172085b36ae1f8806cdf67ee",
+    "tests/regression/test_bug_runtime_supply_chain_pins.py": "6098457ca3f73ea5a97d6f50cb1409a89a541ec8231d7bf8366253a719ec7b6d"
+  },
+  "checks": [
+    {
+      "command": "UV_PYTHON=3.11 PYTEST_ADDOPTS=\"--expected-python=3.11 --python-evidence=<lane>/unit.json\" make test-unit",
+      "python": "3.11.14",
+      "passed": 11471,
+      "seconds": 107.46,
+      "workers": 4,
+      "result": "passed",
+      "temporary_log": "unit-3.11.log",
+      "log_sha256": "d89d766d5f54becaa9221837da1cd09c64fe81a2d2d2f37ed6cf0e45616b2799"
+    },
+    {
+      "command": "UV_PYTHON=3.11 PYTEST_ADDOPTS=\"--expected-python=3.11 --python-evidence=<lane>/regression.json\" make test-regression",
+      "python": "3.11.14",
+      "passed": 2257,
+      "seconds": 109.51,
+      "workers": 4,
+      "result": "passed",
+      "temporary_log": "regression-3.11.log",
+      "log_sha256": "0c17573cc6a845e64b8095b5207b2b93d539ec4587e1b4f279b5a0fb5a02c407"
+    },
+    {
+      "command": "UV_PYTHON=3.11 FORGE_WHEEL_SMOKE_PYTHON=3.11 ./scripts/test-wheel-runtime.sh",
+      "result": "passed",
+      "backend_group_exited": true,
+      "temporary_tree_removed": true,
+      "provider_inference": false,
+      "temporary_log": "wheel-3.11.log",
+      "log_sha256": "66a842f9c12bc0ad1798e22ad9410fc32a5c91e04f1d3d0608814de4525d74c3"
+    },
+    {
+      "command": "UV_PYTHON=3.13 PYTEST_ADDOPTS=\"--expected-python=3.13 --python-evidence=<lane>/unit.json\" make test-unit",
+      "python": "3.13.11",
+      "passed": 11471,
+      "seconds": 98.27,
+      "workers": 4,
+      "result": "passed",
+      "temporary_log": "unit-3.13.log",
+      "log_sha256": "0aeb0cfa9bbde1a62d93fc3a71f6ca35f20e70781ccf52ddeb2ce27e0a0811a2"
+    },
+    {
+      "command": "UV_PYTHON=3.13 PYTEST_ADDOPTS=\"--expected-python=3.13 --python-evidence=<lane>/regression.json\" make test-regression",
+      "python": "3.13.11",
+      "passed": 2257,
+      "seconds": 98.04,
+      "workers": 4,
+      "result": "passed",
+      "temporary_log": "regression-3.13.log",
+      "log_sha256": "3fabdb9b07f3c89e6ba2b4e8ec14e263fcd2e7f02941f4bafbe7e993daeb9f97"
+    },
+    {
+      "command": "UV_PYTHON=3.13 FORGE_WHEEL_SMOKE_PYTHON=3.13 ./scripts/test-wheel-runtime.sh",
+      "result": "passed",
+      "backend_group_exited": true,
+      "temporary_tree_removed": true,
+      "provider_inference": false,
+      "temporary_log": "wheel-3.13.log",
+      "log_sha256": "4f449101031e063e5c045b02a3c42fae0aa22893136ace30fd9838c4badeaea1"
+    },
+    {
+      "command": "make pre-commit",
+      "result": "passed",
+      "temporary_log": "pre-commit.log",
+      "log_sha256": "caf86003fb50766132d2e1d806f52b5c747041714fe9a5915d13f0d0a8859e9f"
+    },
+    {
+      "command": "uv run --locked pre-commit run --files .github/workflows/test.yaml tests/regression/test_bug_runtime_supply_chain_pins.py",
+      "result": "passed",
+      "temporary_log": "review-fix-hooks.log",
+      "log_sha256": "3fc70cbac320d6ee8cb0e1b3ebc809a91991a85fda3307dcfc74faa0213f25b9"
+    }
+  ]
+}

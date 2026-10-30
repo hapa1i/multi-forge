@@ -1,0 +1,113 @@
+{
+  "date": "2026-10-30",
+  "base_commit": "6edcb3b2",
+  "startup_columns": 80,
+  "production_changes": false,
+  "checks": [
+    {
+      "temporary_log": "cli-width-three-before.log",
+      "result": "expected_failure",
+      "failed": 3,
+      "reason": "80-column startup reproduces all three affected fixture surfaces before the repair",
+      "log_sha256": "596caf8b0fcd08a4bdae1e2b8985d678f063b7a7a5266d55fd9446bb3944c1be"
+    },
+    {
+      "temporary_log": "cli-width-after.log",
+      "result": "passed",
+      "passed": 217,
+      "seconds": 8.41,
+      "log_sha256": "dc421681330a707c485fb621b3f5e6233b74388767e35dae51c2de52dc86ccfd"
+    },
+    {
+      "temporary_log": "unit-3.11-columns80.log",
+      "result": "failed",
+      "failed": 1,
+      "passed": 11470,
+      "seconds": 154.56,
+      "reason": "Markdown link test ran while a newly referenced evidence file was still unstaged; staging completed and its isolated rerun passed.",
+      "log_sha256": "72b6a9fb4d688a148342cf08650c6850414562d8b632db0c3786006f50d56af9"
+    },
+    {
+      "temporary_log": "unit-3.13-columns80.log",
+      "result": "failed",
+      "failed": 1,
+      "passed": 11470,
+      "seconds": 162.19,
+      "reason": "A Git probe exceeded its 0.5s deadline during concurrent full suites and pre-commit; its isolated rerun passed unchanged.",
+      "log_sha256": "b666cc6cbf1a352d106541de9e293697f37e07abe0178c32628940375ca38ea0"
+    },
+    {
+      "temporary_log": "width-isolated-3.11.log",
+      "result": "passed",
+      "passed": 3,
+      "seconds": 10.95,
+      "cases": "Both incidental local failures plus the new CLI-width subprocess regression",
+      "log_sha256": "62974d4e3f66df7631dcafc35f75ff31e5a9b41adb5397d6d22dca72ea1dcdfb"
+    },
+    {
+      "temporary_log": "width-isolated-3.13.log",
+      "result": "passed",
+      "passed": 3,
+      "seconds": 1.9,
+      "cases": "Both incidental local failures plus the new CLI-width subprocess regression",
+      "log_sha256": "940c117caa4b2745e6d7a01702218484b90e29256db1c43700a82bbca59ec2c8"
+    },
+    {
+      "temporary_log": "pre-commit-width-fix.log",
+      "result": "passed",
+      "command": "make pre-commit",
+      "log_sha256": "caf86003fb50766132d2e1d806f52b5c747041714fe9a5915d13f0d0a8859e9f"
+    },
+    {
+      "temporary_log": "regression-3.11-columns80-serial.log",
+      "result": "passed",
+      "passed": 2258,
+      "seconds": 95.88,
+      "command": "COLUMNS=80 UV_PYTHON=3.11 make test-regression with version/evidence options",
+      "head_commit": "29efb3cbf5c743ceff46910b41390fa713c16519",
+      "log_sha256": "4bad5fdc92c3056cfdb9b4b0bd2f16506e8b3357dc024288a5b52e9399a110ad"
+    },
+    {
+      "temporary_log": "regression-3.13-columns80-serial.log",
+      "result": "passed",
+      "passed": 2258,
+      "seconds": 104.85,
+      "command": "COLUMNS=80 UV_PYTHON=3.13 make test-regression with version/evidence options",
+      "head_commit": "29efb3cbf5c743ceff46910b41390fa713c16519",
+      "log_sha256": "6cd677f06eee934ec5f1642aa02e19a741b97f77496e75ccc6f4154dce246dfe"
+    },
+    {
+      "temporary_log": "cli-cross-project-width-before.log",
+      "result": "expected_failure",
+      "passed": 0,
+      "failed": 1,
+      "seconds": 1.19,
+      "cases": "Expanded subprocess guard at COLUMNS=9; after-fix run also includes both cross-project tests",
+      "log_sha256": "051b99e276e8272e282c17f3e12f73f4bec687ad86b07b8b382220673f0ece79"
+    },
+    {
+      "temporary_log": "cli-cross-project-width-after.log",
+      "result": "passed",
+      "passed": 3,
+      "failed": 0,
+      "seconds": 4.77,
+      "cases": "Expanded subprocess guard at COLUMNS=9; after-fix run also includes both cross-project tests",
+      "log_sha256": "4eac4b54565dcefaadb800613d7d60a87b8536a2062c92753a27f16045a22096"
+    }
+  ],
+  "input_sha256": {
+    "tests/src/cli/conftest.py": "1846e3d6c7bab1380d1071f1af37cf45ba9f39c311894797ee8413fa2e5e7f82",
+    "tests/src/cli/test_activity.py": "4fd9190b332a50256d49a98d2ea555504f7ea94f8a330fe1de873e96092ae0fc",
+    "tests/src/cli/test_session_rewind_cli.py": "2c72ae38cff6c0f106fc514fadbc7bfb8b4c3031772dddc59c3832dfda1ff786",
+    "tests/regression/test_bug_cli_width_environment.py": "2511a52bf2414c7be7bbbd8a1423740ee0b56bf9117016d2338cb72c5188cafb"
+  },
+  "notes": [
+    "The initial complete local matrix remains in local-checks.json and local-comparison.json. Final clean-run matrix evidence is required from CI.",
+    "The two concurrent local reruns aborted before regression targets; no passing final local matrix is claimed.",
+    "An extra explicit Pyright invocation on the test files reported two unchanged Optional[str] forge_root argument diagnostics at test_session_rewind_cli.py:297,388, outside the configured Pyright source scope. The configured full pre-commit checks passed."
+  ],
+  "cross_project_repair_input_sha256": {
+    "tests/regression/test_bug_cli_width_environment.py": "b9fe19b8022852ff5fdbce7ee34e47eea46e7ea171b73099fae5acdef410157e",
+    "tests/regression/test_bug_cross_project_show_delete.py": "c3592380678295cfa9fa13c77a96b9fe5464f55d96c6841d62b0b68ac538f992"
+  }
+}

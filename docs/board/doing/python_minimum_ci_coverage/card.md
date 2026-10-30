@@ -1,5 +1,8 @@
 # Exercise the minimum supported Python version in CI
 
+**Status:** Doing. Accepted for execution on 2026-10-30 on `codex/python-minimum-ci`, based on main `849de170`. See
+[checklist](checklist.md).
+
 ## Problem
 
 The project declares Python `>=3.11,<3.14` and targets Python 3.11, but the unit and regression CI suites run under
@@ -29,6 +32,11 @@ parallel workers.
    through the dependency-security process rather than relaxing the declared floor as part of CI wiring.
 5. Run the pinned clean-wheel smoke on Python 3.11 using its `FORGE_WHEEL_SMOKE_PYTHON` override. Keep its interpreter
    explicit if the smoke also runs in the 3.13 lane; packaging checks complement the full unit and regression suites.
+
+The CI matrix exposed an existing cold-start limit in the LiteLLM adapter after both complete suites passed. A fresh
+Linux wheel can become healthy after the old 10-second deadline. Execution includes a bounded 30-second readiness budget
+and delayed-start/timeout regressions so both supported-version smoke checks exercise an unmodified cold install. The
+separate wheel-cleanup ownership policy remains unchanged.
 
 ## Acceptance
 

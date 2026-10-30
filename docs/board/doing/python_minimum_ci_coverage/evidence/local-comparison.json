@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "matched": true,
+  "suites": {
+    "unit": {
+      "matched": true,
+      "lanes": {
+        "3.11": {
+          "selected_count": 11471,
+          "node_ids_sha256": "5b2bba89205b69bbc4f96f419d67e1a0441c4b12e9b08dd73263bc6d50d56fd1",
+          "controller": {
+            "version": "3.11.14",
+            "executable": "/tmp/forge-python-minimum-ci-20261030/venv-3.11/bin/python"
+          },
+          "workers": {
+            "gw0": {
+              "version": "3.11.14",
+              "executable": "/tmp/forge-python-minimum-ci-20261030/venv-3.11/bin/python"
+            },
+            "gw1": {
+              "version": "3.11.14",
+              "executable": "/tmp/forge-python-minimum-ci-20261030/venv-3.11/bin/python"
+            },
+            "gw2": {
+              "version": "3.11.14",
+              "executable": "/tmp/forge-python-minimum-ci-20261030/venv-3.11/bin/python"
+            },
+            "gw3": {
+              "version": "3.11.14",
+              "executable": "/tmp/forge-python-minimum-ci-20261030/venv-3.11/bin/python"
+            }
+          }
+        },
+        "3.13": {
+          "selected_count": 11471,
+          "node_ids_sha256": "5b2bba89205b69bbc4f96f419d67e1a0441c4b12e9b08dd73263bc6d50d56fd1",
+          "controller": {
+            "version": "3.13.11",
+            "executable": "/Users/habib/.codex/worktrees/test-suite-runtime/multi-forge/.venv/bin/python"
+          },
+          "workers": {
+            "gw0": {
+              "version": "3.13.11",
+              "executable": "/Users/habib/.codex/worktrees/test-suite-runtime/multi-forge/.venv/bin/python"
+            },
+            "gw1": {
+              "version": "3.13.11",
+              "executable": "/Users/habib/.codex/worktrees/test-suite-runtime/multi-forge/.venv/bin/python"
+            },
+            "gw2": {
+              "version": "3.13.11",
+              "executable": "/Users/habib/.codex/worktrees/test-suite-runtime/multi-forge/.venv/bin/python"
+            },
+            "gw3": {
+              "version": "3.13.11",
+              "executable": "/Users/habib/.codex/worktrees/test-suite-runtime/multi-forge/.venv/bin/python"
+            }
+          }
+        }
+      }
+    },
+    "regression": {
+      "matched": true,
+      "lanes": {
+        "3.11": {
+          "selected_count": 2257,
+          "node_ids_sha256": "eebcab30e7b4fe21f32042b1319b669ac36f4307e982c0a485de0fd3f525cb74",
+          "controller": {
+            "version": "3.11.14",
+            "executable": "/tmp/forge-python-minimum-ci-20261030/venv-3.11/bin/python"
+          },
+          "workers": {
+            "gw0": {
+              "version": "3.11.14",
+              "executable": "/tmp/forge-python-minimum-ci-20261030/venv-3.11/bin/python"
+            },
+            "gw1": {
+              "version": "3.11.14",
+              "executable": "/tmp/forge-python-minimum-ci-20261030/venv-3.11/bin/python"
+            },
+            "gw2": {
+              "version": "3.11.14",
+              "executable": "/tmp/forge-python-minimum-ci-20261030/venv-3.11/bin/python"
+            },
+            "gw3": {
+              "version": "3.11.14",
+              "executable": "/tmp/forge-python-minimum-ci-20261030/venv-3.11/bin/python"
+            }
+          }
+        },
+        "3.13": {
+          "selected_count": 2257,
+          "node_ids_sha256": "eebcab30e7b4fe21f32042b1319b669ac36f4307e982c0a485de0fd3f525cb74",
+          "controller": {
+            "version": "3.13.11",
+            "executable": "/Users/habib/.codex/worktrees/test-suite-runtime/multi-forge/.venv/bin/python"
+          },
+          "workers": {
+            "gw0": {
+              "version": "3.13.11",
+              "executable": "/Users/habib/.codex/worktrees/test-suite-runtime/multi-forge/.venv/bin/python"
+            },
+            "gw1": {
+              "version": "3.13.11",
+              "executable": "/Users/habib/.codex/worktrees/test-suite-runtime/multi-forge/.venv/bin/python"
+            },
+            "gw2": {
+              "version": "3.13.11",
+              "executable": "/Users/habib/.codex/worktrees/test-suite-runtime/multi-forge/.venv/bin/python"
+            },
+            "gw3": {
+              "version": "3.13.11",
+              "executable": "/Users/habib/.codex/worktrees/test-suite-runtime/multi-forge/.venv/bin/python"
+            }
+          }
+        }
+      }
+    }
+  }
+}

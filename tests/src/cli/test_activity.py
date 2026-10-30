@@ -158,7 +158,7 @@ def test_json_carries_runtime_and_billing(monkeypatch) -> None:
 
 def test_human_render_shows_runtime_billing(monkeypatch) -> None:
     """The human table shows the resolved lane in a Runtime/Billing column."""
-    monkeypatch.setenv("COLUMNS", "200")  # widen so Rich does not truncate the lane cell
+    monkeypatch.setattr(activity_module.console, "_width", 200)  # retain the full lane cell
     _patch_resolver(monkeypatch)
     log_usage_event(_event(command="supervisor", runtime="codex", billing_mode="subscription_quota"))
     result = CliRunner().invoke(main, _activity_args("planner", "--period", "all"))

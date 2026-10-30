@@ -1,0 +1,59 @@
+{
+  "date": "2026-10-30",
+  "implementation_commit": "710dde86b823c389c5eeb93cac45bf6902d095f4",
+  "run_url": "https://github.com/hapa1i/multi-forge/actions/runs/41093299013",
+  "pre_commit_url": "https://github.com/hapa1i/multi-forge/actions/runs/41093299023",
+  "result": "passed",
+  "comparison_job_id": 124195410718,
+  "comparison_summary": "ci-comparison.json",
+  "comparison_source": "JSON emitted by the successful comparison job, which writes the same object to its uploaded summary.json.",
+  "lanes": {
+    "3.11": {
+      "python_version": "3.11.17",
+      "job_id": 124192460800,
+      "unit_passed": 11471,
+      "unit_seconds": 147.74,
+      "unit_warnings": 0,
+      "regression_passed": 2260,
+      "regression_seconds": 146.21,
+      "wheel_smoke": "passed_install_start_health_process_group_exit_cleanup"
+    },
+    "3.13": {
+      "python_version": "3.13.17",
+      "job_id": 124192461498,
+      "unit_passed": 11471,
+      "unit_seconds": 157.17,
+      "unit_warnings": 8,
+      "regression_passed": 2260,
+      "regression_seconds": 149.93,
+      "wheel_smoke": "passed_install_start_health_process_group_exit_cleanup"
+    }
+  },
+  "notes": [
+    "All controllers and all four xdist workers in each suite use their lane's expected interpreter.",
+    "Exact selected test identity multisets match across both Python versions; no skips, reruns or version-specific exceptions were used.",
+    "Python 3.13 reports eight multiprocessing fork-in-multithreaded-process DeprecationWarnings from existing contention tests; all cases pass.",
+    "The local development pin, declared Python range and dependency lock are unchanged.",
+    "Earlier unsuccessful CI attempts and local probes remain retained separately."
+  ],
+  "artifacts": [
+    {
+      "name": "python-matrix-summary",
+      "id": 12996105195,
+      "digest": "sha256:bf6816a5a6e6f5c1e7ee9d0517f126473caffe6a88593608cf51127af801ae21",
+      "expires_at": "2026-11-29T16:54:59Z"
+    },
+    {
+      "name": "python-3.11",
+      "id": 12994913816,
+      "digest": "sha256:7078ec262acb06ce01f6b0dd6e1ec1eeefc786ec4df1886f073f2b54e8e504cc",
+      "expires_at": "2026-11-29T16:54:41Z"
+    },
+    {
+      "name": "python-3.13",
+      "id": 12994524616,
+      "digest": "sha256:e8e774df6491639bea9054cc5968b3fb0421c733a670b94db3e307490b2db3e0",
+      "expires_at": "2026-11-29T16:54:47Z"
+    }
+  ]
+}

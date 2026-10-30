@@ -36,6 +36,8 @@ from tests.fixtures.repos import (
     git_repo_with_claude,
 )
 
+pytest_plugins = ["tests.fixtures.python_matrix"]
+
 __all__ = [
     # Repos
     "git_repo",

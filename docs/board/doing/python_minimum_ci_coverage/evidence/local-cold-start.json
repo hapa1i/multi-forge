@@ -1,0 +1,81 @@
+{
+  "date": "2026-10-30",
+  "source_commit": "e9166324c27f58448fe9322937c6b5384882004f",
+  "environment": "Disposable Linux arm64 forge-sidecar:latest containers; uv-managed Python 3.13.11; fresh wheel venv and unchanged locked dependencies on every run; PYTHON_DOTENV_DISABLED=1; no provider credentials or inference.",
+  "method": "Run the original wheel smoke. Diagnostic runs only wrap LiteLLMAdapter._wait_for_health to allow 45 seconds and print monotonic elapsed time; neither backend imports nor bytecode are warmed. The final diagnostic enables Python child import profiling. Runtime tree and cleanup behavior remain unchanged.",
+  "checks": [
+    {
+      "temporary_log": "linux-wheel-cold.log",
+      "cpu_limit": 2,
+      "readiness_allowance_seconds": 10,
+      "healthy": true,
+      "elapsed_readiness_seconds": null,
+      "child_import_profiling": false,
+      "log_sha256": "27ac8c458dc45d5345429cbb02068dfd752000ca21fe34a987f159df7451486b"
+    },
+    {
+      "temporary_log": "linux-wheel-cold-timed.log",
+      "cpu_limit": 0.5,
+      "readiness_allowance_seconds": 45,
+      "healthy": true,
+      "elapsed_readiness_seconds": 9.376,
+      "child_import_profiling": false,
+      "log_sha256": "8409d23dd5d4688fac062c3101c44d90b56c0e30db0b09f770cc19c12e895933"
+    },
+    {
+      "temporary_log": "linux-wheel-cold-timed-quarter-cpu.log",
+      "cpu_limit": 0.25,
+      "readiness_allowance_seconds": 45,
+      "healthy": false,
+      "elapsed_readiness_seconds": 45.186,
+      "child_import_profiling": false,
+      "log_sha256": "d7a0ec4a80bfdd59a9a6e4f854efe5055acecf69ac8e3459078ad64be8f3fc97"
+    },
+    {
+      "temporary_log": "linux-wheel-cold-profiled.log",
+      "cpu_limit": 0.4,
+      "readiness_allowance_seconds": 45,
+      "healthy": true,
+      "elapsed_readiness_seconds": 14.206,
+      "child_import_profiling": true,
+      "log_sha256": "198cce66f7cb9a2f704f6acb1f030f550144655cfe9965885dd1e116db15ad6d"
+    }
+  ],
+  "limits": "These controlled CPU limits do not reproduce GitHub hardware. They show valid cold startup can exceed ten seconds, not that thirty seconds covers arbitrary CPU starvation. The quarter-CPU failure is retained; final unmodified wheel smoke and CI must validate the repair.",
+  "repair_checks": [
+    {
+      "temporary_log": "cold-readiness-regression-before.log",
+      "result": "expected_failure",
+      "details": "Two readiness regression cases fail under the former ten-second startup allowance.",
+      "log_sha256": "b6a86422a58e7cb4daf6700c0724c61023250ad9b04afaa141c60e121435d5b9"
+    },
+    {
+      "temporary_log": "cold-readiness-focused.log",
+      "result": "passed",
+      "details": "13 backend unit and readiness regression cases passed.",
+      "log_sha256": "169cb5382724cae71d783949f50b5598d644b04e469bff86fa50631f3d6254b4"
+    },
+    {
+      "temporary_log": "linux-wheel-cold-fixed.log",
+      "result": "passed",
+      "details": "Unmodified fresh locked wheel smoke passed on Linux Python 3.13.11 at 0.4 CPU, with no profiling or import warmup; process group exited and temporary tree was removed.",
+      "log_sha256": "9097f3f935c4caf67ac6309ac6642041359e958ed6eca8d39ff3b142b34909fa"
+    },
+    {
+      "temporary_log": "cold-readiness-integration.log",
+      "result": "passed",
+      "details": "Required integration wrapper: two real LiteLLM process-group cases passed, one unrelated case deselected. Provider credentials omitted and dotenv disabled; wrapper warns about missing GEMINI_API_KEY, which these cases do not need.",
+      "log_sha256": "b729c4335d36201c3a3abf0dca171bfc6d6e5eef3280f0030e356cbe6eac7090"
+    },
+    {
+      "temporary_log": "cold-readiness-wheel-3.11.log",
+      "result": "passed",
+      "details": "Fresh locked Python 3.11.14 wheel install passed backend startup, health, process-group exit and temporary-tree removal. PYTHON_DOTENV_DISABLED=1; no provider inference.",
+      "log_sha256": "7c755ff4e4da9053db99e0199bfc5c6c14bc69b9a4558dde8d65ef6b953dd58c"
+    }
+  ],
+  "repair_input_sha256": {
+    "src/forge/backend/adapters/litellm.py": "49c7ebfa250345d83ab5e9c434d7395edec34d0a9dcb198bddd620c039c60f9d",
+    "tests/regression/test_bug_litellm_cold_start_readiness.py": "3057376e8dcc6c14773d99908463310c711105df2e6d11db9c972daf8ab6d945"
+  }
+}

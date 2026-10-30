@@ -23,6 +23,7 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from forge.cli.output import console
 from forge.session import IndexStore, create_session_state
 from tests.fixtures.session_state import publish_session
 
@@ -35,6 +36,8 @@ def _setup_repo_with_two_forge_roots(tmp_path: Path, monkeypatch: pytest.MonkeyP
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("COLUMNS", "500")
+    # The shared console may have captured a narrower COLUMNS before this fixture ran.
+    monkeypatch.setattr(console, "_width", 500)
 
     repo = tmp_path / "repo"
     repo.mkdir()

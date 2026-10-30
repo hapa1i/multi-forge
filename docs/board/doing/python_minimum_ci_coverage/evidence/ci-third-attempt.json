@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-30",
+  "head_commit": "e9166324c27f58448fe9322937c6b5384882004f",
+  "run_url": "https://github.com/hapa1i/multi-forge/actions/runs/41090791335",
+  "pre_commit_url": "https://github.com/hapa1i/multi-forge/actions/runs/41090791480",
+  "pre_commit_result": "passed",
+  "comparison": "skipped_after_wheel_smoke_failure",
+  "lanes": {
+    "3.11": {
+      "python_version": "3.11.17",
+      "job_id": 124183819341,
+      "unit_passed": 11471,
+      "unit_seconds": 152.1,
+      "regression_passed": 2258,
+      "regression_seconds": 140.53,
+      "wheel_smoke": "failed_readiness_deadline"
+    },
+    "3.13": {
+      "python_version": "3.13.17",
+      "job_id": 124183819867,
+      "unit_passed": 11471,
+      "unit_seconds": 156.37,
+      "unit_warning_count": 8,
+      "regression_passed": 2258,
+      "regression_seconds": 149.37,
+      "wheel_smoke": "failed_readiness_deadline"
+    }
+  },
+  "diagnosis": "Both installed-wheel checks fail at the adapter's existing ten-second readiness deadline. The backend executable remains the selected wheel environment's sibling litellm; the new UV_PYTHON and FORGE_WHEEL_SMOKE_PYTHON variables are not used by that executable to choose an interpreter. The 3.11 log shows server startup completed before the log was printed; its exact completion time is unknown. The 3.13 log is empty.",
+  "cleanup": "Failed startup kills the owned process group before registry publication. The smoke's missing-index refusal preserves its evidence as designed; cleanup ownership policy is unchanged.",
+  "repair": "Give cold startup a 30-second monotonic readiness budget, preserving single-launch behavior and full process-group termination on failure. Do not prewarm imports or relax smoke assertions."
+}

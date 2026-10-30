@@ -16,6 +16,13 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.13']
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+      FORGE_WHEEL_SMOKE_PYTHON: ${{ matrix.python-version }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -23,7 +30,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
@@ -34,14 +41,75 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      - name: Verify selected interpreter
+        run: |
+          uv run --locked python - <<'PY'
+          import os
+          import sys
+
+          actual = '.'.join(map(str, sys.version_info[:2]))
+          expected = os.environ['UV_PYTHON']
+          print(f'Project interpreter: {sys.version} ({sys.executable})')
+          if actual != expected:
+              raise SystemExit(f'Expected Python {expected}, got {actual}')
+          PY
+
       - name: Verify dependency pins
         run: uv run --locked python scripts/check-dependency-pins.py
 
       - name: Run unit tests
+        env:
+          PYTEST_ADDOPTS: >-
+            --expected-python=${{ matrix.python-version }}
+            --python-evidence=.test-evidence/python-${{ matrix.python-version }}/unit.json
         run: make test-unit
 
       - name: Run regression tests
+        env:
+          PYTEST_ADDOPTS: >-
+            --expected-python=${{ matrix.python-version }}
+            --python-evidence=.test-evidence/python-${{ matrix.python-version }}/regression.json
         run: make test-regression
 
       - name: Verify clean wheel LiteLLM runtime
         run: ./scripts/test-wheel-runtime.sh
+
+      - name: Retain interpreter and test-selection evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: python-${{ matrix.python-version }}
+          path: .test-evidence/python-${{ matrix.python-version }}/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+
+  compare-test-selection:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.13'
+
+      - name: Download both lanes
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: python-*
+          path: .test-evidence
+
+      - name: Compare selected test identities
+        run: python scripts/check-python-matrix.py .test-evidence --output .test-evidence/summary.json
+
+      - name: Retain comparison summary
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: python-matrix-summary
+          path: .test-evidence/summary.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30

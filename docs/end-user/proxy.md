@@ -103,8 +103,9 @@ in `forge model backend list` (for example, `forge model backend stop litellm-40
 process with `forge model backend stop --all`. Forge signals the complete detached LiteLLM process group. If the group
 cannot be signalled, stop exits nonzero and retains its managed-process row so the ownership and retry target are not
 lost. `forge model backend delete litellm` also retains the adapter config, omits `Deleted`, and exits nonzero when any
-required process stop fails. If a newly started LiteLLM process never becomes healthy, Forge kills its complete detached
-group so a spawned worker cannot remain on the port.
+required process stop fails. A new LiteLLM process has a 30-second readiness budget for cold imports and local server
+startup. If it does not become healthy, Forge kills its complete detached group so a spawned worker cannot remain on the
+port.
 
 The local LiteLLM backends (`litellm-gemini-local`, `litellm-openai-local`, `litellm-anthropic-local`, and
 `codex-responses-local`) all share one adapter and port (`litellm` on `4000`), so a single LiteLLM process backs every

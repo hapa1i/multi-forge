@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "matched": true,
+  "suites": {
+    "unit": {
+      "matched": true,
+      "lanes": {
+        "3.11": {
+          "selected_count": 11471,
+          "node_ids_sha256": "5b2bba89205b69bbc4f96f419d67e1a0441c4b12e9b08dd73263bc6d50d56fd1",
+          "controller": {
+            "version": "3.11.17",
+            "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+          },
+          "workers": {
+            "gw0": {
+              "version": "3.11.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            },
+            "gw1": {
+              "version": "3.11.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            },
+            "gw2": {
+              "version": "3.11.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            },
+            "gw3": {
+              "version": "3.11.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            }
+          }
+        },
+        "3.13": {
+          "selected_count": 11471,
+          "node_ids_sha256": "5b2bba89205b69bbc4f96f419d67e1a0441c4b12e9b08dd73263bc6d50d56fd1",
+          "controller": {
+            "version": "3.13.17",
+            "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+          },
+          "workers": {
+            "gw0": {
+              "version": "3.13.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            },
+            "gw1": {
+              "version": "3.13.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            },
+            "gw2": {
+              "version": "3.13.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            },
+            "gw3": {
+              "version": "3.13.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            }
+          }
+        }
+      }
+    },
+    "regression": {
+      "matched": true,
+      "lanes": {
+        "3.11": {
+          "selected_count": 2260,
+          "node_ids_sha256": "5e26ef8fb484591c28dc9e7eb377aacbb7060f7a7f6155fd3f412146bb4fd9b4",
+          "controller": {
+            "version": "3.11.17",
+            "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+          },
+          "workers": {
+            "gw0": {
+              "version": "3.11.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            },
+            "gw1": {
+              "version": "3.11.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            },
+            "gw2": {
+              "version": "3.11.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            },
+            "gw3": {
+              "version": "3.11.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            }
+          }
+        },
+        "3.13": {
+          "selected_count": 2260,
+          "node_ids_sha256": "5e26ef8fb484591c28dc9e7eb377aacbb7060f7a7f6155fd3f412146bb4fd9b4",
+          "controller": {
+            "version": "3.13.17",
+            "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+          },
+          "workers": {
+            "gw0": {
+              "version": "3.13.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            },
+            "gw1": {
+              "version": "3.13.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            },
+            "gw2": {
+              "version": "3.13.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            },
+            "gw3": {
+              "version": "3.13.17",
+              "executable": "/home/runner/work/multi-forge/multi-forge/.venv/bin/python"
+            }
+          }
+        }
+      }
+    }
+  }
+}

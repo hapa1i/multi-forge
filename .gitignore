@@ -8,9 +8,13 @@
 
 # Virtual environment
 .venv/
+.venv-python-*/
 venv/
 ENV/
 env/
+
+# Local Python matrix reports; retained acceptance summaries live with their card.
+/.test-evidence/
 
 # Environment variables
 .env
