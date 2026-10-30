@@ -198,6 +198,29 @@ def test_malformed_supervisor_without_baseline_requires_manifest_repair(parent: 
     assert "forge policy supervisor remove" not in caught.value.recovery
 
 
+@pytest.mark.parametrize("raw_supervisor", ["bad", [1], 1, True])
+@pytest.mark.parametrize("has_baseline", [False, True])
+def test_malformed_supervisor_container_keeps_recovery_actionable(
+    parent: SessionState, raw_supervisor: Any, has_baseline: bool
+) -> None:
+    if has_baseline:
+        parent.intent.policy = PolicyIntent(supervisor=SupervisorConfig(plan_override_path="/plan"))
+    parent.overrides = {"policy": {"supervisor": raw_supervisor}}
+    before = deepcopy(parent)
+
+    with pytest.raises(InvalidDerivedSessionOverridesError) as caught:
+        validate_derived_session_overrides(parent)
+
+    assert caught.value.key == "policy.supervisor"
+    assert "forge session reset" not in caught.value.recovery
+    if has_baseline:
+        assert "forge policy supervisor remove --session parent" in caught.value.recovery
+    else:
+        assert "Repair or restore" in caught.value.recovery
+        assert "forge policy supervisor remove" not in caught.value.recovery
+    assert parent == before
+
+
 def test_native_identity_change_does_not_offer_direct_reset(parent: SessionState) -> None:
     parent.intent.policy = PolicyIntent(
         supervisor=SupervisorConfig(plan_override_path="/plan", supervisor_model="opus")

@@ -54,23 +54,24 @@ relaunch child that could not decode; fork/fresh failed late with key `unknown`.
 override was silently dropped by fork/fresh and copied by relaunch over Claude dispatch intent. Both reproductions now
 refuse before writes, with the precise override path.
 
-- The new regression matrix has 156 passing cases. Combined with the memory, authority and consumer-lane owner modules:
-  **216 passed**. These execute real publication, reset and supervisor-remove operations on isolated persisted state.
-  All four lane slots and cleared requests are covered in the persisted matrix; no duplicate lane-helper tests were
-  needed.
-- Structural guard unit tests: **34 passed**, including constructor-error path narrowing, nullable parents and recovery
-  constraints. Independent guard review plus the persisted matrix: **190 passed**.
-- Affected CLI resume/fork/rewind/core-preflight modules: **180 passed** before nine final dispatch/refusal controls
-  were added; all **38 new CLI cases passed** afterward. Nine additional late-manager-error cases cover native, transfer
-  and rewind stderr-only repair/restoration guidance.
-- Existing manager/inheritance compatibility selections: **21 passed** and **12 passed**.
-- `make test-unit`: **11,565 passed** in 88.81 seconds.
-- `make test-regression`: **2,416 passed** in 103.60 seconds.
+- The final structural guard and persisted regression selection: **210 passed** in 15.80 seconds (**42** guard cases,
+  **168** regression cases). These execute real publication, reset and supervisor-remove operations on isolated
+  persisted state. All four lane slots and cleared requests are covered in the persisted matrix; no duplicate
+  lane-helper tests were needed.
+- The focused tests include constructor-error path narrowing, nullable parents, native/frozen identity recovery and
+  malformed whole-supervisor values. The final container checks reproduced a decoder `AttributeError` during recovery;
+  derivation now handles it at the snapshot boundary and offers executable removal or explicit manifest repair.
+- CLI cases cover route/process/transfer refusal, ordinary versus child dispatch and stderr-only repair/restoration for
+  native, transfer and rewind manager reread failures. Memory, authority and lane owner tests remain in the aggregate
+  gates.
+- `make test-unit`: **11,573 passed** in 90.12 seconds on the final recovery fix.
+- `make test-regression`: **2,428 passed** in 109.45 seconds on the final recovery fix.
 - `make pre-commit`: **all hooks passed**, including mypy, Pyright, file limits and Markdown links. The initial run
   normalized test formatting and found a fixture dictionary annotation; both were corrected before the final pass.
-- Targeted Docker command below: **51 passed** in 49.51 seconds, including nine new persisted-child cases. Credentials
-  were removed from the invocation; the runner warned that Gemini was unavailable, and these tests needed no live LLM.
-  The first invocation selected an incorrect test filename and collected nothing; the corrected invocation passed.
+- Targeted Docker command below: **54 passed** in 50.96 seconds on the final recovery fix, including twelve new
+  persisted-child cases. Credentials were removed from the invocation; the runner warned that Gemini was unavailable,
+  and these tests needed no live LLM. The first invocation selected an incorrect test filename and collected nothing;
+  the corrected invocation passed.
 
 ```bash
 env -u GEMINI_API_KEY -u OPENROUTER_API_KEY -u ANTHROPIC_API_KEY -u OPENAI_API_KEY \
@@ -80,10 +81,9 @@ env -u GEMINI_API_KEY -u OPENROUTER_API_KEY -u ANTHROPIC_API_KEY -u OPENAI_API_K
   tests/integration/cli/test_session_resume_proxy_integration.py -q
 ```
 
-The Docker run preceded the final native/rewind strict-read diagnostic correction; the nine focused error-handler tests
-and aggregate unit suite cover that correction. Independent seam review found no other ordering, dispatch, readiness or
-lease issue. Broader corrupt-state deletion guidance remains outside this card and is recorded in
-[a separate proposal](../../proposed/scoped_corrupt_state_recovery/card.md). Raw local logs are temporary; this
+Independent seam review found no remaining ordering, dispatch, readiness or lease issue. Broader corrupt-state recovery,
+including the shared reset command's existing malformed-supervisor traceback, remains outside this card and is recorded
+in [a separate proposal](../../proposed/scoped_corrupt_state_recovery/card.md). Raw local logs are temporary; this
 checklist retains their result summary and the checked-in tests reproduce the acceptance cases.
 
 ## Closeout after merge

@@ -116,6 +116,8 @@ def case(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> DerivationCase:
             {"memory": {"auto_update": {"min_turns": "bad"}}},
             "memory.auto_update.min_turns",
         ),
+        ({"policy": {"supervisor": "bad"}}, "policy.supervisor"),
+        ({"policy": {"supervisor": [1]}}, "policy.supervisor"),
         ({"launch": {"runtime": "codex"}}, "launch.runtime"),
         ({"launch": {"mode": "host", "model_route": None}}, "launch.model_route"),
         ({"authority": {"role": "producer"}}, "authority"),
@@ -596,3 +598,21 @@ def test_recovery_respects_real_supervisor_reset_limits(
     child = SessionStore(str(case.root), "child").read()
     assert child.intent.policy is not None and child.intent.policy.supervisor is None
     assert child.confirmed.consumer_lanes is None
+
+
+@pytest.mark.parametrize("operation", OPERATIONS)
+def test_malformed_supervisor_container_can_be_removed_before_derivation(case: DerivationCase, operation: str) -> None:
+    case.parent.intent.policy = PolicyIntent(supervisor=SupervisorConfig(resume_id="planner"))
+    case.publish()
+    before = case.replace_raw(overrides={"policy": {"supervisor": "bad"}})
+    index_before = case.manager.index_store.index_path.read_bytes()
+
+    with pytest.raises(ForgeSessionError, match="policy.supervisor") as refused:
+        case.derive(operation)
+
+    assert "forge policy supervisor remove --session parent" in str(refused.value)
+    assert "forge session reset" not in str(refused.value)
+    case.assert_no_child(before, index_before)
+    supervisor_remove(store=case.store, manifest=case.store.read())
+    child = case.derive(operation)
+    assert child.intent.policy is not None and child.intent.policy.supervisor is None

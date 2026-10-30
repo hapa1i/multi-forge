@@ -14,6 +14,10 @@ an unsupported schema version. Those directories also hold unrelated durable sta
   errors.
 - `src/forge/cli/session_derived_preflight.py` provides scoped repair/restoration guidance for derivation, including
   suppressing the embedded version-reset advice. Other callers retain the generic guidance.
+- `src/forge/core/ops/session.py`, `reset_session_overrides`, calls `snapshot_supervisor_options` before mutation. A
+  truthy scalar/list at `overrides.policy.supervisor` reaches `dacite.from_dict` in `policy/semantic/identity.py` and
+  raises an unclassified `AttributeError`. Derivation recovery handles this boundary, but the reset command still leaks
+  a traceback instead of its configured-supervisor removal or absent-baseline restoration guidance.
 
 ## Scope
 
@@ -21,6 +25,8 @@ Make recovery guidance reflect the affected resource. Durable session/configurat
 offer applicable repair, restoration or version-compatibility guidance. Preserve narrowly scoped reset advice for
 disposable runtime state where its owner establishes that rebuilding it is safe. Preserve retry/permissions guidance for
 unreadable files. Consolidate the derivation-specific workaround when the shared handler can express this contract.
+Classify malformed supervisor-container failures in the shared reset path without admitting a reset that currently
+violates supervisor transition rules.
 
 ## Acceptance
 
@@ -28,6 +34,8 @@ unreadable files. Consolidate the derivation-specific workaround when the shared
   unreadable state.
 - Diagnostics stay on stderr, preserve exception classifications and leave on-disk bytes unchanged.
 - Recovering one durable record never recommends deleting project/global roots.
+- Reset of a truthy scalar/list supervisor override produces an actionable refusal without a traceback or writes.
+  Preserve existing nullable/falsey behavior and native/frozen supervisor identity checks.
 - The user guide distinguishes restoration of durable records from rebuilding disposable runtime state.
 
 Automatic repair, new migrations, broader cleanup/deletion behavior and lifecycle admission changes are out of scope.

@@ -907,7 +907,7 @@ class TestSessionManagerDerivedOverrideValidation:
     """Persisted parent validation and inherited layers in the isolated runtime."""
 
     @pytest.mark.parametrize("operation", ["fork", "fresh", "relaunch"])
-    @pytest.mark.parametrize("invalid_path", ["verification", "runtime"])
+    @pytest.mark.parametrize("invalid_path", ["verification.bypass", "launch.runtime", "policy.supervisor"])
     def test_invalid_parent_never_publishes_child(
         self, manager_workspace: "WorktreeWorkspace", operation: str, invalid_path: str
     ) -> None:
@@ -929,8 +929,11 @@ publish_session(index, parent, root)
 store = SessionStore(str(root), 'parent')
 # Deliberately corrupt one override only after coherent publication.
 raw = json.loads(store.manifest_path.read_text())
-raw['overrides'] = ({'verification': {'bypass': 'bad'}} if invalid_path == 'verification'
-                    else {'launch': {'runtime': 'codex'}})
+raw['overrides'] = {
+    'verification.bypass': {'verification': {'bypass': 'bad'}},
+    'launch.runtime': {'launch': {'runtime': 'codex'}},
+    'policy.supervisor': {'policy': {'supervisor': 'bad'}},
+}[invalid_path]
 store.manifest_path.write_text(json.dumps(raw))
 before = store.manifest_path.read_bytes()
 index_before = index.index_path.read_bytes()
@@ -957,8 +960,7 @@ print(json.dumps({
         )
         assert result.ok, result.stderr
         assert result.data is not None
-        expected_path = "verification.bypass" if invalid_path == "verification" else "launch.runtime"
-        assert expected_path in result.data["error"]
+        assert invalid_path in result.data["error"]
         assert result.data["parent_unchanged"] and result.data["index_unchanged"]
         assert not result.data["child_exists"] and not result.data["transfer_exists"]
 

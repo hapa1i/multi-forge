@@ -111,6 +111,13 @@ def _reset_is_safe(state: SessionState, key: str | None) -> bool:
     candidate = deepcopy(state)
     try:
         old = snapshot_supervisor_options(candidate)
+    except AttributeError:
+        # Dacite expects an object at this snapshot boundary; a truthy scalar
+        # or list supervisor reaches data.keys() before its typed errors.
+        return False
+    except (dacite.DaciteError, TypeError, ValueError):
+        return False
+    try:
         if key is None:
             clear_overrides(candidate.overrides)
         elif not delete_override(candidate.overrides, key):
