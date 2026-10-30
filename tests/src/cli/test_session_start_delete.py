@@ -151,7 +151,7 @@ class TestSessionStart:
         result = runner.invoke(main, ["session", "start", "direct-default", "--no-launch"])
 
         assert result.exit_code == 0
-        assert "Routing: direct" in result.output
+        assert "Routing: direct" in result.stdout
 
         manager = SessionManager()
         manifest = manager.get_session_store("direct-default").read()
