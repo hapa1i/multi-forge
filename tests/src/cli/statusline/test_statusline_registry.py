@@ -245,11 +245,11 @@ def _manifest_with_proxy_cost_baseline(
 
 GOLDEN_MINIMAL = "\x1b[0m\x1b[32;1m/tmp/demo\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;75m[Opus\xa04.6]\x1b[0m\xa0\x1b[38;5;115m--------\xa012%/\x1b[1m200K\x1b[0m\x1b[0m\xa0\xa0\xa0\n"
 
-GOLDEN_FULL = "\x1b[0m\x1b[32;1m/tmp/demo\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;69m[Sonnet\xa04.6\xa0(1M)]\x1b[0m\xa0\x1b[38;5;179m###-----\xa047%/\x1b[1m1M\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;145m≈$0.42\x1b[0m\xa0\x1b[38;5;145m3m\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;28m+12\x1b[0m\x1b[90m/\x1b[0m\x1b[38;5;124m-3\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[2min:\x1b[0m\x1b[38;5;145m28.0K\x1b[0m\xa0\x1b[2mout:\x1b[0m\x1b[38;5;145m17.5K\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[94mTHINK\x1b[0m\x1b[0m\xa0\xa0\xa0\n"
+GOLDEN_FULL = "\x1b[0m\x1b[32;1m/tmp/demo\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;69m[Sonnet\xa04.6]\x1b[0m\xa0\x1b[38;5;179m###-----\xa047%/\x1b[1m1M\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;145m≈$0.42\x1b[0m\xa0\x1b[38;5;145m3m\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;28m+12\x1b[0m\x1b[90m/\x1b[0m\x1b[38;5;124m-3\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[2min:\x1b[0m\x1b[38;5;145m28.0K\x1b[0m\xa0\x1b[2mout:\x1b[0m\x1b[38;5;145m17.5K\x1b[0m\x1b[0m\xa0\xa0\xa0\n"
 
 GOLDEN_SESSION = "\x1b[0m\x1b[32;1m/tmp/demo\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;139mparent-sess\xa0>\xa0child-sess\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;75m[Opus\xa04.6]\x1b[0m\xa0\x1b[38;5;150m##------\xa030%/\x1b[1m200K\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0LOOP\xa03/50\xa0\x1b[90m|\x1b[0m\xa0SC\x1b[0m\xa0\xa0\xa0\n"
 
-GOLDEN_PROXY = "\x1b[0m\x1b[32;1m/tmp/demo\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;60mlitellm-openai\x1b[0m\xa0[\x1b[38;5;75mO:o3\x1b[0m\xa0\x1b[38;5;69mS:gpt-4o\x1b[0m\xa0\x1b[38;5;67mH:gpt-4o-mini\x1b[0m]\xa0\x1b[38;5;150m##------\xa031%/\x1b[1m128K\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;145m~$0.01\x1b[0m\x1b[0m\xa0\xa0\xa0\n"
+GOLDEN_PROXY = "\x1b[0m\x1b[32;1m/tmp/demo\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;60mlitellm-openai\x1b[0m\xa0[\x1b[38;5;75mO:o3\x1b[0m\xa0\x1b[38;5;69mS:gpt-4o@unknown\x1b[0m\xa0\x1b[38;5;67mH:gpt-4o-mini\x1b[0m]\xa0\x1b[38;5;150m##------\xa031%/\x1b[1m128K\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;145m~$0.01\x1b[0m\x1b[0m\xa0\xa0\xa0\n"
 
 
 class TestGoldenNoOpGuard:
@@ -479,6 +479,7 @@ class TestLazyContext:
         runtime = ProxyRuntimeTruth(
             {
                 "is_proxy": True,
+                "wire_shape": "openai_translated",
                 "runtime": {
                     "backend_id": "openrouter",
                     "active_tier": "sonnet",
@@ -524,6 +525,7 @@ class TestLazyContext:
         runtime = ProxyRuntimeTruth(
             {
                 "is_proxy": True,
+                "wire_shape": "openai_translated",
                 "runtime": {
                     "backend_id": "openrouter",
                     "active_tier": "sonnet",

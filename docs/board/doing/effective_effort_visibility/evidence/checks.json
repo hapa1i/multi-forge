@@ -1,0 +1,76 @@
+{
+  "date": "2026-10-30",
+  "python": "3.13.11",
+  "platform": "macOS arm64",
+  "local_logs_are_temporary": true,
+  "checks": [
+    {
+      "command": "make pre-commit",
+      "result": "passed",
+      "passed_tests": null,
+      "log_summary": [
+        "check for merge conflicts................................................Passed",
+        "trim trailing whitespace.................................................Passed",
+        "check yaml...............................................................Passed",
+        "check json...............................................................Passed",
+        "detect private key.......................................................Passed",
+        "pretty format json.......................................................Passed",
+        "check that scripts with shebangs are executable..........................Passed",
+        "fix end of files.........................................................Passed",
+        "check for added large files..............................................Passed",
+        "Detect hardcoded secrets.................................................Passed",
+        "isort....................................................................Passed",
+        "ruff (legacy alias)......................................................Passed",
+        "black....................................................................Passed",
+        "mypy.....................................................................Passed",
+        "pyright..................................................................Passed",
+        "repository file-size limits..............................................Passed",
+        "dependency pins..........................................................Passed",
+        "repository Markdown links................................................Passed",
+        "mdformat.................................................................Passed"
+      ],
+      "local_log": "pre-commit-final.log",
+      "local_log_sha256": "caf86003fb50766132d2e1d806f52b5c747041714fe9a5915d13f0d0a8859e9f"
+    },
+    {
+      "command": "make test-unit",
+      "result": "passed",
+      "passed_tests": 11418,
+      "log_summary": [
+        "11418 passed in 82.78s (0:01:22)"
+      ],
+      "local_log": "unit-final.log",
+      "local_log_sha256": "ecebb178cf668645200150dfcdefda2e588f4536d236a5f1ba5142376030843b"
+    },
+    {
+      "command": "make test-regression",
+      "result": "passed",
+      "passed_tests": 2234,
+      "log_summary": [
+        "2234 passed in 106.61s (0:01:46)"
+      ],
+      "local_log": "regression-final.log",
+      "local_log_sha256": "da5a52c7435f1e1fef14ee1667a335dffda9685b2445dccaf6abfb78f271e734"
+    },
+    {
+      "command": "./scripts/test-integration.sh tests/integration/proxy/test_effort_observation_e2e.py",
+      "result": "passed",
+      "passed_tests": 8,
+      "log_summary": [
+        "8 passed in 6.42s"
+      ],
+      "local_log": "proxy-integration-final.log",
+      "local_log_sha256": "c90e967153d1071cf29b50ffbc26248023201e9b0bccec6d3d5b51bf9bfbd6bc"
+    },
+    {
+      "command": "./scripts/test-integration.sh tests/integration/docker/test_session_routing.py tests/integration/sidecar/test_launch_headers.py",
+      "result": "passed",
+      "passed_tests": 4,
+      "log_summary": [
+        "4 passed in 31.93s"
+      ],
+      "local_log": "launch-integration-final.log",
+      "local_log_sha256": "ce7700e3a1eb164a446334c0194633b28ed3ff407070dfd0572d1b796a81f5b9"
+    }
+  ]
+}

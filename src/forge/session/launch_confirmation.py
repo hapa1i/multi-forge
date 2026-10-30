@@ -23,6 +23,7 @@ from urllib.request import urlopen
 
 from forge.core.reactive.env import InteractiveApiKeyDecision
 from forge.core.state import now_iso
+from forge.proxy.runtime_truth import ProxyRuntimeTruth
 from forge.session import SessionState, SessionStore
 from forge.session.exceptions import SessionFileNotFoundError
 
@@ -49,6 +50,7 @@ class ProxyCostBaseline:
 
     cost_micros: int | None
     started_at: str | None
+    runtime: ProxyRuntimeTruth | None = None
 
 
 def record_launch_confirmed(
@@ -125,16 +127,19 @@ def read_proxy_cost_baseline(base_url: str | None, *, timeout_s: float = 0.5) ->
 
     if not isinstance(raw, dict) or raw.get("is_proxy") is not True:
         return None
+    runtime = ProxyRuntimeTruth(raw)
     metrics = raw.get("metrics")
     costs = metrics.get("costs") if isinstance(metrics, dict) else None
     started_at = metrics.get("started_at") if isinstance(metrics, dict) else None
     started_at = started_at if isinstance(started_at, str) and started_at else None
     total_usd = costs.get("total_usd") if isinstance(costs, dict) else None
     if isinstance(total_usd, bool) or not isinstance(total_usd, (int, float)):
-        return ProxyCostBaseline(cost_micros=None, started_at=started_at)
+        return ProxyCostBaseline(cost_micros=None, started_at=started_at, runtime=runtime)
     if total_usd <= 0:
-        return ProxyCostBaseline(cost_micros=0, started_at=started_at)
-    return ProxyCostBaseline(cost_micros=int(round(float(total_usd) * _COST_MICROS_PER_USD)), started_at=started_at)
+        return ProxyCostBaseline(cost_micros=0, started_at=started_at, runtime=runtime)
+    return ProxyCostBaseline(
+        cost_micros=int(round(float(total_usd) * _COST_MICROS_PER_USD)), started_at=started_at, runtime=runtime
+    )
 
 
 def read_proxy_cost_baseline_micros(base_url: str | None, *, timeout_s: float = 0.5) -> int | None:

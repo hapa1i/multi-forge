@@ -16,13 +16,9 @@ from typing import Any, AsyncGenerator, Callable
 
 import httpx
 from openai import AsyncOpenAI
-from tenacity import (
-    retry,
-    retry_if_exception,
-    stop_after_attempt,
-    wait_exponential,
-)
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
+from forge.core.effort_observation import AppliedEffort
 from forge.core.models.catalog import get_model_spec, model_exists
 from forge.runtime_config import get_runtime_config
 
@@ -38,6 +34,7 @@ from ..types import (
     ToolCallDelta,
 )
 from .base import estimate_message_tokens, merge_hyperparams
+from .effort import applied_effort
 from .openai_compat import (
     ToolCallAccumulator,
     build_chat_completion_kwargs,
@@ -396,9 +393,11 @@ class LiteLLMClient:
         messages: list[Message],
         tools: list[dict[str, Any]] | None,
         hyperparams: ModelHyperparameters,
-    ) -> dict[str, Any]:
-        """Build kwargs for OpenAI chat completion request."""
+    ) -> tuple[dict[str, Any], AppliedEffort]:
+        """Build the Chat Completions request and report its final effort parameter."""
         kwargs = build_chat_completion_kwargs(self._model, messages, tools, hyperparams)
+        effort_wire = "reasoning_effort"
+        effort_dropped = False
 
         if self._model in ("gemini/gemini-4-argon", "vertex_ai/gemini-4-argon", "gemini-4-argon"):
             # LiteLLM 1.102 maps Argon's generic effort to unsupported token budgets.
@@ -413,17 +412,27 @@ class LiteLLMClient:
             kwargs.pop("thinkingConfig", None)
             extra_body["thinkingConfig"] = {"thinkingLevel": effort, "includeThoughts": True}
             kwargs["extra_body"] = extra_body
+            effort_wire = "thinkingConfig.thinkingLevel"
 
         # GPT-5 Chat Completions API doesn't support reasoning_effort with
-        # function tools. Runs AFTER extras merge so callers can't reintroduce it.
+        # function tools. SDK extra_body still takes precedence over these kwargs.
         if tools and "reasoning_effort" in kwargs and self._is_gpt5_model():
             dropped = kwargs.pop("reasoning_effort")
+            effort_dropped = True
             logger.warning(
                 f"Stripped reasoning_effort={dropped} - "
                 f"not supported with function tools on Chat Completions API for {self._model}"
             )
 
-        return kwargs
+        observation = applied_effort(kwargs, effort_wire)
+        final_extra_body = kwargs.get("extra_body")
+        if effort_dropped and not (isinstance(final_extra_body, dict) and "reasoning_effort" in final_extra_body):
+            observation = AppliedEffort(
+                applied=None,
+                wire="dropped",
+                note="GPT-5 Chat Completions drops reasoning_effort when function tools are present.",
+            )
+        return kwargs, observation
 
     async def _complete_with_responses_api(
         self,
@@ -432,6 +441,7 @@ class LiteLLMClient:
         hyperparams: ModelHyperparameters,
         tools: list[dict[str, Any]] | None = None,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> CompletionResponse:
         """Complete using the Responses API.
 
@@ -491,6 +501,8 @@ class LiteLLMClient:
 
         if on_provider_dispatch is not None:
             on_provider_dispatch()
+        if on_effort_applied is not None:
+            on_effort_applied(applied_effort(request_params, "reasoning.effort"))
         raw = await client.responses.with_raw_response.create(**request_params)
         completion = self._parse_responses_output(raw.parse(), self._model)
         return self._merge_response_metadata(completion, raw.headers)
@@ -508,6 +520,7 @@ class LiteLLMClient:
         tools: list[dict[str, Any]] | None,
         merged_params: ModelHyperparameters,
         on_provider_dispatch: Callable[[], None] | None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> CompletionResponse:
         """Make the completion request with retry logic.
 
@@ -522,9 +535,10 @@ class LiteLLMClient:
                 merged_params,
                 tools=tools,
                 on_provider_dispatch=on_provider_dispatch,
+                on_effort_applied=on_effort_applied,
             )
 
-        kwargs = self._build_request_kwargs(messages, tools, merged_params)
+        kwargs, effort = self._build_request_kwargs(messages, tools, merged_params)
         if self._model == "vertex_ai/gemini-4-argon":
             # Vertex generateContent allows 32K per hop; the catalog's 64K limit
             # applies to streamGenerateContent and the other Argon providers.
@@ -542,6 +556,8 @@ class LiteLLMClient:
         # .create() drops; .parse() returns the same ChatCompletion model.
         if on_provider_dispatch is not None:
             on_provider_dispatch()
+        if on_effort_applied is not None:
+            on_effort_applied(effort)
         raw = await client.chat.completions.with_raw_response.create(**kwargs)
         completion = self._openai_to_completion(raw.parse())
         return self._merge_response_metadata(completion, raw.headers)
@@ -553,6 +569,7 @@ class LiteLLMClient:
         tools: list[dict[str, Any]] | None = None,
         hyperparams: ModelHyperparameters | None = None,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> CompletionResponse:
         """Non-streaming completion.
 
@@ -563,6 +580,7 @@ class LiteLLMClient:
             tools: Optional list of tool definitions.
             hyperparams: Optional hyperparameters to override defaults.
             on_provider_dispatch: Optional callback fired immediately before provider I/O.
+            on_effort_applied: Optional callback describing the final outbound effort before provider I/O.
 
         Returns:
             CompletionResponse with text, optional tool_calls, and usage.
@@ -581,6 +599,7 @@ class LiteLLMClient:
                 tools,
                 merged_params,
                 on_provider_dispatch,
+                on_effort_applied=on_effort_applied,
             )
         except (ProviderError, AuthenticationError):
             # Already wrapped, re-raise as-is
@@ -615,6 +634,7 @@ class LiteLLMClient:
         tools: list[dict[str, Any]] | None = None,
         hyperparams: ModelHyperparameters | None = None,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Streaming completion.
 
@@ -628,6 +648,7 @@ class LiteLLMClient:
             tools: Optional list of tool definitions.
             hyperparams: Optional hyperparameters to override defaults.
             on_provider_dispatch: Optional callback fired immediately before provider I/O.
+            on_effort_applied: Optional callback describing the final outbound effort before provider I/O.
 
         Yields:
             StreamEvent objects (text_delta, tool_call_delta, response_end, usage, error).
@@ -647,6 +668,7 @@ class LiteLLMClient:
                     merged_params,
                     tools=tools,
                     on_provider_dispatch=on_provider_dispatch,
+                    on_effort_applied=on_effort_applied,
                 )
 
                 # Carry the provider_meta computed by _complete_with_responses_api onto the
@@ -701,12 +723,14 @@ class LiteLLMClient:
         finish_reason: str | None = None
 
         try:
-            kwargs = self._build_request_kwargs(messages, tools, merged_params)
+            kwargs, effort = self._build_request_kwargs(messages, tools, merged_params)
             kwargs["stream"] = True
             kwargs["stream_options"] = {"include_usage": True}
 
             if on_provider_dispatch is not None:
                 on_provider_dispatch()
+            if on_effort_applied is not None:
+                on_effort_applied(effort)
             stream = await client.chat.completions.create(**kwargs)
 
             async for chunk in stream:

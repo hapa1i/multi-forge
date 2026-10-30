@@ -79,7 +79,9 @@ def status_line() -> None:
     logger.debug("status-line: required sources=%s", sorted(source.value for source in plan.sources))
 
     if StatusSource.PROXY in plan.sources:
-        is_proxy, runtime, is_proxy_authoritative = status_sources.detect_proxy()
+        is_proxy, runtime, is_proxy_authoritative = status_sources.detect_proxy(
+            include_effort=any(segment.name == "model" for segment in plan.segments)
+        )
     else:
         is_proxy, runtime, is_proxy_authoritative = False, None, False
 

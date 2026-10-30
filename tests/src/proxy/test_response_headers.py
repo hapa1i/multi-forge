@@ -27,6 +27,7 @@ def test_relay_response_headers_strips_fixed_and_connection_nominated_fields() -
         "X-Resolved-Model": "upstream-model",
         "X-Cumulative-Cost": "999.99",
         "X-Forge-Session": "upstream-session",
+        "X-Forge-Launch": "run_aaaaaaaaaaaa",
     }
 
     assert relay_response_headers(upstream, "forge-id") == {

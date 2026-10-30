@@ -72,7 +72,11 @@ def checked_launch_args(
         print_error("--effort and runtime arguments after '--' apply only to a launch; drop them or --no-launch")
         sys.exit(1)
     try:
-        return validate_launch_args(args, runtime=runtime, advisory=authority is not None and authority.is_advisory)
+        return validate_launch_args(
+            args,
+            runtime=runtime,
+            advisory=authority is not None and authority.is_advisory,
+        )
     except LaunchArgsError as e:
         print_error(str(e))
         sys.exit(1)

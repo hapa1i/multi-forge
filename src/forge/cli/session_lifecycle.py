@@ -106,6 +106,7 @@ from forge.session.transfer import ResumeStrategy, parse_lineage_depth
 
 session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
 
+from forge.cli import session_effort_hint as effort_hint  # noqa: E402
 from forge.cli.session_authority_options import (  # noqa: E402
     authority_creation_options,
     parse_creation_authority,
@@ -618,6 +619,9 @@ class _ClaudeStartCliPresenter:
     def before_launch(self, forge_root: Path) -> None:
         _warn_before_claude_launch(forge_root)
 
+    def on_launch_ready(self, event: effort_hint.ClaudeLaunchReady) -> None:
+        effort_hint.print_derived_effort_hint(event)
+
     def on_routing_payload(self, payload: dict[str, Any]) -> None:
         _render_model_route_payload(payload)
 
@@ -689,6 +693,9 @@ class _ClaudeResumeCliPresenter:
 
     def before_launch(self, forge_root: Path) -> None:
         _warn_before_claude_launch(forge_root)
+
+    def on_launch_ready(self, event: effort_hint.ClaudeLaunchReady) -> None:
+        effort_hint.print_derived_effort_hint(event)
 
     def on_routing_payload(self, payload: dict[str, Any]) -> None:
         _render_model_route_payload(payload)

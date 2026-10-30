@@ -122,7 +122,6 @@ def _install_message_stubs(
     )
     monkeypatch.setattr(server.client_factory, "get_client", get_client)
     monkeypatch.setattr(server, "convert_anthropic_to_openai", _convert)
-    monkeypatch.setattr(server, "resolve_reasoning_effort", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(server, "_check_client_tool_failures", _no_op_async)
     monkeypatch.setattr(server, "_inject_provider_user_enabled", lambda: False)
     monkeypatch.setattr(server, "_provider_user_value", lambda **_kwargs: None)

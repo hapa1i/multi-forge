@@ -8,6 +8,7 @@ from typing import Any
 
 import click
 from rich.table import Table
+from rich.text import Text
 
 from forge.cli.output import err_console, print_error
 from forge.cli.session import console
@@ -45,7 +46,7 @@ def show_cmd(session_name: str | None, as_json: bool) -> None:
     table.add_column("Field", style="bold")
     table.add_column("Value")
     for field, value in session_model_summary_rows(payload):
-        table.add_row(field, value)
+        table.add_row(field, Text(value))
     console.print(table)
     console.print("\n[bold]Limitations[/bold]")
     for limitation in payload["limitations"]:
@@ -100,14 +101,65 @@ def session_model_summary_rows(payload: dict[str, Any]) -> list[tuple[str, str]]
         ("Runtime", payload["runtime"]),
         ("Active", "yes" if payload["active"] else "no"),
         ("Intent", payload["route_intent"]["kind"]),
-        ("Committed route", commit["kind"] if commit and commit["kind"] else "unavailable"),
+        (
+            "Committed route",
+            commit["kind"] if commit and commit["kind"] else "unavailable",
+        ),
         ("Route evidence", commit["evidence_source"] if commit else "none"),
         ("History", payload["history_status"] or "no claim"),
         ("Live proxy", live["evidence_source"]),
         ("Default tier", live["default_tier"] or "-"),
         ("Launch marking entries", str(len(payload["marking"]["launch_entries"]))),
         ("Live marking entries", str(len(payload["marking"]["live_proxy_entries"]))),
+        *_effort_summary_rows(payload["effort"]),
     ]
+
+
+def _effort_summary_rows(effort: dict[str, Any]) -> list[tuple[str, str]]:
+    if effort["status"] != "observed":
+        reason = str(effort["reason"] or "unavailable").replace("_", " ")
+        return [("Effort", f"unknown ({reason})")]
+
+    rows = [
+        ("Effort launch", effort["launch_id"]),
+        ("Effort backend", effort["backend_id"] or "unknown"),
+    ]
+    for tier in ("opus", "sonnet", "haiku"):
+        record = effort["observations"].get(tier)
+        if record is None:
+            continue
+        label = tier.capitalize()
+        opt_in = "yes" if record["opt_in"] else "no"
+        applicable = "yes" if record["client_applicable"] else "no"
+        used = "yes" if record["source"] == "client" else "no"
+        supported = ", ".join(record["supported"]) if record["supported"] is not None else "not catalogued"
+        applied = "dropped" if record["wire"] == "dropped" else record["applied"] or "unset"
+        rows.extend(
+            [
+                (f"{label} effort", applied),
+                (f"{label} requested", record["requested"] or "unset"),
+                (
+                    f"{label} client effort",
+                    f"opt-in: {opt_in}; applicable: {applicable}; used: {used}",
+                ),
+                (f"{label} thinking", record["thinking"] or "unset"),
+                (f"{label} derived", record["derived"] or "unset"),
+                (f"{label} minimum", record["floor"] or "unset"),
+                (f"{label} pre-clamp", record["pre_clamp"] or "unset"),
+                (f"{label} supported", supported),
+                (
+                    f"{label} resolved",
+                    f"{record['resolved'] or 'unset'} ({record['source']})",
+                ),
+                (f"{label} tier source", record["tier_source"]),
+                (f"{label} model", record["mapped_model"]),
+                (f"{label} wire", record["wire"] or "unset"),
+                (f"{label} observed", record["observed_at"]),
+            ]
+        )
+        if record["note"]:
+            rows.append((f"{label} note", record["note"]))
+    return rows
 
 
 def _model_slot_summary(snapshots: object) -> str:

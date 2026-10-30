@@ -1324,16 +1324,16 @@ class TestGetLineChangeValues:
 
 
 class TestFormatModelLabel:
-    """Tests for model label cleanup and context suffixing."""
+    """Tests for model labels without duplicate context sizes."""
 
     def test_default_context_has_no_suffix(self):
-        assert format_model_label("Opus 4.6", 200_000) == "Opus 4.6"
+        assert format_model_label("Opus 4.6") == "Opus 4.6"
 
-    def test_large_context_adds_suffix(self):
-        assert format_model_label("Opus 4.6", 1_000_000) == "Opus 4.6 (1M)"
+    def test_strips_context_size_suffix(self):
+        assert format_model_label("Opus 4.6 (1M)") == "Opus 4.6"
 
-    def test_strips_redundant_context_suffix_before_adding_new_one(self):
-        assert format_model_label("Opus 4.6 (200k context)", 1_000_000) == "Opus 4.6 (1M)"
+    def test_strips_context_description(self):
+        assert format_model_label("Opus 4.6 (200k context)") == "Opus 4.6"
 
 
 class TestParseContextFromJson:
@@ -1571,16 +1571,19 @@ class TestOutputHardening:
         )
         runner = CliRunner()
         with (
-            patch("forge.cli.statusline.sources.detect_proxy", return_value=(False, None, False)),
+            patch(
+                "forge.cli.statusline.sources.detect_proxy",
+                return_value=(False, None, False),
+            ),
             patch("forge.cli.status_line._get_terminal_width", return_value=200),
         ):
             result = runner.invoke(status_line, input=input_json)
         assert result.exit_code == 0
 
         raw_output = result.output.replace("\u00a0", " ")
-        assert "\033[38;5;75m[Opus 4.6 (1M)]\033[0m" in raw_output
+        assert "\033[38;5;75m[Opus 4.6]\033[0m" in raw_output
         visible = _ANSI_RE.sub("", result.output).replace("\u00a0", " ")
-        assert "[Opus 4.6 (1M)]" in visible
+        assert "[Opus 4.6]" in visible
         assert "12%/1M" in visible
         assert "+12/-3" in visible
         assert "in:28.0K out:17.5K" in visible

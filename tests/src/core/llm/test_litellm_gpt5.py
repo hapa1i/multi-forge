@@ -577,9 +577,11 @@ class TestBuildRequestKwargsSafetyNet:
         tools = [{"type": "function", "function": {"name": "test", "parameters": {}}}]
         params = ModelHyperparameters(reasoning_effort="high")
 
-        kwargs = client._build_request_kwargs(messages, tools, params)
+        kwargs, observation = client._build_request_kwargs(messages, tools, params)
 
         assert "reasoning_effort" not in kwargs
+        assert observation.wire == "dropped"
+        assert observation.applied is None
         assert "tools" in kwargs
 
     def test_non_gpt5_keeps_reasoning_effort_with_tools(self):
@@ -589,9 +591,11 @@ class TestBuildRequestKwargsSafetyNet:
         tools = [{"type": "function", "function": {"name": "test", "parameters": {}}}]
         params = ModelHyperparameters(reasoning_effort="high")
 
-        kwargs = client._build_request_kwargs(messages, tools, params)
+        kwargs, observation = client._build_request_kwargs(messages, tools, params)
 
         assert kwargs["reasoning_effort"] == "high"
+        assert observation.wire == "reasoning_effort"
+        assert observation.applied == "high"
 
     def test_gpt5_keeps_reasoning_effort_without_tools(self):
         """GPT-5 without tools keeps reasoning_effort (Chat Completions fallback)."""
@@ -599,9 +603,11 @@ class TestBuildRequestKwargsSafetyNet:
         messages = [Message(role="user", content="test")]
         params = ModelHyperparameters(reasoning_effort="high")
 
-        kwargs = client._build_request_kwargs(messages, None, params)
+        kwargs, observation = client._build_request_kwargs(messages, None, params)
 
         assert kwargs["reasoning_effort"] == "high"
+        assert observation.wire == "reasoning_effort"
+        assert observation.applied == "high"
 
     def test_gpt5_extras_cannot_reintroduce_reasoning_effort(self):
         """Extras merged before safety net can't reintroduce reasoning_effort."""
@@ -613,9 +619,11 @@ class TestBuildRequestKwargsSafetyNet:
             extra={"openai": {"reasoning_effort": "medium"}},
         )
 
-        kwargs = client._build_request_kwargs(messages, tools, params)
+        kwargs, observation = client._build_request_kwargs(messages, tools, params)
 
         assert "reasoning_effort" not in kwargs
+        assert observation.wire == "dropped"
+        assert observation.applied is None
 
 
 class TestRetryExclusion:

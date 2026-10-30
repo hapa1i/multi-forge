@@ -3,7 +3,7 @@
 Covers derive_reasoning_effort (thinking config -> effort string),
 max_effort (effort comparison for tier override floor), and the
 model-aware normalization (supported_efforts_for_model,
-clamp_effort_to_supported, resolve_reasoning_effort).
+clamp_effort_to_supported, resolve_reasoning_effort_record).
 """
 
 from types import SimpleNamespace
@@ -17,7 +17,7 @@ from forge.proxy.reasoning import (
     clamp_effort_to_supported,
     derive_reasoning_effort,
     max_effort,
-    resolve_reasoning_effort,
+    resolve_reasoning_effort_record,
     supported_efforts_for_model,
 )
 
@@ -198,22 +198,22 @@ class TestResolveReasoningEffort:
         return SimpleNamespace(reasoning_effort=reasoning_effort, thinking=thinking)
 
     def test_explicit_supported_passes_through(self):
-        result = resolve_reasoning_effort(
+        result = resolve_reasoning_effort_record(
             self._request(reasoning_effort="high"),
             tier_override=None,
             model_id="gemini/gemini-3.5-flash",
             request_id="req-1",
-        )
+        ).resolved
         assert result == "high"
 
     def test_explicit_unsupported_rejected_with_supported_list(self):
         with pytest.raises(HTTPException) as exc_info:
-            resolve_reasoning_effort(
+            resolve_reasoning_effort_record(
                 self._request(reasoning_effort="xhigh"),
                 tier_override=None,
                 model_id="gemini/gemini-3.5-flash",
                 request_id="req-1",
-            )
+            ).resolved
         assert exc_info.value.status_code == 400
         assert isinstance(exc_info.value.detail, dict)
         detail = cast("dict[str, str]", exc_info.value.detail)
@@ -222,69 +222,69 @@ class TestResolveReasoningEffort:
         assert "none, disable, minimal, low, medium, high" in detail["message"]
 
     def test_explicit_for_uncataloged_model_passes_through(self):
-        result = resolve_reasoning_effort(
+        result = resolve_reasoning_effort_record(
             self._request(reasoning_effort="xhigh"),
             tier_override=None,
             model_id="someorg/unlisted-model",
             request_id="req-1",
-        )
+        ).resolved
         assert result == "xhigh"
 
     def test_derived_budget_clamps_to_model_ceiling(self):
         """A 30k thinking budget derives xhigh; gemini-3.5-flash tops at high."""
-        result = resolve_reasoning_effort(
+        result = resolve_reasoning_effort_record(
             self._request(thinking={"budget_tokens": 30_000}),
             tier_override=None,
             model_id="gemini/gemini-3.5-flash",
             request_id="req-1",
-        )
+        ).resolved
         assert result == "high"
 
     def test_tier_floor_result_clamps_to_model_ceiling(self):
         """The tier-override floor is applied first, then the model clamp."""
-        result = resolve_reasoning_effort(
+        result = resolve_reasoning_effort_record(
             self._request(thinking={"budget_tokens": 3_000}),  # derives medium
             tier_override=TierOverride(reasoning_effort="xhigh"),
             model_id="gemini/gemini-3.5-flash",
             request_id="req-1",
-        )
+        ).resolved
         assert result == "high"
 
     def test_glm_53_max_tier_floor_uses_provider_max_label(self):
-        result = resolve_reasoning_effort(
+        result = resolve_reasoning_effort_record(
             self._request(thinking={"budget_tokens": 30_000}),
             tier_override=TierOverride(reasoning_effort="max"),
             model_id="z-ai/glm-5.3",
             request_id="req-1",
-        )
+        ).resolved
         assert result == "max"
 
     def test_derived_for_uncataloged_model_not_clamped(self):
-        result = resolve_reasoning_effort(
+        result = resolve_reasoning_effort_record(
             self._request(thinking={"budget_tokens": 30_000}),
             tier_override=None,
             model_id="someorg/unlisted-model",
             request_id="req-1",
-        )
+        ).resolved
         assert result == "xhigh"
 
     def test_no_sources_returns_none(self):
-        result = resolve_reasoning_effort(
+        result = resolve_reasoning_effort_record(
             self._request(),
             tier_override=None,
             model_id="gemini/gemini-3.5-flash",
             request_id="req-1",
-        )
+        ).resolved
         assert result is None
 
     def test_missing_stub_fields_returns_none(self):
         """Request stubs without the new fields resolve to None (getattr path)."""
-        result = resolve_reasoning_effort(
+        result = resolve_reasoning_effort_record(
             SimpleNamespace(),
             tier_override=None,
             model_id="gemini/gemini-3.5-flash",
             request_id="req-1",
-        )
+        ).resolved
         assert result is None
 
 
@@ -301,14 +301,21 @@ class TestClientEffortOptIn:
             output_config={"effort": effort},
         )
 
-    def _resolve(self, request: object, *, honor: bool, floor: str | None = "high", model: str = "openai/gpt-6-astra"):
-        return resolve_reasoning_effort(
+    def _resolve(
+        self,
+        request: object,
+        *,
+        honor: bool,
+        floor: str | None = "high",
+        model: str = "openai/gpt-6-astra",
+    ):
+        return resolve_reasoning_effort_record(
             request,
             tier_override=TierOverride(reasoning_effort=floor) if floor is not None else None,
             model_id=model,
             request_id="req-1",
             honor_client_effort=honor,
-        )
+        ).resolved
 
     def test_without_opt_in_client_effort_is_ignored(self):
         # adaptive -> medium, floored to the tier's high: the established behavior.

@@ -99,6 +99,7 @@ def _assert_stable_report_shape(payload: dict[str, object]) -> None:
         "current_request_source",
         "history_status",
         "marking",
+        "effort",
         "limitations",
     ]
     intent = payload["route_intent"]
@@ -173,6 +174,15 @@ def _assert_stable_report_shape(payload: dict[str, object]) -> None:
             "evidence_source",
             "declaration",
         ]
+    effort = payload["effort"]
+    assert isinstance(effort, dict)
+    assert list(effort) == [
+        "status",
+        "reason",
+        "launch_id",
+        "backend_id",
+        "observations",
+    ]
 
 
 def test_no_route_evidence_uses_stable_null_and_empty_shapes(project: Path) -> None:
@@ -198,7 +208,9 @@ def test_no_route_evidence_uses_stable_null_and_empty_shapes(project: Path) -> N
     assert payload["marking"]["provider_declared"] is True
 
 
-def test_model_first_route_reports_the_requested_model_from_launch_intent(project: Path) -> None:
+def test_model_first_route_reports_the_requested_model_from_launch_intent(
+    project: Path,
+) -> None:
     store = _publish(project, proxy=True)
     state = store.read()
     assert state.intent.launch is not None
@@ -225,7 +237,9 @@ def test_model_first_route_reports_the_requested_model_from_launch_intent(projec
     }
 
 
-def test_model_first_route_reports_removed_requested_model_verbatim(project: Path) -> None:
+def test_model_first_route_reports_removed_requested_model_verbatim(
+    project: Path,
+) -> None:
     store = _publish(project, proxy=True)
     state = store.read()
     assert state.intent.launch is not None
@@ -654,3 +668,164 @@ def test_history_wrapper_returns_full_events_in_append_order(project: Path) -> N
         "reason_code",
         "payload",
     }
+
+
+def _effort_observation() -> dict[str, object]:
+    return {
+        "tier": "opus",
+        "tier_source": "header",
+        "client_model": "gemini-4-argon",
+        "mapped_model": "gemini/gemini-4-argon",
+        "requested": "max",
+        "thinking": "between_tools",
+        "opt_in": True,
+        "client_applicable": False,
+        "derived": "none",
+        "floor": "high",
+        "pre_clamp": "high",
+        "supported": ["low", "medium", "high"],
+        "resolved": "high",
+        "source": "floor",
+        "applied": "high",
+        "wire": "thinkingConfig.thinkingLevel",
+        "note": None,
+        "observed_at": "2026-10-30T12:00:00Z",
+    }
+
+
+def _effort_runtime(observations: dict[str, object] | None) -> ProxyRuntimeTruth:
+    runtime: dict[str, object] = {
+        "backend_id": "openrouter",
+        "active_tier": "sonnet",
+        "tier_mappings": {"opus": "gemini/gemini-4-argon"},
+        "model_alternatives": {},
+    }
+    if observations is not None:
+        runtime["effort"] = observations
+    return ProxyRuntimeTruth(
+        {
+            "is_proxy": True,
+            "wire_shape": "openai_translated",
+            "proxy": {"proxy_id": "p1", "template": "openrouter-anthropic"},
+            "runtime": runtime,
+        }
+    )
+
+
+def test_effort_uses_unmarked_routing_commit_and_resets_for_next_launch(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _publish(project, proxy=True)
+    monkeypatch.setattr("forge.core.ops.session_routing.load_config", lambda **_kwargs: _proxy_config())
+    seen: list[str | None] = []
+    records: dict[str, object] = {"opus": _effort_observation()}
+
+    def probe(_url: str | None, **kwargs: object) -> ProxyRuntimeTruth:
+        launch_id = kwargs.get("launch_id")
+        assert launch_id is None or isinstance(launch_id, str)
+        seen.append(launch_id)
+        return _effort_runtime(records)
+
+    monkeypatch.setattr(ops, "_probe_proxy_runtime", probe)
+    for operation in ("start", "resume"):
+        state = store.read()
+        identity = new_root_run_identity()
+        commit_launch_routing(
+            store=store,
+            state=state,
+            root=identity,
+            operation=operation,
+            payload=build_claude_routing_payload(
+                state,
+                effective_template="openrouter-anthropic",
+                runtime_base_url="http://127.0.0.1:8999",
+                proxy_id="p1",
+            ),
+            authority_attempt=None,
+        )
+        report = ops.get_session_model_report(ctx=ExecutionContext.from_cwd(), session_name="planner").to_dict()
+        effort = report["effort"]
+        assert report["route_commit"]["evidence_source"] == "route_commit"
+        assert effort["launch_id"] == identity.run_id
+        assert seen[-1] == identity.run_id
+        assert effort["observations"] == records
+        assert effort["status"] == ("observed" if operation == "start" else "unknown")
+        if operation == "resume":
+            assert effort["reason"] == "no_observation_for_launch"
+        records = {}
+    assert len(seen) == 2 and seen[0] != seen[1]
+
+
+@pytest.mark.parametrize("evidence", ["unproven_projection", "legacy_confirmed_launch"])
+def test_unproven_effort_never_uses_launch_pointer_or_returned_observations(
+    project: Path, monkeypatch: pytest.MonkeyPatch, evidence: str
+) -> None:
+    store = _publish(project, proxy=True)
+    state = store.read()
+    if evidence == "unproven_projection":
+        state.confirmed.route_commit = RouteCommitConfirmed(
+            event_id="sevt_0123456789abcdef0123456789abcdef", run_id="run_0123456789ab"
+        )
+    else:
+        state.confirmed.launch = LaunchConfirmed(routing_mode="proxy", proxy_id="p1", base_url="http://127.0.0.1:8999")
+    store.write(state)
+    scoped_queries: list[object] = []
+
+    def probe(_url: str | None, **kwargs: object) -> ProxyRuntimeTruth:
+        scoped_queries.append(kwargs.get("launch_id"))
+        return _effort_runtime({"opus": _effort_observation()})
+
+    monkeypatch.setattr(ops, "_probe_proxy_runtime", probe)
+    report = ops.get_session_model_report(ctx=ExecutionContext.from_cwd(), session_name="planner").to_dict()
+
+    assert scoped_queries == [None]  # Ordinary live-route inspection has no launch observation scope.
+    assert report["effort"] == {
+        "status": "unknown",
+        "reason": evidence,
+        "launch_id": None,
+        "backend_id": None,
+        "observations": {},
+    }
+
+
+@pytest.mark.parametrize(
+    ("runtime", "reason"),
+    [
+        (None, "proxy_unavailable"),
+        (_effort_runtime(None), "proxy_effort_unavailable"),
+        (_effort_runtime({}), "no_observation_for_launch"),
+    ],
+)
+def test_effort_unknown_distinguishes_unreachable_old_and_empty_proxy(
+    runtime: ProxyRuntimeTruth | None, reason: str
+) -> None:
+    commit = {
+        "evidence_source": "route_commit",
+        "kind": "proxy",
+        "run_id": "run_0123456789ab",
+    }
+    assert ops._effort_report(commit, runtime)["reason"] == reason
+
+
+@pytest.mark.parametrize("launch_id", [None, "run_0123456789ab", "invalid?other=launch"])
+def test_runtime_probe_scopes_only_valid_launch_query(monkeypatch: pytest.MonkeyPatch, launch_id: str | None) -> None:
+    from contextlib import nullcontext
+
+    import httpx
+
+    queries: list[str] = []
+
+    def get(url: str) -> SimpleNamespace:
+        queries.append(url)
+        return SimpleNamespace(status_code=200, json=lambda: _effort_runtime({}).raw)
+
+    monkeypatch.setattr(httpx, "Client", lambda **_kwargs: nullcontext(SimpleNamespace(get=get)))
+    runtime = ops._probe_proxy_runtime(
+        "http://127.0.0.1:8999/v1",
+        expected_proxy_id="p1",
+        expected_template="openrouter-anthropic",
+        launch_id=launch_id,
+    )
+    assert runtime is not None
+    suffix = "?forge_launch=run_0123456789ab" if launch_id == "run_0123456789ab" else ""
+    assert queries == [f"http://127.0.0.1:8999/{suffix}"]

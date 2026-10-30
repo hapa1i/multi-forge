@@ -40,9 +40,7 @@ class Palette:
     line_remove: str
     tier_haiku: str
     tier_sonnet: str
-    tier_sonnet_deep: str
     tier_opus: str
-    tier_opus_deep: str
     ctx_low: str
     ctx_med: str
     ctx_high: str
@@ -63,9 +61,7 @@ DEFAULT_PALETTE = Palette(
     line_remove=fmt.LINE_REMOVE_COLOR,
     tier_haiku=fmt.TIER_HAIKU,
     tier_sonnet=fmt.TIER_SONNET,
-    tier_sonnet_deep=fmt.TIER_SONNET_DEEP,
     tier_opus=fmt.TIER_OPUS,
-    tier_opus_deep=fmt.TIER_OPUS_DEEP,
     ctx_low=fmt.CTX_LOW,
     ctx_med=fmt.CTX_MED,
     ctx_high=fmt.CTX_HIGH,
@@ -74,7 +70,7 @@ DEFAULT_PALETTE = Palette(
 )
 
 # "Sage & clay" earth tones: moss/sage/clay/stone/ochre, tiers in a green-family
-# shaded by context size. Context gradient nudged warmer at the low end.
+# shaded by tier. Context gradient nudged warmer at the low end.
 EARTHY_PALETTE = Palette(
     path="\033[1;38;5;65m",  # bold moss
     branch="\033[38;5;108m",  # sage
@@ -86,9 +82,7 @@ EARTHY_PALETTE = Palette(
     line_remove="\033[38;5;167m",  # clay-red
     tier_haiku="\033[38;5;108m",  # sage
     tier_sonnet="\033[38;5;72m",  # teal-sage
-    tier_sonnet_deep="\033[38;5;66m",  # deep teal-sage
     tier_opus="\033[38;5;65m",  # moss
-    tier_opus_deep="\033[38;5;23m",  # deep moss
     ctx_low="\033[38;5;151m",  # pale sage
     ctx_med="\033[38;5;108m",  # sage
     ctx_high="\033[38;5;179m",  # ochre (== default)

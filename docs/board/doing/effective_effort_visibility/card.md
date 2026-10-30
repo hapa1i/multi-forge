@@ -1,6 +1,8 @@
 # Show the effective reasoning effort
 
-**Lane:** `todo/` -- accepted on 2026-10-29; parked until execution starts.
+**Lane:** `doing/` -- started on 2026-10-30 on `codex/effective-effort-visibility`, based on `d32e7b1d`.
+
+**Execution:** [Checklist](checklist.md).
 
 **Origin:** Owner request on 2026-10-29. The effort a session actually runs at is hard to see, and on proxied routes it
 can differ from Claude Code's own setting without any visible signal. Research used Claude Code 2.1.312 and the current
@@ -27,7 +29,7 @@ names are calibrated per model, so `high` on GPT-6 Astra and `high` on Opus 5.5 
 
 Concrete confusions this card addresses:
 
-- **Translated routes ignore `/effort`.** Without launch `--effort`, `resolve_reasoning_effort` uses
+- **Translated routes ignore `/effort`.** Without launch `--effort`, `resolve_reasoning_effort_record` uses
   `max(thinking-derived, tier floor)`. Adaptive thinking derives `medium`, so a mid-session `/effort xhigh` changes
   nothing upstream, and nothing says so.
 - **Silent drops.** `LiteLLMClient._build_request_kwargs` strips `reasoning_effort` for GPT-5 Chat Completions requests
@@ -41,8 +43,10 @@ bar that already ends in `47%/1M`, and `tier_color` encodes extended context a t
 ## Evidence
 
 - **Status-line stdin:** documented `effort.level` (`low`..`max`; live, including mid-session `/effort`; absent when the
-  model does not support effort), `thinking.enabled` and `fast_mode`. Whether stdin reports the configured or the
-  clamped level is not documented.
+  model does not support effort), `thinking.enabled` and `fast_mode`. The
+  [current documentation](https://code.claude.com/docs/en/statusline#available-data), rechecked on 2026-10-30, specifies
+  the substituted supported level, except that `CLAUDE_CODE_EFFORT_LEVEL` is shown directly. This clarifies the original
+  research, which could not establish configured-versus-clamped semantics.
 - **Transcripts:** assistant entries carry undocumented `effort` and `perTurnEffort` fields in every local 2.1.281 to
   2.1.312 sample. Observed pairs include `(None, "max")` and `("xhigh", None)`, consistent with per-turn changes.
 - **Session correlation:** interactive launches send no session or run identity to the proxy. `invoke.py` builds their
@@ -73,13 +77,18 @@ bar that already ends in `47%/1M`, and `tier_color` encodes extended context a t
 - Leave proxied rendering unchanged in this phase. Echoing Claude's level there would be wrong on translated routes.
 
 **Launch hint.** A managed Claude launch (`session start|resume|fork|incognito`) on a Forge proxy whose wire shape is
-not `anthropic_passthrough`, without `--effort`, prints one stderr line before Claude starts. Every other wire shape,
-including the `codex-responses-local` Messages ingress, resolves effort through `resolve_reasoning_effort` and ignores
-Claude's level without the opt-in. The line says the route derives effort from thinking and the tier minimum, names the
-selected tier's configured minimum when `GET /` reports one, and offers `--effort <level>` on the same lifecycle
-command. It goes through the `forge.cli.output` recovery helpers and never into JSON output. Direct, passthrough,
-`--no-launch` and bare `forge claude start` launches print nothing. Bare launch has no `--effort`, and the CLI style
-contract forbids recovery commands that do not apply. Launches whose wire shape Forge cannot confirm also print nothing.
+not `anthropic_passthrough`, without `--effort`, prints one stderr tip block before Claude starts. Every other wire
+shape, including the `codex-responses-local` Messages ingress, resolves effort through `resolve_reasoning_effort_record`
+and ignores Claude's level without the opt-in. The tip says the route derives effort from thinking and the tier minimum
+and names configured minimums from the existing launch-time proxy snapshot, without another network request. It offers
+`forge session resume <actual-session> --effort <level>` in the recovery helper's `commands=[...]` block. For `start`,
+`fork` and `resume --fresh`, this targets the session just created; it must not repeat a creation command or create
+another child. Plain resume targets the resumed session. Incognito sessions are deleted on exit, so their tip instead
+offers a new nameless incognito launch with the same route selectors and `--effort <level>`. Tips omit prompts and
+creation-only options. A child in another Forge root includes a shell-quoted `cd` to that root before resume. Tips go
+through `forge.cli.output` and never into JSON output. Direct, passthrough, `--no-launch` and bare `forge claude start`
+launches print nothing. Bare launch has no `--effort`, and the CLI style contract forbids recovery commands that do not
+apply. Launches whose wire shape Forge cannot confirm also print nothing.
 
 ### Phase B -- proxy effort observation
 
@@ -128,15 +137,19 @@ The proxy records the completed record, in memory, bounded, and lost on restart,
 - `GET /?forge_launch=<id>` adds `runtime.effort` for that validated launch only. Plain `GET /` stays unchanged and
   never enumerates launches. The status line reads the id from its inherited `ANTHROPIC_CUSTOM_HEADERS`, so no request
   is added.
-- Passthrough builds the same record from the client value, or the pinned value when override mode mutates it.
+- Passthrough builds the same record from the client value, or the pinned value when override mode mutates it. Its floor
+  is populated only in override mode, and requests without a valid launch header do no observation-only catalog work.
+- Readers validate each tier independently, preserving usable observations when another tier is malformed. The requested
+  value is client vocabulary and accepts printable strings beyond Forge's known levels; resolved and applied levels
+  remain strict.
 
 ### Phase B rendering
 
 The proxied label annotates only the active tier, chosen with the proxy's dispatch precedence: an explicit tier in stdin
 `model.id`, then the launch's projected `X-Forge-Model-Tier` from the inherited `ANTHROPIC_CUSTOM_HEADERS`, then
-`runtime.active_tier`. This also shows which tier is active, which the mapping display currently omits. The annotated
-slot names the observed `mapped_model`, not the configured tier default, so a model alternative serving the tier shows
-its own name.
+`runtime.active_tier`, with passthrough's `sonnet` fallback when the default is absent. This also shows which tier is
+active, which the mapping display currently omits. The annotated slot names the observed `mapped_model`, not the
+configured tier default, so a model alternative serving the tier shows its own name.
 
 The same helper predicts the route model by dispatch path, checking the wire shape first:
 
@@ -167,11 +180,13 @@ Claude's request. The arrow reads "from" and avoids a less-than reading when a t
 | A model alternative served the tier                         | `[O:sol@high<-xhigh S:astra H:mini]`               |
 | Level, model or route changed since the last request        | `[O:astra@high (stale) ...]` until the next one    |
 | Client stage dropped it                                     | `[O:gpt-5.4@dropped<-xhigh ...]` in warning color  |
+| Observed request sent no effort parameter                   | `[O:astra@unset ...]`                              |
 | No observation for this launch, unsupported proxy, fallback | `[O:astra@unknown ...]`                            |
 
 An observation is stale when stdin `effort.level` differs from `requested`, stdin `model.id` differs from `client_model`
 after `strip_transport_model_suffix`, or a proven route model differs from `mapped_model`. Launch keying already
-discards earlier launches, so staleness covers only changes within one launch.
+discards earlier launches, so staleness covers only changes within one launch. An observed unset value can also show
+`unset<-high` or `unset (stale)`; it remains distinct from a missing observation.
 
 ### Phase B explain surface
 
@@ -179,10 +194,11 @@ discards earlier launches, so staleness covers only changes within one launch.
 CLI takes the launch ID from the run ID in the session's routing commitment, so it works outside the Claude process for
 marked and unmarked sessions. It uses that ID only when `forge session model show` already classifies the commitment as
 `route_commit` evidence. An `unproven_projection` or legacy launch record reports `unknown` with that reason, without
-querying the proxy. The block states the requested level, whether the launch opted in and whether that applied, the
-thinking-derived value, the tier minimum, the value before clamping with the supported levels, the tier source, the wire
-parameter and the backend. A launch without an observation reports `unknown`, for example before its first request,
-after a proxy restart, or when the launch predates the header.
+querying launch-scoped observations. A reachable proxy's effort observations remain usable even when its route fields
+require a separate config or commitment fallback. The block states the requested level, whether the launch opted in and
+whether that applied, the thinking-derived value, the tier minimum, the value before clamping with the supported levels,
+the tier source, the wire parameter and the backend. A launch without an observation reports `unknown`, for example
+before its first request, after a proxy restart, or when the launch predates the header.
 
 ## Non-goals
 
@@ -222,11 +238,13 @@ after a proxy restart, or when the launch predates the header.
 The owner settled the design questions on 2026-10-29:
 
 1. **Placement:** inside the `model` segment's label; no separate `effort` segment name.
-2. **States:** spelled out (`<-`, `(stale)`, `dropped`, `unknown`) instead of symbol markers.
+2. **States:** spelled out (`<-`, `(stale)`, `dropped`, `unset`, `unknown`) instead of symbol markers. Owner review on
+   2026-10-30 added `unset` for a valid observation with no effort parameter.
 3. **`think`:** removed from `DEFAULT_ORDER`; the opt-in segment remains.
 4. **Extended-context color:** removed; the context bar shows the size.
 5. **Per-turn raises:** deferred until Claude Code documents a stdin field.
-6. **Launch hint:** included in Phase A.
+6. **Launch hint:** included in Phase A. Owner review on 2026-10-30 corrected creation paths to resume the actual
+   created session; incognito guidance names the next ephemeral launch.
 7. **`drift` and `marking` route bugs:** the projected tier, model alternatives and passthrough dispatch are fixed in
    Phase B through the shared route helper, with a regression test.
 
@@ -234,7 +252,9 @@ The owner settled the design questions on 2026-10-29:
 
 - Phase A: direct sessions show the stdin level and no `(1M)` suffix or deeper color; models without effort render
   unchanged; the default bar omits `THINK`. The launch hint prints once for a qualifying launch and stays silent for
-  direct, passthrough, `--no-launch`, bare, unconfirmed and `--effort` launches.
+  direct, passthrough, `--no-launch`, bare, unconfirmed and `--effort` launches. Its command resumes the created child
+  after start/fork/fresh-resume and never repeats creation; incognito offers a new ephemeral launch. The tip reuses the
+  cost-baseline proxy snapshot and adds no probe.
 - Phase B resolution: a translated launch without `--effort` shows the thinking or minimum value as
   `applied<-requested`. With `--effort`, a supported level shows alone and an unsupported one shows clamped:
   `gemini-4-argon` (low to high) with opted-in `max` and adaptive thinking shows `high<-max`. Opted-in `between_tools`
@@ -242,7 +262,8 @@ The owner settled the design questions on 2026-10-29:
   without a floor and `high<-max` with a `high` floor. The explain surface lists the derived value, floor, pre-clamp
   value and supported levels separately and reports the opt-in as present but not applicable. A GPT-5 Chat Completions
   request with tools shows `dropped`; Argon reports `thinkingLevel`; passthrough override shows the pinned value with
-  its source.
+  its source. A valid observation with no effort parameter shows `unset`, distinct from missing evidence. Ordinary
+  passthrough does not report an unenforced configured floor, and a malformed tier cannot hide other valid observations.
 - Phase B routing: a non-Claude model pinned to Opus on a Sonnet-default proxy annotates Opus, and `drift` and `marking`
   evaluate the Opus route (regression). On a passthrough proxy advertising Opus 5.5, an Opus 4.6 request annotates and
   marks Opus 4.6, never turns `(stale)` from route prediction, and shows no `drift` (regression). An explicit

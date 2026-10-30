@@ -27,7 +27,6 @@ from forge.cli.statusline.formatting import (
     METRICS_COLOR,
     RED,
     YELLOW,
-    explicit_tier_from_model,
     format_audit,
     format_drift,
     format_forge_cost,
@@ -374,7 +373,13 @@ class TestDriftProducer:
     def test_mismatch_renders(self):
         raw = {
             "is_proxy": True,
-            "runtime": {"active_tier": "opus", "tier_mappings": {"opus": "o3"}},
+            "wire_shape": "openai_translated",
+            "runtime": {
+                "backend_id": "openrouter",
+                "model_alternatives": {},
+                "active_tier": "opus",
+                "tier_mappings": {"opus": "o3"},
+            },
             "proxy": {"template": "litellm-openai"},
         }
         ctx = _ctx(is_proxy=True, runtime=_proxy(raw))
@@ -383,7 +388,10 @@ class TestDriftProducer:
     def test_aligned_is_quiet(self):
         raw = {
             "is_proxy": True,
+            "wire_shape": "openai_translated",
             "runtime": {
+                "backend_id": "openrouter",
+                "model_alternatives": {},
                 "active_tier": "opus",
                 "tier_mappings": {"opus": "claude-opus-4-8"},
             },
@@ -396,7 +404,13 @@ class TestDriftProducer:
         # display_name only (no model.id) -> can't normalize -> hidden, not a guess.
         raw = {
             "is_proxy": True,
-            "runtime": {"active_tier": "opus", "tier_mappings": {"opus": "o3"}},
+            "wire_shape": "openai_translated",
+            "runtime": {
+                "backend_id": "openrouter",
+                "model_alternatives": {},
+                "active_tier": "opus",
+                "tier_mappings": {"opus": "o3"},
+            },
         }
         ctx = _ctx(
             data={"workspace": {}, "model": {"display_name": "Opus"}},
@@ -412,7 +426,10 @@ class TestDriftProducer:
         # against the sonnet default would have false-positived.
         raw = {
             "is_proxy": True,
+            "wire_shape": "openai_translated",
             "runtime": {
+                "backend_id": "openrouter",
+                "model_alternatives": {},
                 "active_tier": "sonnet",
                 "tier_mappings": {
                     "sonnet": "claude-sonnet-4-5",
@@ -435,7 +452,13 @@ class TestDriftProducer:
         # A bare backend model id (no haiku/sonnet/opus) -> route by proxy default.
         raw = {
             "is_proxy": True,
-            "runtime": {"active_tier": "sonnet", "tier_mappings": {"sonnet": "gpt-4o"}},
+            "wire_shape": "openai_translated",
+            "runtime": {
+                "backend_id": "openrouter",
+                "model_alternatives": {},
+                "active_tier": "sonnet",
+                "tier_mappings": {"sonnet": "gpt-4o"},
+            },
             "proxy": {"template": "litellm-openai"},
         }
         ctx = _ctx(
@@ -448,12 +471,13 @@ class TestDriftProducer:
         )
         assert any("drift:" in s for s in _stream(ctx, ["drift"]))  # custom-model != gpt-4o
 
-    def test_tier_detection_parity_with_proxy(self):
+    def test_tier_detection_parity_with_proxy(self, monkeypatch):
         # These three sites share the tier-word leaf; get_tier_from_display_name
         # deliberately keeps its separate display-name defaulting behavior.
         from forge.proxy.data_models import _detect_tier
         from forge.proxy.server import _tier_from_model_name
 
+        monkeypatch.delenv("ANTHROPIC_CUSTOM_HEADERS", raising=False)
         corpus = [
             "claude-opus-4-8",
             "claude-fable-5-1",  # Fable rides the opus tier in both mirrors
@@ -469,14 +493,15 @@ class TestDriftProducer:
         ]
         for model in corpus:
             expected = detect_tier_word(model)
-            assert explicit_tier_from_model(model) == expected, model
+            ctx = _ctx(data={"model": {"id": model}})
+            assert ctx.route.tier == expected, model
             assert _tier_from_model_name(model) == expected, model
             assert _detect_tier({"model": model})["tier"] == expected, model
 
     def test_fable_rides_opus_tier(self):
         # Fable has no tier word of its own; both the model-id and display-name
         # detectors must classify it as opus (else the status line mis-colors it).
-        assert explicit_tier_from_model("claude-fable-5-1") == "opus"
+        assert _ctx(data={"model": {"id": "claude-fable-5-1"}}).route.tier == "opus"
         assert get_tier_from_display_name("Claude Fable 5.1") == "opus"
 
 

@@ -544,7 +544,10 @@ class TestBuildClaudeEnvRunIdentity:
     def test_derive_run_identity_false_passes_through(self):
         with patch.dict("os.environ", {}, clear=True):
             env = build_claude_env(
-                extra_vars={FORGE_RUN_ID_VAR: "run_fixed", FORGE_ROOT_RUN_ID_VAR: "run_fixed"},
+                extra_vars={
+                    FORGE_RUN_ID_VAR: "run_fixed",
+                    FORGE_ROOT_RUN_ID_VAR: "run_fixed",
+                },
                 derive_run_identity=False,
             )
         assert env[FORGE_RUN_ID_VAR] == "run_fixed"
@@ -567,7 +570,11 @@ class TestBuildClaudeEnvRunIdentity:
     def test_source_env_not_mutated(self):
         import os
 
-        with patch.dict("os.environ", {FORGE_DEPTH_VAR: "1", FORGE_RUN_ID_VAR: "run_src"}, clear=True):
+        with patch.dict(
+            "os.environ",
+            {FORGE_DEPTH_VAR: "1", FORGE_RUN_ID_VAR: "run_src"},
+            clear=True,
+        ):
             env = build_claude_env()
             # Child env advances depth and gets a fresh run id...
             assert env[FORGE_DEPTH_VAR] == "2"
@@ -595,7 +602,10 @@ class TestCorrelationHeaders:
     def _marker_vars(self, base: str | None = None) -> dict[str, str]:
         # FORGE_SUBPROCESS_PROXY_ID present AND FORGE_SUBPROCESS_BASE_URL == selected url
         # is the registry-free "proven Forge proxy" path (covers sidecar).
-        return {"FORGE_SUBPROCESS_PROXY_ID": "p1", "FORGE_SUBPROCESS_BASE_URL": base or self.BASE}
+        return {
+            "FORGE_SUBPROCESS_PROXY_ID": "p1",
+            "FORGE_SUBPROCESS_BASE_URL": base or self.BASE,
+        }
 
     def test_stamps_both_headers_for_proven_proxy(self) -> None:
         env = build_claude_env(extra_vars=self._marker_vars(), base_url=self.BASE)
@@ -615,7 +625,11 @@ class TestCorrelationHeaders:
 
     def test_no_header_for_interactive(self) -> None:
         # derive_run_identity=False is the interactive/root path -> excluded (harness boundary).
-        env = build_claude_env(extra_vars=self._marker_vars(), base_url=self.BASE, derive_run_identity=False)
+        env = build_claude_env(
+            extra_vars=self._marker_vars(),
+            base_url=self.BASE,
+            derive_run_identity=False,
+        )
         assert self._H not in env
 
     def test_forge_owned_merge_preserves_user_replaces_stale(self) -> None:
@@ -654,6 +668,16 @@ class TestCorrelationHeaders:
         env = build_claude_env(extra_vars=self._marker_vars(), base_url=self.BASE)
         run_id = env[FORGE_RUN_ID_VAR]
         assert f"{self._RUN_H}: {run_id}" in env[self._H]
+
+    @pytest.mark.parametrize("routed", [True, False], ids=["proxy-routed", "direct"])
+    def test_headless_child_scrubs_launch_header(self, routed: bool) -> None:
+        vars_ = self._marker_vars() if routed else {}
+        vars_[self._H] = "X-User: keep\nx-forge-launch: run_aaaaaaaaaaaa"
+
+        env = build_claude_env(extra_vars=vars_, base_url=self.BASE if routed else None, direct=not routed)
+
+        assert "X-User: keep" in env[self._H]
+        assert "x-forge-launch" not in env[self._H].lower()
 
     # Provider session and command headers
 

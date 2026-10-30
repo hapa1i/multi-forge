@@ -1,0 +1,590 @@
+{
+  "date": "2026-10-30",
+  "platform": "macOS arm64",
+  "upstream": "loopback synthetic Anthropic HTTP/SSE server",
+  "paid_inference": false,
+  "method": "Isolated HOME/settings/project, no user keys or tools/MCP, PTY launch; first turn, /effort low with confirmation, /model claude-sonnet-4-6, second turn. Only model/effort/thinking/version and request construction fields retained.",
+  "limits": [
+    "These probes show Claude session stdin and outbound request construction, not provider execution.",
+    "Sonnet 4.6 with max remained max on both versions against the synthetic endpoint; no native clamping was established.",
+    "Model validation requests have no effort. Pinned CLI also issued a title-generation request with high effort."
+  ],
+  "runs": [
+    {
+      "label": "latest-314-final",
+      "version": "2.1.314",
+      "initial_model": "claude-opus-4-6[1m]",
+      "initial_effort": "max",
+      "stages": [
+        {
+          "stage": "startup",
+          "stdin": {
+            "version": "2.1.314",
+            "model": {
+              "id": "claude-opus-4-6[1m]",
+              "display_name": "Opus 4.6 (1M context)"
+            },
+            "effort": {
+              "level": "max"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": []
+        },
+        {
+          "stage": "first_request",
+          "stdin": {
+            "version": "2.1.314",
+            "model": {
+              "id": "claude-opus-4-6[1m]",
+              "display_name": "Opus 4.6 (1M context)"
+            },
+            "effort": {
+              "level": "max"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": [
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-opus-4-6",
+              "output_config": {
+                "effort": "max"
+              },
+              "thinking": {
+                "type": "adaptive",
+                "display": "updates"
+              },
+              "stream": true
+            }
+          ]
+        },
+        {
+          "stage": "effort_change",
+          "stdin": {
+            "version": "2.1.314",
+            "model": {
+              "id": "claude-opus-4-6[1m]",
+              "display_name": "Opus 4.6 (1M context)"
+            },
+            "effort": {
+              "level": "low"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": []
+        },
+        {
+          "stage": "model_change",
+          "stdin": {
+            "version": "2.1.314",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "low"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": [
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-sonnet-4-6",
+              "output_config": null,
+              "thinking": null,
+              "stream": null
+            }
+          ]
+        },
+        {
+          "stage": "second_request",
+          "stdin": {
+            "version": "2.1.314",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "low"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": [
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-sonnet-4-6",
+              "output_config": {
+                "effort": "low"
+              },
+              "thinking": {
+                "type": "adaptive",
+                "display": "updates"
+              },
+              "stream": true
+            }
+          ]
+        }
+      ],
+      "local_source_sha256": {
+        "summary.json": "619abbdcecb309554049ab70ec3f13ae1c6bce1d9ced1efc71cd359259cc9ceb",
+        "stdin.jsonl": "59bee0944a7bd770ac1607b272754380ee1ca2d8b4fe9eacdd72787088aa2d9b",
+        "requests.jsonl": "231285ef6586869eb10551d87628cea4932b1aa949946a47b9df03d85afb42f5"
+      }
+    },
+    {
+      "label": "pinned-245-final",
+      "version": "2.1.245",
+      "initial_model": "claude-opus-4-6[1m]",
+      "initial_effort": "max",
+      "stages": [
+        {
+          "stage": "startup",
+          "stdin": {
+            "version": "2.1.245",
+            "model": {
+              "id": "claude-opus-4-6[1m]",
+              "display_name": "Opus 4.6 (1M context)"
+            },
+            "effort": {
+              "level": "max"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": []
+        },
+        {
+          "stage": "first_request",
+          "stdin": {
+            "version": "2.1.245",
+            "model": {
+              "id": "claude-opus-4-6[1m]",
+              "display_name": "Opus 4.6 (1M context)"
+            },
+            "effort": {
+              "level": "max"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": [
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-opus-4-6",
+              "output_config": {
+                "effort": "max"
+              },
+              "thinking": {
+                "type": "adaptive"
+              },
+              "stream": true
+            }
+          ]
+        },
+        {
+          "stage": "effort_change",
+          "stdin": {
+            "version": "2.1.245",
+            "model": {
+              "id": "claude-opus-4-6[1m]",
+              "display_name": "Opus 4.6 (1M context)"
+            },
+            "effort": {
+              "level": "low"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": []
+        },
+        {
+          "stage": "model_change",
+          "stdin": {
+            "version": "2.1.245",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "low"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": [
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-sonnet-4-6",
+              "output_config": null,
+              "thinking": null,
+              "stream": null
+            }
+          ]
+        },
+        {
+          "stage": "second_request",
+          "stdin": {
+            "version": "2.1.245",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "low"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": [
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-sonnet-4-6",
+              "output_config": {
+                "effort": "high",
+                "format": {
+                  "type": "json_schema",
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "title"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "thinking": {
+                "type": "disabled"
+              },
+              "stream": true
+            },
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-sonnet-4-6",
+              "output_config": {
+                "effort": "low"
+              },
+              "thinking": {
+                "type": "adaptive"
+              },
+              "stream": true
+            }
+          ]
+        }
+      ],
+      "local_source_sha256": {
+        "summary.json": "1f6f28c6873c1fbad591fd0f8ebd1a26638e0cfbfd4ef475af4f6c96f39e70ea",
+        "stdin.jsonl": "e87f53154cd93ed19f6a3e719fd7e86b19e64d7516cb7115c7ba4e24bbd90d93",
+        "requests.jsonl": "f33d8bf008aacfdaa204ac357b42ced12893827a731c48562977b49adb95f4f6"
+      }
+    },
+    {
+      "label": "latest-314-clamp",
+      "version": "2.1.314",
+      "initial_model": "claude-sonnet-4-6",
+      "initial_effort": "max",
+      "stages": [
+        {
+          "stage": "startup",
+          "stdin": {
+            "version": "2.1.314",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "max"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": []
+        },
+        {
+          "stage": "first_request",
+          "stdin": {
+            "version": "2.1.314",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "max"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": [
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-sonnet-4-6",
+              "output_config": {
+                "effort": "max"
+              },
+              "thinking": {
+                "type": "adaptive",
+                "display": "updates"
+              },
+              "stream": true
+            }
+          ]
+        },
+        {
+          "stage": "effort_change",
+          "stdin": {
+            "version": "2.1.314",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "low"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": []
+        },
+        {
+          "stage": "model_change",
+          "stdin": {
+            "version": "2.1.314",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "low"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": [
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-sonnet-4-6",
+              "output_config": null,
+              "thinking": null,
+              "stream": null
+            }
+          ]
+        },
+        {
+          "stage": "second_request",
+          "stdin": {
+            "version": "2.1.314",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "low"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": [
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-sonnet-4-6",
+              "output_config": {
+                "effort": "low"
+              },
+              "thinking": {
+                "type": "adaptive",
+                "display": "updates"
+              },
+              "stream": true
+            }
+          ]
+        }
+      ],
+      "local_source_sha256": {
+        "summary.json": "cdac9b62272663982bd69d70b35bfd814a1683321c5a3e914e0218aef700a5c0",
+        "stdin.jsonl": "4ce09d4ffc7adffd5cdfee8dcf3f4669a1a8078147160c5e67bf3c293ccd8e4f",
+        "requests.jsonl": "81b13c1e0f70db2937189496ee63b51b8f2edcc07d7ab24ae0aca6eb96030970"
+      }
+    },
+    {
+      "label": "pinned-245-clamp",
+      "version": "2.1.245",
+      "initial_model": "claude-sonnet-4-6",
+      "initial_effort": "max",
+      "stages": [
+        {
+          "stage": "startup",
+          "stdin": {
+            "version": "2.1.245",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "max"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": []
+        },
+        {
+          "stage": "first_request",
+          "stdin": {
+            "version": "2.1.245",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "max"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": [
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-sonnet-4-6",
+              "output_config": {
+                "effort": "max"
+              },
+              "thinking": {
+                "type": "adaptive"
+              },
+              "stream": true
+            }
+          ]
+        },
+        {
+          "stage": "effort_change",
+          "stdin": {
+            "version": "2.1.245",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "low"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": []
+        },
+        {
+          "stage": "model_change",
+          "stdin": {
+            "version": "2.1.245",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "low"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": [
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-sonnet-4-6",
+              "output_config": null,
+              "thinking": null,
+              "stream": null
+            }
+          ]
+        },
+        {
+          "stage": "second_request",
+          "stdin": {
+            "version": "2.1.245",
+            "model": {
+              "id": "claude-sonnet-4-6",
+              "display_name": "Sonnet 4.6"
+            },
+            "effort": {
+              "level": "low"
+            },
+            "thinking": {
+              "enabled": true
+            }
+          },
+          "new_requests": [
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-sonnet-4-6",
+              "output_config": {
+                "effort": "high",
+                "format": {
+                  "type": "json_schema",
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "title"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "thinking": {
+                "type": "disabled"
+              },
+              "stream": true
+            },
+            {
+              "path": "/v1/messages?beta=true",
+              "model": "claude-sonnet-4-6",
+              "output_config": {
+                "effort": "low"
+              },
+              "thinking": {
+                "type": "adaptive"
+              },
+              "stream": true
+            }
+          ]
+        }
+      ],
+      "local_source_sha256": {
+        "summary.json": "87db18abcc886b9e697df0cd54d56254f94f5e2b03c41589700948fc8940aa66",
+        "stdin.jsonl": "cc89b02d7af18e5ff9672082b17f94beadd65d672001e5fbda72f74713655827",
+        "requests.jsonl": "2ad425a983d93f0b0e3d7c6e51ab6f6c0e805b730394ac49e0ec402f5e4b11fc"
+      }
+    }
+  ]
+}

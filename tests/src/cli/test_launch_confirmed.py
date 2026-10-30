@@ -144,6 +144,9 @@ class TestReadProxyCostBaselineMicros:
         assert baseline is not None
         assert baseline.cost_micros == 769_651
         assert baseline.started_at == "2026-06-17T19:00:00Z"
+        assert baseline.runtime is not None
+        assert baseline.runtime.is_proxy is True
+        assert baseline.runtime.proxy_cost_usd == 0.769651
         assert seen_urls == ["http://localhost:8085/"]
 
     def test_reads_proxy_total_micros_wrapper(self, monkeypatch: pytest.MonkeyPatch) -> None:

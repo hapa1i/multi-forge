@@ -14,7 +14,7 @@ from forge.config.schema import (
 from forge.core.llm import Message, ModelHyperparameters
 from forge.core.llm.clients.openai_compat import build_chat_completion_kwargs
 from forge.proxy.intercept import ReasoningOverrideError, apply_override
-from forge.proxy.reasoning import resolve_reasoning_effort
+from forge.proxy.reasoning import resolve_reasoning_effort_record
 
 pytestmark = pytest.mark.regression
 
@@ -72,9 +72,12 @@ def test_between_tools_maps_to_lowest_translated_effort() -> None:
     request = SimpleNamespace(reasoning_effort=None, thinking={"type": "between_tools"})
 
     assert (
-        resolve_reasoning_effort(
-            request, tier_override=None, model_id="anthropic/claude-sonnet-5-5", request_id="sonnet55"
-        )
+        resolve_reasoning_effort_record(
+            request,
+            tier_override=None,
+            model_id="anthropic/claude-sonnet-5-5",
+            request_id="sonnet55",
+        ).resolved
         == "low"
     )
 

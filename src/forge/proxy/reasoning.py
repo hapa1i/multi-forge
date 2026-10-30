@@ -13,6 +13,7 @@ from fastapi import HTTPException
 
 from forge.config import TierOverride
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
+from forge.core.effort_observation import EffortResolution, EffortSource
 
 logger = logging.getLogger(__name__)
 
@@ -158,26 +159,33 @@ def client_requested_effort(request_data: object) -> str | None:
     return effort
 
 
-def resolve_reasoning_effort(
+def resolve_reasoning_effort_record(
     request_data: object,
     *,
     tier_override: TierOverride | None,
     model_id: str,
     request_id: str,
     honor_client_effort: bool = False,
-) -> str | None:
-    """Resolve the final reasoning_effort for a request.
+) -> EffortResolution:
+    """Resolve effort and retain the inputs that explain its existing precedence.
 
-    Priority: request explicit > opted-in client effort > thinking-derived >
-    tier_override floor. ``honor_client_effort`` is set only when the launch sent
-    ``X-Forge-Effort-Source: client``: Claude Code always sends a default effort,
-    so honoring it unconditionally would override every configured floor. The
-    result is normalized against the catalog effort levels for the mapped
-    model: an explicit unsupported value is rejected (the caller named an
-    exact level), while client and derived values clamp (the caller asked for a
-    thinking depth that this model may not express exactly).
+    Explicit request effort wins, then opted-in applicable client effort, then
+    the higher of thinking-derived effort and the tier floor. The launch opt-in
+    prevents Claude's default effort from silently replacing configured floors.
+    Explicit unsupported values fail; client and derived values clamp to the
+    mapped model's supported levels.
     """
     supported = supported_efforts_for_model(model_id)
+    output_config = getattr(request_data, "output_config", None)
+    requested = output_config.get("effort") if isinstance(output_config, dict) else None
+    requested = requested if isinstance(requested, str) else None
+    thinking = getattr(request_data, "thinking", None)
+    thinking_type = thinking.get("type") if isinstance(thinking, dict) else None
+    thinking_type = thinking_type if isinstance(thinking_type, str) else None
+    derived = derive_reasoning_effort(thinking)
+    tier_effort = tier_override.reasoning_effort if tier_override else None
+    applicable_effort = client_requested_effort(request_data)
+    source: EffortSource
 
     # Use getattr() for test stubs that don't include new fields.
     explicit = getattr(request_data, "reasoning_effort", None)
@@ -193,23 +201,29 @@ def resolve_reasoning_effort(
                     ),
                 },
             )
-        return explicit
-
-    client_effort = client_requested_effort(request_data) if honor_client_effort else None
-    if client_effort is not None:
+        effort: str | None = explicit
+        source = "explicit"
+    elif honor_client_effort and applicable_effort is not None:
         # The user chose this effort for the launch, so the tier floor does not apply.
-        effort: str | None = client_effort
+        effort = applicable_effort
+        source = "client"
     else:
-        # Claude Code sends `thinking` (Anthropic-specific) instead of
-        # `reasoning_effort`. Translate to reasoning_effort so litellm can
-        # map it to each provider's native parameter.
-        derived = derive_reasoning_effort(getattr(request_data, "thinking", None))
-
         # Apply tier_override as a floor: max(derived, tier_override).
-        tier_effort = tier_override.reasoning_effort if tier_override else None
         effort = max_effort(derived, tier_effort)
+        source = "floor" if tier_effort is not None and effort != derived else "thinking"
 
     clamped = clamp_effort_to_supported(effort, supported)
     if clamped != effort:
         logger.debug(f"[{request_id}] Clamped reasoning_effort '{effort}' -> '{clamped}' for '{model_id}'")
-    return clamped
+    return EffortResolution(
+        requested=requested,
+        thinking=thinking_type,
+        opt_in=honor_client_effort,
+        client_applicable=applicable_effort is not None,
+        derived=derived,
+        floor=tier_effort,
+        pre_clamp=effort,
+        supported=supported,
+        resolved=clamped,
+        source=source,
+    )

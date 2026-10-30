@@ -23,6 +23,7 @@ from forge.cli.session_authority_options import (
     authority_creation_options,
     parse_creation_authority,
 )
+from forge.cli.session_effort_hint import ClaudeLaunchReady, print_derived_effort_hint
 from forge.cli.session_launch_args import (
     RuntimePassthroughCommand,
     checked_launch_args,
@@ -115,6 +116,9 @@ class _ClaudeForkCliPresenter:
 
     def before_launch(self, forge_root: Path) -> None:
         _warn_before_claude_launch(forge_root)
+
+    def on_launch_ready(self, event: ClaudeLaunchReady) -> None:
+        print_derived_effort_hint(event)
 
     def on_routing_payload(self, payload: dict[str, Any]) -> None:
         _render_model_route_payload(payload)
@@ -327,7 +331,12 @@ def _render_fork_execution_error(error: ForkExecutionError) -> None:
     default=None,
     help=_MODEL_TIER_HELP,
 )
-@click.option("--incognito", "-i", is_flag=True, help="Attempt guarded purge of the fork after runtime exit")
+@click.option(
+    "--incognito",
+    "-i",
+    is_flag=True,
+    help="Attempt guarded purge of the fork after runtime exit",
+)
 @click.option("--worktree", "-w", is_flag=True, help="Create git worktree for fork isolation")
 @click.option("--branch", "-b", help="Override branch name (implies --worktree)")
 @click.option("--no-launch", is_flag=True, help="Create fork without launching Claude")

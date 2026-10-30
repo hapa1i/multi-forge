@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 _EMPTY_STATS = TranscriptStats()
 
 
-def detect_proxy() -> tuple[bool, ProxyRuntimeTruth | None, bool]:
+def detect_proxy(*, include_effort: bool = False) -> tuple[bool, ProxyRuntimeTruth | None, bool]:
     """Detect proxy use and return runtime truth plus its authority.
 
     ``is_authoritative=True`` means the live proxy identity endpoint succeeded;
@@ -60,10 +60,19 @@ def detect_proxy() -> tuple[bool, ProxyRuntimeTruth | None, bool]:
         import urllib.request
 
         query_url = f"{parsed.scheme}://{parsed.netloc}/"
+        launch_id = None
+        if include_effort:
+            from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR, read_launch_id
+
+            if launch_id := read_launch_id(os.environ.get(ANTHROPIC_CUSTOM_HEADERS_VAR)):
+                query_url += f"?forge_launch={launch_id}"
         with urllib.request.urlopen(query_url, timeout=_status_timeout()) as response:
             proxy_info = json.loads(response.read())
 
         if proxy_info.get("is_proxy") is True:
+            if launch_id is None and isinstance(proxy_info.get("runtime"), dict):
+                # Unscoped responses cannot establish this launch's observation.
+                proxy_info["runtime"].pop("effort", None)
             return True, ProxyRuntimeTruth(proxy_info), True
     except Exception:
         pass

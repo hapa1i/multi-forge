@@ -145,7 +145,8 @@ valid and intentionally empty, so every model resolves to `unknown` until a sepa
 **Tier selection precedence:**
 
 1. Request explicit tier (model name contains `haiku|sonnet|opus`)
-2. Proxy default tier (configured for that base URL)
+2. Valid projected `X-Forge-Model-Tier` from a managed launch
+3. Proxy default tier (configured for that base URL)
 
 Tier-word detection for raw model names is single-sourced in `forge.core.tiers.detect_tier_word()`. The status line's
 display-name helper remains separate because it has different display fallback behavior (defaults to `sonnet` when no
@@ -153,6 +154,37 @@ tier word is visible).
 
 This applies to tier selection *within* a resolved proxy. Which proxy a subprocess uses is decided by the resolution
 chain (§3.6.12).
+
+**Launch effort observation.** Managed interactive Claude launches stamp `X-Forge-Launch` with the same root run ID
+stored in their routing commitment, only for a proven Forge proxy. Host and sidecar launches share this identity rule;
+headless children scrub the header. It does not change provider session grouping or run-tree attribution, and upstream
+request/response filtering keeps it inside Forge.
+
+`GET /?forge_launch=<valid-run-id>` adds `runtime.effort`, a tier-keyed map of the latest outbound effort observations
+for that launch. An empty map means no observation is retained. Plain or invalid queries omit the field and never list
+launches. The process retains at most 512 launch/tier entries, evicting the oldest observation; restart clears them.
+Resume and fork mint new launch identities.
+
+Resolution records preserve the requested level, opt-in/applicability, thinking-derived level, tier floor, pre-clamp
+value, supported levels, result and source without changing precedence. Client callbacks finalize the applied value,
+wire parameter and any drop note after request construction for streaming and non-streaming dispatch. Passthrough
+records the actual native effort, including an override mutation; an inactive configured floor is omitted. Requests
+without a valid launch header skip observation-only passthrough catalog work. These observations describe what Forge
+sent, not gateway/provider execution, and are not persisted in downstream telemetry.
+
+Effort records are validated per tier independently of route metadata. A malformed tier does not erase another tier's
+valid observation. Client-requested effort accepts safe future vocabulary, while Forge's resolved and applied levels
+retain their known vocabulary. Session model reads keep identity-validated live effort data when route reporting falls
+back to config or commitment; an invalid live backend identifier is reported as unknown.
+
+Launch effort guidance shares the existing cost-baseline response through a transient parsed runtime snapshot. The op
+reports the actual session being launched after preparation, so durable-session guidance resumes that session and
+incognito guidance describes a new ephemeral launch. Rendering the optional tip adds no proxy request.
+
+Read-side route prediction checks wire shape before tier maps: Anthropic passthrough uses the normalized client model;
+translated tier routes use an exact alternative before the tier default. Explicit `provider/model` requests and invalid
+or fallback runtime truth remain unproven. A projected `X-Forge-Model-Tier` sits between an explicit request tier and
+the proxy default. Passthrough tier maps describe accounting, not the forwarded model.
 
 ### Typed judgments
 

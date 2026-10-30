@@ -9,7 +9,10 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
 
+import pytest
+
 from forge.core.ops.claude_session import (
+    ClaudeLaunchReady,
     ClaudeSessionLaunchResult,
     ClaudeSessionStartResult,
     ClaudeSidecarLaunch,
@@ -26,12 +29,14 @@ from forge.core.reactive.env import (
 )
 from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR
 from forge.core.runtime.launch_args import RuntimeLaunchArgs
+from forge.proxy.runtime_truth import ProxyRuntimeTruth
 from forge.session import (
     LAUNCH_MODE_SIDECAR,
     IndexStore,
     SessionStore,
     create_session_state,
 )
+from forge.session.launch_confirmation import ProxyCostBaseline
 from forge.session.models import SessionState
 from forge.session.routing import derive_routing_history
 from forge.session.workers import (
@@ -44,6 +49,7 @@ from forge.session.workers import (
 class _Presenter:
     def __init__(self) -> None:
         self.sidecar_launch: ClaudeSidecarLaunch | None = None
+        self.launch_ready: ClaudeLaunchReady | None = None
 
     def on_created(self, event: ClaudeStartCreated) -> None:
         pass
@@ -56,6 +62,9 @@ class _Presenter:
 
     def before_launch(self, forge_root: Path) -> None:
         pass
+
+    def on_launch_ready(self, event: ClaudeLaunchReady) -> None:
+        self.launch_ready = event
 
     def on_routing_payload(self, payload: dict[str, Any]) -> None:
         pass
@@ -332,3 +341,26 @@ def test_sidecar_launch_without_effort_sends_no_effort_source(tmp_path: Path) ->
     kwargs = fixture.run_sidecar.call_args.kwargs
     assert "--effort" not in kwargs["claude_args"]
     assert "X-Forge-Effort-Source" not in kwargs["env_vars"].get(ANTHROPIC_CUSTOM_HEADERS_VAR, "")
+
+
+def test_sidecar_launch_ready_reuses_existing_cost_snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runtime = ProxyRuntimeTruth({"is_proxy": True, "wire_shape": "openai_translated"})
+    reads: list[str | None] = []
+
+    def baseline(base_url: str | None) -> ProxyCostBaseline:
+        reads.append(base_url)
+        return ProxyCostBaseline(cost_micros=25, started_at="2026-10-30T00:00:00Z", runtime=runtime)
+
+    monkeypatch.setattr("forge.core.ops.claude_session.read_proxy_cost_baseline", baseline)
+    fixture = _launch_split_root_sidecar(tmp_path)
+    event = fixture.presenter.launch_ready
+    assert event is not None
+    assert event.runtime is runtime
+    assert event.session == fixture.result.manifest.name
+    assert event.operation == "start"
+    assert event.forge_root == str(fixture.forge_root)
+    assert event.incognito is False
+    assert reads == ["http://localhost:8085"]
+    launch = fixture.store.read().confirmed.launch
+    assert launch is not None
+    assert launch.proxy_cost_baseline_micros == 25

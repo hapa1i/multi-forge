@@ -154,6 +154,7 @@ def _install_server_stubs(monkeypatch: pytest.MonkeyPatch, case: ResolutionCase)
             request_id: str,
             *,
             on_provider_dispatch: Callable[[], None] | None = None,
+            on_effort_applied: object | None = None,
         ) -> dict[str, Any]:
             if on_provider_dispatch is not None:
                 on_provider_dispatch()

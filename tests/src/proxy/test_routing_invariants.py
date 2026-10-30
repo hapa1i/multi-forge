@@ -195,7 +195,9 @@ async def _capture_openrouter_request(
     async def _fake_get_client(*args, **kwargs):
         client = AsyncMock()
 
-        async def _capture_create_completion(openai_request, request_id, *, on_provider_dispatch=None):
+        async def _capture_create_completion(
+            openai_request, request_id, *, on_provider_dispatch=None, on_effort_applied=None
+        ):
             if on_provider_dispatch is not None:
                 on_provider_dispatch()
             captured["openai_request"] = openai_request

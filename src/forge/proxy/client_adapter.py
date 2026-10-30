@@ -15,6 +15,7 @@ import logging
 import time
 from typing import Any, AsyncGenerator, Callable, Dict, List, Literal, Optional
 
+from forge.core.effort_observation import AppliedEffort
 from forge.core.llm import (
     CompletionResponse,
     Message,
@@ -243,6 +244,7 @@ class CoreLLMClientAdapter:
         request_id: str,
         *,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> Dict[str, Any]:
         """Create a non-streaming completion.
 
@@ -299,6 +301,7 @@ class CoreLLMClientAdapter:
             tools=tools,
             hyperparams=hyperparams,
             on_provider_dispatch=on_provider_dispatch,
+            on_effort_applied=on_effort_applied,
         )
 
         if response.usage:
@@ -324,6 +327,7 @@ class CoreLLMClientAdapter:
         request_id: str,
         *,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: Callable[[AppliedEffort], None] | None = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Create a streaming completion.
 
@@ -386,6 +390,7 @@ class CoreLLMClientAdapter:
             tools=tools,
             hyperparams=hyperparams,
             on_provider_dispatch=on_provider_dispatch,
+            on_effort_applied=on_effort_applied,
         ):
             # Emit the provider-trace metadata as its own internal-only chunk the instant it
             # first appears (Phase 2). The core client publishes it on the FIRST content/tool

@@ -247,14 +247,14 @@ only as the cache key for the throttled direct-mode cache-hit-rate. Session disc
 for `.forge/` directories.
 
 **Configuration (`statusline:` in `~/.forge/config.yaml`).** A segment registry renders an ordered, user-selectable set
-of fields. `statusline.segments` is the ordered allowlist (empty -> `DEFAULT_ORDER`, which reproduces the pre-config bar
-byte-for-byte). Other keys: `cost_mode` (`auto|api|subscription`), `palette` (`default|earthy`), `glyphs`
-(`ascii|unicode`), `cache_hit` (`auto|off`), `cache_hit_ttl`, `forge_cost_ttl` (`forge_cost` throttle window, seconds,
-default 10, `>= 1`). `forge config set`/`edit` is the strict allowlist gate (rejects unknown segment names and bad
-enums; the on-disk loader fails open per-subtree); the renderer drops unknown names and falls back to `DEFAULT_ORDER` if
-a non-empty config resolves to nothing. The flat `show_rate_limits` key was removed (clean break) — `rate_limits` is now
-an opt-in segment. Default-off segments: `rate_limits`, `cache_hit`, `supervisor`, `policy`, `audit`, `drift`,
-`spend_cap`, `launch`, `forge_cost`, `marking`. Full key/segment reference: `docs/end-user/config.md`.
+of fields. `statusline.segments` is the ordered allowlist (empty -> `DEFAULT_ORDER`). Other keys: `cost_mode`
+(`auto|api|subscription`), `palette` (`default|earthy`), `glyphs` (`ascii|unicode`), `cache_hit` (`auto|off`),
+`cache_hit_ttl`, `forge_cost_ttl` (`forge_cost` throttle window, seconds, default 10, `>= 1`). `forge config set`/`edit`
+is the strict allowlist gate (rejects unknown segment names and bad enums; the on-disk loader fails open per-subtree);
+the renderer drops unknown names and falls back to `DEFAULT_ORDER` if a non-empty config resolves to nothing. The flat
+`show_rate_limits` key was removed (clean break) — `rate_limits` is now an opt-in segment. Default-off segments:
+`rate_limits`, `cache_hit`, `supervisor`, `policy`, `audit`, `drift`, `spend_cap`, `launch`, `forge_cost`, `marking`,
+`think`. Full key/segment reference: `docs/end-user/config.md`.
 
 **Segment-lazy source acquisition.** `types.py` owns neutral facts, `sources.py` fail-open acquisition, `formatting.py`
 presentation/ANSI width/truncate/wrap, and `rendering.py` palette/hardening/final layout. `status_line.py` owns only
@@ -263,7 +263,21 @@ requirements are unioned once: `path`, `branch`, `lines`, `tokens`, `think`, and
 `model`, `rate_limits`, `cache_hit`, `audit`, `drift`, and `spend_cap` need proxy; `breadcrumb`, `loop`, `sidecar`,
 `supervisor`, `policy`, `launch`, and `forge_cost` need session; `cost` and `marking` need both. Thus `[path, branch]`
 touches neither shared source. Lazy `RenderContext.cached_property` is the process-local per-render cache; persistent
-throttles remain file-backed. The empty/default layout requests both sources and stays byte-compatible and fail-open.
+throttles remain file-backed. The empty/default layout requests both sources and remains fail-open.
+
+**Effort in the model label.** Direct sessions append stdin `effort.level` when present, such as `[Opus 5.5 @xhigh]`.
+The context bar alone shows context size; model labels and tier colors no longer encode extended context. The opt-in
+`think` segment retains its behavior but is absent from the default bar.
+
+For a proxied model segment, the existing runtime fetch includes the validated inherited `X-Forge-Launch` query. It does
+not add a request or read the routing journal. Layouts without `model` omit effort-query work. The active tier uses
+explicit stdin model tier, then projected launch tier, then the live proxy default. The annotated slot names the
+observed mapped model and applied effort: `@high`, `@high<-xhigh`, `@dropped<-xhigh` (warning color), `@unset` for an
+observed request without an effort parameter, or `@unknown` for no usable observation. Passthrough uses its dispatch
+fallback of Sonnet when no explicit, projected or default tier is available. `(stale)` means a present stdin effort,
+normalized client model, or proven predicted route changed since that observation. Missing effort fields and unproven
+route predictions do not establish staleness. Observations are scoped to one launch and tier; same-process subagents can
+replace the latest observation on that tier.
 
 **Billing-aware cost.** Billing mode is an explicit **declaration**, never inferred from a key. `cost_mode=api` shows
 real `$`; `cost_mode=subscription` shows quota burn instead of dollar spend — both the 5h and weekly windows,
@@ -279,13 +293,14 @@ reached the model and whether a key was made available — honest auth provenanc
 ambient env. Manifest-gated: absent for ambient sessions (no `FORGE_SESSION`).
 
 **Provider-declared text marking.** The opt-in `marking` segment renders the observed stdin model as `mark:yes`,
-`mark:no`, or `mark:?`. For a proxy route it applies server routing precedence (explicit request tier before proxy
-default; matching model alternative before tier default) and requires the new authoritative live backend and mapping
-fields for `yes` or `no`. Older/unreachable proxy responses and config/route-commit fallback render `?`. Direct mode
-also renders `?` in this version because Forge has no authoritative direct backend identity; that unconditional result
-does not read session state or the growing routing journal on the status-line polling path. A missing stdin model omits
-only this segment. Catalog, source, and expected mapping failures resolve to `?`; unexpected producer failures retain
-the registry's segment-level fail-open behavior. `no` means a matching provider declaration says unmarked—it is not
+`mark:no`, or `mark:?`. For a proxy route it applies server routing precedence (explicit request tier, projected launch
+tier, then proxy default; matching model alternative before tier default) and requires authoritative live backend and
+mapping fields for `yes` or `no`. Anthropic passthrough uses the actual client model; explicit translated backends
+remain unproven. Older/unreachable proxy responses and config/route-commit fallback render `?`. Direct mode also renders
+`?` in this version because Forge has no authoritative direct backend identity; that unconditional result does not read
+session state or the growing routing journal on the status-line polling path. A missing stdin model omits only this
+segment. Catalog, source, and expected mapping failures resolve to `?`; unexpected producer failures retain the
+registry's segment-level fail-open behavior. `no` means a matching provider declaration says unmarked—it is not
 detection, admission, or an authorship claim. The segment is not in `DEFAULT_ORDER`.
 
 **Forge session cost (`forge_cost`, Phase 5).** The opt-in `forge +$Y` segment shows **Forge-added LLM spend for this

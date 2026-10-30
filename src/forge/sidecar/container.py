@@ -19,9 +19,11 @@ from forge.core.reactive.env import (
     FORGE_PROXY_WIRE_SHAPE_VAR,
     RunIdentity,
     apply_attribution_header_policy,
+    apply_forge_launch_header,
     new_root_run_identity,
     resolve_proxy_wire_shape,
 )
+from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR
 from forge.sidecar.docker import _docker_name_filter
 
 # In-container Forge home, pinned via FORGE_HOME so telemetry/audit/cost/config resolution is
@@ -116,6 +118,14 @@ def run_sidecar_session(
     # container boundary, and a sidecar session begins its own run tree.
     run_identity = run_identity or new_root_run_identity()
     attribution_env = _sidecar_attribution_header_env(template=template, proxy_id=proxy_id)
+    container_env = dict(env_vars or {})
+    # The entrypoint owns and health-checks this local Forge proxy before Claude starts.
+    header_env = {
+        ANTHROPIC_CUSTOM_HEADERS_VAR: container_env.pop(ANTHROPIC_CUSTOM_HEADERS_VAR, ""),
+    }
+    apply_forge_launch_header(header_env, run_identity.run_id, owned_sidecar_proxy=True)
+    docker_env = os.environ.copy()
+    docker_env[ANTHROPIC_CUSTOM_HEADERS_VAR] = header_env[ANTHROPIC_CUSTOM_HEADERS_VAR]
 
     cmd = [
         "docker",
@@ -140,6 +150,10 @@ def run_sidecar_session(
         f"FORGE_RUN_ID={run_identity.run_id}",
         "-e",
         f"FORGE_ROOT_RUN_ID={run_identity.root_run_id}",
+        # Docker env files cannot carry newline-separated custom headers. Passing
+        # the variable name keeps its value out of the process command line.
+        "-e",
+        ANTHROPIC_CUSTOM_HEADERS_VAR,
         # Deterministic home: a `--user` uid with no passwd entry would get HOME=/,
         # breaking claude (~/.claude.json) and forge (~/.forge) resolution.
         "-e",
@@ -181,10 +195,10 @@ def run_sidecar_session(
     # leaking secrets via `ps aux` (CR-022). Cleanup in finally.
     env_file_path: str | None = None
     try:
-        if env_vars:
+        if container_env:
             fd, env_file_path = tempfile.mkstemp(prefix=".forge-env-", suffix=".env")
             with os.fdopen(fd, "w") as f:
-                for k, v in env_vars.items():
+                for k, v in container_env.items():
                     f.write(f"{k}={v}\n")
             os.chmod(env_file_path, 0o600)
             cmd.extend(["--env-file", env_file_path])
@@ -193,7 +207,7 @@ def run_sidecar_session(
         if claude_args:
             cmd.extend(claude_args)
 
-        result = subprocess.run(cmd)
+        result = subprocess.run(cmd, env=docker_env)
         return result.returncode
     finally:
         if env_file_path:

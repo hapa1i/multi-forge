@@ -20,6 +20,7 @@ from forge.core.run_id import (
     ANTHROPIC_CUSTOM_HEADERS_VAR,
     FORGE_EFFORT_SOURCE_HEADER,
     FORGE_MODEL_TIER_HEADER,
+    read_launch_id,
 )
 from forge.session.claude.invoke import (
     ClaudeBinaryNotFoundError,
@@ -94,6 +95,49 @@ class TestBuildCommand:
 
 class TestBuildEnvironment:
     """Tests for _build_environment()."""
+
+    @pytest.mark.parametrize("marked", [False, True], ids=["unmarked", "marked"])
+    def test_launch_header_uses_committed_root(self, monkeypatch: pytest.MonkeyPatch, marked: bool) -> None:
+        from forge.core.reactive.env import RunIdentity
+
+        monkeypatch.setattr("forge.core.usage.correlation.target_is_forge_proxy", lambda url: True)
+        monkeypatch.setenv(
+            ANTHROPIC_CUSTOM_HEADERS_VAR,
+            "X-User: keep\nx-forge-launch: run_bbbbbbbbbbbb",
+        )
+        identity = RunIdentity("run_aaaaaaaaaaaa", None, "run_aaaaaaaaaaaa")
+        extras = {"ANTHROPIC_BASE_URL": "http://localhost:8085"}
+        if marked:
+            extras["FORGE_AUTHORITY_MARKER"] = "validated"
+
+        env = _build_environment(extras, run_identity=identity)
+
+        assert read_launch_id(env[ANTHROPIC_CUSTOM_HEADERS_VAR]) == identity.run_id
+        assert "X-User: keep" in env[ANTHROPIC_CUSTOM_HEADERS_VAR]
+        assert "X-Forge-Session" not in env[ANTHROPIC_CUSTOM_HEADERS_VAR]
+        assert "X-Forge-Run-ID" not in env[ANTHROPIC_CUSTOM_HEADERS_VAR]
+
+    @pytest.mark.parametrize("base_url", [None, "https://opaque.example.invalid"])
+    def test_non_proxy_launch_scrubs_inherited_header(
+        self, monkeypatch: pytest.MonkeyPatch, base_url: str | None
+    ) -> None:
+        monkeypatch.setattr("forge.core.usage.correlation.target_is_forge_proxy", lambda url: False)
+        monkeypatch.setenv(
+            ANTHROPIC_CUSTOM_HEADERS_VAR,
+            "X-User: keep\nX-Forge-Launch: run_aaaaaaaaaaaa",
+        )
+        extras = {"ANTHROPIC_BASE_URL": base_url} if base_url else {}
+        env = _build_environment(extras, unset_vars=[] if base_url else ["ANTHROPIC_BASE_URL"])
+        assert env[ANTHROPIC_CUSTOM_HEADERS_VAR] == "X-User: keep"
+
+    def test_each_interactive_launch_uses_a_new_header(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("forge.core.usage.correlation.target_is_forge_proxy", lambda url: True)
+        extras = {"ANTHROPIC_BASE_URL": "http://localhost:8085"}
+        first = _build_environment(extras)
+        second = _build_environment(extras)
+        assert read_launch_id(first[ANTHROPIC_CUSTOM_HEADERS_VAR]) != read_launch_id(
+            second[ANTHROPIC_CUSTOM_HEADERS_VAR]
+        )
 
     def test_inherits_current_environment(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Should include current environment variables."""
