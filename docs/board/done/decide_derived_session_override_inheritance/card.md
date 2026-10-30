@@ -4,8 +4,8 @@
 
 **Lane**: `done/` -- shipped on 2026-10-28 in [PR #284](https://github.com/hapa1i/multi-forge/pull/284), merged as
 `3ad15937` with the same tree as reviewed head `864cb926`. The maintainer selected the inheritance contract on
-2026-10-27. Uniform pre-derivation validation is active in the separate
-[implementation card](../../doing/validate_derived_session_overrides/card.md). See
+2026-10-27. Uniform pre-derivation validation subsequently shipped in PR #294; see its
+[implementation card](../../done/validate_derived_session_overrides/card.md). See
 [merged closeout](checklist.md#merged-closeout).
 
 **Parent epic**: [`epic_repo_maintenance_round`](../../done/epic_repo_maintenance_round/card.md) (completed provenance).
@@ -22,7 +22,7 @@ settings; relaunch retains valid live overrides as a separate layer, with reset 
 The 2026-10-27 recheck confirms the distinction and existing regressions that require relaunch to preserve disabled
 policy. [Evidence](evidence.md) records the verified behavior and validation gaps. Pre-merge review also fixed
 proxy-pair inheritance, wildcard lane writes and malformed-supervisor reset diagnostics, and removed the unreachable
-relaunch fallback. Uniform pre-derivation validation has not shipped.
+relaunch fallback. The separate validation implementation shipped on 2026-10-30.
 
 ## Original evidence
 

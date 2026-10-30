@@ -11,6 +11,22 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 
 ## 2026-10-30
 
+### Validate parent overrides before deriving sessions
+
+**Goal**: Refuse invalid parent configuration before creating children or triggering derivation side effects.
+
+- Guard fork, fresh resume and relaunch before route realization, legacy identity migration, replacement deletion,
+  worktree creation and transfer work, while retaining the selected inheritance layers and readiness boundaries.
+- Reject native-source identity in generic writes and offer recovery admitted by supervisor identity checks. Disclose
+  reset-all's effect on unrelated overrides and keep corrupt-manifest errors independent of resume-path classification.
+- Sync session design and user guidance; correct the status-line integration proxy test double left by PR #292.
+
+**Verification**: [PR #294](https://github.com/hapa1i/multi-forge/pull/294) merged as `1f2f7fce`, with a tree identical
+to tested head `f0aaf79a`. Final CI passed 11,596 unit tests and 2,456 regressions on both Python lanes, both
+clean-wheel smokes, exact test-ID comparison and pre-commit. Local Docker checks passed 64 lifecycle and 18 status-line
+tests without live inference. The [closeout](done/validate_derived_session_overrides/checklist.md#merged-closeout)
+retains results and warnings; broader corrupt-state recovery remains a separate proposal.
+
 ### Verify the supported Python CI lanes
 
 **Goal**: Exercise Python 3.11 and 3.13 explicitly while retaining the reviewed lock and local development default.

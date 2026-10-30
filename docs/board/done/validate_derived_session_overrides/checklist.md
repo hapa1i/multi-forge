@@ -1,7 +1,7 @@
 # Derived-session override validation checklist
 
-**Current focus:** [PR #294](https://github.com/hapa1i/multi-forge/pull/294) review and CI. Parent validation now
-precedes derivation side effects while preserving the selected
+**Status:** Complete. [PR #294](https://github.com/hapa1i/multi-forge/pull/294) merged on 2026-10-30 as `1f2f7fce`.
+Parent validation precedes derivation side effects while preserving the selected
 [inheritance contract](../../done/decide_derived_session_override_inheritance/decision.md).
 
 **Execution:** `codex/derived-session-override-validation`, based on `04c9620d` (`main`), accepted 2026-10-30.
@@ -102,13 +102,37 @@ checklist retains their result summary and the checked-in tests reproduce the ac
 - [x] Verify the integrated review fixes with aggregate unit/regression, targeted Docker and full hooks: **11,596 unit**
   passed in 103.69 seconds; **2,456 regression** passed in 123.47 seconds; **64 Docker** passed in 63.96 seconds; all
   hooks passed. Docker used the same no-live-inference command above, including ten new persisted CLI cases for native
-  source authoring and nullable clears. Final-head CI is the remaining live review gate on PR #294 and must pass before
-  merge.
+  source authoring and nullable clears. Final-head CI passed; see [merged closeout](#merged-closeout).
+- [x] Fix the status-line integration test double left behind by PR #292's `include_effort` argument. Reproduce the
+  `TypeError`, then verify model/cost layouts with effort lookup enabled/disabled and unchanged source-call counts. The
+  full status-line Docker file passed **18 tests**; focused effort/source-plan checks passed **75 tests**; full
+  pre-commit passed. This test-only follow-up is commit `f0aaf79a`.
 
 ## Closeout after merge
 
-- [ ] Confirm merged commit and required checks, then record final verification and completed-work change-log entry.
-- [ ] Move this card to `done/` and repoint inbound links; verify design/end-user docs match shipped behavior.
+- [x] Confirm merged commit and required checks, then record final verification and completed-work change-log entry.
+- [x] Move this card to `done/` and repoint inbound links; verify design/end-user docs match shipped behavior.
+
+## Merged closeout
+
+- [PR #294](https://github.com/hapa1i/multi-forge/pull/294) merged as `1f2f7fce` on 2026-10-30. Its tree is identical to
+  final tested head `f0aaf79a` (`97f0b3063e5355a3bd429fc10dec463ae666b816`).
+- Final [Tests](https://github.com/hapa1i/multi-forge/actions/runs/41114309556) passed **11,596 unit** and **2,456
+  regression** tests on each of Python **3.11.17** and **3.13.17**. Both lanes verified their controller and four
+  workers, and both clean-wheel LiteLLM startup, health and process-group cleanup checks passed.
+- The [selection comparison](https://github.com/hapa1i/multi-forge/actions/runs/41114309556/job/124267091644) confirmed
+  identical test-ID multisets for both suites. Final
+  [Pre-commit](https://github.com/hapa1i/multi-forge/actions/runs/41114309456) passed all hooks. No tests failed or were
+  skipped. Python 3.13 emitted eight existing multiprocessing `fork()` deprecation warnings; artifact download emitted a
+  Node `Buffer()` deprecation warning.
+- Local evidence above includes **64 lifecycle Docker tests**, **18 status-line Docker tests**, the full unit and
+  regression suites, and full pre-commit. No live inference was required. CI artifacts expire on 2026-11-29; this
+  checked-in summary and the tests retain the acceptance evidence independently of temporary logs and artifacts.
+- Session design and the session guide describe the shipped guard, protected write paths, admitted recovery and
+  reset-all consequences. The reviewed structural-validation boundary is recorded in the
+  [session implementation notes](../../impl_notes/sessions.md#validate-derivation-before-any-side-effects-reviewed-2026-10-30).
+- [Scoped corrupt-state recovery](../../proposed/scoped_corrupt_state_recovery/card.md) remains a separate proposal;
+  this closeout does not activate it.
 
 No design decision is blocked. Ordinary reattach, Codex bridging, routing policy and concurrent snapshot guarantees are
 outside this card.

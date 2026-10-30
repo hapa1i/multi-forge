@@ -8,6 +8,19 @@ Durable session, transcript, transfer, memory, and Codex-session decisions.
 
 ## Notes
 
+### Validate derivation before any side effects (reviewed 2026-10-30)
+
+- Validate the parent's sparse override paths and effective types before CLI route realization and manager legacy
+  identity migration, then recheck under the existing lease before child or replacement writes. Manager-only admission
+  is too late for CLI proxy startup.
+- Keep structural validation free of reviewer, credential and source readiness checks. Recovery must satisfy the real
+  reset operation's supervisor identity rules; an override that can be deleted is not necessarily safe to reset.
+- Reject lifecycle-owned fields at generic authoring as well as derivation. Explicit null identity is still a write;
+  clearing a permitted nullable parent does not imply an identity override.
+
+Sources: [reviewed closeout](../done/validate_derived_session_overrides/checklist.md#merged-closeout) and
+[session design](../../design_sessions.md#derived-session-configuration).
+
 ### Derived configuration keeps layer provenance (reviewed 2026-10-28)
 
 - Select inheritance by operation: fork/fresh take selected baseline fields plus effective memory `auto_update`;

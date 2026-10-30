@@ -1,7 +1,7 @@
 # Scope corrupt-state recovery to the affected resource
 
 **Lane:** `proposed/` -- P2 follow-up from
-[derived-session override validation](../../doing/validate_derived_session_overrides/card.md).
+[derived-session override validation](../../done/validate_derived_session_overrides/card.md).
 
 ## Problem and evidence
 

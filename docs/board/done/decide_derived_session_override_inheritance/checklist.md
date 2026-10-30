@@ -1,8 +1,8 @@
 # Derived-session override inheritance checklist
 
 **Status:** Complete. PR #284 merged on 2026-10-28 as `3ad15937`; the decision, bounded fixes and documentation are
-shipped and verified. Uniform derivation validation is active in
-[the implementation card](../../doing/validate_derived_session_overrides/card.md).
+shipped and verified. Uniform derivation validation subsequently shipped in PR #294; see
+[the implementation card](../../done/validate_derived_session_overrides/card.md).
 
 ## Evidence
 
@@ -23,7 +23,7 @@ shipped and verified. Uniform derivation validation is active in
 - [x] Specify immutable/lifecycle-owned keys, invalid legacy state and recovery without silent repair.
 - [x] Specify child reset semantics and distinguish reattach from a new session.
 - [x] Resolve the product choice with the maintainer: keep the fork/fresh versus relaunch distinction.
-- [x] Create [the validation implementation proposal](../../doing/validate_derived_session_overrides/card.md) with
+- [x] Create [the validation implementation proposal](../../done/validate_derived_session_overrides/card.md) with
   fixture-grounded acceptance after the decision; it was left unstarted at this decision's closeout.
 
 ## Closeout
@@ -38,8 +38,8 @@ shipped and verified. Uniform derivation validation is active in
 - [x] Run focused regressions, aggregate unit/regression, targeted Docker and full pre-commit checks; prepare the
   reviewed PR #284 update. See [revision verification](evidence.md#revision-verification).
 
-- [x] Document shipped inheritance/reset behavior in session and memory design plus the session/policy guides; retain
-  the explicit unshipped validation limitation and its follow-up owner.
+- [x] Document shipped inheritance/reset behavior in session and memory design plus the session/policy guides; at the
+  decision closeout, retain the explicit unshipped validation limitation and its follow-up owner.
 
 - [x] Run Markdown formatting, link, file-size and diff checks: `make pre-commit-md` passed with the refreshed,
   content-matched session-guide count. See [initial verification](evidence.md#initial-documentation-verification).
@@ -62,5 +62,6 @@ shipped and verified. Uniform derivation validation is active in
   override-only verification setup, reset/admission limits and live inherited plans. The reviewed contract is recorded
   in the
   [session implementation notes](../../impl_notes/sessions.md#derived-configuration-keeps-layer-provenance-reviewed-2026-10-28).
-- [Uniform pre-derivation validation](../../doing/validate_derived_session_overrides/card.md) is now active. It owns
-  refusal before proxy startup, transfer work and forced fork replacement; this closeout does not activate it.
+- [Uniform pre-derivation validation](../../done/validate_derived_session_overrides/card.md) subsequently shipped in PR
+  #294 on 2026-10-30. It adds refusal before proxy startup, transfer work and forced fork replacement; it was not part
+  of this decision's original closeout.

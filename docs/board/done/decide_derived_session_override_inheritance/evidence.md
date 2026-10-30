@@ -23,8 +23,8 @@ fixtures; no real session state was changed.
 
 At the inspected base, the fork section of the [session guide](../../../end-user/session.md) said the session's intent,
 overrides and confirmed sections were copied wholesale. That conflicted with the manager and existing lane/authority
-tests. This decision package corrects the guide; runtime validation is tracked in
-[the implementation card](../../doing/validate_derived_session_overrides/card.md).
+tests. This decision package corrected the guide; runtime validation subsequently shipped in PR #294 and is recorded in
+[the implementation card](../../done/validate_derived_session_overrides/card.md).
 
 ## Isolated characterization
 
