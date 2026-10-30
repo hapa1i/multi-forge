@@ -1,6 +1,7 @@
 # Preserve the documented LiteLLM backup
 
-**Status:** Doing. Branch `codex/fix-litellm-backup-docs`, based on `e469fccf`. See [checklist](checklist.md).
+**Status:** Done. Shipped on 2026-10-29 in [PR #287](https://github.com/hapa1i/multi-forge/pull/287), merged as
+`addf8f7e`; board closeout recorded on 2026-10-30. See [checklist](checklist.md).
 
 The [backend upgrade procedure](../../../end-user/proxy.md#updating-saved-proxy-and-backend-configurations) saves
 `config.yaml.bak` inside the adapter directory that `forge model backend delete litellm` removes. Following the

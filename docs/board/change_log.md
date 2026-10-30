@@ -11,6 +11,17 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 
 ## 2026-10-30
 
+### Close the LiteLLM backup documentation fix
+
+**Goal**: Preserve custom backend configuration through the documented adapter recreation procedure.
+
+- Store the backup outside the directory removed by `forge model backend delete litellm`.
+
+**Verification**: [PR #287](https://github.com/hapa1i/multi-forge/pull/287) shipped as `addf8f7e` on 2026-10-29 with
+passing CI and Markdown checks. An isolated copy/delete/create control proved that the corrected backup retains the
+custom bytes; no backend or inference was started. The [card](done/litellm_backup_docs/checklist.md#merged-closeout) is
+now closed; runtime behavior is unchanged.
+
 ### Show effective session reasoning effort
 
 **Goal**: Make the effort Forge sends visible beside the session model and explain differences from Claude's setting.
