@@ -60,8 +60,8 @@ The numeric override smoke used
 log reported `created: 8/8 workers` and one passing test in 8.89 seconds.
 
 The CI comparison and Part B integration measurements below are separate from these local results. The later
-hook-emission ordering failure reopens unit stability validation; the unchanged regression suite's three passing runs
-remain accepted.
+hook-emission ordering failure required the renewed unit stability validation recorded below; the unchanged regression
+suite's three passing runs remain accepted.
 
 ## CI serial baseline
 
@@ -165,10 +165,38 @@ multiplicity and runtime pairing while retaining the returned-result order and s
 counts are unchanged. The failed log is saved at
 `/tmp/forge-test-suite-runtime-20261030/ci-final-grouped-hook-failure.log`.
 
-All seven tests in the grouped-invoker file passed on four workers in 0.81 seconds, and full pre-commit passed. Three
-consecutive complete unit runs and CI must pass after this fix before unit stability and CI adoption are complete. The
-earlier unit measurements remain historical evidence; the unchanged regression three-run evidence and Part B validation
-remain accepted.
+All seven tests in the grouped-invoker file passed on four workers in 0.81 seconds, and full pre-commit passed. The
+following full-suite and CI checks complete validation of the fix. The earlier unit measurements remain historical
+evidence; the unchanged regression three-run evidence and Part B validation remain accepted.
+
+## Renewed unit stability and CI validation
+
+At `2469ec36a1771e023cdfdd366e73045ecbe4e3e2`, three consecutive complete Make unit runs passed all 11,234 tests without
+failures, errors, skips or retries. Wall times were 78.757, 74.711 and 75.868 seconds, giving a median of 75.868 seconds
+versus the matching 270.954-second serial run, a 72.0% reduction.
+
+All three JUnit test-case multisets match each other, the serial baseline and the earlier accepted local runs after
+exactly the two previously recorded unit parameter-ID renames. The hook-ordering assertion fix introduces no test
+identity or count changes. Raw logs and JUnit reports are under
+`/tmp/forge-test-suite-runtime-20261030/unit-hook-order-*`; `unit-hook-order-stability.json` records wall times and
+`unit-hook-order-identity-comparison.json` records the comparisons.
+
+[Tests run 40984787664](https://github.com/hapa1i/multi-forge/actions/runs/40984787664) passed on the same runner image,
+Python and pytest versions as the earlier CI runs, with four workers per suite:
+
+| Suite      | Step wall seconds | Pytest seconds | Result        |
+| ---------- | ----------------- | -------------- | ------------- |
+| Unit       | 84                | 81.11          | 11,234 passed |
+| Regression | 95                | 95.08          | 2,218 passed  |
+
+The exact passing IDs match the bounded-ID candidate, with no failures, skips or retries. The clean-wheel runtime smoke
+passed in 11 seconds, and the complete Tests job took 202 seconds.
+[Pre-commit run 40984787661](https://github.com/hapa1i/multi-forge/actions/runs/40984787661) passed with an 83-second
+checks step. Evidence is preserved under `/tmp/forge-test-suite-runtime-20261030/ci-hook-order*`.
+
+The renewed local stability and green CI close the reopened unit gates. Retain the automatic four-worker cap for both CI
+suites: the latest wall times of 84 and 95 seconds improve on the 288- and 293-second serial baseline, corroborating the
+earlier bounded-ID candidate's 122 and 121 seconds.
 
 ## Part B integration baseline
 
@@ -251,5 +279,5 @@ distribution, automatic workers capped by `--maxprocesses`, and `-n 0` for seria
 `auto` were the local candidates. The default is automatic selection capped at four workers, preserving an explicit
 numeric override. Ten workers saved 11 seconds on unit and 19 seconds on regression but used about 65% more CPU time
 than four; the cap leaves capacity for other work on shared hosts. Local stability and serial-debugging checks pass.
-Regression CI meets the improvement gate, and Part B's clean integration validation passes. Unit stability and CI
-validation are reopened for the hook-ordering test fix.
+Both CI suites meet the improvement gate, renewed unit stability passes, and Part B's clean integration validation
+passes.
