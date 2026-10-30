@@ -24,6 +24,8 @@ from forge.backend.registry import ManagedBackendProcess
 from forge.core.paths import get_forge_home
 from forge.core.state import now_iso
 
+STARTUP_HEALTH_TIMEOUT_S = 30.0
+
 
 class LiteLLMAdapter(BackendAdapter):
     """Adapter for managing LiteLLM backend processes.
@@ -38,7 +40,7 @@ class LiteLLMAdapter(BackendAdapter):
     which checks BackendDependency.required_env_vars before starting.
     """
 
-    def _wait_for_health(self, port: int, timeout: float = 15.0) -> bool:
+    def _wait_for_health(self, port: int, timeout: float = STARTUP_HEALTH_TIMEOUT_S) -> bool:
         """Wait for backend to become healthy.
 
         Uses /health/liveliness (not /health) because the full health endpoint
@@ -53,18 +55,20 @@ class LiteLLMAdapter(BackendAdapter):
         Returns:
             True if healthy within timeout, False otherwise
         """
-        start_time = time.time()
+        deadline = time.monotonic() + timeout
         url = f"http://localhost:{port}/health/liveliness"
 
-        while time.time() - start_time < timeout:
-            try:
-                with httpx.Client(timeout=httpx.Timeout(2.0)) as client:
-                    response = client.get(url)
+        with httpx.Client(timeout=httpx.Timeout(2.0)) as client:
+            while (remaining := deadline - time.monotonic()) > 0:
+                try:
+                    response = client.get(url, timeout=min(2.0, remaining))
                     if response.status_code == 200:
                         return True
-            except (httpx.RequestError, httpx.TimeoutException):
-                pass
-            time.sleep(0.5)
+                except httpx.RequestError:
+                    pass
+                remaining = deadline - time.monotonic()
+                if remaining > 0:
+                    time.sleep(min(0.5, remaining))
 
         return False
 
@@ -107,7 +111,7 @@ class LiteLLMAdapter(BackendAdapter):
                 start_new_session=True,  # Detach from parent
             )
 
-        if not self._wait_for_health(port, timeout=10):
+        if not self._wait_for_health(port, timeout=STARTUP_HEALTH_TIMEOUT_S):
             try:
                 os.killpg(proc.pid, signal.SIGKILL)
             except ProcessLookupError:

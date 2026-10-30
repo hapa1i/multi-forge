@@ -35,6 +35,12 @@ Both pinned wheel smokes use an explicit `FORGE_WHEEL_SMOKE_PYTHON`, isolated en
 They check hash-constrained dependency installation, local LiteLLM startup/health, process-group shutdown and temporary
 directory removal. No provider inference or dependency changes are involved.
 
+The [third CI attempt](ci-third-attempt.json) passed both complete suites but exposed the existing ten-second backend
+readiness limit in both installed-wheel checks. [Controlled cold-start probes](local-cold-start.json) retain successful
+and failed Linux measurements, including a healthy start after 14.206s. The adapter now gives cold startup a 30-second
+monotonic readiness budget; the smoke does not prewarm imports. Delayed readiness and exhausted-budget regressions cover
+the single launch and full process-group cleanup paths.
+
 Compact results and exact-identity comparison summaries are retained beside this file. Full local reports and logs under
 `/tmp/forge-python-minimum-ci-20261030/` are temporary. CI uploads full reports and a compact comparison summary with
 30-day retention; completed acceptance summaries belong in this directory rather than relying on those expiring files.

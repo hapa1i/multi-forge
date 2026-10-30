@@ -53,8 +53,8 @@ changes. [Check summaries](evidence/local-checks.json) retain input/log hashes a
 
 Full pre-commit passed. Independent review found two evidence issues, both corrected: a nested collection probe now
 preserves its parent's report, and failed comparison summaries are uploaded in CI. Matrix/comparison CI remains the PR
-merge gate. This card changes test infrastructure and maintainer workflow; product architecture and end-user behavior
-are unchanged.
+merge gate. The initial implementation changed test infrastructure and maintainer workflow; the cold-start correction
+below also adjusts the existing backend readiness allowance.
 
 ## CI fixture correction
 
@@ -75,3 +75,26 @@ lanes then failed one cross-project session assertion because the CI temporary p
 helper now overrides the existing console width, and the subprocess guard starts narrower than `subproject`. Before this
 additional repair, sequential full local regression runs already passed all 2,258 cases on both versions under
 `COLUMNS=80` (95.88s on 3.11 and 104.85s on 3.13); the CI failure depended on the temporary path length.
+
+## Cold-start readiness
+
+The [third CI attempt](evidence/ci-third-attempt.json) passed all unit and regression cases on both versions, then both
+clean-wheel smokes hit the adapter's existing 10-second readiness deadline. The new matrix selects the intended
+interpreter; it does not reroute the installed backend process.
+[Controlled Linux probes](evidence/local-cold-start.json) show a valid fresh-wheel start taking 14.206s without
+prewarming. A more severely CPU-limited probe remained unhealthy at 45s; the fix does not promise startup under
+arbitrary resource starvation.
+
+- [x] Give startup a named 30-second monotonic readiness budget, with bounded polling and the existing failure cleanup.
+- [x] Reproduce delayed readiness after 12s and verify a never-ready process still receives one process-group kill.
+- [x] Update runtime design and operator guidance for the startup allowance.
+- [x] Verify real process-group integration and unmodified cold-wheel startup after the correction.
+- [ ] Pass full pre-commit and both complete CI lanes, including wheel smoke and exact test-selection comparison.
+
+The smoke keeps its cold install and existing assertions. Missing-registry cleanup refusal after failed startup still
+preserves evidence; no cleanup ownership or retry policy changes are included.
+
+The two real LiteLLM teardown integration cases passed. Fresh-wheel smoke passed on macOS Python 3.11.14 and Linux
+Python 3.13.11 at 0.4 CPU without diagnostic overrides or warmup. Focused backend unit/regression checks passed all 13
+cases; independent review found no blocking issue. The controlled probe and check summaries retain the earlier failures
+alongside these results.
