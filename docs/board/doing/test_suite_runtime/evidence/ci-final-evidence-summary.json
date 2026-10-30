@@ -1,0 +1,33 @@
+{
+  "head_sha": "7bd19ebb9f7f3094cc53438add4fdc5b07bc00e9",
+  "tests": {
+    "run_url": "https://github.com/hapa1i/multi-forge/actions/runs/40985566400",
+    "conclusion": "failure",
+    "steps": [
+      {
+        "name": "Run unit tests",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run regression tests",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify clean wheel LiteLLM runtime",
+        "conclusion": "failure"
+      }
+    ]
+  },
+  "precommit": {
+    "run_url": "https://github.com/hapa1i/multi-forge/actions/runs/40985566382",
+    "conclusion": "success"
+  },
+  "log_evidence": [
+    "2026-10-30T01:25:06.2029029Z ================= 11234 passed, 8 warnings in 81.54s (0:01:21) =================",
+    "2026-10-30T01:26:32.5680975Z ======================= 2218 passed in 85.25s (0:01:25) ========================",
+    "2026-10-30T01:26:42.3370974Z Clean wheel install and LiteLLM start/health smoke passed.",
+    "2026-10-30T01:26:43.2745701Z rm: cannot remove '/tmp/multi-forge-wheel-smoke.59w2WH/venv/lib/python3.13/site-packages': Directory not empty",
+    "2026-10-30T01:26:43.2764045Z ##[error]Process completed with exit code 1."
+  ],
+  "diagnosis": "Runtime build/install/start/health succeeded; EXIT-trap rm -rf failed with Directory not empty. Concurrent writer/teardown race is plausible, but writer identity and stop result are not observable in this log. No evidence of external network failure."
+}

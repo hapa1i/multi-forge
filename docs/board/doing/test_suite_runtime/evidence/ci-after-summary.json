@@ -1,0 +1,146 @@
+{
+  "head_sha": "8d47d11abb3ad06d7368c1982821cd12ebed9543",
+  "job_id": 123816104669,
+  "conclusion": "success",
+  "job_seconds": 473.0,
+  "steps": [
+    {
+      "name": "Set up job",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "conclusion": "success",
+      "wall_seconds": 2.0
+    },
+    {
+      "name": "Set up Python",
+      "conclusion": "success",
+      "wall_seconds": 1.0
+    },
+    {
+      "name": "Install uv",
+      "conclusion": "success",
+      "wall_seconds": 2.0
+    },
+    {
+      "name": "Install dependencies",
+      "conclusion": "success",
+      "wall_seconds": 4.0
+    },
+    {
+      "name": "Verify dependency pins",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Run unit tests",
+      "conclusion": "success",
+      "wall_seconds": 116.0
+    },
+    {
+      "name": "Run regression tests",
+      "conclusion": "success",
+      "wall_seconds": 328.0
+    },
+    {
+      "name": "Verify clean wheel LiteLLM runtime",
+      "conclusion": "success",
+      "wall_seconds": 16.0
+    },
+    {
+      "name": "Post Install uv",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Post Set up Python",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "conclusion": "success",
+      "wall_seconds": 1.0
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    }
+  ],
+  "node_ids": {
+    "src": {
+      "passed_count": 11234,
+      "unique_count": 11234,
+      "exact_match_before": true,
+      "missing": [],
+      "added": [],
+      "worker_counts": {
+        "gw0": 1892,
+        "gw1": 2844,
+        "gw2": 3287,
+        "gw3": 3211
+      },
+      "walkthrough_counts": {}
+    },
+    "regression": {
+      "passed_count": 2218,
+      "unique_count": 2218,
+      "exact_match_before": true,
+      "missing": [],
+      "added": [],
+      "worker_counts": {
+        "gw3": 1007,
+        "gw1": 275,
+        "gw0": 619,
+        "gw2": 317
+      },
+      "walkthrough_counts": {
+        "gw3": 17,
+        "gw0": 9,
+        "gw2": 8,
+        "gw1": 29
+      }
+    }
+  },
+  "log_evidence": [
+    "2026-10-30T00:25:44.0072879Z Image: ubuntu-26.04",
+    "2026-10-30T00:25:44.0073501Z Version: 20261025.179.1",
+    "2026-10-30T00:26:19.0903479Z platform linux -- Python 3.13.11, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/work/multi-forge/multi-forge/.venv/bin/python",
+    "2026-10-30T00:26:19.0909814Z created: 4/4 workers",
+    "2026-10-30T00:27:48.8741157Z ================ 11234 passed, 8 warnings in 112.80s (0:01:52) =================",
+    "2026-10-30T00:27:57.2890969Z platform linux -- Python 3.13.11, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/work/multi-forge/multi-forge/.venv/bin/python",
+    "2026-10-30T00:27:57.2895496Z created: 4/4 workers",
+    "2026-10-30T00:33:17.4919932Z ======================= 2218 passed in 137.57s (0:02:17) =======================",
+    "2026-10-30T00:33:32.2911390Z Clean wheel install and LiteLLM start/health smoke passed."
+  ],
+  "comparison": {
+    "unit": {
+      "serial_step_seconds": 288,
+      "parallel_step_seconds": 116,
+      "serial_pytest_seconds": 283.01,
+      "parallel_pytest_seconds": 112.8,
+      "wall_reduction_percent": 59.72222222222222
+    },
+    "regression": {
+      "serial_step_seconds": 293,
+      "parallel_step_seconds": 328,
+      "serial_pytest_seconds": 290.92,
+      "parallel_pytest_seconds": 137.57,
+      "wall_increase_percent": 11.945392491467576
+    },
+    "job": {
+      "serial_seconds": 611,
+      "parallel_seconds": 473
+    }
+  },
+  "recommendation": "Unit meets the measured CI improvement gate. Regression adoption remains pending because step wall time increased despite lower pytest-reported time.",
+  "caveat": "Candidate Actions logs print a 262KB oversized-header parameter ID twice; long timestamp gaps surround these lines. Existing local JUnit timings for that case are 0.004-0.005 seconds. Output handling is the leading explanation, not yet confirmed by a short-ID CI run.",
+  "precommit": {
+    "job_id": 123816104698,
+    "conclusion": "success",
+    "check_step_seconds": 88.0
+  }
+}

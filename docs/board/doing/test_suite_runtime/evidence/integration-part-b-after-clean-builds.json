@@ -1,0 +1,21 @@
+{
+  "exitstatus": 0,
+  "builds": [
+    {
+      "builder": "build_wheel",
+      "passed": true,
+      "wheel_sha256": "e969e353d0d93f2c24abd92a3316dac1d4234db6c01030842251281f6460b87e",
+      "seconds": 0.463
+    },
+    {
+      "builder": "build_qa_image",
+      "passed": true,
+      "seconds": 77.072
+    },
+    {
+      "builder": "build_qa_image",
+      "passed": true,
+      "seconds": 2.01
+    }
+  ]
+}

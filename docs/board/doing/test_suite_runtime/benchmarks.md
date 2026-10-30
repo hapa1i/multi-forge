@@ -5,6 +5,11 @@ trials added pytest-xdist 3.8.0 and execnet 2.1.2 through exact `uv run --with` 
 The stability runs use those versions in the reviewed lock and the adopted Make targets. Tests and builds run
 sequentially on this host. Source baseline: `f9faedd9`.
 
+The [retained evidence](evidence/README.md) includes compact JSON results and
+[source hashes with verification conclusions](evidence/provenance.json). Raw logs, JUnit reports, node-ID lists and job
+metadata were collected in `/tmp/forge-test-suite-runtime-20261030`; they are ephemeral local files and are not retained
+in this repository. CI run links remain subject to GitHub's retention policy.
+
 ## Local results
 
 Initial trial wall time includes uv/pytest startup and is recorded with `/usr/bin/time -p`. Pytest time is its reported
@@ -33,6 +38,8 @@ same phrase check. Product behavior and the test count are unchanged.
 The adopted Make targets run `--dist=load -n auto --maxprocesses=4`, selecting four workers on this host. Each suite
 passed three consecutive complete runs after the initial isolation changes. The corresponding serial commands are
 `make test-unit TEST_WORKERS=0` and `make test-regression TEST_WORKERS=0`, so both sides include the Make prerequisites.
+The [initial stability summary](evidence/stability.json) retains recorded commands and wall times;
+[provenance](evidence/provenance.json) records the rechecked counts and normalized identity hashes.
 
 | Suite      | Parallel wall seconds, in run order | Median wall seconds | Matching Make serial wall seconds | Result per parallel run |
 | ---------- | ----------------------------------- | ------------------- | --------------------------------- | ----------------------- |
@@ -83,12 +90,12 @@ installed CPython 3.11.17, the pytest session headers confirm that uv ran both s
 Step wall times come from the completed job metadata and have one-second resolution. The complete Tests job took 611
 seconds, including setup and cleanup. Both suites had no failures, skips or retries; the unit suite reported eight
 `multiprocessing` fork deprecation warnings. The verbose log contains 11,234 unique passing unit node IDs and 2,218
-unique passing regression node IDs, retained for the parallel comparison.
+unique passing regression node IDs, used for the parallel comparison.
 
 [Pre-commit run 40977896302](https://github.com/hapa1i/multi-forge/actions/runs/40977896302) also passed, with 143
-seconds in its checks step. Completed job metadata, logs and extracted node IDs are saved locally under
-`/tmp/forge-test-suite-runtime-20261030/ci-before*`. The local Part A `make build`, clean-wheel runtime smoke and full
-`make pre-commit` also passed before the CI workflow candidate was prepared.
+seconds in its checks step. The [serial CI summary](evidence/ci-before-summary.json) retains step timings, result counts
+and runtime-version excerpts. The local Part A `make build`, clean-wheel runtime smoke and full `make pre-commit` also
+passed before the CI workflow candidate was prepared.
 
 ## First CI parallel candidate
 
@@ -111,8 +118,8 @@ Unit step wall time fell by 59.7%, meeting its CI improvement gate. Regression s
 regression adoption was deferred despite the lower pytest-reported duration. The candidate log prints the 262 KB
 generated node ID for the oversized executor-header parameter twice, with long timestamp gaps around those lines. The
 same case took 0.004-0.005 seconds in the local stability reports. Output handling was the leading explanation for the
-extra wall time, but this trial alone did not establish the cause or justify claiming a regression CI speedup. Logs,
-metadata, exact node IDs and comparison data are saved under `/tmp/forge-test-suite-runtime-20261030/ci-after*`.
+extra wall time, but this trial alone did not establish the cause or justify claiming a regression CI speedup. The
+[first parallel CI summary](evidence/ci-after-summary.json) retains the comparison and exact-identity result.
 
 A follow-up replaces three generated payload IDs with explicit labels:
 
@@ -124,8 +131,8 @@ A follow-up replaces three generated payload IDs with explicit labels:
 
 Only the IDs change: payload values, parameter order, assertions and test counts remain unchanged, including the first
 two executor-header IDs. The recorded local three-pass stability evidence still covers that behavior. All five
-affected-function cases (two unit and three regression) passed on four workers in 1.27 seconds; evidence is saved in
-`/tmp/forge-test-suite-runtime-20261030/bounded-ids.log` and `bounded-ids.xml`. Full pre-commit passed.
+affected-function cases (two unit and three regression) passed on four workers in 1.27 seconds. Their raw log and JUnit
+report were collected locally but are not retained here. Full pre-commit passed.
 
 ## Bounded-ID CI validation and adoption
 
@@ -147,8 +154,9 @@ step took 138 seconds.
 
 This candidate supports the Make targets' automatic four-worker cap for both CI suites: unit step wall time improved by
 57.6% and regression by 58.7% against serial. The bounded-ID candidate meets the regression wall-time gate; this
-comparison does not establish output handling as the sole cause of the first trial's overhead. Raw logs, job metadata,
-passing IDs and the comparison summary are preserved under `/tmp/forge-test-suite-runtime-20261030/ci-bounded*`.
+comparison does not establish output handling as the sole cause of the first trial's overhead. The
+[bounded-ID CI summary](evidence/ci-bounded-summary.json) retains timings, counts, exact-identity comparisons and the
+three explicit name mappings.
 
 ## Subsequent CI hook-ordering failure
 
@@ -162,8 +170,8 @@ input order, but observed `x1`, then `x0`. The returned-result order and stdout 
 each result inside its worker thread and restores input order only when constructing the returned list, so hook emission
 order is not guaranteed. The test fix sorts both invokers' emitted-label lists before comparison, preserving exact
 multiplicity and runtime pairing while retaining the returned-result order and stdout assertions. Product code and test
-counts are unchanged. The failed log is saved at
-`/tmp/forge-test-suite-runtime-20261030/ci-final-grouped-hook-failure.log`.
+counts are unchanged. The linked CI run contains the failure; [provenance](evidence/provenance.json) identifies the
+locally checked failure log by hash, without retaining the raw log.
 
 All seven tests in the grouped-invoker file passed on four workers in 0.81 seconds, and full pre-commit passed. The
 following full-suite and CI checks complete validation of the fix. The earlier unit measurements remain historical
@@ -177,9 +185,8 @@ versus the matching 270.954-second serial run, a 72.0% reduction.
 
 All three JUnit test-case multisets match each other, the serial baseline and the earlier accepted local runs after
 exactly the two previously recorded unit parameter-ID renames. The hook-ordering assertion fix introduces no test
-identity or count changes. Raw logs and JUnit reports are under
-`/tmp/forge-test-suite-runtime-20261030/unit-hook-order-*`; `unit-hook-order-stability.json` records wall times and
-`unit-hook-order-identity-comparison.json` records the comparisons.
+identity or count changes. The [renewed stability summary](evidence/unit-hook-order-stability.json) records wall times
+and the [identity comparison](evidence/unit-hook-order-identity-comparison.json) records exact multiset acceptance.
 
 [Tests run 40984787664](https://github.com/hapa1i/multi-forge/actions/runs/40984787664) passed on the same runner image,
 Python and pytest versions as the earlier CI runs, with four workers per suite:
@@ -192,18 +199,29 @@ Python and pytest versions as the earlier CI runs, with four workers per suite:
 The exact passing IDs match the bounded-ID candidate, with no failures, skips or retries. The clean-wheel runtime smoke
 passed in 11 seconds, and the complete Tests job took 202 seconds.
 [Pre-commit run 40984787661](https://github.com/hapa1i/multi-forge/actions/runs/40984787661) passed with an 83-second
-checks step. Evidence is preserved under `/tmp/forge-test-suite-runtime-20261030/ci-hook-order*`.
+checks step. The [hook-order CI summary](evidence/ci-hook-order-summary.json) retains these results and the exact
+identity comparison.
 
 The renewed local stability and green CI close the reopened unit gates. Retain the automatic four-worker cap for both CI
 suites: the latest wall times of 84 and 95 seconds improve on the 288- and 293-second serial baseline, corroborating the
 earlier bounded-ID candidate's 122 and 121 seconds.
 
+On the subsequent documentation-only head `7bd19ebb9f7f3094cc53438add4fdc5b07bc00e9`, both suites and the runtime
+start/health smoke passed, but temporary-venv removal failed with `Directory not empty`.
+[One job retry on the same commit](https://github.com/hapa1i/multi-forge/actions/runs/40985566400/attempts/2) passed
+both suites and cleanup; [pre-commit](https://github.com/hapa1i/multi-forge/actions/runs/40985566382) passed on its
+first attempt. The [first-attempt summary](evidence/ci-final-evidence-summary.json) and
+[retry summary](evidence/ci-final-evidence-attempt2-summary.json) preserve both outcomes. The log does not identify the
+writer, and the successful retry does not repair the possible teardown race.
+
 ## Part B integration baseline
 
-[Part B PR #291](https://github.com/hapa1i/multi-forge/pull/291), head `e6248907`, removes the 22 reviewed CLI mirrors
-listed in the [coverage map](cli_coverage.md) and shares one release wheel across the three consumers. Two unit twins
-now preserve the removed stdout assertions. The full pre-commit check passed, and an independent static review found no
-remaining issues. [CI tests](https://github.com/hapa1i/multi-forge/actions/runs/40979801953) passed all 11,234 unit and
+[Part B PR #291](https://github.com/hapa1i/multi-forge/pull/291) removes the 22 reviewed CLI mirrors listed in the
+[coverage map](cli_coverage.md) and shares one release wheel across the three consumers. Three unit twins now preserve
+the removed stdout assertions. The third, `test_start_defaults_to_direct`, was strengthened during review in `5a30b345`;
+its focused test and full pre-commit passed. The full integration measurements below are from the earlier `e6248907`
+revision, which passed pre-commit and its initial static review.
+[CI tests](https://github.com/hapa1i/multi-forge/actions/runs/40979801953) at that revision passed all 11,234 unit and
 2,218 regression cases plus the clean-wheel runtime smoke;
 [CI pre-commit](https://github.com/hapa1i/multi-forge/actions/runs/40979801879) also passed. The clean full integration
 comparison below completes the runtime validation.
@@ -218,16 +236,15 @@ for 19.359 seconds of measured test time.
 | `build_qa_image` | 2              | 97.007        |
 
 All three baseline wheel builds produced the same SHA-256. Both QA image builds remain necessary because their runtime
-metadata differs. Raw baseline evidence is in
-`/tmp/forge-test-suite-runtime-20261030/integration-part-b-before-summary.json` and
-`/tmp/forge-test-suite-runtime-20261030/integration-part-b-before-builds.json`.
+metadata differs. The retained [baseline summary](evidence/integration-part-b-before-summary.json) records test timings,
+and the [build summary](evidence/integration-part-b-before-builds.json) records the wheel hashes and build counts.
 
 The first after-change run selected 521 tests, the expected reduction of 22, but was interrupted after Docker's
 filesystem reached 100% usage. The guarded-worker npm build failed with `ENOSPC`; the sidecar audit container also
 exited, although its trace alone does not establish the cause. The incomplete result was 393 passed, 2 failed and 5
 reruns, with 1,012.34 seconds reported by pytest and 1,028.04 seconds runner wall time. These timings are invalid for
-the before/after comparison. Evidence is preserved under
-`/tmp/forge-test-suite-runtime-20261030/integration-part-b-after-disk-full.*`.
+the before/after comparison. The [disk-full summary](evidence/integration-part-b-after-disk-full-summary.json) retains
+the invalid result separately.
 
 The interrupted run's build probe recorded one wheel build in 0.636 seconds with the same SHA-256 as the baseline, and
 two QA image builds in 76.411 and 18.575 seconds. This confirms the observed build count and identity, but does not
@@ -260,10 +277,10 @@ seconds in the 22 removed tests plus 1.852 seconds in the two avoided wheel buil
 cache cleanup also changed cache state, so the remaining whole-run and image-build variation must not be attributed to
 the implementation.
 
-Exact identity, timing, build-count and disk evidence is summarized in
-`/tmp/forge-test-suite-runtime-20261030/integration-part-b-comparison.json`; the clean run's log, JUnit report, build
-probe and disk samples are preserved under `integration-part-b-after-clean*` in that directory. The interrupted run
-remains separate evidence and is excluded from the comparison.
+The [integration comparison](evidence/integration-part-b-comparison.json) retains exact identity subtraction, timings,
+build counts and disk observations. The [clean build summary](evidence/integration-part-b-after-clean-builds.json)
+retains the shared-wheel SHA-256; [provenance](evidence/provenance.json) records the checked JUnit multiset hashes. The
+interrupted run remains separate evidence and is excluded from the comparison.
 
 ## Dependency review
 

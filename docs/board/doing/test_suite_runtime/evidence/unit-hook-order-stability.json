@@ -1,0 +1,20 @@
+[
+  {
+    "run": "unit-hook-order-1",
+    "head": "2469ec36a1771e023cdfdd366e73045ecbe4e3e2",
+    "exit_code": 0,
+    "wall_seconds": 78.757
+  },
+  {
+    "run": "unit-hook-order-2",
+    "head": "2469ec36a1771e023cdfdd366e73045ecbe4e3e2",
+    "exit_code": 0,
+    "wall_seconds": 74.711
+  },
+  {
+    "run": "unit-hook-order-3",
+    "head": "2469ec36a1771e023cdfdd366e73045ecbe4e3e2",
+    "exit_code": 0,
+    "wall_seconds": 75.868
+  }
+]

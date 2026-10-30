@@ -6,11 +6,14 @@ Part A: [PR #290](https://github.com/hapa1i/multi-forge/pull/290). Part B:
 [PR #291](https://github.com/hapa1i/multi-forge/pull/291). The [CLI coverage map](cli_coverage.md) records every
 approved removal and retained command check.
 
+The [retained evidence](evidence/README.md) includes stability, identity-comparison, timing and CI outcome summaries.
+Raw logs and reports in `/tmp` are temporary local artifacts, not retained evidence.
+
 ## Current focus
 
 Complete review and merge of both PRs. The hook-emission ordering fix passes targeted checks, full pre-commit, three
-complete unit runs and CI. The renewed unit median is 75.868 seconds, and latest CI wall times are 84 seconds unit and
-95 seconds regression. Part B passes all 521 retained integration tests with one shared wheel build. Measurements,
+complete unit runs and CI. The renewed unit median is 75.868 seconds, and the recorded CI wall times are 84 seconds unit
+and 95 seconds regression. Part B passes all 521 retained integration tests with one shared wheel build. Measurements,
 earlier failures and the integration cache caveat are recorded in [benchmarks](benchmarks.md). Keep the card in `doing/`
 until both PRs are shipped and verified.
 
@@ -38,7 +41,8 @@ until both PRs are shipped and verified.
   test-case IDs match the first adopted parallel report.
 - [x] Record the successful CI serial baseline: unit 288 seconds / 11,234 passed; regression 293 seconds / 2,218 passed;
   clean-wheel runtime and pre-commit also passed. Actual suite Python is 3.13.11 despite setup-python installing
-  3.11.17.
+  3.11.17. Track minimum-version coverage separately in the
+  [Python CI proposal](../../proposed/python_minimum_ci_coverage/card.md).
 - [x] Run local `make build`, `./scripts/test-wheel-runtime.sh` and full `make pre-commit` for Part A before the CI
   workflow candidate.
 - [x] Compare the first CI parallel candidate with the serial baseline: both suites used four workers and retained exact
@@ -63,8 +67,10 @@ until both PRs are shipped and verified.
   total 2.888 seconds and two QA image builds total 97.007 seconds.
 - [x] Map the 22 approved removals to unit twins and retained real-process coverage in
   [cli_coverage.md](cli_coverage.md); their baseline test time totals 19.359 seconds.
-- [x] Preserve real-process `proxy validate`, `proxy set` and lifecycle/process checks; strengthen two unit twins to
+- [x] Preserve real-process `proxy validate`, `proxy set` and lifecycle/process checks; strengthen three unit twins to
   retain stdout assertions.
+- [x] Restore the default-direct twin's `Routing: direct` stdout check after review; the focused test and full
+  pre-commit pass in Part B commit `5a30b345`. Product code and integration fixtures are unchanged.
 - [x] Implement the shared release-wheel fixture while retaining independent build-policy tests.
 - [x] Retain separate QA images because caller-specific runtime metadata differs.
 - [x] Run full pre-commit for Part B and complete an independent static review with no remaining findings.
@@ -102,4 +108,9 @@ until both PRs are shipped and verified.
 - [x] Open Part B [PR #291](https://github.com/hapa1i/multi-forge/pull/291); full pre-commit, static review, CI and
   clean integration validation pass.
 - [x] Review the implementation diffs and open both authorized PRs with validation evidence.
+- [x] Retain the small acceptance summaries and source provenance under [evidence/](evidence/README.md), including the
+  exact identity comparisons and the cleanup failure followed by its successful same-commit retry.
+- [x] Record the pre-existing Python 3.11 coverage gap in a separate
+  [proposed card](../../proposed/python_minimum_ci_coverage/card.md). Keep the cleanup incident disclosed; propose a
+  separate cleanup card if it recurs.
 - [ ] After merge, sync completed-work records and move the card to `done/` only when all accepted scope has shipped.

@@ -1,0 +1,100 @@
+{
+  "passed": 543,
+  "deselected": 13613,
+  "pytest_seconds": 884.37,
+  "runner_seconds": 912.34,
+  "failures": 0,
+  "errors": 0,
+  "skips": 0,
+  "removed_tests": [
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_show_not_found_error",
+      "seconds": 0.754
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_validate_invalid_yaml",
+      "seconds": 0.813
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_validate_missing_required_field",
+      "seconds": 0.943
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_validate_not_found_error",
+      "seconds": 0.85
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_set_simple_field",
+      "seconds": 0.906
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_set_invalid_format_error",
+      "seconds": 0.898
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_set_not_found_error",
+      "seconds": 0.871
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_delete_removes_proxy_and_registry",
+      "seconds": 1.139
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_delete_not_found_error",
+      "seconds": 0.793
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_create_already_exists_error",
+      "seconds": 0.807
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_create_invalid_template_error",
+      "seconds": 0.753
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_create_with_custom_port",
+      "seconds": 0.796
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_list_with_invalid_json_registry",
+      "seconds": 0.806
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_list_with_missing_version_registry",
+      "seconds": 0.803
+    },
+    {
+      "test": "tests.integration.cli.test_proxy_commands_integration::test_list_with_wrong_version_registry",
+      "seconds": 0.83
+    },
+    {
+      "test": "tests.integration.cli.test_session_commands_integration::test_list_empty_shows_message",
+      "seconds": 0.743
+    },
+    {
+      "test": "tests.integration.cli.test_session_commands_integration::test_start_creates_session",
+      "seconds": 0.781
+    },
+    {
+      "test": "tests.integration.cli.test_session_commands_integration::test_start_defaults_to_direct",
+      "seconds": 0.775
+    },
+    {
+      "test": "tests.integration.cli.test_session_commands_integration::test_start_duplicate_fails",
+      "seconds": 1.307
+    },
+    {
+      "test": "tests.integration.cli.test_session_commands_integration::test_resume_nonexistent_fails",
+      "seconds": 0.752
+    },
+    {
+      "test": "tests.integration.cli.test_session_commands_integration::test_set_invalid_key_fails",
+      "seconds": 1.354
+    },
+    {
+      "test": "tests.integration.cli.test_session_commands_integration::test_set_no_session_fails",
+      "seconds": 0.885
+    }
+  ],
+  "removed_test_seconds": 19.359
+}

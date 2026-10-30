@@ -1,0 +1,182 @@
+{
+  "head_sha": "b567e2e1d690dc5708c26f4394f2be045d770a9f",
+  "run_id": 40982187613,
+  "job_id": 123824633073,
+  "conclusion": "success",
+  "job_seconds": 274.0,
+  "steps": [
+    {
+      "name": "Set up job",
+      "conclusion": "success",
+      "wall_seconds": 1.0
+    },
+    {
+      "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "conclusion": "success",
+      "wall_seconds": 2.0
+    },
+    {
+      "name": "Set up Python",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Install uv",
+      "conclusion": "success",
+      "wall_seconds": 3.0
+    },
+    {
+      "name": "Install dependencies",
+      "conclusion": "success",
+      "wall_seconds": 4.0
+    },
+    {
+      "name": "Verify dependency pins",
+      "conclusion": "success",
+      "wall_seconds": 1.0
+    },
+    {
+      "name": "Run unit tests",
+      "conclusion": "success",
+      "wall_seconds": 122.0
+    },
+    {
+      "name": "Run regression tests",
+      "conclusion": "success",
+      "wall_seconds": 121.0
+    },
+    {
+      "name": "Verify clean wheel LiteLLM runtime",
+      "conclusion": "success",
+      "wall_seconds": 16.0
+    },
+    {
+      "name": "Post Install uv",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Post Set up Python",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    }
+  ],
+  "node_ids": {
+    "src": {
+      "passed_count": 11234,
+      "unique_count": 11234,
+      "renamed_count": 2,
+      "normalized_exact_match_before": true,
+      "normalized_exact_match_first_parallel": true,
+      "missing": [],
+      "added": [],
+      "result_counts": {
+        "PASSED": 11234
+      },
+      "worker_counts": {
+        "gw0": 2237,
+        "gw1": 2494,
+        "gw2": 3213,
+        "gw3": 3290
+      },
+      "walkthrough_counts": {}
+    },
+    "regression": {
+      "passed_count": 2218,
+      "unique_count": 2218,
+      "renamed_count": 1,
+      "normalized_exact_match_before": true,
+      "normalized_exact_match_first_parallel": true,
+      "missing": [],
+      "added": [],
+      "result_counts": {
+        "PASSED": 2218
+      },
+      "worker_counts": {
+        "gw3": 973,
+        "gw1": 270,
+        "gw0": 667,
+        "gw2": 308
+      },
+      "walkthrough_counts": {
+        "gw0": 21,
+        "gw2": 8,
+        "gw3": 7,
+        "gw1": 27
+      }
+    }
+  },
+  "identity_mappings": [
+    {
+      "previous_id_length": 30081,
+      "previous_id_sha256": "92f35c54edc566b7cf70e3bdd2f1c3c87366a44f7d0d772de0b2dba53bb435d7",
+      "new_id": "tests/src/core/judgments/test_budget.py::test_serialized_bytes_include_envelope[ascii-byte-limit]"
+    },
+    {
+      "previous_id_length": 60081,
+      "previous_id_sha256": "3135fda2d50e7faba8169ee8148d6a23c0430f1ca9d017fadee16428cfc94712",
+      "new_id": "tests/src/core/judgments/test_budget.py::test_serialized_bytes_include_envelope[utf8-byte-limit]"
+    },
+    {
+      "previous_id_length": 262247,
+      "previous_id_sha256": "14d95499e8a047f2aa99331fd0a300c5d6f8789fc2a4352093c616a3e27ad173",
+      "new_id": "tests/regression/test_bug_b5_executor_history.py::test_malformed_executor_headers_remain_unavailable[oversized-header]"
+    }
+  ],
+  "log_evidence": [
+    "﻿2026-10-30T00:50:27.0727605Z Current runner version: '2.338.0'",
+    "2026-10-30T00:50:27.0764558Z Image: ubuntu-26.04",
+    "2026-10-30T00:50:27.0765195Z Version: 20261025.179.1",
+    "2026-10-30T00:50:30.9571087Z Successfully set up CPython (3.11.17)",
+    "2026-10-30T00:51:05.5593843Z platform linux -- Python 3.13.11, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/work/multi-forge/multi-forge/.venv/bin/python",
+    "2026-10-30T00:51:05.5600813Z created: 4/4 workers",
+    "2026-10-30T00:52:39.9003917Z ================ 11234 passed, 8 warnings in 119.42s (0:01:59) =================",
+    "2026-10-30T00:52:48.5738690Z platform linux -- Python 3.13.11, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/work/multi-forge/multi-forge/.venv/bin/python",
+    "2026-10-30T00:52:48.5797277Z created: 4/4 workers",
+    "2026-10-30T00:54:41.6634731Z ======================= 2218 passed in 120.53s (0:02:00) =======================",
+    "2026-10-30T00:54:56.0553182Z Clean wheel install and LiteLLM start/health smoke passed."
+  ],
+  "comparison": {
+    "unit": {
+      "serial_step_seconds": 288,
+      "first_parallel_step_seconds": 116,
+      "bounded_step_seconds": 122,
+      "serial_pytest_seconds": 283.01,
+      "first_parallel_pytest_seconds": 112.8,
+      "bounded_pytest_seconds": 119.42,
+      "wall_reduction_from_serial_percent": 57.638888888888886
+    },
+    "regression": {
+      "serial_step_seconds": 293,
+      "first_parallel_step_seconds": 328,
+      "bounded_step_seconds": 121,
+      "serial_pytest_seconds": 290.92,
+      "first_parallel_pytest_seconds": 137.57,
+      "bounded_pytest_seconds": 120.53,
+      "wall_reduction_from_serial_percent": 58.703071672354945
+    },
+    "job": {
+      "serial_seconds": 611,
+      "first_parallel_seconds": 473,
+      "bounded_seconds": 274
+    }
+  },
+  "precommit": {
+    "run_id": 40982187659,
+    "job_id": 123824633335,
+    "conclusion": "success",
+    "check_step_seconds": 138.0
+  },
+  "recommendation": "Adopt four-worker unit and regression CI defaults: both measured step wall times improve over serial with passing tests, unchanged counts, and exactly the three intended ID renames.",
+  "caveat": "The bounded-ID candidate resolves the measured regression wall-time overhead in this run. This comparison does not isolate output handling as its sole cause."
+}

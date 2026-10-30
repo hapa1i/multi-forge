@@ -1,0 +1,14 @@
+{
+  "revision": "e624890706ff4c68eed2e9a5beaea3c0472fa89f",
+  "valid_performance_evidence": false,
+  "reason": "Docker filesystem full; npm image build reported ENOSPC; interrupted after five retries with one SIGINT.",
+  "passed": 393,
+  "failed": 2,
+  "reruns": 5,
+  "deselected": 13613,
+  "pytest_seconds": 1012.34,
+  "runner_seconds": 1028.04,
+  "release_wheel_builds": 1,
+  "qa_image_builds": 2,
+  "interrupted_test": "tests/integration/sidecar/test_sidecar_omit.py::test_sidecar_omit_withholds_key_from_claude_but_proxy_keeps_it"
+}

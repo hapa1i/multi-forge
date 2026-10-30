@@ -4,11 +4,11 @@ Static comparison against `f9faedd9` identifies 25 candidates: 17 proxy tests an
 3 as real-process representatives. The card did not name the original detector's candidates; this inventory records the
 reviewed set used for implementation.
 
-The named unit twins cover every removed test's exit-status, message and filesystem assertions. The session empty-list
-and start-success twins now assert their messages on `result.stdout`, preserving the removed subprocess tests' stream
-checks instead of accepting merged `result.output`. Unit twins use `CliRunner`; the retained integration tests below
-preserve command execution through the installed `forge` entry point. Runtime verification belongs in the card
-checklist.
+The named unit twins cover every removed test's exit-status, message and filesystem assertions. The session empty-list,
+start-success and default-direct twins assert their messages on `result.stdout`, preserving the removed subprocess
+tests' stream checks instead of accepting merged `result.output`. Unit twins use `CliRunner`; the retained integration
+tests below preserve command execution through the installed `forge` entry point. Runtime verification belongs in the
+card checklist.
 
 ## Proxy candidates
 
@@ -63,6 +63,7 @@ Transferred stream assertions:
 
 - `TestSessionList::test_list_empty_shows_message`: `No sessions found` must appear on stdout.
 - `TestSessionStart::test_start_creates_session`: `Created session` and `new-session` must appear on stdout.
+- `TestSessionStart::test_start_defaults_to_direct`: `Routing: direct` must appear on stdout.
 
 Retained process coverage keys:
 

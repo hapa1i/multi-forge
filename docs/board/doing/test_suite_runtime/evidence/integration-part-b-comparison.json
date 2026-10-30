@@ -1,0 +1,77 @@
+{
+  "before_revision": "f9faedd9bc47aeb1996fc2f93f9c2233ea35229f",
+  "after_revision": "e624890706ff4c68eed2e9a5beaea3c0472fa89f",
+  "before_passed": 543,
+  "after_passed": 521,
+  "deselected": 13613,
+  "exact_identity_subtraction": true,
+  "removed_test_identities": [
+    "tests.integration.cli.test_proxy_commands_integration.TestProxyShow::test_show_not_found_error",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxyValidate::test_validate_invalid_yaml",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxyValidate::test_validate_missing_required_field",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxyValidate::test_validate_not_found_error",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxySet::test_set_simple_field",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxySet::test_set_invalid_format_error",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxySet::test_set_not_found_error",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxyDelete::test_delete_removes_proxy_and_registry",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxyDelete::test_delete_not_found_error",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxyCreateNoStart::test_create_already_exists_error",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxyCreateNoStart::test_create_invalid_template_error",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxyCreateNoStart::test_create_with_custom_port",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxyRegistryCorruption::test_list_with_invalid_json_registry",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxyRegistryCorruption::test_list_with_missing_version_registry",
+    "tests.integration.cli.test_proxy_commands_integration.TestProxyRegistryCorruption::test_list_with_wrong_version_registry",
+    "tests.integration.cli.test_session_commands_integration.TestSessionList::test_list_empty_shows_message",
+    "tests.integration.cli.test_session_commands_integration.TestSessionStart::test_start_creates_session",
+    "tests.integration.cli.test_session_commands_integration.TestSessionStart::test_start_defaults_to_direct",
+    "tests.integration.cli.test_session_commands_integration.TestSessionStart::test_start_duplicate_fails",
+    "tests.integration.cli.test_session_commands_integration.TestSessionResume::test_resume_nonexistent_fails",
+    "tests.integration.cli.test_session_commands_integration.TestSessionSetOverride::test_set_invalid_key_fails",
+    "tests.integration.cli.test_session_commands_integration.TestSessionSetOverride::test_set_no_session_fails"
+  ],
+  "failures": 0,
+  "errors": 0,
+  "skips": 0,
+  "reruns": 0,
+  "before_pytest_seconds": 884.37,
+  "after_pytest_seconds": 833.73,
+  "pytest_reduction_seconds": 50.64,
+  "pytest_reduction_percent": 5.726,
+  "before_runner_seconds": 912.34,
+  "after_runner_seconds": 842.31,
+  "runner_reduction_seconds": 70.03,
+  "runner_reduction_percent": 7.676,
+  "before_wheel_seconds": [
+    1.036,
+    1.248,
+    0.604
+  ],
+  "after_wheel_seconds": [
+    0.463
+  ],
+  "before_qa_image_seconds": [
+    78.151,
+    18.856
+  ],
+  "after_qa_image_seconds": [
+    77.072,
+    2.01
+  ],
+  "baseline_removed_test_seconds": 19.359,
+  "baseline_avoided_second_third_wheel_seconds": 1.852,
+  "baseline_direct_removed_work_seconds": 21.211,
+  "release_consumer_test_identities": [
+    "tests.integration.docker.test_qa_release_artifact::test_release_image_imports_only_the_exact_wheel",
+    "tests.integration.docker.test_walkthrough_release_artifact::test_walkthrough_setup_report_and_cleanup_resolve_from_one_wheel",
+    "tests.integration.docker.test_worker_native_controls::test_worker_native_controls_from_clean_wheel",
+    "tests.integration.docker.test_worker_native_controls::test_guarded_worker_with_inherited_helper_from_clean_wheel"
+  ],
+  "build_policy_test_identities": [
+    "tests.integration.docker.test_runtime_build_constraints::test_unrelated_project_can_select_its_own_backend_dependency",
+    "tests.integration.docker.test_runtime_build_constraints::test_forge_backend_cache_still_supports_hash_verified_offline_build"
+  ],
+  "docker_free_kib_before": 5979700,
+  "docker_free_kib_after": 5979352,
+  "docker_lowest_observed_free_kib": 3811872,
+  "caveat": "One before/after pair; intervening disk-full run, unused-build-cache cleanup and passing three-test recovery changed cache warmth. Baseline rebuilt the integration image; clean after reused it. Do not attribute all whole-run or QA-image variation to code. Invalid interrupted run retained separately."
+}
