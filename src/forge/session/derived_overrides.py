@@ -135,7 +135,7 @@ def _recovery(state: SessionState, key: str) -> str:
     if _reset_is_safe(state, key):
         return f"Run '{reset} {key}' before retrying."
     if _reset_is_safe(state, None):
-        return f"Run '{reset} --all' before retrying."
+        return f"Run '{reset} --all' before retrying. This clears all live overrides, including unrelated settings."
 
     if state.intent.policy and state.intent.policy.supervisor:
         from forge.policy.semantic.identity import SUPERVISOR_CONSUMER
@@ -150,7 +150,10 @@ def _recovery(state: SessionState, key: str) -> str:
         if _valid_overrides(candidate):
             return f"Run '{remove}' and reconfigure the supervisor before retrying."
         if _reset_is_safe(candidate, None):
-            return f"Run '{remove}', then '{reset} --all', and reconfigure the supervisor before retrying."
+            return (
+                f"Run '{remove}', then '{reset} --all', and reconfigure the supervisor before retrying. "
+                "This clears all live overrides, including unrelated settings."
+            )
 
     return (
         f"Repair or restore the overrides in session '{state.name}' manifest before retrying; reset is not applicable."

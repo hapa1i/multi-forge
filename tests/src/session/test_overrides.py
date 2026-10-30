@@ -174,6 +174,20 @@ class TestValidateKey:
     @pytest.mark.parametrize(
         "key",
         [
+            "policy.supervisor.native_source",
+            "policy.supervisor.native_source.thread_id",
+            "policy.supervisor.native_source.home",
+        ],
+    )
+    def test_native_source_rejected_as_supervisor_identity(self, key: str) -> None:
+        with pytest.raises(InvalidOverrideKeyError, match="native_source is supervisor identity") as refused:
+            validate_key(key)
+
+        assert "forge policy supervisor set" in str(refused.value)
+
+    @pytest.mark.parametrize(
+        "key",
+        [
             "consumer_lanes",
             "consumer_lanes.supervisor",
             "consumer_lanes.supervisor.runtime_id",
@@ -433,6 +447,46 @@ class TestSetOverride:
 
         assert overrides == {"launch": {"mode": "host"}}
 
+    @pytest.mark.parametrize(
+        ("key", "value"),
+        [
+            ("policy.supervisor.native_source", None),
+            ("policy.supervisor.native_source", {"runtime": "codex"}),
+            ("policy.supervisor.native_source.thread_id", "source-id"),
+            ("policy.supervisor", {"suspended": True, "native_source": None}),
+            ("policy.supervisor", {"native_source": {"runtime": "codex"}}),
+            ("policy", {"enabled": False, "supervisor": {"native_source": None}}),
+            ("policy", {"supervisor": {"native_source": {"runtime": "codex"}}}),
+            ("policy.*", None),
+        ],
+    )
+    def test_set_rejects_native_source_before_any_mutation(self, key: str, value: object) -> None:
+        overrides: dict = {"policy": {"enabled": True}, "memory": {"auto_recall": True}}
+
+        with pytest.raises(InvalidOverrideKeyError, match="native_source is supervisor identity") as refused:
+            set_override(overrides, key, value)
+
+        assert "forge policy supervisor set" in str(refused.value)
+        assert overrides == {"policy": {"enabled": True}, "memory": {"auto_recall": True}}
+
+    @pytest.mark.parametrize(
+        ("key", "value", "expected"),
+        [
+            ("policy", None, {"policy": None}),
+            ("policy.supervisor", None, {"policy": {"supervisor": None}}),
+            ("policy", {"supervisor": None}, {"policy": {"supervisor": None}}),
+            ("policy.supervisor", {"suspended": True}, {"policy": {"supervisor": {"suspended": True}}}),
+        ],
+    )
+    def test_set_parent_without_explicit_native_source_remains_supported(
+        self, key: str, value: object, expected: dict
+    ) -> None:
+        overrides: dict = {}
+
+        set_override(overrides, key, value)
+
+        assert overrides == expected
+
     def test_set_parent_launch_object_without_runtime(self) -> None:
         overrides: dict = {}
 
@@ -540,6 +594,23 @@ class TestDeleteOverride:
 
         assert result is True
         assert overrides == {}
+
+    @pytest.mark.parametrize(
+        ("key", "expected"),
+        [
+            ("policy.supervisor.native_source", {"policy": {"supervisor": {}}}),
+            (
+                "policy.supervisor.native_source.home",
+                {"policy": {"supervisor": {"native_source": {"runtime": "codex"}}}},
+            ),
+        ],
+    )
+    def test_delete_legacy_native_source_remains_a_recovery_path(self, key: str, expected: dict) -> None:
+        overrides: dict = {"policy": {"supervisor": {"native_source": {"runtime": "codex", "home": "/codex"}}}}
+
+        assert delete_override(overrides, key)
+
+        assert overrides == expected
 
 
 class TestClearOverrides:

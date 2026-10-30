@@ -274,6 +274,12 @@ in-memory migrations remain in force. Structural validation adds no source/auth 
 readiness checks cover active native Codex sources; sidecar and Claude reviewer admission stay at launch, including fork
 `--no-launch`. Disabled relaunch policy does not acquire a new reviewer-readiness requirement.
 
+Generic override authoring also rejects explicit native-source paths and enclosing objects containing them, including
+null or identical source values; source identity is owned by `forge policy supervisor set`. Legacy keyed reset remains
+subject to the existing supervisor transition checks. Recovery that requires reset-all explicitly warns that it clears
+unrelated valid overrides as well. Strict read errors use a neutral manifest diagnostic because a corrupt record cannot
+establish whether `resume --force` would derive a child or resume in place.
+
 ### Session cleanup
 
 `session/deletion.py` owns the immutable plan and coordinated apply for delete, purge, clean, retention and incognito.

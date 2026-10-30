@@ -1,7 +1,8 @@
 # Derived-session override inheritance checklist
 
 **Status:** Complete. PR #284 merged on 2026-10-28 as `3ad15937`; the decision, bounded fixes and documentation are
-shipped and verified. Uniform derivation validation remains in the separate, unstarted proposal.
+shipped and verified. Uniform derivation validation is active in
+[the implementation card](../../doing/validate_derived_session_overrides/card.md).
 
 ## Evidence
 
@@ -23,7 +24,7 @@ shipped and verified. Uniform derivation validation remains in the separate, uns
 - [x] Specify child reset semantics and distinguish reattach from a new session.
 - [x] Resolve the product choice with the maintainer: keep the fork/fresh versus relaunch distinction.
 - [x] Create [the validation implementation proposal](../../doing/validate_derived_session_overrides/card.md) with
-  fixture-grounded acceptance after the decision; leave it unstarted.
+  fixture-grounded acceptance after the decision; it was left unstarted at this decision's closeout.
 
 ## Closeout
 

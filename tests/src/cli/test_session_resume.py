@@ -1823,10 +1823,14 @@ class TestDerivedResumePreflight:
         ],
     )
     @pytest.mark.parametrize("flags", [["--fresh"], ["--force"]])
+    @pytest.mark.parametrize("confirmed", [False, True])
     def test_strict_manifest_failure_offers_only_repair_or_restore(
-        self, runner: CliRunner, temp_env: Path, invalid_fields: dict[str, object], flags: list[str]
+        self, runner: CliRunner, temp_env: Path, invalid_fields: dict[str, object], flags: list[str], confirmed: bool
     ) -> None:
         parent = create_session_state("strict-parent", worktree_path=str(temp_env))
+        if confirmed:
+            parent.confirmed.claude_session_id = "parent-uuid"
+            parent.confirmed.confirmed_by = "hook:SessionStart:startup"
         publish_session(SessionManager().index_store, parent, temp_env, forge_root=str(temp_env))
         store = SessionStore(str(temp_env), parent.name)
         # Deliberately break the stored schema after publishing a valid parent.
@@ -1838,6 +1842,8 @@ class TestDerivedResumePreflight:
         result = runner.invoke(main, ["session", "resume", parent.name, *flags])
 
         assert result.exit_code == 1, result.output
+        assert "Invalid session manifest" in result.stderr
+        assert "Cannot derive" not in result.stderr
         assert "Repair" in result.stderr and "restore" in result.stderr
         assert result.stdout == ""
         assert "delete" not in result.stderr.lower()

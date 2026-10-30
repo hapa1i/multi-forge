@@ -616,3 +616,47 @@ def test_malformed_supervisor_container_can_be_removed_before_derivation(case: D
     supervisor_remove(store=case.store, manifest=case.store.read())
     child = case.derive(operation)
     assert child.intent.policy is not None and child.intent.policy.supervisor is None
+
+
+@pytest.mark.parametrize("forbidden_key", ["authority", "consumer_lanes"])
+def test_reset_all_recovery_discloses_loss_of_valid_live_overrides(case: DerivationCase, forbidden_key: str) -> None:
+    case.parent.intent.policy = PolicyIntent(enabled=True)
+    case.publish()
+    before = case.replace_raw(
+        overrides={
+            forbidden_key: None,
+            "policy": {"enabled": False},
+            "verification": {"bypass": True},
+        }
+    )
+    index_before = case.manager.index_store.index_path.read_bytes()
+
+    with pytest.raises(ForgeSessionError) as refused:
+        case.derive("relaunch")
+
+    assert "forge session reset --session parent --all" in str(refused.value)
+    assert "This clears all live overrides, including unrelated settings." in str(refused.value)
+    case.assert_no_child(before, index_before)
+    reset_session_overrides(ctx=case.ctx, session_name="parent")
+    effective = compute_effective_intent(case.store.read())
+    assert effective.policy is not None and effective.policy.enabled
+    assert effective.verification is None
+
+
+@pytest.mark.parametrize("confirmed", [False, True])
+def test_corrupt_inactive_force_resume_does_not_claim_derivation(case: DerivationCase, confirmed: bool) -> None:
+    if confirmed:
+        case.parent.confirmed.claude_session_id = "parent-uuid"
+        case.parent.confirmed.confirmed_by = "hook:SessionStart:startup"
+    case.publish()
+    before = case.replace_raw(schema_version=999)
+    index_before = case.manager.index_store.index_path.read_bytes()
+
+    result = CliRunner().invoke(main, ["session", "resume", "parent", "--force"])
+
+    assert result.exit_code == 1, result.output
+    assert "Invalid session manifest" in result.stderr
+    assert "Cannot derive" not in result.stderr
+    assert "Repair" in result.stderr and "restore" in result.stderr
+    assert result.stdout == ""
+    case.assert_no_child(before, index_before)

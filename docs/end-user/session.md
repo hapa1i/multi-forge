@@ -1116,12 +1116,13 @@ forge session reset --all
 ### Configuration inheritance and reset
 
 Before creating a fork, fresh-resume child or active-session relaunch child, Forge checks the parent's current
-configuration. Invalid values and stale overrides of lifecycle-owned settings stop derivation before proxy startup,
+configuration. Invalid values and stored overrides of lifecycle-owned settings stop derivation before proxy startup,
 transfer work, worktree changes or child creation. The error names the offending path and an applicable recovery: reset
 the named key, reset all overrides, or remove and reconfigure the supervisor. If the manifest cannot be decoded or the
 suggested reset would change protected supervisor identity without a baseline supervisor to remove, repair the manifest
 or restore a valid saved copy. Rejected derivation leaves the parent configuration unchanged. Nullable section clears
-remain supported.
+remain supported. Resetting all overrides also removes valid live settings, including `%policy disable` and verification
+setup.
 
 Fork and `resume --fresh` inherit selected **baseline** settings and start with no generic overrides. For example,
 `%policy disable` temporarily disables a parent's policy, but a fork/fresh child still uses the parent's baseline policy
@@ -1165,6 +1166,12 @@ authority intent. Use `forge session authority set|clear` from outside a managed
 
 Consumer lanes use the resolving lane commands; `session set` rejects both concrete `consumer_lanes` paths and
 `consumer_lanes.*`.
+
+Native supervisor source identity belongs to `forge policy supervisor set`. Generic `session set` rejects
+`policy.supervisor.native_source`, its descendants, `policy.*`, and `policy` or `policy.supervisor` objects that
+explicitly contain it, even when the source value is null or unchanged. Nullable parent clears remain subject to the
+existing supervisor transition checks. Keyed reset can remove a stored source override only when those checks allow it;
+changing protected identity requires supervisor remove/reconfigure.
 
 ### Policy controls
 

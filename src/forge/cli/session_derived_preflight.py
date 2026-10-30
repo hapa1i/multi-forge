@@ -19,7 +19,7 @@ def handle_derived_session_error(error: ForgeSessionError) -> None:
     if isinstance(error, (ManifestCorruptedError, ManifestValidationError)):
         # The legacy version diagnostic embeds deletion advice in its reason.
         reason = error.reason.removesuffix(" Delete this session and recreate it.")
-        print_error(f"Cannot derive a session from invalid stored state: manifest at '{error.path}': {reason}")
+        print_error(f"Invalid session manifest at '{error.path}': {reason}")
         print_tip(
             "Repair the named manifest explicitly or restore a known-good copy before retrying.", console=err_console
         )

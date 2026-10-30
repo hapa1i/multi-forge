@@ -1028,6 +1028,127 @@ print(json.dumps(result))
         assert result.data["reset_writer"] == (operation != "relaunch")
 
 
+class TestNativeSourceOverrideAuthoring:
+    """Installed CLI authoring refuses native identity while retaining legal clears."""
+
+    @pytest.mark.parametrize("has_supervisor", [False, True], ids=["no-supervisor", "plan-supervisor"])
+    @pytest.mark.parametrize(
+        ("key", "value"),
+        [
+            ("policy.supervisor.native_source", None),
+            ("policy.supervisor", {"native_source": None}),
+            ("policy", {"supervisor": {"native_source": None}}),
+            ("policy.*", None),
+        ],
+        ids=["direct-null", "supervisor-object", "policy-object", "policy-wildcard"],
+    )
+    def test_native_source_writes_preserve_published_parent(
+        self,
+        manager_workspace: "WorktreeWorkspace",
+        has_supervisor: bool,
+        key: str,
+        value: dict[str, object] | None,
+    ) -> None:
+        result = manager_workspace.run_python(
+            f"has_supervisor = {has_supervisor!r}\nkey = {key!r}\nvalue = {value!r}\n" + """
+import json
+import os
+from pathlib import Path
+from click.testing import CliRunner
+from forge.cli.main import main
+from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session.models import PolicyIntent, SupervisorConfig
+from tests.fixtures.session_state import publish_session
+
+root = Path('/workspace')
+os.chdir(root)
+plan = root / 'approved.md'
+plan.write_text('Only change files named by the approved task.')
+index = IndexStore()
+parent = create_session_state('parent', worktree_path=str(root))
+parent.intent.policy = PolicyIntent(
+    enabled=True,
+    supervisor=SupervisorConfig(plan_override_path=str(plan), supervisor_model='opus') if has_supervisor else None,
+)
+publish_session(index, parent, root)
+store = SessionStore(str(root), parent.name)
+before = store.manifest_path.read_bytes()
+index_before = index.index_path.read_bytes()
+invoked = CliRunner().invoke(main, ['session', 'set', '--session', parent.name, key, json.dumps(value)])
+print(json.dumps({
+    'exit_code': invoked.exit_code,
+    'stdout': invoked.stdout,
+    'stderr': invoked.stderr,
+    'parent_unchanged': store.manifest_path.read_bytes() == before,
+    'index_unchanged': index.index_path.read_bytes() == index_before,
+}))
+""",
+            home=HOME,
+        )
+        assert result.ok, result.stderr
+        assert result.data is not None
+        assert result.data["exit_code"] == 1, result.data
+        assert result.data["stdout"] == ""
+        error = " ".join(result.data["stderr"].split())
+        assert "native_source is supervisor identity" in error
+        assert "forge policy supervisor set" in error
+        assert result.data["parent_unchanged"] and result.data["index_unchanged"]
+
+    @pytest.mark.parametrize("has_supervisor", [False, True], ids=["no-supervisor", "plan-supervisor"])
+    def test_nullable_parent_clears_remain_derivable(
+        self, manager_workspace: "WorktreeWorkspace", has_supervisor: bool
+    ) -> None:
+        result = manager_workspace.run_python(
+            f"has_supervisor = {has_supervisor!r}\n" + """
+import json
+import os
+from pathlib import Path
+from click.testing import CliRunner
+from forge.cli.main import main
+from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
+from forge.session.effective import compute_effective_intent
+from forge.session.models import PolicyIntent, SupervisorConfig
+from tests.fixtures.session_state import publish_session
+
+root = Path('/workspace')
+os.chdir(root)
+plan = root / 'approved.md'
+plan.write_text('Only change files named by the approved task.')
+index = IndexStore()
+manager = SessionManager(index)
+results = []
+for position, key in enumerate(('policy', 'policy.supervisor')):
+    name = f'parent-{position}'
+    parent = create_session_state(name, worktree_path=str(root))
+    parent.intent.policy = PolicyIntent(
+        enabled=True,
+        supervisor=SupervisorConfig(plan_override_path=str(plan), supervisor_model='opus') if has_supervisor else None,
+    )
+    publish_session(index, parent, root)
+    invoked = CliRunner().invoke(main, ['session', 'set', '--session', name, key, 'null'])
+    assert invoked.exit_code == 0, invoked.output
+    assert invoked.stderr == '', invoked.stderr
+    store = SessionStore(str(root), name)
+    before_derivation = store.manifest_path.read_bytes()
+    _, child = manager.relaunch_session(name, child_name=f'child-{position}', forge_root=str(root))
+    persisted = SessionStore(str(root), child.name).read()
+    expected_overrides = {'policy': None if key == 'policy' else {'supervisor': None}}
+    effective = compute_effective_intent(persisted)
+    results.append({
+        'overrides_preserved': persisted.overrides == expected_overrides,
+        'cleared': effective.policy is None if key == 'policy' else effective.policy.supervisor is None,
+        'parent_unchanged': store.manifest_path.read_bytes() == before_derivation,
+    })
+print(json.dumps({'results': results}))
+""",
+            home=HOME,
+        )
+        assert result.ok, result.stderr
+        assert result.data is not None
+        assert len(result.data["results"]) == 2
+        assert all(all(checks.values()) for checks in result.data["results"])
+
+
 class TestSessionManagerDeleteSession:
     """Tests for SessionManager.delete_session()."""
 

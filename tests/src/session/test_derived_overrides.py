@@ -255,6 +255,7 @@ def test_frozen_identity_blocks_reset_all_until_supervisor_removed(parent: Sessi
         "Run 'forge policy supervisor remove --session parent', then 'forge session reset --session parent --all'"
         in (caught.value.recovery)
     )
+    assert "This clears all live overrides, including unrelated settings." in caught.value.recovery
     assert parent == before
 
 

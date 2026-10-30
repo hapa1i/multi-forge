@@ -49,6 +49,8 @@ remain the owners of their respective rules; the regression matrix exercises per
 
 ### Recorded local evidence (2026-10-30)
 
+These results cover implementation head `252d20c2`; review follow-up verification is recorded below.
+
 Before the fix, a coherently published parent edited to contain `verification.bypass: "bad"` produced a persisted
 relaunch child that could not decode; fork/fresh failed late with key `unknown`. A stored `launch.runtime: codex`
 override was silently dropped by fork/fresh and copied by relaunch over Claude dispatch intent. Both reproductions now
@@ -85,6 +87,23 @@ Independent seam review found no remaining ordering, dispatch, readiness or leas
 including the shared reset command's existing malformed-supervisor traceback, remains outside this card and is recorded
 in [a separate proposal](../../proposed/scoped_corrupt_state_recovery/card.md). Raw local logs are temporary; this
 checklist retains their result summary and the checked-in tests reproduce the acceptance cases.
+
+### PR review follow-up
+
+- [x] Reject native-source authoring through direct/descendant keys, enclosing objects and wildcards, including null or
+  identical values. Preserve nullable parent clears and identity-checked legacy keyed reset. Focused override, native
+  supervisor CLI and persisted authoring checks: **192 passed**.
+- [x] Warn that both reset-all recovery paths also clear unrelated valid live overrides; verify actual reset removes
+  temporary policy and verification settings.
+- [x] Use a neutral manifest error heading before a corrupt record can establish whether force-resume derives or
+  reconnects; cover never-launched and confirmed-but-inactive parents. Focused guard, resume and persisted regression
+  selection: **313 passed**.
+- [x] Correct current board status while preserving the historical decision's initially unstarted follow-up.
+- [x] Verify the integrated review fixes with aggregate unit/regression, targeted Docker and full hooks: **11,596 unit**
+  passed in 103.69 seconds; **2,456 regression** passed in 123.47 seconds; **64 Docker** passed in 63.96 seconds; all
+  hooks passed. Docker used the same no-live-inference command above, including ten new persisted CLI cases for native
+  source authoring and nullable clears. Final-head CI is the remaining live review gate on PR #294 and must pass before
+  merge.
 
 ## Closeout after merge
 
