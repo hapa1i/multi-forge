@@ -1,0 +1,62 @@
+{
+  "runs": [
+    {
+      "run": "unit-hook-order-1",
+      "head": "2469ec36a1771e023cdfdd366e73045ecbe4e3e2",
+      "exit_code": 0,
+      "wall_seconds": 78.757,
+      "test_count": 11234,
+      "unique_count": 11234,
+      "failure_error_skip_rerun_counts": {},
+      "exact_multiset_match_normalized_baseline": true,
+      "exact_multiset_match_normalized_accepted_local": true,
+      "exact_multiset_match_bounded_and_hook_order_ci_after_log_redaction_mapping": true
+    },
+    {
+      "run": "unit-hook-order-2",
+      "head": "2469ec36a1771e023cdfdd366e73045ecbe4e3e2",
+      "exit_code": 0,
+      "wall_seconds": 74.711,
+      "test_count": 11234,
+      "unique_count": 11234,
+      "failure_error_skip_rerun_counts": {},
+      "exact_multiset_match_normalized_baseline": true,
+      "exact_multiset_match_normalized_accepted_local": true,
+      "exact_multiset_match_bounded_and_hook_order_ci_after_log_redaction_mapping": true
+    },
+    {
+      "run": "unit-hook-order-3",
+      "head": "2469ec36a1771e023cdfdd366e73045ecbe4e3e2",
+      "exit_code": 0,
+      "wall_seconds": 75.868,
+      "test_count": 11234,
+      "unique_count": 11234,
+      "failure_error_skip_rerun_counts": {},
+      "exact_multiset_match_normalized_baseline": true,
+      "exact_multiset_match_normalized_accepted_local": true,
+      "exact_multiset_match_bounded_and_hook_order_ci_after_log_redaction_mapping": true
+    }
+  ],
+  "median_wall_seconds": 75.868,
+  "matching_serial_wall_seconds": 270.954,
+  "wall_reduction_percent": 71.99967522162434,
+  "baseline": "unit-adopted-serial-final.xml",
+  "accepted_local": [
+    "unit-adopted-1.xml",
+    "unit-adopted-2.xml",
+    "unit-adopted-3.xml"
+  ],
+  "intentional_prior_name_mappings": 2,
+  "new_identity_changes_from_hook_fix": 0,
+  "github_log_redaction": {
+    "masked_tuple": [
+      "tests.src.session.test_routing",
+      "test_custom_fingerprint_uses_only_canonical_origin[***example.com/private-https://example.com]"
+    ],
+    "local_tuple": [
+      "tests.src.session.test_routing",
+      "test_custom_fingerprint_uses_only_canonical_origin[https://user:pass@example.com/private-https://example.com]"
+    ],
+    "note": "Existing GitHub masking of the URL userinfo fixture parameter affects CI log text only; not a test-ID change."
+  }
+}

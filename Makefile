@@ -2,6 +2,9 @@
 
 export UV_BUILD_CONSTRAINT := $(CURDIR)/requirements/build.txt
 
+TEST_WORKERS ?= auto
+TEST_WORKER_CAP = $(if $(filter auto logical,$(TEST_WORKERS)),--maxprocesses=4)
+
 # uv includes the dev dependency group by default.
 deps:
 	@uv sync --locked --quiet
@@ -11,9 +14,9 @@ help:
 	@echo ""
 	@echo "  make build              - Build the source distribution and wheel"
 	@echo ""
-	@echo "  make test-unit          - Run unit tests (fast, no Docker required)"
+	@echo "  make test-unit          - Run unit tests (default: up to 4 workers, no Docker required)"
 	@echo "  make test-integration   - Run integration tests (requires Docker)"
-	@echo "  make test-regression    - Run regression tests (fast, no Docker required)"
+	@echo "  make test-regression    - Run regression tests (default: up to 4 workers)"
 	@echo "  make test               - Run both unit and integration tests"
 	@echo ""
 	@echo "  make pre-commit         - Run all pre-commit hooks (ruff, black, isort, mypy, pyright, mdformat, gitleaks)"
@@ -32,7 +35,7 @@ build:
 
 test-unit: deps
 	@echo "Running unit tests (excluding integration)..."
-	uv run --locked pytest tests/src -m "not integration" -v
+	uv run --locked pytest tests/src -m "not integration" -n $(TEST_WORKERS) $(TEST_WORKER_CAP) --dist=load -v
 
 test-integration: deps
 	@echo "Running integration tests (requires Docker)..."
@@ -40,7 +43,7 @@ test-integration: deps
 
 test-regression: deps
 	@echo "Running regression tests..."
-	uv run --locked pytest tests/regression -m regression -v
+	uv run --locked pytest tests/regression -m regression -n $(TEST_WORKERS) $(TEST_WORKER_CAP) --dist=load -v
 
 test: test-unit test-integration
 	@echo "All tests complete!"

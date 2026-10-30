@@ -1,0 +1,314 @@
+{
+  "schema_version": 1,
+  "copied_on": "2026-10-30",
+  "source_directory": "/tmp/forge-test-suite-runtime-20261030",
+  "raw_artifacts_retained_in_repository": false,
+  "raw_artifacts_checked": [
+    {
+      "file": "unit-adopted-serial-final.xml",
+      "bytes": 1687991,
+      "sha256": "422b1d1b690726af1896337d67528c3f04ee59db049445520f0802be21a15d78"
+    },
+    {
+      "file": "unit-adopted-1.xml",
+      "bytes": 1687990,
+      "sha256": "1cf146b2e7115e45b596afe6ceaa5137663b3e4653fad6bf4186bcd3db4bed78"
+    },
+    {
+      "file": "unit-adopted-2.xml",
+      "bytes": 1687990,
+      "sha256": "9efb8365cadb26cad32272e400342f8b464721d8ef27d58ad83d3132c69bbc21"
+    },
+    {
+      "file": "unit-adopted-3.xml",
+      "bytes": 1687990,
+      "sha256": "bde14c87966599b23f06b1ef96e8747ea94180a31eceba51f82030b195b4ac60"
+    },
+    {
+      "file": "regression-adopted-serial-final.xml",
+      "bytes": 633527,
+      "sha256": "7423f0de2d5b518db9dbed3801b8413d20d01ed60a8cb27d62b99ecf3e73e4b5"
+    },
+    {
+      "file": "regression-adopted-1.xml",
+      "bytes": 633526,
+      "sha256": "703abbe875ba424fdb60cb8df6a2f646ac6d14bcf6dde86abfe1fb3fb40a52eb"
+    },
+    {
+      "file": "regression-adopted-2.xml",
+      "bytes": 633526,
+      "sha256": "5a754fdff8357c5ffd8e3bf548b46ad077cfcbb868d6a7e9e5b202d5fb0c1324"
+    },
+    {
+      "file": "regression-adopted-3.xml",
+      "bytes": 633526,
+      "sha256": "cf9f4004c4c76434c1a07abb4747118d12df3a1168eb1165daf4fdebfcadba82"
+    },
+    {
+      "file": "unit-hook-order-1.xml",
+      "bytes": 1598021,
+      "sha256": "85934b781d67f571caa93a7821db120b6733a82fb3d1d4fcacfb1ac15f7d81aa"
+    },
+    {
+      "file": "unit-hook-order-2.xml",
+      "bytes": 1598021,
+      "sha256": "8586fe2708a9ad2520d526b6bd81324380a4a027c211fc033a611bb398532366"
+    },
+    {
+      "file": "unit-hook-order-3.xml",
+      "bytes": 1598021,
+      "sha256": "d8eb05ab2c52937f24e2ac08983bcfaa04428dbf7f85fbb9f5233e5013009e41"
+    },
+    {
+      "file": "ci-before-src-nodeids.txt",
+      "bytes": 1245122,
+      "sha256": "ad080dc84386427f24bf7dc4e7a6a69832f26bac9bb1961526fe2e34f70703fa"
+    },
+    {
+      "file": "ci-before-regression-nodeids.txt",
+      "bytes": 544622,
+      "sha256": "0418076cd23df3743e6d0fd070e7ed17879684594527067e7867d0792c1a16e5"
+    },
+    {
+      "file": "ci-after-src-nodeids.txt",
+      "bytes": 1245122,
+      "sha256": "ad080dc84386427f24bf7dc4e7a6a69832f26bac9bb1961526fe2e34f70703fa"
+    },
+    {
+      "file": "ci-after-regression-nodeids.txt",
+      "bytes": 544622,
+      "sha256": "0418076cd23df3743e6d0fd070e7ed17879684594527067e7867d0792c1a16e5"
+    },
+    {
+      "file": "ci-bounded-src-nodeids.txt",
+      "bytes": 1155153,
+      "sha256": "d5397b23433f0dbd164c7bda1497afe71fcffa3c915486689de37737db74a766"
+    },
+    {
+      "file": "ci-bounded-regression-nodeids.txt",
+      "bytes": 282493,
+      "sha256": "c7c8c9e32d6f175e7e9a233dafc9f959b38182a9f5a6dbfaeadd00a8044cdfb4"
+    },
+    {
+      "file": "ci-hook-order-src-nodeids.txt",
+      "bytes": 1155153,
+      "sha256": "d5397b23433f0dbd164c7bda1497afe71fcffa3c915486689de37737db74a766"
+    },
+    {
+      "file": "ci-hook-order-regression-nodeids.txt",
+      "bytes": 282493,
+      "sha256": "c7c8c9e32d6f175e7e9a233dafc9f959b38182a9f5a6dbfaeadd00a8044cdfb4"
+    },
+    {
+      "file": "integration-part-b-before.xml",
+      "bytes": 85425,
+      "sha256": "144aab483a54cc488718fd9b8f14cb306f7cbc717ba1c11d492c38aa1028c484"
+    },
+    {
+      "file": "integration-part-b-after-clean.xml",
+      "bytes": 82159,
+      "sha256": "167b80e5c13ca67232dec5724eb8c3f91e9071fb01be72290680f38e6aea9a77"
+    },
+    {
+      "file": "ci-before-test-job.json",
+      "bytes": 3042,
+      "sha256": "231288ee5a45b5516229ffcbd3a28b1ae583c9706af398adb94e9304d623fe60"
+    },
+    {
+      "file": "ci-after-test-job.json",
+      "bytes": 3042,
+      "sha256": "bcda71eadea248b262c96eb59288d560ca131657f90f9de95ce1437a7663c0ec"
+    },
+    {
+      "file": "ci-bounded-test-job.json",
+      "bytes": 3042,
+      "sha256": "0684944a166a5358abc689b289cb4138456834a0d6cb8a2b7c4a4ba56bee935a"
+    },
+    {
+      "file": "ci-hook-order-test-job.json",
+      "bytes": 3042,
+      "sha256": "3beb64590b501427c66f2027a020053bfb40c4db97e1b2c6fbe2146181beb5e5"
+    },
+    {
+      "file": "ci-final-evidence-test-job.json",
+      "bytes": 3042,
+      "sha256": "c3a5bbb9ecd2d1c7a7d3577760567bb66afa5ae54daa08b3a863e4d7a4abc94e"
+    },
+    {
+      "file": "ci-final-evidence-test.log",
+      "bytes": 3996740,
+      "sha256": "347d332bd20669b3fa0089a21e84536c63b53c201d8984383bd514441194cc24"
+    },
+    {
+      "file": "ci-final-evidence-precommit-job.json",
+      "bytes": 2739,
+      "sha256": "3b9f2661cf4bf0ad834ecddadc76e694bd5ea69bf08015c6067c32c7087d7fff"
+    },
+    {
+      "file": "ci-final-evidence-attempt2-test-job.json",
+      "bytes": 3042,
+      "sha256": "a631c1c451cd4d68ae6d0f4147a1ba84c5a8e35ec02ceb698fb917656e617edd"
+    },
+    {
+      "file": "ci-final-evidence-attempt2-test-run.json",
+      "bytes": 12514,
+      "sha256": "eacd8fbe93b6823ea5fe2b9ccee16d7d0c3c785ccf5546ef8d35282f2eaabeb4"
+    },
+    {
+      "file": "ci-final-evidence-attempt2-test.log",
+      "bytes": 3997026,
+      "sha256": "ae267c25cafd51f2b410839b680415e727c6eede8a394c997e646f6a181f0a4c"
+    },
+    {
+      "file": "ci-final-grouped-hook-failure.log",
+      "bytes": 3248819,
+      "sha256": "0b573134fe39b92a210805803b7c40d10b37397d1c54393910835b9c48db4f55"
+    },
+    {
+      "file": "ci-review-part-b-cleanup-test.log",
+      "bytes": 2569973,
+      "sha256": "c9779e55218c878a2de1f142d9b279e99f4c6fdf674f57fe9d2bb5c3ed0934b7"
+    }
+  ],
+  "notes": [
+    "source_summaries records SHA-256 and byte size of the ORIGINAL local summary files. Repository formatting may change bytes while preserving parsed JSON values.",
+    "Raw logs, JUnit XML, node-ID lists and job metadata are not retained here; their hashes identify checked inputs but do not reconstruct them.",
+    "Existing artifacts were re-read for counts, identity multisets, CI status/timings, shared-wheel identity and final cleanup outcome; no suites were rerun.",
+    "Historical recommendations in copied summaries are retained as values; later results and benchmarks.md determine final acceptance."
+  ],
+  "source_summaries": [
+    {
+      "file": "stability.json",
+      "bytes": 1076,
+      "sha256": "78d89c0df6ddc651d7a530fc19ba44879334b413c50dbcc2a7c7d53d70e2bb0b"
+    },
+    {
+      "file": "unit-hook-order-stability.json",
+      "bytes": 435,
+      "sha256": "95357cc95da79fd3796d051369624ae65841aa3ad85bd73e518919113aa738c8"
+    },
+    {
+      "file": "unit-hook-order-identity-comparison.json",
+      "bytes": 2286,
+      "sha256": "75bef6ec950bd96a304cbc58a6167551c0feb5f0249094a1ebd58cc9905089e7"
+    },
+    {
+      "file": "ci-before-summary.json",
+      "bytes": 2999,
+      "sha256": "db1abd7985bd5e9a2cc593d421a5658205899a58e0219ef475446bca82b7196e"
+    },
+    {
+      "file": "ci-after-summary.json",
+      "bytes": 4336,
+      "sha256": "ae41ccf90d20b4648ae74f5f1d266e62dc7dacda888892241491ddffe839e260"
+    },
+    {
+      "file": "ci-bounded-summary.json",
+      "bytes": 5821,
+      "sha256": "646942a75d8a0e9358d646bf1863c2044189904d1a4bbccc0fcae9e51c124ed5"
+    },
+    {
+      "file": "ci-hook-order-summary.json",
+      "bytes": 3568,
+      "sha256": "b0d6a534dc2411bc0703f2f158986832dda8eb1dddde396e5c8ecf90f5729077"
+    },
+    {
+      "file": "integration-part-b-before-summary.json",
+      "bytes": 3265,
+      "sha256": "2779271fd22c628cd5fd84b37bc7c85a26ec6901d8f3ecb88d4eae159c93b9cd"
+    },
+    {
+      "file": "integration-part-b-before-builds.json",
+      "bytes": 768,
+      "sha256": "f566b786d88928ce9ba268488d429ea21ae9d02908650f322f0957a1adee7b8d"
+    },
+    {
+      "file": "integration-part-b-after-clean-builds.json",
+      "bytes": 406,
+      "sha256": "ed42f07f2ee6b3101b1f5c4445fcb7aa959428a4c9fd5bce590d30077b1f04be"
+    },
+    {
+      "file": "integration-part-b-comparison.json",
+      "bytes": 4707,
+      "sha256": "86beedce176e02921aafdcdb16b88584613af3ae1b048f3b84599ed395eace9b"
+    },
+    {
+      "file": "integration-part-b-after-disk-full-summary.json",
+      "bytes": 537,
+      "sha256": "c556c5bf4d223bab249c38c0a2847dcaf634e7836db63ce38eb6fc331e1391c4"
+    },
+    {
+      "file": "ci-final-evidence-summary.json",
+      "bytes": 1465,
+      "sha256": "34f6b28a5500ade42fbeaa689b699300ccbe707820eb4a6630034b1c9c9ef3a8"
+    },
+    {
+      "file": "ci-final-evidence-attempt2-summary.json",
+      "bytes": 1008,
+      "sha256": "73f06fa407b668f7a3a060c4f5a0fccd137c1f1ed41ce53561e1e9819a929c82"
+    },
+    {
+      "file": "ci-review-part-b-cleanup-summary.json",
+      "bytes": 4681,
+      "sha256": "0eb0445a6447e35e1b3f11570bc79a6c73ea25dcc0f6b0f880a115f9cc95d76e"
+    }
+  ],
+  "verification": {
+    "unit": {
+      "count": 11234,
+      "initial_parallel_runs": 3,
+      "renewed_parallel_runs": 3,
+      "serial_baseline": "unit-adopted-serial-final.xml",
+      "all_multisets_match_after_two_prior_parameter_id_renames": true,
+      "failures_errors_skips_reruns": 0,
+      "normalized_multiset_sha256": "6538964febfbac2390b721eca2749be3606fa2567d4e50c41ce8f55d256433ae"
+    },
+    "regression": {
+      "count": 2218,
+      "parallel_runs": 3,
+      "serial_baseline": "regression-adopted-serial-final.xml",
+      "all_multisets_match_after_one_prior_parameter_id_rename": true,
+      "failures_errors_skips_reruns": 0,
+      "normalized_multiset_sha256": "0bb66d7428ff97ac5642cc349cb5b46332f19a3fccd0da65bc6e5d8627ba3220"
+    },
+    "ci": {
+      "identity_lists_checked": 8,
+      "all_match_normalized_local_baselines": true,
+      "exactly_three_prior_parameter_id_renames": true,
+      "log_mask_normalization": "GitHub masks the synthetic user:pass@example.com URL fixture in logs. Exactly that known mask is normalized for CI-log to local-JUnit comparisons; it is not an added test-ID rename.",
+      "job_metadata_matches_retained_comparison_status_and_timings": true
+    },
+    "integration": {
+      "before": {
+        "source_file": "integration-part-b-before.xml",
+        "test_count": 543,
+        "unique_count": 543,
+        "failure_error_skip_rerun_counts": {},
+        "normalized_multiset_sha256": "53da014a8c1316108faf7a6bbef25caca54e5d836564216909942a07c1beff5e",
+        "prior_parameter_ids_normalized": 0
+      },
+      "clean_after": {
+        "source_file": "integration-part-b-after-clean.xml",
+        "test_count": 521,
+        "unique_count": 521,
+        "failure_error_skip_rerun_counts": {},
+        "normalized_multiset_sha256": "fcac12a7753b6a4ca7759fed711e7e92ed9e114fa60ffb69db5fe01d085c49b5",
+        "prior_parameter_ids_normalized": 0
+      },
+      "mapped_removals_count": 22,
+      "mapped_removals_multiset_sha256": "23c3b4820dfc6e0e7811667ccb17c9037c6ded0f650d6578403681dcf3caaa76",
+      "exact_multiset_subtraction": true,
+      "unexpected_additions": 0,
+      "unexpected_removals": 0,
+      "release_consumer_cases_passed": 4,
+      "independent_build_policy_cases_passed": 2,
+      "wheel_sha256": "e969e353d0d93f2c24abd92a3316dac1d4234db6c01030842251281f6460b87e"
+    },
+    "final_cleanup": {
+      "same_commit_between_attempts": true,
+      "first_smoke_passed_cleanup_failed": true,
+      "second_smoke_and_cleanup_passed": true
+    },
+    "identity_digest_encoding": "SHA-256 of UTF-8 JSON sorted [classname,name,count] rows, ensure_ascii=true, compact separators, plus one trailing newline. Prior parameter-ID mappings are applied before hashing."
+  }
+}

@@ -1,0 +1,66 @@
+[
+  {
+    "label": "unit-adopted-1",
+    "command": [
+      "make",
+      "test-unit"
+    ],
+    "wall_seconds": 89.336,
+    "exit_code": 0
+  },
+  {
+    "label": "regression-adopted-1",
+    "command": [
+      "make",
+      "test-regression"
+    ],
+    "wall_seconds": 99.525,
+    "exit_code": 0
+  },
+  {
+    "label": "unit-adopted-2",
+    "command": [
+      "make",
+      "test-unit"
+    ],
+    "wall_seconds": 78.637,
+    "exit_code": 0
+  },
+  {
+    "label": "regression-adopted-2",
+    "command": [
+      "make",
+      "test-regression"
+    ],
+    "wall_seconds": 97.558,
+    "exit_code": 0
+  },
+  {
+    "label": "unit-adopted-3",
+    "command": [
+      "make",
+      "test-unit"
+    ],
+    "wall_seconds": 79.632,
+    "exit_code": 0
+  },
+  {
+    "label": "regression-adopted-3",
+    "command": [
+      "make",
+      "test-regression"
+    ],
+    "wall_seconds": 97.849,
+    "exit_code": 0
+  },
+  {
+    "label": "unit-adopted-serial-final",
+    "command": [
+      "make",
+      "test-unit",
+      "TEST_WORKERS=0"
+    ],
+    "wall_seconds": 270.954,
+    "exit_code": 0
+  }
+]

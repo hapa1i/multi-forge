@@ -98,13 +98,16 @@ cross-module bugs.
 
 ```bash
 # Unit tests (host, no Docker)
-make test-unit              # ~20s
+make test-unit
+
+# Regression tests (host, no Docker)
+make test-regression
 
 # Integration (Docker; infra)
-make test-integration       # ~2-3 min
+make test-integration
 
-# Full suite
-make test                   # ~3 min
+# Unit and integration tests; regression runs separately
+make test
 
 # Other targets
 make pre-commit             # All hooks: ruff, black, isort, mypy, pyright, mdformat
@@ -113,6 +116,23 @@ make clean                  # remove caches
 # Clean wheel install with hash-checked locked dependencies, then start/health/stop
 ./scripts/test-wheel-runtime.sh
 ```
+
+The unit and regression Make targets use pytest-xdist with `-n auto --maxprocesses=4 --dist=load`. Tests are distributed
+individually across at most four automatically selected workers. Override the worker count when needed:
+
+```bash
+# Explicit numeric counts bypass the automatic four-worker cap
+make test-unit TEST_WORKERS=8
+make test-regression TEST_WORKERS=8
+
+# Serial debugging
+make test-unit TEST_WORKERS=0
+make test-regression TEST_WORKERS=0
+```
+
+Integration tests remain serial because they share containers and other runtime resources. Keep parallel options on the
+unit and regression commands rather than in global pytest settings. Run times depend on the host, concurrent work and
+cached build artifacts.
 
 **Why `make` is required:**
 
@@ -143,7 +163,7 @@ Stay cost-conscious: run the **relevant** integration files, not the whole suite
 ./scripts/test-integration.sh tests/integration/cli/test_handoff_integration.py -v
 ```
 
-Reserve the full `make test-integration` (~2-3 min) for pre-release or broad, cross-cutting changes.
+Reserve the full `make test-integration` for pre-release or broad, cross-cutting changes.
 
 Set `PYTHON_DOTENV_DISABLED=1` when an integration run must not load the repository's `.env`. The runner honors it for
 shell sourcing, and python-dotenv honors it in Python. The switch preserves inherited environment variables; it does not
@@ -179,20 +199,20 @@ carry the `slow` marker; explicit file selection still runs them unless `-m 'int
 **WARNING:** Direct `pytest` assumes `make` ran; integration fails if LiteLLM isn't on 4001.
 
 ```bash
-# Unit tests only
-uv run pytest tests/src -m "not integration" -v
+# Unit tests with the same parallel defaults as make
+uv run --locked pytest tests/src -m "not integration" -v -n auto --maxprocesses=4 --dist=load
 
 # Integration tests (assumes make ran once)
 uv run pytest -m integration
 
-# Regression tests
-uv run pytest -m regression
+# Regression tests with the same parallel defaults as make
+uv run --locked pytest tests/regression -m regression -v -n auto --maxprocesses=4 --dist=load
 
 # Shared/remote LiteLLM infrastructure tests
 uv run pytest -m remote_litellm
 
-# Specific file
-uv run pytest tests/src/session/test_store.py -v
+# Specific file, serial debugging
+uv run --locked pytest tests/src/session/test_store.py -n 0 -v
 
 # Filter
 uv run pytest -k test_proxy
@@ -260,7 +280,7 @@ use the existing `slow` marker; do not add a separate paid marker.
 - **Unit tests:** No Docker (host)
 - **Integration tests:** Docker required (session-scoped)
   - **Docker memory:** ≥6GB in Docker Desktop (Settings > Resources > Memory)
-- **First run:** Builds images (~2-3 min), then cached
+- **First run:** Builds images; later runs reuse valid cached images
 
 ---
 

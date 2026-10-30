@@ -1,0 +1,130 @@
+{
+  "head_sha": "2469ec36a1771e023cdfdd366e73045ecbe4e3e2",
+  "run_id": 40984787664,
+  "job_id": 123833154831,
+  "conclusion": "success",
+  "job_seconds": 202.0,
+  "steps": [
+    {
+      "name": "Set up job",
+      "conclusion": "success",
+      "wall_seconds": 1.0
+    },
+    {
+      "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "conclusion": "success",
+      "wall_seconds": 2.0
+    },
+    {
+      "name": "Set up Python",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Install uv",
+      "conclusion": "success",
+      "wall_seconds": 2.0
+    },
+    {
+      "name": "Install dependencies",
+      "conclusion": "success",
+      "wall_seconds": 3.0
+    },
+    {
+      "name": "Verify dependency pins",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Run unit tests",
+      "conclusion": "success",
+      "wall_seconds": 84.0
+    },
+    {
+      "name": "Run regression tests",
+      "conclusion": "success",
+      "wall_seconds": 95.0
+    },
+    {
+      "name": "Verify clean wheel LiteLLM runtime",
+      "conclusion": "success",
+      "wall_seconds": 11.0
+    },
+    {
+      "name": "Post Install uv",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Post Set up Python",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "conclusion": "success",
+      "wall_seconds": 1.0
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    }
+  ],
+  "node_ids": {
+    "src": {
+      "passed_count": 11234,
+      "unique_count": 11234,
+      "exact_match_bounded": true,
+      "result_counts": {
+        "PASSED": 11234
+      },
+      "worker_counts": {
+        "gw0": 2288,
+        "gw1": 2449,
+        "gw2": 3287,
+        "gw3": 3210
+      },
+      "walkthrough_counts": {}
+    },
+    "regression": {
+      "passed_count": 2218,
+      "unique_count": 2218,
+      "exact_match_bounded": true,
+      "result_counts": {
+        "PASSED": 2218
+      },
+      "worker_counts": {
+        "gw3": 898,
+        "gw0": 642,
+        "gw1": 318,
+        "gw2": 360
+      },
+      "walkthrough_counts": {
+        "gw2": 34,
+        "gw0": 8,
+        "gw3": 7,
+        "gw1": 14
+      }
+    }
+  },
+  "log_evidence": [
+    "﻿2026-10-30T01:15:56.2319670Z Current runner version: '2.338.0'",
+    "2026-10-30T01:15:56.2353712Z Image: ubuntu-26.04",
+    "2026-10-30T01:15:56.2354315Z Version: 20261025.179.1",
+    "2026-10-30T01:15:59.4696455Z Successfully set up CPython (3.11.17)",
+    "2026-10-30T01:16:21.5257093Z platform linux -- Python 3.13.11, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/work/multi-forge/multi-forge/.venv/bin/python",
+    "2026-10-30T01:16:21.5262138Z created: 4/4 workers",
+    "2026-10-30T01:17:27.5590718Z ================= 11234 passed, 8 warnings in 81.11s (0:01:21) =================",
+    "2026-10-30T01:17:33.3954292Z platform linux -- Python 3.13.11, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/work/multi-forge/multi-forge/.venv/bin/python",
+    "2026-10-30T01:17:33.3959004Z created: 4/4 workers",
+    "2026-10-30T01:19:03.7771377Z ======================= 2218 passed in 95.08s (0:01:35) ========================",
+    "2026-10-30T01:19:13.6877501Z Clean wheel install and LiteLLM start/health smoke passed."
+  ],
+  "precommit": {
+    "run_id": 40984787661,
+    "job_id": 123833154980,
+    "conclusion": "success",
+    "check_step_seconds": 83.0
+  }
+}

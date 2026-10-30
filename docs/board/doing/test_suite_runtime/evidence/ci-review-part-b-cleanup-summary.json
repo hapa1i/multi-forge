@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "repository": "hapa1i/multi-forge",
+  "pull_request": 291,
+  "pull_request_url": "https://github.com/hapa1i/multi-forge/pull/291",
+  "head_sha": "5a30b34569cfd10f0611a142d44d569a381daabc",
+  "tests": {
+    "run_id": 41034722366,
+    "run_url": "https://github.com/hapa1i/multi-forge/actions/runs/41034722366",
+    "attempt": 1,
+    "attempt_url": "https://github.com/hapa1i/multi-forge/actions/runs/41034722366/attempts/1",
+    "job_id": 123992636144,
+    "job_url": "https://github.com/hapa1i/multi-forge/actions/runs/41034722366/job/123992636144",
+    "status": "completed",
+    "conclusion": "failure",
+    "started_at": "2026-10-30T09:37:00Z",
+    "completed_at": "2026-10-30T09:45:11Z",
+    "job_wall_seconds": 491,
+    "runtime": {
+      "python": "3.13.11",
+      "pytest": "9.1.1",
+      "execution": "serial"
+    },
+    "unit": {
+      "passed": 11234,
+      "deselected": 120,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "reruns": 0,
+      "pytest_seconds": 216.95,
+      "step_wall_seconds": 222,
+      "summary_excerpt": "2026-10-30T09:40:49.3620451Z ============== 11234 passed, 120 deselected in 216.95s (0:03:36) ==============="
+    },
+    "regression": {
+      "passed": 2218,
+      "deselected": 0,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "reruns": 0,
+      "pytest_seconds": 242.13,
+      "step_wall_seconds": 244,
+      "summary_excerpt": "2026-10-30T09:44:54.4546488Z ======================= 2218 passed in 242.13s (0:04:02) ======================="
+    },
+    "changed_test": {
+      "node_id": "tests/src/cli/test_session_start_delete.py::TestSessionStart::test_start_defaults_to_direct",
+      "conclusion": "passed",
+      "timestamp": "2026-10-30T09:38:24.8973377Z",
+      "evidence": "The verbose job log records the changed test as PASSED."
+    },
+    "wheel_runtime": {
+      "step_conclusion": "failure",
+      "step_wall_seconds": 13,
+      "start_health_smoke_conclusion": "success",
+      "success_timestamp": "2026-10-30T09:45:07.7254276Z",
+      "success_excerpt": "2026-10-30T09:45:07.7254276Z Clean wheel install and LiteLLM start/health smoke passed.",
+      "cleanup_conclusion": "failure",
+      "failure_timestamp": "2026-10-30T09:45:08.7929357Z",
+      "failure_excerpt": "2026-10-30T09:45:08.7929357Z rm: cannot remove '/tmp/multi-forge-wheel-smoke.D2dOiJ/venv/lib/python3.13/site-packages': Directory not empty",
+      "exit_code": 1,
+      "exit_excerpt": "2026-10-30T09:45:08.7954956Z ##[error]Process completed with exit code 1."
+    },
+    "skipped_post_steps": [
+      "Post Install uv",
+      "Post Set up Python"
+    ]
+  },
+  "precommit": {
+    "run_id": 41034722326,
+    "run_url": "https://github.com/hapa1i/multi-forge/actions/runs/41034722326",
+    "attempt": 1,
+    "job_id": 123992635970,
+    "job_url": "https://github.com/hapa1i/multi-forge/actions/runs/41034722326/job/123992635970",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-10-30T09:37:00Z",
+    "completed_at": "2026-10-30T09:39:44Z",
+    "job_wall_seconds": 164,
+    "checks_step_wall_seconds": 145
+  },
+  "prior_occurrence": {
+    "pull_request": 290,
+    "head_sha": "7bd19ebb9f7f3094cc53438add4fdc5b07bc00e9",
+    "run_id": 40985566400,
+    "attempt": 1,
+    "attempt_url": "https://github.com/hapa1i/multi-forge/actions/runs/40985566400/attempts/1",
+    "outcome": "Same Directory not empty cleanup error after a successful wheel start/health smoke. Attempt 2 passed on the identical commit."
+  },
+  "diagnosis": {
+    "confirmed": "Both selected test suites and the clean-wheel start/health smoke passed. The EXIT-trap removal of the temporary wheel virtual environment failed with Directory not empty, causing the job failure. This repeats the earlier PR 290 cleanup symptom.",
+    "unknown": [
+      "Identity of any process writing during cleanup",
+      "Root cause of the removal failure",
+      "Whether backend stop completed successfully; its output is suppressed by the existing script"
+    ],
+    "hypothesis": "A concurrent writer or teardown race is plausible but is not established by these logs.",
+    "rerun_requested": false,
+    "implementation_changed": false
+  },
+  "raw_log": {
+    "path": "/tmp/forge-test-suite-runtime-20261030/ci-review-part-b-cleanup-test.log",
+    "bytes": 2569973,
+    "sha256": "c9779e55218c878a2de1f142d9b279e99f4c6fdf674f57fe9d2bb5c3ed0934b7",
+    "source": "GitHub Actions job logs endpoint, downloaded without stripping terminal escape sequences."
+  },
+  "timing_note": "Step and job wall durations use GitHub metadata with one-second timestamp resolution; pytest durations are reported by each suite."
+}

@@ -1,0 +1,18 @@
+{
+  "head_sha": "7bd19ebb9f7f3094cc53438add4fdc5b07bc00e9",
+  "run_attempt": 2,
+  "run_url": "https://github.com/hapa1i/multi-forge/actions/runs/40985566400/attempts/2",
+  "conclusion": "success",
+  "unit_passed": 11234,
+  "regression_passed": 2218,
+  "failures_errors_skips_reruns": 0,
+  "runtime_smoke_and_cleanup": "success",
+  "precommit_url": "https://github.com/hapa1i/multi-forge/actions/runs/40985566382",
+  "precommit_conclusion": "success",
+  "log_evidence": [
+    "2026-10-30T01:30:10.9563250Z ================ 11234 passed, 8 warnings in 124.98s (0:02:04) =================",
+    "2026-10-30T01:31:56.3650921Z ======================= 2218 passed in 104.00s (0:01:43) =======================",
+    "2026-10-30T01:32:08.5225555Z Clean wheel install and LiteLLM start/health smoke passed."
+  ],
+  "prior_attempt": "Attempt 1 smoke passed but cleanup rm failed with Directory not empty; preserved in ci-final-evidence-test.log and ci-final-evidence-summary.json. No code changes between attempts."
+}

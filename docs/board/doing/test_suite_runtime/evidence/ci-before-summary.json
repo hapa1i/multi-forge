@@ -1,0 +1,88 @@
+{
+  "head_sha": "9dd4aadd9ac23bc63d0520c8f0755d6af5e41cb0",
+  "job_id": 123810360656,
+  "conclusion": "success",
+  "job_seconds": 611.0,
+  "steps": [
+    {
+      "name": "Set up job",
+      "conclusion": "success",
+      "wall_seconds": 1.0
+    },
+    {
+      "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "conclusion": "success",
+      "wall_seconds": 2.0
+    },
+    {
+      "name": "Set up Python",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Install uv",
+      "conclusion": "success",
+      "wall_seconds": 2.0
+    },
+    {
+      "name": "Install dependencies",
+      "conclusion": "success",
+      "wall_seconds": 4.0
+    },
+    {
+      "name": "Verify dependency pins",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Run unit tests",
+      "conclusion": "success",
+      "wall_seconds": 288.0
+    },
+    {
+      "name": "Run regression tests",
+      "conclusion": "success",
+      "wall_seconds": 293.0
+    },
+    {
+      "name": "Verify clean wheel LiteLLM runtime",
+      "conclusion": "success",
+      "wall_seconds": 16.0
+    },
+    {
+      "name": "Post Install uv",
+      "conclusion": "success",
+      "wall_seconds": 1.0
+    },
+    {
+      "name": "Post Set up Python",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success",
+      "wall_seconds": 0.0
+    }
+  ],
+  "log_evidence": [
+    "﻿2026-10-30T00:09:41.0571883Z Current runner version: '2.338.0'",
+    "2026-10-30T00:09:41.0607174Z Image: ubuntu-26.04",
+    "2026-10-30T00:09:41.0607754Z Version: 20261025.179.1",
+    "2026-10-30T00:09:44.4911042Z Successfully set up CPython (3.11.17)",
+    "2026-10-30T00:09:52.8745515Z platform linux -- Python 3.13.11, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/work/multi-forge/multi-forge/.venv/bin/python",
+    "2026-10-30T00:09:52.8747817Z plugins: rerunfailures-16.6.1, mock-3.15.1, anyio-4.15.0, xdist-3.8.0, cov-7.1.0, asyncio-1.4.0",
+    "2026-10-30T00:10:09.8044379Z collecting ... collected 11354 items / 120 deselected / 11234 selected",
+    "2026-10-30T00:14:36.6515405Z ======== 11234 passed, 120 deselected, 8 warnings in 283.01s (0:04:43) =========",
+    "2026-10-30T00:14:39.4662220Z platform linux -- Python 3.13.11, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/work/multi-forge/multi-forge/.venv/bin/python",
+    "2026-10-30T00:14:39.4665601Z plugins: rerunfailures-16.6.1, mock-3.15.1, anyio-4.15.0, xdist-3.8.0, cov-7.1.0, asyncio-1.4.0",
+    "2026-10-30T00:14:43.1522938Z collecting ... collected 2218 items",
+    "2026-10-30T00:19:30.8257173Z ======================= 2218 passed in 290.92s (0:04:50) =======================",
+    "2026-10-30T00:19:46.0260293Z Clean wheel install and LiteLLM start/health smoke passed."
+  ]
+}

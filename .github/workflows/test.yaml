@@ -38,10 +38,10 @@ jobs:
         run: uv run --locked python scripts/check-dependency-pins.py
 
       - name: Run unit tests
-        run: uv run --locked pytest tests/src -m "not integration" -v
+        run: make test-unit
 
       - name: Run regression tests
-        run: uv run --locked pytest tests/regression -m regression -v
+        run: make test-regression
 
       - name: Verify clean wheel LiteLLM runtime
         run: ./scripts/test-wheel-runtime.sh
