@@ -1,6 +1,7 @@
 # Show the effective reasoning effort
 
-**Lane:** `doing/` -- started on 2026-10-30 on `codex/effective-effort-visibility`, based on `d32e7b1d`.
+**Lane:** `done/` -- shipped on 2026-10-30 in [PR #292](https://github.com/hapa1i/multi-forge/pull/292), merged as
+`b7fcc772`. Started on `codex/effective-effort-visibility`, based on `d32e7b1d`.
 
 **Execution:** [Checklist](checklist.md).
 

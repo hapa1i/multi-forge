@@ -4,9 +4,10 @@ Started 2026-10-30 on `codex/effective-effort-visibility`, based on main `d32e7b
 
 ## Current focus
 
-Address the verified owner review on PR #292, including corrections to the card's hint and unset-state contracts. Effort
-resolution precedence and the existing run-tree/provider correlation scope are preserved. The runtime reports Forge's
-outbound effort only; provider-side remapping remains outside the claim.
+Completed on 2026-10-30 in [PR #292](https://github.com/hapa1i/multi-forge/pull/292), including the owner-reviewed
+corrections to the card's hint and unset-state contracts. Effort resolution precedence and the existing
+run-tree/provider correlation scope are preserved. The runtime reports Forge's outbound effort only; provider-side
+remapping remains outside the claim.
 
 Shared ownership: core effort records contain resolution and applied-wire facts without importing proxy code. Proxy
 runtime exposes a tier-keyed `runtime.effort` map only for a validated launch query. The status line and session model
@@ -40,7 +41,7 @@ root run identity.
 - [x] Synchronize runtime/telemetry design, CLI reference, end-user status-line and launch-effort guidance.
 - [x] Pass aggregate unit, regression, full pre-commit and board/link checks; record non-passing attempts and repairs.
 - [x] Complete independent review and prepare the card PR with retained verification evidence.
-- [ ] After merge, verify main and perform board closeout.
+- [x] After merge, verify main and perform board closeout.
 
 ## Acceptance evidence
 
@@ -65,8 +66,7 @@ a TypeError.
 Initial aggregate checks (`b6d65fca`): `make pre-commit` passed, including repository size and Markdown link audits;
 `make test-unit` passed 11,418 tests in 82.78s; `make test-regression` passed 2,234 tests in 106.61s. All eight proxy
 integration cases passed; the four Docker launch cases passed again after the hint-state extraction (31.93s). The
-documentation review's opt-in wording finding was corrected. Merge and board closeout remain pending; owner-review
-verification follows below.
+documentation review's opt-in wording finding was corrected. Owner-review verification follows below.
 
 [evidence/checks.json](evidence/checks.json) retains command results and hashes for the temporary full logs.
 
@@ -86,5 +86,21 @@ Review verification: `make pre-commit` passed; `make test-unit` passed 11,440 te
 passed 2,255 tests in 88.64s. The eight proxy integrations passed in 7.10s and the five Docker integrations passed in
 30.10s, including execution of five lifecycle recovery scenarios. Independent read-only review of the launch snapshot,
 actual target/root and incognito handling found no further issues. The CLI also renders accepted future effort labels
-literally. [Review check results](evidence/review-checks.json) retain command summaries and hashes. GitHub CI remains
-the final PR gate; merge and board closeout require owner approval.
+literally. [Review check results](evidence/review-checks.json) retain command summaries and hashes.
+
+## Merged closeout
+
+The owner merged PR #292 on 2026-10-30 as `b7fcc772ff7a0a368b9d3f55466ecb94dcd84459`. Its tree exactly matches reviewed
+head `31e31391c82313b1c024e3885196b2ef7b23d4ad` (tree `5e60cf6ed816b77cc04ccf1e1b6f5c110848eb5b`), so the local unit,
+regression and integration evidence above applies to merged main without rerunning unchanged code.
+
+Both final-head CI workflows passed: [Pre-commit Checks](https://github.com/hapa1i/multi-forge/actions/runs/41072951499)
+and [Tests](https://github.com/hapa1i/multi-forge/actions/runs/41072951724), including the clean-wheel LiteLLM runtime
+smoke test. Runtime/telemetry design, CLI reference and end-user config/proxy guides describe the shipped contracts.
+Durable behavior is already covered there; no additional implementation-memory promotion is needed.
+
+The card and all retained evidence moved to `done/`. A repository-wide search found no inbound links requiring a lane
+update. Native probes remain synthetic upstream evidence, with no paid inference or provider-side clamping claim.
+
+- [x] Pass closeout Markdown, file-size, link, JSON and diff checks before committing the completed-work record:
+  `make pre-commit-md`, JSON/token-cache hooks, `git diff --check` and `git diff --cached --check` all passed.

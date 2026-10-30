@@ -11,6 +11,23 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 
 ## 2026-10-30
 
+### Show effective session reasoning effort
+
+**Goal**: Make the effort Forge sends visible beside the session model and explain differences from Claude's setting.
+
+- Show direct effort and launch-scoped proxy observations, distinguishing clamped, dropped, unset, stale and unknown
+  states. Keep outbound evidence separate from claims about provider execution.
+- Explain resolution inputs and final wire parameters through `forge session model show` and the in-session command.
+- Reuse the launch snapshot for guidance that resumes the actual created session; incognito guidance offers a new
+  launch. Align model marking and drift with wire shape and tier routing, and remove duplicate context-size styling.
+
+**Verification**: [PR #292](https://github.com/hapa1i/multi-forge/pull/292) merged as `b7fcc772`, with a tree identical
+to reviewed head `31e31391`. Local checks passed 11,440 unit tests, 2,255 regressions, 13 targeted proxy/Docker
+integrations and full pre-commit; final-head CI also passed, including clean-wheel runtime smoke. Native probes on
+Claude 2.1.245 and 2.1.314 used a synthetic local upstream without paid inference. The
+[closeout](done/effective_effort_visibility/checklist.md#merged-closeout) retains the verification and limits; design
+and end-user docs are synced.
+
 ### Reduce test-suite runtime and verify wheel teardown
 
 **Goal**: Shorten routine test runs while retaining assertion coverage and reliable cleanup.
