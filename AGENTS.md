@@ -46,7 +46,8 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - `FORGE_DEV="$PWD" uv run forge session start dev-hooks` launches a managed session whose host hooks use this checkout;
   `FORGE_DEV` must be an absolute root, and the session must be relaunched after changing or unsetting it.
 - `make deps` syncs dev dependencies and is the prerequisite behind the standard targets.
-- `make build` builds the source distribution and wheel with `uv`.
+- `make build` validates dependency exports, then builds the source distribution and wheel with hashed build constraints
+  using an installed Python 3.11--3.13.
 - `uv run forge --help` checks the CLI entry point.
 - `make test-unit` runs unit tests, excluding integration tests, with parallel workers.
 - `make test-integration` builds Docker images, starts test infrastructure, and runs integration-marked tests serially.
@@ -61,10 +62,18 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - `make test-regression` runs regression tests with parallel workers.
 - `make test` runs unit and integration tests; run `make test-regression` separately.
 - `make pre-commit` runs the full hook suite (ruff, black, isort, mypy, pyright, mdformat, gitleaks); run it before
-  committing.
+  committing. Pyright requires a reviewed Node.js release on `PATH`.
 - `make pre-commit-md` runs the Markdown-only hook subset for docs-only changes.
 - For targeted reruns, use direct `pytest` only after `make` has prepared prerequisites; integration flows depend on the
   setup performed by `make test-integration`.
+
+For dependency updates, follow `docs/developer/dependency_security.md`. After reviewing `uv lock` changes, run
+`"$(uv python find --no-project --no-config '>=3.11,<3.14')" -S scripts/check-dependency-pins.py --write` to regenerate
+`requirements/runtime.txt` and `requirements/build.txt`; omit `--write` to check them. Build backend updates must
+reconcile `build-system.requires`, `dependency-groups.build`, and `tool.uv.build-constraint-dependencies` before
+regeneration; `--write` does not update those pins. Run `make deps` before invoking pre-commit directly. When applying
+dependency security updates, stop affected host proxies and local backends before upgrading, then start backends before
+proxies. Rebuild both sidecar image layers using the dependency security update procedure in `docs/end-user/proxy.md`.
 
 Unit and regression Make targets distribute individual tests with `--dist=load -n auto --maxprocesses=4`. Override the
 worker count with `make test-unit TEST_WORKERS=8` or `make test-regression TEST_WORKERS=8`; an explicit number bypasses
@@ -112,11 +121,13 @@ connectivity after first setup, credential changes, or proxy auth changes. For c
 retaining the created, reused, or adopted proxy for inspection and retry. For packaged model/template updates, verify a
 fresh realization and a pre-existing user-owned snapshot: upgrades must not rewrite `proxy.yaml` or materialized LiteLLM
 config. Adopting new tier defaults requires `forge proxy edit <proxy_id>` or recreation of the affected proxy/backend
-before restart. For model upgrades, follow `docs/end-user/proxy.md` for model-specific reasoning/sampling changes. When
-updating LiteLLM adapters, copy complete bundled deployment entries, including any `model_info` capability and pricing
-metadata; restarting alone reloads the saved config. Stop affected proxies with `forge proxy stop <proxy_id>` before
-restarting with `forge proxy start <proxy_id> --smoke-test`. Existing OpenRouter proxies can forward explicit Astra
-workflow workers without changing their tier defaults; LiteLLM backends must serve the Astra route.
+before restart. For model upgrades, follow `docs/end-user/model_selection.md` for model-specific reasoning/sampling
+changes. When updating LiteLLM adapters, copy complete bundled deployment entries, including any `model_info` capability
+and pricing metadata; restarting alone reloads the saved config. Stop affected proxies with
+`forge proxy stop <proxy_id>` before restarting with `forge proxy start <proxy_id> --smoke-test`. Existing OpenRouter
+proxies can forward explicit Astra workflow workers without changing their tier defaults; LiteLLM backends must serve
+the Astra route. Before recreating the local LiteLLM adapter, back up its config outside `~/.forge/backends/litellm/`;
+see the saved-configuration upgrade procedure in `docs/end-user/proxy.md`.
 
 For Sonnet 5.5 thinking or translation changes, run
 `./scripts/test-integration.sh tests/integration/proxy/test_sonnet_55_e2e.py` and exercise the direct worker with
@@ -136,6 +147,11 @@ readiness with `forge runtime preflight codex`, then exercise `forge workflow pa
 `forge workflow panel -p "<review prompt>" -m claude-opus,codex`. Codex workers are opt-in and run read-only; panels
 that include one must use blind context (`--context blind`). The default worker set remains Claude-backed. `--proxy`
 does not reroute direct Claude or Codex workers, and `--effort` applies only to Claude workers.
+
+For worker native-control changes, run
+`./scripts/test-integration.sh tests/integration/docker/test_worker_native_controls.py`. Verify workers disable native
+delegation, native memory, and Claude skills; resumed reviews must preserve the source transcript and managed root
+settings remain unchanged.
 
 For policy CLI or hook changes, exercise `forge policy check --bundle coding_standards --file <path>` and
 `git diff | forge policy check --bundle coding_standards --diff`; exactly one content source is valid. Unknown policy
@@ -179,6 +195,10 @@ also verify `forge model backend start <source-or-adapter>`, `forge model backen
 `forge model backend delete <adapter>`, and `forge model backend reconcile <source-id> --request-id|--remote-id`; `stop`
 targets runtime instance ids from `list`, not source ids or adapter names.
 
+For LiteLLM streaming-cost changes, run
+`./scripts/test-integration.sh tests/integration/proxy/test_litellm_streaming_cost_e2e.py`. Verify final `usage.cost`
+counts once toward telemetry and caps, while missing cost stays unavailable and distinct from explicit zero.
+
 For resume, transfer, memory-writer, and activity changes, verify the user-facing surfaces:
 `forge session resume <name> --fresh --review`, `forge session transfer show|regenerate|edit|diff`,
 `forge session memory report [session] [--latest|--all|--json]`, and `forge telemetry activity [session]`; `forge usage`
@@ -189,6 +209,16 @@ when no proxy ID is supplied. For fresh-transfer ancestry changes, verify
 `forge session resume <parent> --fresh --strategy rewind --drop-last N` and
 `forge session fork <parent> --worktree|--into <path> --strategy rewind --drop-last N`; `rewind` is not a
 `forge session transfer regenerate` strategy.
+
+For transfer-fidelity changes, run
+`./scripts/test-integration.sh tests/integration/cli/test_transfer_fidelity_integration.py`. Check retained tool text
+through regenerate/show and fresh resume with `--review`; oversized interactive Codex prompts must refuse before launch
+and remove the new session and snapshot. See `docs/end-user/transfer.md` for delivery and strategy alternatives.
+
+For child configuration or reset changes, follow the configuration inheritance and reset section in
+`docs/end-user/session.md`. Fork/fresh children drop generic overrides but inherit effective memory-writer settings;
+relaunch children keep overrides. Verify `forge session reset --all` preserves baseline supervisor suspension; use
+`forge policy supervisor on --session <name>` to resume it.
 
 For session-store, launchability, repair, or workspace-scope changes, preview orphan recovery with
 `forge session repair [--json]`, apply it with `forge session repair --yes`, check degraded records with
