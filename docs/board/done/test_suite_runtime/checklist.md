@@ -9,16 +9,14 @@ approved removal and retained command check.
 The [retained evidence](evidence/README.md) includes stability, identity-comparison, timing and CI outcome summaries.
 Raw logs and reports in `/tmp` are temporary local artifacts, not retained evidence.
 
-## Current focus
+## Completed scope
 
-Complete review and merge of both PRs. The hook-emission ordering fix passes targeted checks, full pre-commit, three
-complete unit runs and CI. The renewed unit median is 75.868 seconds, and the recorded CI wall times are 84 seconds unit
-and 95 seconds regression. Part B passes all 521 retained integration tests with one shared wheel build. Measurements,
-earlier failures and the integration cache caveat are recorded in [benchmarks](benchmarks.md). Keep the card in `doing/`
-until both PRs are shipped and verified.
+Both PRs merged on 2026-10-30: Part B as `ece7bff7`, then Part A as `aa02a4fc`. Unit and regression targets use up to
+four workers by default. The integration suite retains 521 cases; its artifact consumers share one release wheel.
+Measurements, earlier failures and the integration cache caveat remain in [benchmarks](benchmarks.md).
 
-Part B's cleanup fix at `acdb6503` passes unit, regression, wheel runtime/cleanup and pre-commit CI on its first
-attempt. The [cleanup follow-up](../wheel_runtime_cleanup_failure/card.md) records the implementation and evidence.
+Part B also shipped the bounded wheel-smoke teardown fix at the user's request. Its
+[cleanup record](../../retired/wheel_runtime_cleanup_failure/card.md) is retired as folded into this closeout.
 
 ## Part A -- parallel unit and regression runs
 
@@ -92,14 +90,14 @@ attempt. The [cleanup follow-up](../wheel_runtime_cleanup_failure/card.md) recor
 
 ## Acceptance evidence
 
-| Check                  | Fixture                                       | Assertion                                             | Evidence                                                                                                                                   |
-| ---------------------- | --------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Unit parallelism       | Full host unit suite                          | Same test count; three green runs; wall time improves | 11,234 passed each; renewed walls 78.757 / 74.711 / 75.868 s; median 75.868 s versus 270.954 s serial                                      |
-| Regression parallelism | Full host regression suite                    | Per-test distribution; same count; three green runs   | 2,218 passed each; walls 99.525 / 97.558 / 97.849 s; median 97.849 s versus 295.250 s serial                                               |
-| Serial debugging       | Adopted runner with zero workers              | Same suite executes serially                          | Unit: 11,234 passed; regression: 2,218 passed; both with `TEST_WORKERS=0`                                                                  |
-| CI adoption            | Same runner class and test behavior           | Parallel wall time improves over serial               | Latest unit 84 s vs 288 s serial; regression 95 s vs 293 s; all 11,234 / 2,218 tests pass with exact IDs matching the bounded-ID candidate |
-| CLI removals           | Named unit twins and retained container tests | Assertions and real-process command coverage remain   | Clean run: 521 passed, exactly 543 baseline identities minus the 22 mapped removals; no failures, skips or reruns                          |
-| Shared release wheel   | QA, walkthrough and native-worker consumers   | Same wheel identity; independent build tests retained | Three builds / 2.888 s become one / 0.463 s with the same SHA-256; all four consumer and two independent build-policy cases pass           |
+| Check                  | Fixture                                       | Assertion                                             | Evidence                                                                                                                                        |
+| ---------------------- | --------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit parallelism       | Full host unit suite                          | Same test count; three green runs; wall time improves | 11,234 passed each; renewed walls 78.757 / 74.711 / 75.868 s; median 75.868 s versus 270.954 s serial                                           |
+| Regression parallelism | Full host regression suite                    | Per-test distribution; same count; three green runs   | 2,218 passed each; walls 99.525 / 97.558 / 97.849 s; median 97.849 s versus 295.250 s serial                                                    |
+| Serial debugging       | Adopted runner with zero workers              | Same suite executes serially                          | Unit: 11,234 passed; regression: 2,218 passed; both with `TEST_WORKERS=0`                                                                       |
+| CI adoption            | Same runner class and test behavior           | Parallel wall time improves over serial               | Measured CI unit 84 s vs 288 s serial; regression 95 s vs 293 s; all 11,234 / 2,218 tests pass with exact IDs matching the bounded-ID candidate |
+| CLI removals           | Named unit twins and retained container tests | Assertions and real-process command coverage remain   | Clean run: 521 passed, exactly 543 baseline identities minus the 22 mapped removals; no failures, skips or reruns                               |
+| Shared release wheel   | QA, walkthrough and native-worker consumers   | Same wheel identity; independent build tests retained | Three builds / 2.888 s become one / 0.463 s with the same SHA-256; all four consumer and two independent build-policy cases pass                |
 
 ## Closeout
 
@@ -116,6 +114,24 @@ attempt. The [cleanup follow-up](../wheel_runtime_cleanup_failure/card.md) recor
 - [x] Record the pre-existing Python 3.11 coverage gap in a separate
   [proposed card](../../proposed/python_minimum_ci_coverage/card.md).
 - [x] Record the repeated wheel-cleanup failure at Part B head `5a30b345` in a separate
-  [cleanup follow-up](../wheel_runtime_cleanup_failure/card.md). Both suites and runtime health passed, but cleanup left
-  that CI job red. The fix at `acdb6503` passed a fresh CI run without retrying the failed attempt.
-- [ ] After merge, sync completed-work records and move the card to `done/` only when all accepted scope has shipped.
+  [cleanup record](../../retired/wheel_runtime_cleanup_failure/card.md). Both suites and runtime health passed, but
+  cleanup left that CI job red. The fix at `acdb6503` passed a fresh CI run without retrying the failed attempt.
+- [x] Verify the combined merged revision, sync completed-work records and move the card to `done/`.
+
+## Merged closeout
+
+Both accepted parts and the cleanup fix shipped through PRs #290 and #291 on 2026-10-30. On combined main `aa02a4fc`,
+`make test-unit` passed all 11,234 cases in 84.19 seconds and `make test-regression` passed all 2,230 cases in 90.01
+seconds. The latter includes 12 new cleanup cases; the historical 2,218-case timing and identity comparisons remain
+unchanged. `./scripts/test-wheel-runtime.sh` passed installation, backend health, process-group exit and temporary-tree
+removal on macOS.
+
+The [combined-main CI run](https://github.com/hapa1i/multi-forge/actions/runs/41041753419) passed on its first attempt:
+11,234 unit cases in 84.87 seconds, 2,230 regressions in 92.23 seconds, and wheel installation, health and teardown.
+Unit tests emitted eight Python multiprocessing fork deprecation warnings. Together with PR #291 CI, this provides two
+successful CI runs after the cleanup fix. Full `make pre-commit`, Markdown links and board lane checks passed after
+formatting and the changelog token-cache refresh.
+
+The [closeout summary](evidence/closeout-summary.json) retains combined verification. Testing guidelines document the
+worker defaults, immutable shared wheel and bounded smoke teardown. Product architecture and end-user behavior are
+unchanged. The [Python minimum-version CI proposal](../../proposed/python_minimum_ci_coverage/card.md) remains open.

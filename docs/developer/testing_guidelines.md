@@ -134,6 +134,11 @@ Integration tests remain serial because they share containers and other runtime 
 unit and regression commands rather than in global pytest settings. Run times depend on the host, concurrent work and
 cached build artifacts.
 
+Docker release-artifact tests share the session-scoped `release_wheel` fixture in
+`tests/integration/docker/conftest.py`. It builds one wheel for QA, walkthrough and native-worker consumers, which reuse
+its path, version and SHA-256. Treat that wheel as immutable. Tests that verify build behavior must retain their
+independent builds.
+
 **Why `make` is required:**
 
 - Builds Docker images
@@ -144,6 +149,13 @@ cached build artifacts.
 The clean-wheel smoke uses hash-checked dependencies from `uv.lock`; `--unconstrained` explicitly exercises consumer
 resolution outside that lock. Run it whenever the LiteLLM compatibility ceiling or Forge-owned proxy dependency set
 changes; pull-request CI gates on the default. See [dependency security](dependency_security.md) for pin maintenance.
+
+Wheel-smoke cleanup uses `scripts/wheel-smoke-cleanup.py` to capture the isolated backend's process group before
+stopping it. Backend stop and the subsequent wait each have a ten-second limit; cleanup waits for all non-zombie group
+members before removing the temporary installation. If shutdown cannot be verified, the script retains the temporary
+tree and prints its path and diagnostics. Inspect these before removing the tree manually. A cleanup failure makes an
+otherwise successful smoke fail; an earlier failure keeps its original exit status. Use the script's final exit status
+as the result—the start/health success message precedes cleanup.
 
 ### When to Run Integration Tests
 

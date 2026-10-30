@@ -9,6 +9,25 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-10-30
+
+### Reduce test-suite runtime and verify wheel teardown
+
+**Goal**: Shorten routine test runs while retaining assertion coverage and reliable cleanup.
+
+- Run unit and regression cases across up to four workers by default, with numeric and serial overrides.
+- Remove 22 mapped Docker CLI mirrors, preserve their stdout checks, and share one immutable release wheel across
+  artifact consumers. Keep independent build-policy tests and distinct QA images.
+- Verify the wheel backend's process-group exit before deleting its temporary environment. The
+  [cleanup card](retired/wheel_runtime_cleanup_failure/card.md) is retired as folded into this work.
+
+**Verification**: [PR #291](https://github.com/hapa1i/multi-forge/pull/291) merged as `ece7bff7`, then
+[PR #290](https://github.com/hapa1i/multi-forge/pull/290) as `aa02a4fc`. Combined local checks passed 11,234 unit tests,
+2,230 regressions and clean-wheel installation, health and teardown; combined-main CI and full pre-commit also passed.
+Earlier integration verification passed all 521 retained cases with exact identity subtraction. Historical timing
+comparisons and failures remain in the [closeout](done/test_suite_runtime/checklist.md#merged-closeout); the Python 3.11
+coverage proposal remains open.
+
 ## 2026-10-29
 
 ### Patch tooling and runtime security dependencies

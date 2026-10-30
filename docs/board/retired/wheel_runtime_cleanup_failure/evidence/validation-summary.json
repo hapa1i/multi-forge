@@ -97,11 +97,12 @@
     }
   },
   "ci_status": "passed on first attempt",
-  "closeout_status": "doing; not merged",
+  "closeout_status": "retired as folded into test_suite_runtime on 2026-10-30; implementation merged through PR #291",
   "provenance": {
     "local_source_directory": "/tmp/forge-test-suite-runtime-20261030",
     "raw_logs_retained_in_repository": false,
     "note": "Logs were read to verify the listed excerpts and original hashes. The executing root agent reported successful macOS/Linux command completion. No suites were rerun to produce this summary."
   },
-  "ci_evidence": "ci-summary.json"
+  "ci_evidence": "ci-summary.json",
+  "closeout_evidence": "../../../done/test_suite_runtime/evidence/closeout-summary.json"
 }

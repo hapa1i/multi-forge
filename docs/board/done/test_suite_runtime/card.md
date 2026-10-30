@@ -1,6 +1,8 @@
 # Cut test-suite wall time
 
-**Lane:** `doing/` -- started on 2026-10-30 on `codex/test-suite-runtime`.
+**Lane:** `done/` -- completed on 2026-10-30. [PR #291](https://github.com/hapa1i/multi-forge/pull/291) merged as
+`ece7bff7`; [PR #290](https://github.com/hapa1i/multi-forge/pull/290) merged as `aa02a4fc`. The
+[merged closeout](checklist.md#merged-closeout) records combined verification and the folded cleanup fix.
 
 **Execution:** [Checklist](checklist.md) and [measurements](benchmarks.md).
 

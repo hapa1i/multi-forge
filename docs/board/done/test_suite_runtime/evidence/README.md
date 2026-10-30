@@ -36,4 +36,7 @@ step's 3.11.17 is not evidence of a Python 3.11 suite run.
 
 Part B later repeated the cleanup failure at `5a30b345` after both suites and runtime health passed. Its retained
 summary records the failed job without a retry; diagnosis belongs to the
-[cleanup proposal](../../../doing/wheel_runtime_cleanup_failure/card.md).
+[folded cleanup record](../../../retired/wheel_runtime_cleanup_failure/card.md).
+
+The [merged closeout summary](closeout-summary.json) records verification of combined main after both PRs merged. It is
+separate from the 15 historical benchmark summaries above.

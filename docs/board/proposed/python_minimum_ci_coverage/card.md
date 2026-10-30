@@ -6,7 +6,7 @@ The project declares Python `>=3.11,<3.14` and targets Python 3.11, but the unit
 Python 3.13. Installing Python 3.11 in the workflow does not establish that the tests use it. A change that breaks the
 declared minimum version can therefore pass the current CI gate.
 
-This gap predates the [test-suite runtime work](../../doing/test_suite_runtime/card.md) and is separate from adopting
+This gap predates the [test-suite runtime work](../../done/test_suite_runtime/card.md) and is separate from adopting
 parallel workers.
 
 ## Evidence

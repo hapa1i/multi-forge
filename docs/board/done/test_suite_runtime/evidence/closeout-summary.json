@@ -1,0 +1,118 @@
+{
+  "date": "2026-10-30",
+  "verified_revision": "aa02a4fc72e2c8b047f57f9145be3d50287e7f19",
+  "local_checkout_state": "clean throughout suite and wheel verification",
+  "merged_prs": [
+    {
+      "number": 291,
+      "approved_head": "acdb6503d13b96d1410a15986556af71930ae694",
+      "merge_commit": "ece7bff79fba1f802236cc82d79550932d1a8c18"
+    },
+    {
+      "number": 290,
+      "approved_head": "0dfc3ee0cb8c4f630159d2d1fe16c38640dd9c95",
+      "merge_commit": "aa02a4fc72e2c8b047f57f9145be3d50287e7f19"
+    }
+  ],
+  "local_verification": [
+    {
+      "command": "make test-unit",
+      "exit_code": 0,
+      "passed": 11234,
+      "pytest_seconds": 84.19,
+      "failures": 0,
+      "skips": 0,
+      "source_log": {
+        "file": "closeout-unit.log",
+        "sha256": "afc2a7e6997db8904c05cb7649fd20d81ffc04573c0412b30ff10e41d0dcf26b",
+        "bytes": 2558352
+      }
+    },
+    {
+      "command": "make test-regression",
+      "exit_code": 0,
+      "passed": 2230,
+      "pytest_seconds": 90.01,
+      "failures": 0,
+      "skips": 0,
+      "source_log": {
+        "file": "closeout-regression.log",
+        "sha256": "bffadde5b549ccd94c189f5373d9eda86761457a890888e1c8c157c7b78a93e0",
+        "bytes": 617505
+      }
+    },
+    {
+      "command": "./scripts/test-wheel-runtime.sh",
+      "exit_code": 0,
+      "runtime_track": "pinned",
+      "health": "passed",
+      "process_group_exit": "verified",
+      "temporary_tree_removal": "passed",
+      "source_log": {
+        "file": "closeout-wheel.log",
+        "sha256": "c75a1ed0b61abcdea61ba3eb88ebf73e39d1fa9014b982b8599119d4dcc48799",
+        "bytes": 3452
+      }
+    }
+  ],
+  "ci": {
+    "conclusion": "success",
+    "event": "workflow_dispatch",
+    "head_sha": "aa02a4fc72e2c8b047f57f9145be3d50287e7f19",
+    "html_url": "https://github.com/hapa1i/multi-forge/actions/runs/41041753419",
+    "id": 41041753419,
+    "run_attempt": 1,
+    "status": "completed",
+    "job_id": 124015995341,
+    "python": "3.13.11",
+    "unit": {
+      "passed": 11234,
+      "warnings": 8,
+      "pytest_seconds": 84.87,
+      "warning_kind": "DeprecationWarning from multiprocessing fork in multi-threaded tests"
+    },
+    "regression": {
+      "passed": 2230,
+      "pytest_seconds": 92.23
+    },
+    "wheel_install_health_cleanup": "passed",
+    "excerpts": [
+      "2026-10-30T10:36:16.8426268Z ================= 11234 passed, 8 warnings in 84.87s (0:01:24) =================",
+      "2026-10-30T10:37:50.2333324Z ======================= 2230 passed in 92.23s (0:01:32) ========================",
+      "2026-10-30T10:38:01.1991717Z Clean wheel install and LiteLLM start/health smoke passed.",
+      "2026-10-30T10:38:02.0957532Z Wheel smoke backend process group 26230 has exited."
+    ],
+    "source_log": {
+      "file": "closeout-ci.log",
+      "sha256": "75737a55562751f5070479d3240c1c51c445093a67d6ed583c7a558fd72f25f8",
+      "bytes": 4587534
+    }
+  },
+  "scope_notes": [
+    "The regression suite now includes 12 cleanup additions: 2,230 versus the historical 2,218-case benchmark.",
+    "The unchanged Part B integration evidence retains all 521 cases and exact subtraction of 22 mapped mirrors.",
+    "The Python 3.11 minimum-version CI proposal remains open.",
+    "The cleanup card is retired as folded into the shipped parent, with no independent completion credit."
+  ],
+  "provenance": {
+    "raw_logs_retained_in_repository": false,
+    "local_source_directory": "/tmp/forge-test-suite-runtime-20261030",
+    "note": "Retained counts and hashes were read from the combined-head verification logs; raw logs remain ephemeral."
+  },
+  "closeout_checks": {
+    "precommit": {
+      "command": "make pre-commit",
+      "exit_code": 0,
+      "source_log": {
+        "file": "closeout-precommit-final.log",
+        "sha256": "caf86003fb50766132d2e1d806f52b5c747041714fe9a5915d13f0d0a8859e9f",
+        "bytes": 1591
+      },
+      "initial_attempt": "failed only on formatter changes and stale changelog token cache; reviewed, formatted, refreshed and rerun"
+    },
+    "markdown_links": "passed",
+    "board_lanes_and_closed_checklists": "passed",
+    "inbound_old_lane_references": "none",
+    "independent_document_review": "no material findings"
+  }
+}

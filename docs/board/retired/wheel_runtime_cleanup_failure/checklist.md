@@ -1,13 +1,12 @@
 # Wheel-runtime cleanup execution
 
-## Current focus
+## Retirement outcome
 
-Review the verified fix in [PR #291](https://github.com/hapa1i/multi-forge/pull/291). The user explicitly requested this
-fix in the existing Part B PR. Its execution branch is `codex/test-suite-runtime-integration`;
-`codex/test-suite-runtime` owns the shared board documentation. The smoke helper is implemented; all 16 focused tests
-and real macOS/Linux smokes pass. Final full pre-commit and CI passed on the first attempt; the card stays in `doing/`
-until merged. [Retained evidence](evidence/validation-summary.json) includes log hashes and distinguishes the controlled
-regression from the unknown historical writer.
+Folded into the [test-suite runtime closeout](../../done/test_suite_runtime/checklist.md#merged-closeout) on 2026-10-30.
+The user requested this fix in Part B [PR #291](https://github.com/hapa1i/multi-forge/pull/291), which merged as
+`ece7bff7`. The card receives no independent completion credit. Its implementation, focused checks and macOS/Linux
+smokes remain in [retained evidence](evidence/validation-summary.json), which distinguishes the controlled regression
+from the unknown historical writer. Combined verification belongs to the parent closeout.
 
 ## Implementation and verification
 
@@ -43,4 +42,7 @@ regression from the unknown historical writer.
 
 - [x] Record implementation and validation results. The historical writer remains unknown; the controlled regression
   proves the ordering gap.
-- [ ] After merge, fold the completed cleanup work into the test-suite runtime closeout and reconcile both cards.
+- [x] Verify the combined revision and fold the cleanup work into the parent closeout, retaining this execution record.
+- [x] Confirm a second successful CI run after the fix on combined main `aa02a4fc`: all 11,234 unit and 2,230 regression
+  cases plus wheel health and cleanup passed on the first attempt. The
+  [parent summary](../../done/test_suite_runtime/evidence/closeout-summary.json) retains counts and log provenance.
