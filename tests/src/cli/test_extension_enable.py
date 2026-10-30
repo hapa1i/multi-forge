@@ -2253,7 +2253,7 @@ class TestCleanupProject:
 
         assert preview.exit_code == 0, preview.output
         assert "Hook Migration Plan" in preview.output
-        assert "enroll last" in preview.output
+        assert "enroll last" in " ".join(preview.output.split())
         assert "forge hook session-start" in settings.read_text(encoding="utf-8")
         assert not ProjectRegistryStore().contains_root(root)
 

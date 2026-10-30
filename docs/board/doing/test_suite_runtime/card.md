@@ -1,6 +1,8 @@
 # Cut test-suite wall time
 
-**Lane:** `todo/` -- accepted on 2026-10-29; parked until execution starts.
+**Lane:** `doing/` -- started on 2026-10-30 on `codex/test-suite-runtime`.
+
+**Execution:** [Checklist](checklist.md) and [measurements](benchmarks.md).
 
 **Origin:** Owner request on 2026-10-29 to find redundant tests after unit and regression runs reached 4-5 minutes and
 integration about 14 minutes. Measurements used commit `eec804c1` on a 10-core macOS host with Docker limited to 6 CPUs
@@ -104,11 +106,12 @@ The two parts are independent and should ship as separate PRs.
 - **Shared wheel captures one tree.** A session-scoped wheel is built from the checkout once per run. That narrows
   exposure to source changes mid-run, but a test that needs a modified tree must build its own wheel.
 
-## Decisions needed
+## Execution choices
 
-1. Should CI adopt Part A, or only local runs?
-2. How many consecutive green parallel runs per suite count as acceptance evidence?
-3. `-n auto` or a fixed worker count, given that Docker and other agents share the host?
+1. Adopt parallelism in CI only after its own serial/parallel comparison shows an improvement.
+2. Require three consecutive green parallel runs per suite after the final isolation changes, with no retries.
+3. Default to `-n auto --maxprocesses=4 --dist=load`, with `TEST_WORKERS` for an explicit count or zero for serial
+   debugging. Four workers retain most of the measured speedup while leaving capacity for other work on the host.
 
 ## Acceptance sketch
 

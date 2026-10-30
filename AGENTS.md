@@ -48,8 +48,8 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - `make deps` syncs dev dependencies and is the prerequisite behind the standard targets.
 - `make build` builds the source distribution and wheel with `uv`.
 - `uv run forge --help` checks the CLI entry point.
-- `make test-unit` runs tests.
-- `make test-integration` builds Docker images, starts test infrastructure, and runs integration-marked tests.
+- `make test-unit` runs unit tests, excluding integration tests, with parallel workers.
+- `make test-integration` builds Docker images, starts test infrastructure, and runs integration-marked tests serially.
 - `./scripts/test-integration.sh <path-or-pytest-args>` runs targeted integration tests with the same Docker/LiteLLM
   prerequisites; paths, `-k`, and other pytest flags pass through. When `GEMINI_API_KEY` is available, the script owns a
   temporary `FORGE_HOME` LiteLLM process on port 4001 and removes it on exit, so that port must be free. Set
@@ -58,13 +58,18 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - `./scripts/test-wheel-runtime.sh` builds a clean wheel with hashed build constraints, installs hash-checked runtime
   dependencies from `uv.lock`, and smoke-tests packaged LiteLLM start/health/stop. Use `--unconstrained` explicitly to
   test consumer dependency resolution; see `docs/developer/dependency_security.md` for pin updates.
-- `make test-regression` runs regression tests.
-- `make test` runs the full test suite.
+- `make test-regression` runs regression tests with parallel workers.
+- `make test` runs unit and integration tests; run `make test-regression` separately.
 - `make pre-commit` runs the full hook suite (ruff, black, isort, mypy, pyright, mdformat, gitleaks); run it before
   committing.
 - `make pre-commit-md` runs the Markdown-only hook subset for docs-only changes.
 - For targeted reruns, use direct `pytest` only after `make` has prepared prerequisites; integration flows depend on the
   setup performed by `make test-integration`.
+
+Unit and regression Make targets distribute individual tests with `--dist=load -n auto --maxprocesses=4`. Override the
+worker count with `make test-unit TEST_WORKERS=8` or `make test-regression TEST_WORKERS=8`; an explicit number bypasses
+the automatic four-worker cap. Use `TEST_WORKERS=0` for serial debugging, or pass `-n 0` to direct pytest commands, such
+as `uv run --locked pytest tests/src/session/test_store.py -n 0 -v`. Integration remains serial.
 
 The configured global pre-commit hook normalizes staged text, including replacing emoji with ASCII. Use `\U` escapes for
 emoji that must survive in source strings. If a hook reformats a staged file, review and restage it before retrying the
