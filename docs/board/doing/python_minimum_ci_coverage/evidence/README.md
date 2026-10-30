@@ -13,6 +13,18 @@ execution, failed or interrupted collection, report-write failure and incomplete
 existing nested collection probe now clears inherited pytest options and asserts that the parent's evidence is
 preserved. Independent review also corrected failed-comparison summary retention in CI.
 
+The [first CI attempt](ci-first-attempt.json) passed interpreter selection but failed the same 18 CLI content assertions
+in both lanes. Rich can capture `COLUMNS` when a console is constructed; changing the environment later does not
+override that explicit width. An 80-column local control reproduced the wrapping failures with matrix evidence disabled.
+The session and activity fixtures now set their intended console widths directly and restore the exact prior value.
+Existing assertions are preserved, and a subprocess regression covers the three affected fixture surfaces.
+
+The [fixture correction checks](local-fixture-correction.json) retain the 217 passing focused cases and subsequent local
+outcomes under `COLUMNS=80`. Concurrent full-unit reruns each hit one unrelated failure: a Markdown-link test observed
+an evidence file before staging, and a Git probe exceeded its 0.5s deadline under load. Both cases and the new
+regression passed sequential isolated checks on each version. The initial passing local matrix remains in
+`local-checks.json` and `local-comparison.json`; final complete matrix evidence must come from the clean CI run.
+
 Both pinned wheel smokes use an explicit `FORGE_WHEEL_SMOKE_PYTHON`, isolated environments and separate local ports.
 They check hash-constrained dependency installation, local LiteLLM startup/health, process-group shutdown and temporary
 directory removal. No provider inference or dependency changes are involved.

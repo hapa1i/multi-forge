@@ -15,13 +15,21 @@ def runner() -> CliRunner:
 
 
 @pytest.fixture
-def temp_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+def wide_session_console(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make content assertions independent of COLUMNS at console import time."""
+    from forge.cli.output import console
+
+    # Restore the original explicit width, including None; the public getter computes a fallback.
+    monkeypatch.setattr(console, "_width", 500)
+
+
+@pytest.fixture
+def temp_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, wide_session_console: None) -> Path:
     """Set up temporary environment for tests."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    # Widen Rich's console so long absolute paths don't wrap mid-string
-    # (breaks substring assertions; macOS tmp paths are long).
+    # Also widen consoles constructed inside the command.
     monkeypatch.setenv("COLUMNS", "500")
 
     project = tmp_path / "project"

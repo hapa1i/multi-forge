@@ -23,7 +23,7 @@ def runner() -> CliRunner:
 
 
 @pytest.fixture
-def temp_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+def temp_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, wide_session_console: None) -> Path:
     """Set up temporary environment for tests."""
     home = tmp_path / "home"
     home.mkdir()
