@@ -8,6 +8,7 @@ from typing import Any
 
 import click
 from rich.table import Table
+from rich.text import Text
 
 from forge.cli.output import err_console, print_error
 from forge.cli.session import console
@@ -45,7 +46,7 @@ def show_cmd(session_name: str | None, as_json: bool) -> None:
     table.add_column("Field", style="bold")
     table.add_column("Value")
     for field, value in session_model_summary_rows(payload):
-        table.add_row(field, value)
+        table.add_row(field, Text(value))
     console.print(table)
     console.print("\n[bold]Limitations[/bold]")
     for limitation in payload["limitations"]:

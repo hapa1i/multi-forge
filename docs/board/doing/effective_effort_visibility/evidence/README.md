@@ -1,8 +1,8 @@
 # Effective effort verification
 
-Recorded 2026-10-30 on macOS arm64. Tests use local fixtures and synthetic upstream responses; no paid inference was
-required. These results concern Claude's session inputs and Forge's outbound request construction, not provider-side
-execution.
+Initial PR head `b6d65fca`, recorded 2026-10-30 on macOS arm64. Tests use local fixtures and synthetic upstream
+responses; no paid inference was required. These results concern Claude's session inputs and Forge's outbound request
+construction, not provider-side execution.
 
 ## Native stdin and request probes
 
@@ -50,4 +50,6 @@ scratch directory above.
 - The first full pre-commit run normalized imports and identified an un-narrowed test value plus the lifecycle module's
   line ceiling. The test now validates the captured launch ID's type; shared hint state lives in the hint module.
 
-Final aggregate results and independent review are recorded in [the checklist](../checklist.md).
+Aggregate results and independent review are recorded in [the checklist](../checklist.md).
+
+[Owner review corrections](review-revisions.md) describe the subsequent fixes and their verification.

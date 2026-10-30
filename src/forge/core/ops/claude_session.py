@@ -39,6 +39,7 @@ from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.core.state import FileLockTimeoutError, atomic_write_text
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.install.project_compat import ProjectCompatibilityError
+from forge.proxy.runtime_truth import ProxyRuntimeTruth
 from forge.session import (
     LAUNCH_MODE_HOST,
     LAUNCH_MODE_SIDECAR,
@@ -103,6 +104,21 @@ from .session_routing import build_claude_routing_payload, commit_launch_routing
 
 logger = logging.getLogger(__name__)
 _DEFAULT_CLAUDE_INVOKER = invoke_claude
+
+
+@dataclass(frozen=True)
+class ClaudeLaunchReady:
+    """Actual launch target and the proxy snapshot already read for cost accounting."""
+
+    session: str
+    operation: str
+    incognito: bool
+    template: str | None
+    proxy_id: str | None
+    model_route: ModelRouteIntent | None
+    runtime: ProxyRuntimeTruth | None
+    direct_model: str | None = None
+    forge_root: str | None = None
 
 
 @dataclass(frozen=True)
@@ -222,6 +238,7 @@ class ClaudeStartPresenter(ClaudeIncognitoCleanupPresenter, Protocol):
     def on_extensions(self, event: ClaudeStartExtensions) -> None: ...
     def on_no_launch(self) -> None: ...
     def before_launch(self, forge_root: Path) -> None: ...
+    def on_launch_ready(self, event: ClaudeLaunchReady) -> None: ...
     def on_routing_payload(self, payload: dict[str, Any]) -> None: ...
     def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None: ...
     def on_launch_error(self, error: ForgeOpError) -> None: ...
@@ -357,6 +374,7 @@ class ClaudeResumePresenter(Protocol):
     def on_warning(self, warning: ClaudeResumeWarning) -> None: ...
     def on_resume_prepared(self, event: ResumePrepared) -> None: ...
     def before_launch(self, forge_root: Path) -> None: ...
+    def on_launch_ready(self, event: ClaudeLaunchReady) -> None: ...
     def on_routing_payload(self, payload: dict[str, Any]) -> None: ...
     def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None: ...
     def on_launch_error(self, error: ForgeOpError) -> None: ...
@@ -366,6 +384,7 @@ class ClaudeForkPresenter(ClaudeIncognitoCleanupPresenter, Protocol):
     """Render hooks the CLI implements for fork launches."""
 
     def before_launch(self, forge_root: Path) -> None: ...
+    def on_launch_ready(self, event: ClaudeLaunchReady) -> None: ...
     def on_routing_payload(self, payload: dict[str, Any]) -> None: ...
     def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None: ...
     def on_launch_error(self, error: ForgeOpError) -> None: ...
@@ -485,6 +504,7 @@ def launch_claude_session(
     authority_operation: str = "resume",
     expected_instance_id: str | None = None,
     before_launch: Callable[[Path], None] | None = None,
+    on_launch_ready: Callable[[ClaudeLaunchReady], None] | None = None,
     on_routing_payload: Callable[[dict[str, Any]], None] | None = None,
     on_sidecar_launch: Callable[[ClaudeSidecarLaunch], None] | None = None,
     invoke: Callable[..., int] | None = None,
@@ -642,6 +662,7 @@ def launch_claude_session(
                 authority_attempt=authority_attempt,
                 routing_operation=authority_operation,
                 on_routing_payload=on_routing_payload,
+                on_launch_ready=on_launch_ready,
             )
         else:
             result = _run_host_claude_session(
@@ -669,6 +690,7 @@ def launch_claude_session(
                 authority_attempt=authority_attempt,
                 routing_operation=authority_operation,
                 on_routing_payload=on_routing_payload,
+                on_launch_ready=on_launch_ready,
             )
         if authority_attempt is not None:
             authority_attempt.complete(result.exit_code)
@@ -822,6 +844,7 @@ def start_claude_session(
                 authority_operation="incognito" if incognito else "start",
                 expected_instance_id=published_instances[0] if published_instances else None,
                 before_launch=presenter.before_launch,
+                on_launch_ready=presenter.on_launch_ready,
                 on_routing_payload=(presenter.on_routing_payload if model_route is not None else None),
                 on_sidecar_launch=presenter.on_sidecar_launch,
                 invoke=invoke or invoke_claude,
@@ -965,6 +988,7 @@ def resume_claude_session(
             authority_operation="resume",
             expected_instance_id=plan.instance_id,
             before_launch=presenter.before_launch,
+            on_launch_ready=presenter.on_launch_ready,
             on_routing_payload=(presenter.on_routing_payload if plan.render_model_route else None),
             on_sidecar_launch=presenter.on_sidecar_launch,
             invoke=invoke or invoke_claude,
@@ -1035,6 +1059,7 @@ def fork_claude_session(
             authority_operation="incognito" if plan.incognito else "fork",
             expected_instance_id=plan.instance_id,
             before_launch=presenter.before_launch,
+            on_launch_ready=presenter.on_launch_ready,
             on_routing_payload=(presenter.on_routing_payload if plan.render_model_route else None),
             on_sidecar_launch=presenter.on_sidecar_launch,
             invoke=invoke or invoke_claude,
@@ -1473,6 +1498,7 @@ def _run_sidecar_claude_session(
     authority_attempt: AuthorityLaunchAttempt | None,
     routing_operation: str,
     on_routing_payload: Callable[[dict[str, Any]], None] | None,
+    on_launch_ready: Callable[[ClaudeLaunchReady], None] | None,
 ) -> ClaudeSessionLaunchResult:
     if effective_template is None or runtime_base_url is None:
         raise ForgeOpError("Direct sessions are not supported with --sidecar")
@@ -1593,6 +1619,20 @@ def _run_sidecar_claude_session(
             source="env" if _has_container_key else "none",
         )
     _sidecar_cost_baseline = read_proxy_cost_baseline(runtime_base_url)
+    if on_launch_ready is not None:
+        on_launch_ready(
+            ClaudeLaunchReady(
+                session=manifest.name,
+                operation=routing_operation,
+                incognito=manifest.is_incognito,
+                forge_root=manifest.forge_root,
+                template=effective_template,
+                proxy_id=proxy_id,
+                model_route=manifest.intent.launch.model_route if manifest.intent.launch else None,
+                direct_model=manifest.intent.launch.direct_model if manifest.intent.launch else None,
+                runtime=_sidecar_cost_baseline.runtime if _sidecar_cost_baseline else None,
+            )
+        )
     record_launch_confirmed(
         store,
         routing_mode="proxy",
@@ -1757,6 +1797,7 @@ def _run_host_claude_session(
     authority_attempt: AuthorityLaunchAttempt | None,
     routing_operation: str,
     on_routing_payload: Callable[[dict[str, Any]], None] | None,
+    on_launch_ready: Callable[[ClaudeLaunchReady], None] | None,
 ) -> ClaudeSessionLaunchResult:
     _update_manifest_best_effort(
         store,
@@ -1804,6 +1845,20 @@ def _run_host_claude_session(
 
     routing_mode = _routing_mode_for(runtime_base_url, proxy_id)
     _proxy_cost_baseline = read_proxy_cost_baseline(runtime_base_url)
+    if on_launch_ready is not None:
+        on_launch_ready(
+            ClaudeLaunchReady(
+                session=manifest.name,
+                operation=routing_operation,
+                incognito=manifest.is_incognito,
+                forge_root=manifest.forge_root,
+                template=effective_template,
+                proxy_id=proxy_id,
+                model_route=manifest.intent.launch.model_route if manifest.intent.launch else None,
+                direct_model=manifest.intent.launch.direct_model if manifest.intent.launch else None,
+                runtime=_proxy_cost_baseline.runtime if _proxy_cost_baseline else None,
+            )
+        )
     record_launch_confirmed(
         store,
         routing_mode=routing_mode,

@@ -1172,7 +1172,6 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             mapped_model=actual_model_id,
             resolution=effort_resolution,
         )
-        effort_kwargs = {"on_effort_applied": effort_observer} if effort_observer is not None else {}
 
         # Note: the raw `thinking` dict is NOT forwarded — it's Anthropic-specific.
         # Litellm controls thinking via reasoning_effort (mapped above).
@@ -1316,7 +1315,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                         openai_request_dict,
                         request_id,
                         on_provider_dispatch=_mark_provider_dispatch,
-                        **effort_kwargs,
+                        on_effort_applied=effort_observer,
                     ):
                         yield chunk
                 except ProxyStreamError as e:
@@ -1441,7 +1440,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     openai_request_dict,
                     request_id,
                     on_provider_dispatch=_mark_provider_dispatch,
-                    **effort_kwargs,
+                    on_effort_applied=effort_observer,
                 )
                 provider_response_received = True
                 anthropic_response = convert_openai_to_anthropic(openai_response, original_model_name)
@@ -1553,7 +1552,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     openai_request_dict,
                     request_id,
                     on_provider_dispatch=_mark_provider_dispatch,
-                    **effort_kwargs,
+                    on_effort_applied=effort_observer,
                 )
                 provider_response_received = True
                 anthropic_response = convert_openai_to_anthropic(openai_response, original_model_name)

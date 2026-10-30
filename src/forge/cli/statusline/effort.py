@@ -18,7 +18,7 @@ def observation_label(
     if record is None:
         return "unknown", False
     dropped = record["wire"] == "dropped"
-    applied = "dropped" if dropped else record["applied"] or "unknown"
+    applied = "dropped" if dropped else record["applied"] or "unset"
     stale = (
         (requested is not None and requested != record["requested"])
         or (
@@ -32,6 +32,6 @@ def observation_label(
     )
     if stale:
         return f"{applied} (stale)", dropped
-    if applied != "unknown" and record["requested"] is not None and applied != record["requested"]:
+    if record["requested"] is not None and applied != record["requested"]:
         return f"{applied}<-{record['requested']}", dropped
     return applied, dropped

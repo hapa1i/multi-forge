@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 
 import pytest
 import yaml
@@ -255,6 +256,7 @@ def test_direct_parent_forks_to_proxy_model_and_bare_resume_reuses_route(
         assert forked.returncode == 0, forked.stdout + forked.stderr
         assert forked.stderr.count("Effort is derived") == 1
         assert "sonnet: high" in forked.stderr
+        assert "forge session resume model-route-child --effort '<level>'" in forked.stderr
         assert (
             f"Route: provider=openrouter template=openrouter-openai proxy={proxy_id} "
             "tier=sonnet model=openai/gpt-5.6-sol billing_mode=unknown" in forked.stderr
@@ -348,5 +350,51 @@ def test_saved_passthrough_launches_preserve_native_model_selection(forge_worksp
             assert events
             assert all(event["payload"]["requested_model"] == "claude-sonnet-5" for event in events)
         assert forge_workspace.read_file(config_path) == saved_config
+    finally:
+        forge_workspace.exec(f"kill $(cat {pid_path}) 2>/dev/null || true")
+
+
+def test_effort_guidance_commands_resume_created_children_and_restart_incognito(forge_workspace: ContainerLike) -> None:
+    """Execute each placeholder command after replacing its effort, from the original project."""
+    _enable_claude_env_capture(forge_workspace)
+    proxy_id = "effort-guidance"
+    pid_path = _register_proxy(forge_workspace, proxy_id=proxy_id, port=_allocate_container_port(forge_workspace))
+    try:
+        enabled = forge_workspace.exec("forge extension enable --scope user --profile minimal")
+        assert enabled.returncode == 0, enabled.stdout + enabled.stderr
+        setup = forge_workspace.exec(
+            "cd /workspace && git worktree add /tmp/effort-target -b effort-target && "
+            "cd /tmp/effort-target && forge extension enable --scope local"
+        )
+        assert setup.returncode == 0, setup.stdout + setup.stderr
+        commands = [
+            f"forge session start guidance-parent --proxy {proxy_id}",
+            "forge session fork guidance-parent",
+            "forge session resume guidance-parent --fresh --strategy minimal",
+            "forge session fork guidance-parent --into /tmp/effort-target --name guidance-into",
+            f"forge session incognito private-guidance --proxy {proxy_id} --model gpt-5.6-sol",
+        ]
+        for command in commands:
+            launched = forge_workspace.exec(f"cd /workspace && {command}")
+            assert launched.returncode == 0, launched.stdout + launched.stderr
+            tips = [line.strip() for line in launched.stderr.splitlines() if "--effort '<level>'" in line]
+            assert len(tips) == 1, launched.stderr
+            recovery = tips[0]
+            tokens = shlex.split(recovery)
+            assert "--fresh" not in tokens
+            assert "--into" not in tokens
+            if "--into" in command:
+                assert tokens[:3] == ["cd", "/tmp/effort-target", "&&"]
+            elif "incognito" in command:
+                assert tokens[:3] == ["forge", "session", "incognito"]
+                assert "private-guidance" not in tokens
+                assert "deleted on exit" in launched.stderr
+            else:
+                assert tokens[:3] == ["forge", "session", "resume"]
+                assert forge_workspace.file_exists(f"/workspace/.forge/sessions/{tokens[3]}/forge.session.json")
+            recovery = recovery.replace("'<level>'", "high")
+            resumed = forge_workspace.exec(f"cd /workspace && {recovery}")
+            assert resumed.returncode == 0, resumed.stdout + resumed.stderr
+            assert "Effort is derived" not in resumed.stderr
     finally:
         forge_workspace.exec(f"kill $(cat {pid_path}) 2>/dev/null || true")

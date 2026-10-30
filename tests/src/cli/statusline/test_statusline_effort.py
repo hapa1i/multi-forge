@@ -153,7 +153,9 @@ def test_think_stays_available_only_by_opt_in():
             "high<-max",
         ),
         ({"applied": None, "wire": "dropped"}, "xhigh", "dropped<-xhigh"),
-        ({"applied": None, "wire": None}, "xhigh", "unknown"),
+        ({"applied": None, "wire": None}, "xhigh", "unset<-xhigh"),
+        ({"applied": None, "wire": None, "requested": None}, None, "unset"),
+        ({"applied": None, "wire": None}, "low", "unset (stale)"),
         ({}, "low", "high (stale)"),
     ],
 )
@@ -263,6 +265,17 @@ def test_runtime_truth_retains_complete_records_and_valid_empty_map():
     assert ProxyRuntimeTruth(_raw({})).has_effort_observations
 
 
+@pytest.mark.parametrize("backend_id", ["INVALID BACKEND", "bad\nbackend", [], 42])
+def test_invalid_backend_id_does_not_hide_safe_effort_record(backend_id):
+    raw = _raw()
+    raw["runtime"]["backend_id"] = backend_id
+    truth = ProxyRuntimeTruth(raw)
+    assert truth.backend_id is None
+    assert not truth.has_authoritative_route_truth
+    assert truth.has_effort_observations
+    assert truth.effort == {"opus": _record()}
+
+
 @pytest.mark.parametrize("bad", [None, [], "bad", {"other": _record()}, {"opus": {}}, {"opus": []}])
 def test_invalid_effort_map_is_unsupported(bad):
     raw = _raw()
@@ -279,6 +292,8 @@ def test_invalid_effort_map_is_unsupported(bad):
         {"opt_in": 1},
         {"client_applicable": None},
         {"requested": []},
+        {"requested": ""},
+        {"requested": "future\nlevel"},
         {"applied": "\x1b[31mhigh"},
         {"mapped_model": "bad\nmodel"},
         {"source": "guessed"},
@@ -291,11 +306,29 @@ def test_invalid_effort_map_is_unsupported(bad):
         {"note": "\x1b[0m"},
     ],
 )
-def test_one_malformed_record_invalidates_entire_effort_map(changes):
+def test_malformed_record_does_not_discard_other_tiers(changes):
     raw = _raw({"opus": _record(**changes), "sonnet": _record(tier="sonnet")})
     truth = ProxyRuntimeTruth(raw)
-    assert not truth.has_effort_observations
-    assert truth.effort == {}
+    assert truth.has_effort_observations
+    assert truth.effort == {"sonnet": _record(tier="sonnet")}
+
+
+def test_unknown_client_level_is_retained_without_loosening_outbound_levels():
+    future = _record(tier="haiku", requested="future-level", client_applicable=False)
+    raw = _raw({"opus": _record(), "haiku": future})
+    truth = ProxyRuntimeTruth(raw)
+    assert truth.has_effort_observations
+    assert truth.effort == {"opus": _record(), "haiku": future}
+    assert "O:gpt-6-astra@high<-xhigh" in _model(_context(raw=raw))
+
+    raw["runtime"]["effort"]["haiku"]["applied"] = "future-level"
+    assert ProxyRuntimeTruth(raw).effort == {"opus": _record()}
+
+
+def test_unknown_tier_does_not_discard_valid_observation():
+    truth = ProxyRuntimeTruth(_raw({"opus": _record(), "future-tier": _record(tier="future-tier")}))
+    assert truth.has_effort_observations
+    assert truth.effort == {"opus": _record()}
 
 
 @pytest.mark.parametrize("shape", [None, {}, "unknown"])

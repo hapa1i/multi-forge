@@ -6,7 +6,7 @@ thinking budget (>=25k tokens -> xhigh) and applied tier_overrides as a floor
 list tops out at high, so a routine 30k thinking budget sent
 reasoning_effort=xhigh upstream — an unsupported value.
 
-Fixed in src/forge/proxy/reasoning.py by resolve_reasoning_effort (applied at
+Fixed in src/forge/proxy/reasoning.py by resolve_reasoning_effort_record (applied at
 the server.py /v1/messages seam): derived values clamp to the model's
 litellm_reasoning_efforts; explicit unsupported values are rejected.
 """
@@ -19,7 +19,10 @@ import pytest
 
 from forge.config import TierOverride
 from forge.core.models import get_model_spec
-from forge.proxy.reasoning import derive_reasoning_effort, resolve_reasoning_effort
+from forge.proxy.reasoning import (
+    derive_reasoning_effort,
+    resolve_reasoning_effort_record,
+)
 
 pytestmark = pytest.mark.regression
 
@@ -38,21 +41,21 @@ def test_bug_large_budget_no_longer_leaks_xhigh_past_model_ceiling() -> None:
     assert "xhigh" not in supported
 
     # Post-fix: the resolved value is the model's highest supported level.
-    result = resolve_reasoning_effort(
+    result = resolve_reasoning_effort_record(
         _request({"budget_tokens": 30_000}),
         tier_override=None,
         model_id="gemini/gemini-3.5-flash",
         request_id="regression",
-    )
+    ).resolved
     assert result == "high"
 
 
 def test_bug_tier_override_floor_no_longer_leaks_xhigh() -> None:
     """The floor path had the same leak: tier xhigh over a modest budget."""
-    result = resolve_reasoning_effort(
+    result = resolve_reasoning_effort_record(
         _request({"budget_tokens": 3_000}),
         tier_override=TierOverride(reasoning_effort="xhigh"),
         model_id="gemini/gemini-3.5-flash",
         request_id="regression",
-    )
+    ).resolved
     assert result == "high"

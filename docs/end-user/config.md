@@ -305,12 +305,14 @@ On a Forge proxy, only the active tier gets an annotation, using the last observ
 | `@high<-xhigh`    | Forge sent high from a Claude request for xhigh    |
 | `@high (stale)`   | Effort, client model or proven route changed       |
 | `@dropped<-xhigh` | Client construction removed the effort parameter   |
+| `@unset`          | Forge observed a request with no effort parameter  |
 | `@unknown`        | No usable observation for this launch              |
 
 `<-` reads "from"; a tier minimum can raise a level as well as a model limit lowering it. These are Forge's outbound
 values, not a measurement of provider-side reasoning. Use `forge session model show <name>` (or `%session model show`)
 to inspect requested, derived, minimum, pre-clamp, supported and applied levels separately. `--json` includes the
-observations by tier.
+observations by tier. An unset observation can show `@unset<-high` when Claude requested a level, or `@unset (stale)`
+after a relevant change.
 
 Observations are temporary: a new launch, proxy restart or cache eviction starts at `unknown`. Relaunch sessions that
 predate the launch header to enable observation. Background work on the same launch and tier can replace its latest

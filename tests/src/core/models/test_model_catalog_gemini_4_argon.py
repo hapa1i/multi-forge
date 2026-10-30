@@ -12,7 +12,7 @@ from forge.core.models.model_routes import (
     load_model_route_catalog,
     normalize_model_route_request,
 )
-from forge.proxy.reasoning import resolve_reasoning_effort
+from forge.proxy.reasoning import resolve_reasoning_effort_record
 
 
 @pytest.mark.parametrize(
@@ -86,12 +86,12 @@ def test_argon_routes_retain_pro_family_template_coverage_and_provider_spelling(
 @pytest.mark.parametrize("effort", ["none", "disable", "minimal", "xhigh", "max"])
 def test_argon_rejects_explicit_unsupported_effort(effort: str) -> None:
     with pytest.raises(HTTPException) as error:
-        resolve_reasoning_effort(
+        resolve_reasoning_effort_record(
             SimpleNamespace(reasoning_effort=effort),
             tier_override=None,
             model_id="google/gemini-4-argon",
             request_id="argon-explicit",
-        )
+        ).resolved
 
     assert error.value.status_code == 400
     assert "not supported" in str(error.value.detail)
@@ -99,12 +99,12 @@ def test_argon_rejects_explicit_unsupported_effort(effort: str) -> None:
 
 def test_argon_clamps_derived_thinking_disabled_to_low() -> None:
     assert (
-        resolve_reasoning_effort(
+        resolve_reasoning_effort_record(
             SimpleNamespace(thinking={"type": "disabled"}),
             tier_override=None,
             model_id="google/gemini-4-argon",
             request_id="argon-derived",
-        )
+        ).resolved
         == "low"
     )
 

@@ -23,7 +23,7 @@ from forge.cli.session_authority_options import (
     authority_creation_options,
     parse_creation_authority,
 )
-from forge.cli.session_effort_hint import SessionEffortHint
+from forge.cli.session_effort_hint import ClaudeLaunchReady, print_derived_effort_hint
 from forge.cli.session_launch_args import (
     RuntimePassthroughCommand,
     checked_launch_args,
@@ -111,23 +111,14 @@ __all__ = ["fork"]
 class _ClaudeForkCliPresenter:
     """CLI-side renderer for ``fork_claude_session`` events."""
 
-    def __init__(
-        self,
-        *,
-        session_name: str,
-        base_url: str | None = None,
-        template: str | None = None,
-        proxy_id: str | None = None,
-        projected_tier: str | None = None,
-    ) -> None:
+    def __init__(self, *, session_name: str) -> None:
         self._session_name = session_name
-        self._effort_hint = SessionEffortHint(
-            base_url=base_url, template=template, proxy_id=proxy_id, projected_tier=projected_tier
-        )
 
     def before_launch(self, forge_root: Path) -> None:
         _warn_before_claude_launch(forge_root)
-        self._effort_hint.show()
+
+    def on_launch_ready(self, event: ClaudeLaunchReady) -> None:
+        print_derived_effort_hint(event)
 
     def on_routing_payload(self, payload: dict[str, Any]) -> None:
         _render_model_route_payload(payload)
@@ -774,16 +765,9 @@ def fork(
             )
         sys.exit(0)
 
-    launch_model_route = execution.manifest.intent.launch.model_route if execution.manifest.intent.launch else None
     result = fork_claude_session(
         manager=manager,
         plan=replace(execution.launch_plan, launch_args=launch_args),
-        presenter=_ClaudeForkCliPresenter(
-            session_name=execution.manifest.name,
-            base_url=execution.launch_plan.runtime_base_url,
-            template=execution.launch_plan.effective_template,
-            proxy_id=execution.launch_plan.proxy_id,
-            projected_tier=(launch_model_route.selected_tier if launch_model_route is not None else None),
-        ),
+        presenter=_ClaudeForkCliPresenter(session_name=execution.manifest.name),
     )
     sys.exit(_render_claude_fork_result(result))

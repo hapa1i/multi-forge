@@ -18,7 +18,6 @@ from forge.core.metric_formatting import (
     format_usd,
     format_usd_micros,
 )
-from forge.core.tiers import detect_tier_word
 
 logger = logging.getLogger(__name__)
 
@@ -170,18 +169,6 @@ def get_tier_from_display_name(display_name: str) -> str:
     return "sonnet"
 
 
-def explicit_tier_from_model(model_id: str) -> str | None:
-    """Infer an explicit haiku/sonnet/opus tier from a model id, else None.
-
-    1:1 mirror of the proxy's ``_tier_from_model_name`` (proxy/server.py): request
-    routing prefers an explicit tier in the model name over ``config.proxy
-    .default_tier``. Returns None when no tier substring is present (the proxy then
-    falls back to its default), so the drift producer can replicate the real route
-    instead of comparing against the proxy default tier.
-    """
-    return detect_tier_word(model_id or "")
-
-
 def parse_context_from_json(data: dict[str, Any]) -> dict[str, Any] | None:
     """Parse context usage from Claude Code's JSON input.
 
@@ -233,31 +220,6 @@ def parse_context_from_json(data: dict[str, Any]) -> dict[str, Any] | None:
         "tokens": total_tokens,
         "context_window": context_window_size,
     }
-
-
-def get_effective_context_window(
-    data: dict[str, Any],
-    runtime: status_types.ProxyRuntimeTruth | None,
-    context_info: dict[str, Any] | None,
-) -> int | None:
-    """Resolve the best-known context window size for display."""
-    if runtime and runtime.active_context_window:
-        return runtime.active_context_window
-
-    if context_info:
-        context_window = context_info.get("context_window", 0)
-        if context_window > 0:
-            return context_window
-
-    context_window_data = data.get("context_window")
-    if isinstance(context_window_data, dict):
-        context_window_size = context_window_data.get("context_window_size", 0)
-        if context_window_size > 0:
-            return context_window_size
-    if isinstance(context_window_data, (int, float)) and context_window_data > 0:
-        return int(context_window_data)
-
-    return None
 
 
 def format_model_label(display_name: str) -> str:

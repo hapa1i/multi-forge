@@ -168,8 +168,18 @@ Resume and fork mint new launch identities.
 Resolution records preserve the requested level, opt-in/applicability, thinking-derived level, tier floor, pre-clamp
 value, supported levels, result and source without changing precedence. Client callbacks finalize the applied value,
 wire parameter and any drop note after request construction for streaming and non-streaming dispatch. Passthrough
-records the actual native effort, including an override mutation. These observations describe what Forge sent, not
-gateway/provider execution, and are not persisted in downstream telemetry.
+records the actual native effort, including an override mutation; an inactive configured floor is omitted. Requests
+without a valid launch header skip observation-only passthrough catalog work. These observations describe what Forge
+sent, not gateway/provider execution, and are not persisted in downstream telemetry.
+
+Effort records are validated per tier independently of route metadata. A malformed tier does not erase another tier's
+valid observation. Client-requested effort accepts safe future vocabulary, while Forge's resolved and applied levels
+retain their known vocabulary. Session model reads keep identity-validated live effort data when route reporting falls
+back to config or commitment; an invalid live backend identifier is reported as unknown.
+
+Launch effort guidance shares the existing cost-baseline response through a transient parsed runtime snapshot. The op
+reports the actual session being launched after preparation, so durable-session guidance resumes that session and
+incognito guidance describes a new ephemeral launch. Rendering the optional tip adds no proxy request.
 
 Read-side route prediction checks wire shape before tier maps: Anthropic passthrough uses the normalized client model;
 translated tier routes use an exact alternative before the tier default. Explicit `provider/model` requests and invalid

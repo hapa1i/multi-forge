@@ -199,10 +199,6 @@ class RenderContext:
         return info
 
     @cached_property
-    def effective_context_window(self) -> int | None:
-        return fmt.get_effective_context_window(self.data, self.runtime, self.context_info)
-
-    @cached_property
     def effective_intent(self) -> dict[str, Any]:
         """Session intent with overrides applied (the in-force posture).
 

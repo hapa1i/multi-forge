@@ -140,6 +140,27 @@ def _response(request: httpx.Request, body: dict[str, Any]) -> httpx.Response:
         ),
         pytest.param(
             EffortCase(
+                model="openai/gpt-5-fixture",
+                params=ModelHyperparameters(extra={"openai": {"reasoning_effort": None}}),
+                tools=True,
+                observation=DROP,
+            ),
+            id="gpt-tools-drops-explicit-null",
+        ),
+        pytest.param(
+            EffortCase(
+                model="openai/gpt-5-fixture",
+                params=ModelHyperparameters(
+                    reasoning_effort="high",
+                    extra={"openai": {"extra_body": {"reasoning_effort": None}}},
+                ),
+                tools=True,
+                body={"reasoning_effort": None},
+            ),
+            id="gpt-tools-extra-body-null-survives",
+        ),
+        pytest.param(
+            EffortCase(
                 model="gemini/gemini-4-argon",
                 observation=AppliedEffort("medium", "thinkingConfig.thinkingLevel"),
                 body={

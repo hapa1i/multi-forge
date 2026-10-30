@@ -393,9 +393,11 @@ class LiteLLMClient:
         messages: list[Message],
         tools: list[dict[str, Any]] | None,
         hyperparams: ModelHyperparameters,
-    ) -> dict[str, Any]:
-        """Build kwargs for OpenAI chat completion request."""
+    ) -> tuple[dict[str, Any], AppliedEffort]:
+        """Build the Chat Completions request and report its final effort parameter."""
         kwargs = build_chat_completion_kwargs(self._model, messages, tools, hyperparams)
+        effort_wire = "reasoning_effort"
+        effort_dropped = False
 
         if self._model in ("gemini/gemini-4-argon", "vertex_ai/gemini-4-argon", "gemini-4-argon"):
             # LiteLLM 1.102 maps Argon's generic effort to unsupported token budgets.
@@ -410,37 +412,27 @@ class LiteLLMClient:
             kwargs.pop("thinkingConfig", None)
             extra_body["thinkingConfig"] = {"thinkingLevel": effort, "includeThoughts": True}
             kwargs["extra_body"] = extra_body
+            effort_wire = "thinkingConfig.thinkingLevel"
 
         # GPT-5 Chat Completions API doesn't support reasoning_effort with
-        # function tools. Runs AFTER extras merge so callers can't reintroduce it.
+        # function tools. SDK extra_body still takes precedence over these kwargs.
         if tools and "reasoning_effort" in kwargs and self._is_gpt5_model():
             dropped = kwargs.pop("reasoning_effort")
+            effort_dropped = True
             logger.warning(
                 f"Stripped reasoning_effort={dropped} - "
                 f"not supported with function tools on Chat Completions API for {self._model}"
             )
 
-        return kwargs
-
-    def _chat_applied_effort(
-        self,
-        kwargs: dict[str, Any],
-        tools: list[dict[str, Any]] | None,
-        hyperparams: ModelHyperparameters,
-    ) -> AppliedEffort:
-        if self._model in ("gemini/gemini-4-argon", "vertex_ai/gemini-4-argon", "gemini-4-argon"):
-            return applied_effort(kwargs, "thinkingConfig.thinkingLevel")
-        observation = applied_effort(kwargs, "reasoning_effort")
-        extra_body = kwargs.get("extra_body")
-        extra_overrides_effort = isinstance(extra_body, dict) and "reasoning_effort" in extra_body
-        original_effort = hyperparams.extra.get("openai", {}).get("reasoning_effort", hyperparams.reasoning_effort)
-        if tools and self._is_gpt5_model() and original_effort is not None and not extra_overrides_effort:
-            return AppliedEffort(
+        observation = applied_effort(kwargs, effort_wire)
+        final_extra_body = kwargs.get("extra_body")
+        if effort_dropped and not (isinstance(final_extra_body, dict) and "reasoning_effort" in final_extra_body):
+            observation = AppliedEffort(
                 applied=None,
                 wire="dropped",
                 note="GPT-5 Chat Completions drops reasoning_effort when function tools are present.",
             )
-        return observation
+        return kwargs, observation
 
     async def _complete_with_responses_api(
         self,
@@ -543,10 +535,10 @@ class LiteLLMClient:
                 merged_params,
                 tools=tools,
                 on_provider_dispatch=on_provider_dispatch,
-                **({"on_effort_applied": on_effort_applied} if on_effort_applied is not None else {}),
+                on_effort_applied=on_effort_applied,
             )
 
-        kwargs = self._build_request_kwargs(messages, tools, merged_params)
+        kwargs, effort = self._build_request_kwargs(messages, tools, merged_params)
         if self._model == "vertex_ai/gemini-4-argon":
             # Vertex generateContent allows 32K per hop; the catalog's 64K limit
             # applies to streamGenerateContent and the other Argon providers.
@@ -565,7 +557,7 @@ class LiteLLMClient:
         if on_provider_dispatch is not None:
             on_provider_dispatch()
         if on_effort_applied is not None:
-            on_effort_applied(self._chat_applied_effort(kwargs, tools, merged_params))
+            on_effort_applied(effort)
         raw = await client.chat.completions.with_raw_response.create(**kwargs)
         completion = self._openai_to_completion(raw.parse())
         return self._merge_response_metadata(completion, raw.headers)
@@ -607,7 +599,7 @@ class LiteLLMClient:
                 tools,
                 merged_params,
                 on_provider_dispatch,
-                **({"on_effort_applied": on_effort_applied} if on_effort_applied is not None else {}),
+                on_effort_applied=on_effort_applied,
             )
         except (ProviderError, AuthenticationError):
             # Already wrapped, re-raise as-is
@@ -676,7 +668,7 @@ class LiteLLMClient:
                     merged_params,
                     tools=tools,
                     on_provider_dispatch=on_provider_dispatch,
-                    **({"on_effort_applied": on_effort_applied} if on_effort_applied is not None else {}),
+                    on_effort_applied=on_effort_applied,
                 )
 
                 # Carry the provider_meta computed by _complete_with_responses_api onto the
@@ -731,14 +723,14 @@ class LiteLLMClient:
         finish_reason: str | None = None
 
         try:
-            kwargs = self._build_request_kwargs(messages, tools, merged_params)
+            kwargs, effort = self._build_request_kwargs(messages, tools, merged_params)
             kwargs["stream"] = True
             kwargs["stream_options"] = {"include_usage": True}
 
             if on_provider_dispatch is not None:
                 on_provider_dispatch()
             if on_effort_applied is not None:
-                on_effort_applied(self._chat_applied_effort(kwargs, tools, merged_params))
+                on_effort_applied(effort)
             stream = await client.chat.completions.create(**kwargs)
 
             async for chunk in stream:

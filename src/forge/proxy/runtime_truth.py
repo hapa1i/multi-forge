@@ -63,7 +63,8 @@ class ProxyRuntimeTruth:
         runtime = raw.get("runtime", {})
         runtime = runtime if isinstance(runtime, dict) else {}
         self.has_authoritative_route_truth = _has_authoritative_route_truth(runtime)
-        self.backend_id = _optional_string(runtime.get("backend_id"))
+        backend_id = runtime.get("backend_id")
+        self.backend_id = backend_id if is_lowercase_identifier(backend_id) else None
         self.active_tier = _optional_string(runtime.get("active_tier"))
         active_context_window = runtime.get("active_context_window")
         self.active_context_window = (
@@ -77,23 +78,11 @@ class ProxyRuntimeTruth:
         self.model_alternatives = _nested_string_map(runtime.get("model_alternatives"))
         effort = runtime.get("effort")
         self.effort = _effort_map(effort)
-        self.has_effort_observations = isinstance(effort, dict) and len(self.effort) == len(effort)
-        if not self.has_effort_observations:
-            self.effort = {}
+        # A bad tier must not hide another tier's usable outbound observation.
+        self.has_effort_observations = isinstance(effort, dict) and (not effort or bool(self.effort))
 
         tiers = raw.get("tiers", {})
         self.tiers = tiers if isinstance(tiers, dict) else {}
-
-    def get_context_window_for_tier(self, tier: str) -> int | None:
-        """Get context window for a tier, preferring runtime truth."""
-        if tier in self.context_windows:
-            value = self.context_windows[tier]
-            return value if isinstance(value, int) and not isinstance(value, bool) else None
-        tier_info = self.tiers.get(tier, {})
-        if not isinstance(tier_info, dict):
-            return None
-        value = tier_info.get("context_window")
-        return value if isinstance(value, int) and not isinstance(value, bool) else None
 
     @property
     def proxy_cost_usd(self) -> float:
@@ -141,14 +130,17 @@ def _valid_effort_record(tier: str, record: dict[str, Any]) -> bool:
         value = record[field]
         if not isinstance(value, str) or not value or not value.isprintable():
             return False
-    for field in ("thinking", "note"):
+    # Requested effort is client vocabulary; a newer client may add a level.
+    for field in ("requested", "thinking", "note"):
         value = record[field]
         if value is not None and (not isinstance(value, str) or not value.isprintable()):
             return False
+    if record["requested"] == "":
+        return False
     for field in ("opt_in", "client_applicable"):
         if not isinstance(record[field], bool):
             return False
-    for field in ("requested", "derived", "floor", "pre_clamp", "resolved", "applied"):
+    for field in ("derived", "floor", "pre_clamp", "resolved", "applied"):
         value = record[field]
         if value is not None and (not isinstance(value, str) or value not in _EFFORT_LEVELS):
             return False

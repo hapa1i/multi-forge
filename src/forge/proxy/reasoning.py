@@ -159,34 +159,6 @@ def client_requested_effort(request_data: object) -> str | None:
     return effort
 
 
-def resolve_reasoning_effort(
-    request_data: object,
-    *,
-    tier_override: TierOverride | None,
-    model_id: str,
-    request_id: str,
-    honor_client_effort: bool = False,
-) -> str | None:
-    """Resolve the final reasoning_effort for a request.
-
-    Priority: request explicit > opted-in client effort > thinking-derived >
-    tier_override floor. ``honor_client_effort`` is set only when the launch sent
-    ``X-Forge-Effort-Source: client``: Claude Code always sends a default effort,
-    so honoring it unconditionally would override every configured floor. The
-    result is normalized against the catalog effort levels for the mapped
-    model: an explicit unsupported value is rejected (the caller named an
-    exact level), while client and derived values clamp (the caller asked for a
-    thinking depth that this model may not express exactly).
-    """
-    return resolve_reasoning_effort_record(
-        request_data,
-        tier_override=tier_override,
-        model_id=model_id,
-        request_id=request_id,
-        honor_client_effort=honor_client_effort,
-    ).resolved
-
-
 def resolve_reasoning_effort_record(
     request_data: object,
     *,
@@ -195,7 +167,14 @@ def resolve_reasoning_effort_record(
     request_id: str,
     honor_client_effort: bool = False,
 ) -> EffortResolution:
-    """Resolve effort and retain the inputs that explain its existing precedence."""
+    """Resolve effort and retain the inputs that explain its existing precedence.
+
+    Explicit request effort wins, then opted-in applicable client effort, then
+    the higher of thinking-derived effort and the tier floor. The launch opt-in
+    prevents Claude's default effort from silently replacing configured floors.
+    Explicit unsupported values fail; client and derived values clamp to the
+    mapped model's supported levels.
+    """
     supported = supported_efforts_for_model(model_id)
     output_config = getattr(request_data, "output_config", None)
     requested = output_config.get("effort") if isinstance(output_config, dict) else None

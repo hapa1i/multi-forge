@@ -32,6 +32,7 @@ async def test_bug_o001_translated_litellm_route_carries_user_agent(monkeypatch:
             _request_id: str,
             *,
             on_provider_dispatch: Callable[[], None] | None = None,
+            on_effort_applied: object | None = None,
         ) -> dict[str, object]:
             if on_provider_dispatch is not None:
                 on_provider_dispatch()

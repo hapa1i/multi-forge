@@ -7,7 +7,7 @@ from fastapi import HTTPException
 
 from forge.core.models import get_model_spec, load_model_catalog, resolve_model_id
 from forge.core.models.model_routes import normalize_model_route_request
-from forge.proxy.reasoning import resolve_reasoning_effort
+from forge.proxy.reasoning import resolve_reasoning_effort_record
 
 
 @pytest.mark.parametrize("alias", ["sol", "gpt-sol", "gpt-6.1-sol", "openai/gpt-6.1-sol"])
@@ -33,21 +33,21 @@ def test_sol_aliases_adopt_61_without_retargeting_versioned_pins(alias: str) -> 
 @pytest.mark.parametrize("effort", ["none", "minimal"])
 def test_sol61_rejects_explicit_unsupported_efforts_but_clamps_thinking_off(effort: str) -> None:
     with pytest.raises(HTTPException) as error:
-        resolve_reasoning_effort(
+        resolve_reasoning_effort_record(
             SimpleNamespace(reasoning_effort=effort),
             tier_override=None,
             model_id="openai/gpt-6.1-sol",
             request_id="sol61-explicit",
-        )
+        ).resolved
     assert error.value.status_code == 400
     assert "not supported" in str(error.value.detail)
 
     assert (
-        resolve_reasoning_effort(
+        resolve_reasoning_effort_record(
             SimpleNamespace(thinking={"type": "disabled"}),
             tier_override=None,
             model_id="openai/gpt-6.1-sol",
             request_id="sol61-derived",
-        )
+        ).resolved
         == "low"
     )

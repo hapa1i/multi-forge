@@ -579,12 +579,10 @@ class _ClaudeStartCliPresenter:
     that point; the op owns the timing, this owns the content.
     """
 
-    def __init__(self, *, session_name: str, projected_tier: str | None = None) -> None:
+    def __init__(self, *, session_name: str) -> None:
         self._session_name = session_name
-        self._effort_hint = effort_hint.SessionEffortHint(projected_tier=projected_tier)
 
     def on_created(self, event: ClaudeStartCreated) -> None:
-        self._effort_hint.set_route(event.runtime_base_url, event.effective_template, event.proxy_display)
         label = "incognito session" if event.incognito else "session"
         console.print(f"Created {label} [green]{event.session}[/green]")
         if event.proxy_display:
@@ -620,7 +618,9 @@ class _ClaudeStartCliPresenter:
 
     def before_launch(self, forge_root: Path) -> None:
         _warn_before_claude_launch(forge_root)
-        self._effort_hint.show()
+
+    def on_launch_ready(self, event: effort_hint.ClaudeLaunchReady) -> None:
+        effort_hint.print_derived_effort_hint(event)
 
     def on_routing_payload(self, payload: dict[str, Any]) -> None:
         _render_model_route_payload(payload)
@@ -644,16 +644,12 @@ class _ClaudeStartCliPresenter:
 class _ClaudeResumeCliPresenter:
     """CLI-side renderer for ``resume_claude_session`` events."""
 
-    def __init__(self, *, projected_tier: str | None = None) -> None:
-        self._effort_hint = effort_hint.SessionEffortHint(projected_tier=projected_tier)
-
     def on_warning(self, warning: ClaudeResumeWarning) -> None:
         console.print(f"[yellow]Warning:[/yellow] {warning.message}")
         if warning.tip:
             print_tip(warning.tip, blank_before=False, console=console)
 
     def on_resume_prepared(self, event: ResumePrepared) -> None:
-        self._effort_hint.set_route(event.runtime_base_url, event.effective_template)
         if event.action in {
             ClaudeResumeAction.FORK_PARENT_CONVERSATION,
             ClaudeResumeAction.START_FRESH,
@@ -697,7 +693,9 @@ class _ClaudeResumeCliPresenter:
 
     def before_launch(self, forge_root: Path) -> None:
         _warn_before_claude_launch(forge_root)
-        self._effort_hint.show()
+
+    def on_launch_ready(self, event: effort_hint.ClaudeLaunchReady) -> None:
+        effort_hint.print_derived_effort_hint(event)
 
     def on_routing_payload(self, payload: dict[str, Any]) -> None:
         _render_model_route_payload(payload)
@@ -817,9 +815,7 @@ def _execute_resume_launch_plan(*, manager: SessionManager, plan: ResumeLaunchPl
     result = resume_claude_session(
         manager=manager,
         plan=plan,
-        presenter=_ClaudeResumeCliPresenter(
-            projected_tier=effort_hint.selected_tier(plan.manifest, plan.model_route_selection)
-        ),
+        presenter=_ClaudeResumeCliPresenter(),
     )
     sys.exit(_render_claude_resume_result(result))
 
@@ -1004,10 +1000,7 @@ def launch_new_session(
             supervisor=supervisor_wiring,
             authority=authority,
             authority_explicit=authority_explicit,
-            presenter=_ClaudeStartCliPresenter(
-                session_name=name,
-                projected_tier=(model_route_intent.selected_tier if model_route_intent is not None else None),
-            ),
+            presenter=_ClaudeStartCliPresenter(session_name=name),
         )
     except ClaudeStartError as e:
         print_error_with_tip(str(e), *e.tip_lines, commands=list(e.commands) or None)

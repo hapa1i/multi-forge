@@ -88,3 +88,93 @@ def test_marking_drift_and_label_share_actual_dispatch_path(
     assert visible[1:] == ["mark:yes"]
     assert resolve.call_args.args[0] == expected_model
     assert ctx.route.tier == "opus"
+
+
+def _effort_record(**changes):
+    return {
+        "tier": "sonnet",
+        "tier_source": "fallback",
+        "client_model": "custom-model",
+        "mapped_model": "custom-model",
+        "requested": None,
+        "thinking": None,
+        "opt_in": False,
+        "client_applicable": False,
+        "derived": None,
+        "floor": None,
+        "pre_clamp": None,
+        "supported": None,
+        "resolved": None,
+        "source": "passthrough",
+        "applied": None,
+        "wire": None,
+        "note": None,
+        "observed_at": "2026-10-30T12:00:00Z",
+        **changes,
+    }
+
+
+def _context_with_observations(effort, *, wire_shape="anthropic_passthrough"):
+    return RenderContext(
+        data={"model": {"id": "custom-model", "display_name": "Custom"}},
+        is_proxy=True,
+        runtime=ProxyRuntimeTruth(
+            {
+                "is_proxy": True,
+                "wire_shape": wire_shape,
+                "runtime": {
+                    "backend_id": "anthropic",
+                    "active_tier": None,
+                    "tier_mappings": {"sonnet": "claude-sonnet-5-5"},
+                    "model_alternatives": {},
+                    "effort": effort,
+                },
+            }
+        ),
+        is_proxy_authoritative=True,
+        manifest=None,
+        is_session_authoritative=False,
+        config=RuntimeConfig(),
+    )
+
+
+@pytest.mark.parametrize("wire_shape", ["anthropic_passthrough", "openai_translated", None])
+def test_only_live_passthrough_uses_sonnet_when_default_tier_is_absent(monkeypatch, wire_shape):
+    monkeypatch.delenv("ANTHROPIC_CUSTOM_HEADERS", raising=False)
+    ctx = _context_with_observations({"sonnet": _effort_record()}, wire_shape=wire_shape)
+    _, stream = render_segments(ctx, ["model", "drift"])
+    visible = _ANSI_RE.sub("", " ".join(stream))
+    if wire_shape == "anthropic_passthrough":
+        assert ctx.route.tier == "sonnet"
+        assert ctx.route.model == "custom-model"
+        assert "S:custom-model@unset" in visible
+    else:
+        assert ctx.route.tier is None
+        assert ctx.route.model is None
+        assert "@unset" not in visible
+    assert "drift:" not in visible
+
+
+@pytest.mark.parametrize("changed_effort", [None, "low"])
+def test_observed_absent_parameter_renders_unset_including_when_stale(monkeypatch, changed_effort):
+    monkeypatch.setenv("ANTHROPIC_CUSTOM_HEADERS", "X-Forge-Model-Tier: sonnet")
+    ctx = _context_with_observations({"sonnet": _effort_record()})
+    if changed_effort:
+        ctx.data["effort"] = {"level": changed_effort}
+    _, stream = render_segments(ctx, ["model"])
+    visible = _ANSI_RE.sub("", stream[0])
+    assert f"@unset{' (stale)' if changed_effort else ''}" in visible
+    assert "@unknown" not in visible
+
+
+@pytest.mark.parametrize("other_requested", ["future-client-level", "invalid\nlevel"])
+def test_other_tier_requested_effort_cannot_hide_active_observation(monkeypatch, other_requested):
+    monkeypatch.setenv("ANTHROPIC_CUSTOM_HEADERS", "X-Forge-Model-Tier: sonnet")
+    ctx = _context_with_observations(
+        {
+            "sonnet": _effort_record(),
+            "haiku": _effort_record(tier="haiku", requested=other_requested),
+        }
+    )
+    _, stream = render_segments(ctx, ["model"])
+    assert "S:custom-model@unset" in _ANSI_RE.sub("", stream[0])

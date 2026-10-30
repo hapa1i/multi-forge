@@ -107,6 +107,7 @@ async def test_passthrough_effort_observes_exact_post_override_body(
     assert observed["requested"] == requested
     assert observed["applied"] == applied == anthropic_transport.captured.json["output_config"]["effort"]
     assert observed["source"] == source
+    assert observed["floor"] == ("high" if mode == "override" else None)
     assert observed["tier_source"] == "request"
     assert observed["wire"] == "output_config.effort"
     assert observed["mapped_model"] == "claude-opus-4-6"

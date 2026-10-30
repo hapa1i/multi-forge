@@ -108,8 +108,9 @@ def test_session_model_history_human_output_keeps_ids_slots_and_limitations(
 
 
 @pytest.mark.parametrize("surface", ["human", "json", "direct"])
+@pytest.mark.parametrize("requested", ["max", "future[bold]level"])
 def test_session_model_effort_explains_distinct_resolution_inputs(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Any, surface: str
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any, surface: str, requested: str
 ) -> None:
     from forge.cli.hooks import hooks
 
@@ -119,7 +120,7 @@ def test_session_model_effort_explains_distinct_resolution_inputs(
         "tier_source": "header",
         "client_model": "gemini-4-argon",
         "mapped_model": "gemini/gemini-4-argon",
-        "requested": "max",
+        "requested": requested,
         "thinking": "between_tools",
         "opt_in": True,
         "client_applicable": False,
@@ -174,6 +175,7 @@ def test_session_model_effort_explains_distinct_resolution_inputs(
     if surface == "json":
         assert json.loads(output)["effort"]["observations"]["opus"] == observation
     else:
+        assert requested in output
         assert "opt-in: yes; applicable: no; used: no" in output
         for field in (
             "derived",

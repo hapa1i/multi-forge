@@ -294,7 +294,7 @@ def _live_proxy(
                 "default_tier": config.proxy.default_tier,
                 "tier_mappings": tier_mappings,
                 "model_alternatives": alternatives,
-            }, None
+            }, runtime
         except Exception:
             pass
 
@@ -308,10 +308,10 @@ def _live_proxy(
             "default_tier": route_commit["default_tier"],
             "tier_mappings": route_commit["tier_mappings"],
             "model_alternatives": route_commit["model_alternatives"],
-        }, None
+        }, runtime
     unavailable = _empty_live_proxy("unavailable")
     unavailable.update({"reachable": runtime_reachable, "proxy_id": proxy_id, "template": template})
-    return unavailable, None
+    return unavailable, runtime
 
 
 def _effort_launch_id(route_commit: dict[str, Any] | None) -> str | None:

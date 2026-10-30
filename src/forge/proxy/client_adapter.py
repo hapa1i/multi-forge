@@ -296,13 +296,12 @@ class CoreLLMClientAdapter:
 
         hyperparams = ModelHyperparameters(**hyperparams_data)
 
-        effort_kwargs = {"on_effort_applied": on_effort_applied} if on_effort_applied is not None else {}
         response = await self._client.complete(
             messages,
             tools=tools,
             hyperparams=hyperparams,
             on_provider_dispatch=on_provider_dispatch,
-            **effort_kwargs,
+            on_effort_applied=on_effort_applied,
         )
 
         if response.usage:
@@ -386,13 +385,12 @@ class CoreLLMClientAdapter:
         final_usage: dict[str, int] = {}
         provider_meta_carried = False  # emit the trace-meta carrier chunk at most once
 
-        effort_kwargs = {"on_effort_applied": on_effort_applied} if on_effort_applied is not None else {}
         async for event in self._client.stream(
             messages,
             tools=tools,
             hyperparams=hyperparams,
             on_provider_dispatch=on_provider_dispatch,
-            **effort_kwargs,
+            on_effort_applied=on_effort_applied,
         ):
             # Emit the provider-trace metadata as its own internal-only chunk the instant it
             # first appears (Phase 2). The core client publishes it on the FIRST content/tool

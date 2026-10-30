@@ -7,7 +7,7 @@ from fastapi import HTTPException
 
 from forge.core.models import get_model_spec, resolve_model_id
 from forge.core.models.model_routes import normalize_model_route_request
-from forge.proxy.reasoning import resolve_reasoning_effort
+from forge.proxy.reasoning import resolve_reasoning_effort_record
 
 
 @pytest.mark.parametrize(
@@ -35,12 +35,12 @@ def test_october_model_identity_and_provider_envelope(
     assert spec.default_reasoning_effort == default_effort
     for effort in efforts:
         assert (
-            resolve_reasoning_effort(
+            resolve_reasoning_effort_record(
                 SimpleNamespace(reasoning_effort=effort),
                 tier_override=None,
                 model_id=slug,
                 request_id="october-explicit",
-            )
+            ).resolved
             == effort
         )
 
@@ -48,17 +48,20 @@ def test_october_model_identity_and_provider_envelope(
 @pytest.mark.parametrize("model", ["moonshotai/kimi-k3.1-pro", "minimax/minimax-m3.1-flash"])
 def test_always_thinking_models_reject_explicit_off_and_clamp_derived_off(model: str) -> None:
     with pytest.raises(HTTPException) as error:
-        resolve_reasoning_effort(
-            SimpleNamespace(reasoning_effort="none"), tier_override=None, model_id=model, request_id="explicit-off"
-        )
+        resolve_reasoning_effort_record(
+            SimpleNamespace(reasoning_effort="none"),
+            tier_override=None,
+            model_id=model,
+            request_id="explicit-off",
+        ).resolved
     assert error.value.status_code == 400
     assert (
-        resolve_reasoning_effort(
+        resolve_reasoning_effort_record(
             SimpleNamespace(thinking={"type": "disabled"}),
             tier_override=None,
             model_id=model,
             request_id="derived-off",
-        )
+        ).resolved
         == "low"
     )
 

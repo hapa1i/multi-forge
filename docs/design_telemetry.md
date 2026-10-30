@@ -272,10 +272,12 @@ The context bar alone shows context size; model labels and tier colors no longer
 For a proxied model segment, the existing runtime fetch includes the validated inherited `X-Forge-Launch` query. It does
 not add a request or read the routing journal. Layouts without `model` omit effort-query work. The active tier uses
 explicit stdin model tier, then projected launch tier, then the live proxy default. The annotated slot names the
-observed mapped model and applied effort: `@high`, `@high<-xhigh`, `@dropped<-xhigh` (warning color), or `@unknown`.
-`(stale)` means a present stdin effort, normalized client model, or proven predicted route changed since that
-observation. Missing effort fields and unproven route predictions do not establish staleness. Observations are scoped to
-one launch and tier; same-process subagents can replace the latest observation on that tier.
+observed mapped model and applied effort: `@high`, `@high<-xhigh`, `@dropped<-xhigh` (warning color), `@unset` for an
+observed request without an effort parameter, or `@unknown` for no usable observation. Passthrough uses its dispatch
+fallback of Sonnet when no explicit, projected or default tier is available. `(stale)` means a present stdin effort,
+normalized client model, or proven predicted route changed since that observation. Missing effort fields and unproven
+route predictions do not establish staleness. Observations are scoped to one launch and tier; same-process subagents can
+replace the latest observation on that tier.
 
 **Billing-aware cost.** Billing mode is an explicit **declaration**, never inferred from a key. `cost_mode=api` shows
 real `$`; `cost_mode=subscription` shows quota burn instead of dollar spend — both the 5h and weekly windows,

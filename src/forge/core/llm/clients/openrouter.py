@@ -155,7 +155,7 @@ class OpenRouterClient:
                 tools,
                 merged_params,
                 on_provider_dispatch,
-                **({"on_effort_applied": on_effort_applied} if on_effort_applied is not None else {}),
+                on_effort_applied=on_effort_applied,
             )
         except (ProviderError, AuthenticationError):
             raise

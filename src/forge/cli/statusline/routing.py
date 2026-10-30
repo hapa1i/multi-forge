@@ -31,6 +31,14 @@ def predict_route(
     default_tier = runtime.active_tier if runtime else None
     tier = explicit_tier or (projected_tier if projected_tier in _TIERS else None) or default_tier
     tier = tier if tier in _TIERS else None
+    if (
+        runtime
+        and authoritative
+        and runtime.wire_shape == ANTHROPIC_PASSTHROUGH
+        and tier is None
+        and default_tier is None
+    ):
+        tier = "sonnet"
     if not runtime or not authoritative or not runtime.wire_shape or not runtime.has_authoritative_route_truth:
         return PredictedRoute(tier, None)
     request_model = strip_transport_model_suffix(model_id) if model_id else None

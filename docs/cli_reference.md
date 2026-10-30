@@ -213,7 +213,8 @@ per-request effort over the tier floor ([proxy guide](end-user/proxy.md#launch-e
 `observations`. It queries a launch only when its routing commitment is proven; missing, legacy and unproven evidence
 remain `unknown`. Human and `%` reads show the requested, applicable, derived, minimum, pre-clamp, supported, resolved
 and applied levels, plus the tier source, wire parameter and model. These are temporary outbound observations, not
-provider execution evidence.
+provider execution evidence. A valid observation without an effort parameter is `unset`; missing or unusable evidence is
+`unknown`. Malformed route metadata can require a route fallback without discarding independently valid live effort.
 
 Rewind resume is available on Claude sessions with `--strategy rewind --drop-last N`.
 `forge session resume <parent> --fresh --strategy rewind --drop-last N` may create a same-directory child: Forge writes

@@ -35,6 +35,7 @@ async def test_adapter_does_not_override_defaults_with_none(
             tools: object | None = None,
             hyperparams: ModelHyperparameters | None = None,
             on_provider_dispatch: object | None = None,
+            on_effort_applied: object | None = None,
         ):
             self.seen_hyperparams = hyperparams
 

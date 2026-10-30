@@ -1,71 +1,48 @@
-"""Regression: proxy registry fallback returns wrong context window.
+"""Registry fallback must render the catalog window instead of Claude's cached size."""
 
-Bug: When the proxy's GET / health check fails, detect_proxy() falls back
-to the proxy registry but returns empty runtime: {}. This makes
-active_context_window None, so get_effective_context_window() falls through
-to Claude Code's cached data, which may reflect the auto-compact window (e.g.,
-400K for GPT-5.5) rather than the proxy's actual model context window.
-
-Root cause: The registry fallback in detect_proxy() did not compute
-tier mappings or context windows from the proxy config file.
-
-Fix: Enrich the registry fallback by loading proxy.yaml and computing
-context windows from the model catalog (best-effort, same data as GET /).
-
-Source owner: src/forge/cli/statusline/sources.py
-"""
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
-from forge.cli.statusline.formatting import get_effective_context_window
-from forge.cli.statusline.types import ProxyRuntimeTruth
+from forge.cli.statusline.context import RenderContext
+from forge.cli.statusline.formatting import _ANSI_RE
+from forge.cli.statusline.registry import render_segments
+from forge.cli.statusline.sources import detect_proxy
+from forge.runtime_config import RuntimeConfig
 
 pytestmark = pytest.mark.regression
 
 
-def test_empty_runtime_has_no_context_window():
-    """The pre-fix condition: empty runtime means active_context_window is None."""
-    runtime = ProxyRuntimeTruth({"is_proxy": True, "proxy": {}, "runtime": {}, "tiers": {}})
-    assert runtime.active_context_window is None
+@pytest.mark.parametrize("config_available,expected", [(True, "20%/1M"), (False, "50%/400K")])
+def test_registry_fallback_context_window_reaches_rendered_bar(monkeypatch, config_available, expected):
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://localhost:8085")
+    monkeypatch.delenv("ANTHROPIC_CUSTOM_HEADERS", raising=False)
+    entry = SimpleNamespace(base_url="http://localhost:8085", port=8085, template="litellm-openai")
+    config = SimpleNamespace(proxy=SimpleNamespace(default_tier="sonnet", backend=None))
+    with (
+        patch("urllib.request.urlopen", side_effect=OSError("Connection refused")),
+        patch("forge.proxy.proxies.ProxyRegistryStore") as store,
+        patch("forge.config.loader.load_config", return_value=config) as load_config,
+        patch("forge.proxy.model_routes.effective_proxy_model_maps", return_value=({"sonnet": "gpt-4.1"}, {})),
+    ):
+        store.return_value.read.return_value = SimpleNamespace(proxies={"fallback": entry})
+        if not config_available:
+            load_config.side_effect = OSError("Config unavailable")
+        is_proxy, runtime, authoritative = detect_proxy()
 
-
-def test_enriched_runtime_has_correct_context_window():
-    """The post-fix condition: enriched runtime carries the catalog context window."""
-    runtime = ProxyRuntimeTruth(
-        {
-            "is_proxy": True,
-            "proxy": {},
-            "runtime": {
-                "tier_mappings": {"sonnet": "gpt-4.1"},
-                "context_windows": {"sonnet": 1_000_000},
-                "active_tier": "sonnet",
-                "active_context_window": 1_000_000,
-            },
-            "tiers": {},
-        }
+    assert is_proxy and runtime is not None and not authoritative
+    ctx = RenderContext(
+        data={
+            "model": {"display_name": "Sonnet", "id": "claude-sonnet-4-5"},
+            "context_window": {"context_window_size": 400_000, "current_usage": {"input_tokens": 200_000}},
+        },
+        is_proxy=is_proxy,
+        runtime=runtime,
+        is_proxy_authoritative=authoritative,
+        manifest=None,
+        is_session_authoritative=False,
+        config=RuntimeConfig(),
     )
-    assert runtime.active_context_window == 1_000_000
-
-
-def test_enriched_runtime_wins_over_claude_code_cached_data():
-    """get_effective_context_window prefers proxy runtime over Claude Code's cached data."""
-    enriched_runtime = ProxyRuntimeTruth(
-        {
-            "is_proxy": True,
-            "proxy": {},
-            "runtime": {"active_context_window": 1_000_000},
-            "tiers": {},
-        }
-    )
-    claude_data = {"context_window": {"context_window_size": 400_000, "current_usage": {}}}
-
-    result = get_effective_context_window(claude_data, enriched_runtime, {"context_window": 400_000})
-    assert result == 1_000_000
-
-
-def test_empty_runtime_falls_through_to_claude_code_data():
-    """Without enrichment, resolution falls through to Claude Code's cached (wrong) value."""
-    empty_runtime = ProxyRuntimeTruth({"is_proxy": True, "proxy": {}, "runtime": {}, "tiers": {}})
-
-    result = get_effective_context_window({}, empty_runtime, {"context_window": 400_000})
-    assert result == 400_000
+    _, stream = render_segments(ctx, ["model"])
+    assert _ANSI_RE.sub("", stream[0]).endswith(expected)

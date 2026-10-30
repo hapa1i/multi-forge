@@ -9,10 +9,7 @@ from fastapi import HTTPException
 from forge.config import TierOverride
 from forge.core.effort_observation import AppliedEffort
 from forge.proxy.effort_observation import EffortObservations
-from forge.proxy.reasoning import (
-    resolve_reasoning_effort,
-    resolve_reasoning_effort_record,
-)
+from forge.proxy.reasoning import resolve_reasoning_effort_record
 
 LAUNCH_A = "run_aaaaaaaaaaaa"
 LAUNCH_B = "run_bbbbbbbbbbbb"
@@ -50,7 +47,6 @@ def test_resolution_preserves_opt_in_applicability_and_each_resolution_stage(
     assert record.supported == ("low", "medium", "high")
     assert record.resolved == resolved
     assert record.source == source
-    assert resolve_reasoning_effort(request, **kwargs) == resolved
 
 
 def test_explicit_effort_retains_precedence_and_rejects_unsupported_values():

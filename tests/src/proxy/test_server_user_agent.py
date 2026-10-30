@@ -26,6 +26,7 @@ class _CapturingClient:
         _request_id: str,
         *,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: object | None = None,
     ) -> dict[str, Any]:
         if on_provider_dispatch is not None:
             on_provider_dispatch()
@@ -38,6 +39,7 @@ class _CapturingClient:
         _request_id: str,
         *,
         on_provider_dispatch: Callable[[], None] | None = None,
+        on_effort_applied: object | None = None,
     ) -> AsyncIterator[bytes]:
         if on_provider_dispatch is not None:
             on_provider_dispatch()

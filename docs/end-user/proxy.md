@@ -668,13 +668,19 @@ model's levels, and a `--model` launch warns first when the model cannot express
 Claude's effort unchanged; an `override`-mode floor still applies.
 
 A managed Claude launch on a confirmed translated route prints one stderr tip when `--effort` is absent. It explains
-thinking-derived effort and configured tier minimums, and shows the same lifecycle command with `--effort <level>`.
-Direct, passthrough, unknown routes, bare `forge claude start` and `--no-launch` do not print this tip.
+thinking-derived effort and configured tier minimums, and offers `forge session resume <name> --effort <level>` for the
+session being launched. After start, fork or fresh resume, this targets the session just created. Incognito sessions are
+deleted on exit, so their tip offers a new incognito launch with the same route and `--effort <level>`. The tip reuses
+the existing launch-time proxy snapshot and omits prompts and creation-only options. If the created child belongs to
+another Forge root, the command changes into that directory before resuming it. Direct, passthrough, unknown routes,
+bare `forge claude start` and `--no-launch` do not print this tip.
 
 The [status line](config.md#status-line-statusline) shows the effort Forge last sent for the active launch and tier,
 including clamped or dropped values. `forge session model show <name> --json` exposes the explanation outside Claude; it
 uses the proven routing commitment for marked and unmarked sessions. Legacy or unproven commitments remain `unknown` and
-never supply a launch-scoped query. Proxy restarts and new launches clear the observed value until the next request.
+never supply a launch-scoped query. An observed request with no effort parameter displays `unset`; `unknown` means no
+usable observation. Valid effort observations remain readable when separate route metadata needs a fallback. Proxy
+restarts and new launches clear the observed value until the next request.
 
 Even when the launch passed `--effort`, `between_tools` or `disabled` thinking makes Claude's effort inapplicable to
 up-front reasoning. Forge derives `none`, applies the tier floor, then clamps to the mapped model's supported levels.
