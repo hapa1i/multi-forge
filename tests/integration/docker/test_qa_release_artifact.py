@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.fixtures.release_artifact import build_qa_image, build_wheel
+from tests.fixtures.release_artifact import WheelArtifact, build_qa_image
 
 pytestmark = [pytest.mark.integration, pytest.mark.docker_host]
 
@@ -19,11 +19,10 @@ DOCKERFILE = REPO_ROOT / "docker" / "Dockerfile.qa"
 QA_SKILL_ROOT = REPO_ROOT / "src" / "skills" / "qa"
 
 
-def test_release_image_imports_only_the_exact_wheel(tmp_path: Path, forge_test_image: str | None) -> None:
+def test_release_image_imports_only_the_exact_wheel(release_wheel: WheelArtifact, forge_test_image: str | None) -> None:
     assert forge_test_image is not None, "release artifact isolation requires the Docker-host test lane"
 
-    artifact = build_wheel(tmp_path)
-    wheel, version = artifact.path, artifact.version
+    wheel, version = release_wheel.path, release_wheel.version
 
     driver_probe = subprocess.run(
         [
@@ -46,7 +45,7 @@ def test_release_image_imports_only_the_exact_wheel(tmp_path: Path, forge_test_i
     driver_identity = json.loads(driver_probe.stdout)
     assert len(driver_identity["qa_driver_sha256"]) == 64
 
-    image = build_qa_image(artifact, forge_test_image)
+    image = build_qa_image(release_wheel, forge_test_image)
 
     probe_code = """
 import importlib.metadata as metadata

@@ -126,7 +126,7 @@ class TestSessionList:
         result = runner.invoke(main, ["session", "list"])
 
         assert result.exit_code == 0
-        assert "No sessions found" in result.output
+        assert "No sessions found" in result.stdout
 
     def test_list_shows_sessions(self, runner: CliRunner, temp_env: Path) -> None:
         """Should list existing sessions."""

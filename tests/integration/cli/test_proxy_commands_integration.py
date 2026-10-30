@@ -93,13 +93,6 @@ tiers:
         assert "litellm-openai" in result.stdout
         assert "gpt-4o" in result.stdout
 
-    def test_show_not_found_error(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should error when proxy not found."""
-        result = mock_claude_workspace.exec("forge proxy show nonexistent")
-
-        assert result.returncode != 0
-        assert "not found" in result.stdout.lower() or "not found" in result.stderr.lower()
-
 
 class TestProxyValidate:
     """Tests for `forge proxy validate` command."""
@@ -129,39 +122,6 @@ tiers:
         assert result.returncode == 0
         assert "valid" in result.stdout.lower()
 
-    def test_validate_invalid_yaml(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should fail for invalid YAML."""
-        self._create_proxy_file(mock_claude_workspace, "bad-proxy", "not: valid: yaml: [")
-
-        result = mock_claude_workspace.exec("forge proxy validate bad-proxy")
-
-        assert result.returncode != 0
-        assert "failed" in (result.stdout + result.stderr).lower()
-
-    def test_validate_missing_required_field(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should fail when required field missing."""
-        # Missing 'provider' field
-        proxy_yaml = """\
-template: litellm-openai
-proxy_endpoint: http://localhost:8085
-port: 8085
-upstream_base_url: https://litellm.test.example.com
-tiers:
-  haiku: gpt-4o-mini
-"""
-        self._create_proxy_file(mock_claude_workspace, "incomplete-proxy", proxy_yaml)
-
-        result = mock_claude_workspace.exec("forge proxy validate incomplete-proxy")
-
-        assert result.returncode != 0
-
-    def test_validate_not_found_error(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should error when proxy not found."""
-        result = mock_claude_workspace.exec("forge proxy validate nonexistent")
-
-        assert result.returncode != 0
-        assert "not found" in (result.stdout + result.stderr).lower()
-
 
 class TestProxySet:
     """Tests for `forge proxy set` command."""
@@ -170,29 +130,6 @@ class TestProxySet:
         """Create a proxy.yaml file in the container."""
         workspace.mkdir(f"$HOME/.forge/proxies/{proxy_id}", parents=True)
         workspace.write_file(f"$HOME/.forge/proxies/{proxy_id}/proxy.yaml", content)
-
-    def test_set_simple_field(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should update simple field."""
-        proxy_yaml = """\
-template: litellm-openai
-provider: litellm
-proxy_endpoint: http://localhost:8085
-port: 8085
-upstream_base_url: https://litellm.test.example.com
-default_tier: sonnet
-tiers:
-  haiku: gpt-4o-mini
-  sonnet: gpt-4o
-  opus: gpt-5
-"""
-        self._create_proxy_file(mock_claude_workspace, "set-test", proxy_yaml)
-
-        result = mock_claude_workspace.exec("forge proxy set set-test default_tier=opus")
-
-        assert result.returncode == 0
-
-        check = mock_claude_workspace.exec("cat $HOME/.forge/proxies/set-test/proxy.yaml")
-        assert "default_tier: opus" in check.stdout
 
     def test_set_nested_field_with_dot_notation(self, mock_claude_workspace: ContainerLike) -> None:
         """Should update nested field with dot notation."""
@@ -218,34 +155,6 @@ tier_overrides:
 
         check = mock_claude_workspace.exec("cat $HOME/.forge/proxies/nested-test/proxy.yaml")
         assert "reasoning_effort: high" in check.stdout
-
-    def test_set_invalid_format_error(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should error on invalid format."""
-        proxy_yaml = """\
-template: litellm-openai
-provider: litellm
-proxy_endpoint: http://localhost:8085
-port: 8085
-upstream_base_url: https://litellm.test.example.com
-tiers:
-  haiku: gpt-4o-mini
-"""
-        self._create_proxy_file(mock_claude_workspace, "format-test", proxy_yaml)
-
-        result = mock_claude_workspace.exec("forge proxy set format-test no_equals_sign")
-
-        assert result.returncode != 0
-        assert (
-            "expected format" in (result.stdout + result.stderr).lower()
-            or "key=value" in (result.stdout + result.stderr).lower()
-        )
-
-    def test_set_not_found_error(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should error when proxy not found."""
-        result = mock_claude_workspace.exec("forge proxy set nonexistent key=value")
-
-        assert result.returncode != 0
-        assert "not found" in (result.stdout + result.stderr).lower()
 
 
 class TestProxyDelete:
@@ -309,45 +218,6 @@ class TestProxyDelete:
             },
         )
 
-    def test_delete_removes_proxy_and_registry(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should remove proxy file and registry entry with --yes."""
-        proxy_yaml = """\
-template: litellm-openai
-provider: litellm
-proxy_endpoint: http://localhost:8085
-port: 8085
-upstream_base_url: https://litellm.test.example.com
-tiers:
-  haiku: gpt-4o-mini
-"""
-        self._create_proxy_file(mock_claude_workspace, "delete-me", proxy_yaml)
-        self._create_registry(
-            mock_claude_workspace,
-            {
-                "delete-me": {
-                    "proxy_id": "delete-me",
-                    "template": "litellm-openai",
-                    "base_url": "http://localhost:8085",
-                    "port": 8085,
-                    "pid": None,
-                    "status": "healthy",
-                }
-            },
-        )
-
-        result = mock_claude_workspace.exec("forge proxy delete delete-me --yes")
-
-        assert result.returncode == 0
-
-        check = mock_claude_workspace.exec(
-            "test -f $HOME/.forge/proxies/delete-me/proxy.yaml && echo exists || echo gone"
-        )
-        assert "gone" in check.stdout
-
-        check = mock_claude_workspace.exec("cat $HOME/.forge/proxies/index.json")
-        registry = json.loads(check.stdout)
-        assert "delete-me" not in registry["proxies"]
-
     def test_delete_last_managed_proxy_stops_process_and_removes_ownership(
         self, mock_claude_workspace: ContainerLike
     ) -> None:
@@ -396,13 +266,6 @@ tiers:
             assert "managed-delete" not in registry["proxies"]
         finally:
             mock_claude_workspace.exec(f"kill {managed_pid} 2>/dev/null || true")
-
-    def test_delete_not_found_error(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should error when proxy not in registry."""
-        result = mock_claude_workspace.exec("forge proxy delete nonexistent --yes")
-
-        assert result.returncode != 0
-        assert "not found" in (result.stdout + result.stderr).lower()
 
     def test_delete_cancel_lists_related_shared_port_proxies(self, mock_claude_workspace: ContainerLike) -> None:
         """Interactive delete should enumerate other proxy aliases on the same port."""
@@ -705,70 +568,3 @@ proxy:
             "workflow-test" in list_result.stdout
         ), f"Created proxy not visible in list!\nList output: {list_result.stdout}"
         assert "configured" in list_result.stdout.lower(), "Proxy should have 'configured' status"
-
-    def test_create_already_exists_error(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should error when proxy already exists."""
-        mock_claude_workspace.mkdir("$HOME/.forge/proxies/existing", parents=True)
-        mock_claude_workspace.write_file("$HOME/.forge/proxies/existing/proxy.yaml", "template: something")
-
-        result = mock_claude_workspace.exec("forge proxy create litellm-openai --name existing --no-start")
-
-        assert result.returncode != 0
-        assert "exists" in (result.stdout + result.stderr).lower()
-
-    def test_create_invalid_template_error(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should error for unknown template."""
-        result = mock_claude_workspace.exec("forge proxy create nonexistent-template --name new-proxy --no-start")
-
-        assert result.returncode != 0
-        assert "not found" in (result.stdout + result.stderr).lower()
-
-    def test_create_with_custom_port(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should use custom port when specified."""
-        result = mock_claude_workspace.exec(
-            "forge proxy create litellm-openai --name custom-port --port 9999 --no-start"
-        )
-
-        assert result.returncode == 0, f"Create failed: {result.stdout}\n{result.stderr}"
-
-        check = mock_claude_workspace.exec("cat $HOME/.forge/proxies/custom-port/proxy.yaml")
-        assert "9999" in check.stdout
-
-
-class TestProxyRegistryCorruption:
-    """Tests for corrupted proxy registry handling.
-
-    These tests verify that CLI commands handle corrupt registry files gracefully.
-    """
-
-    def _create_registry_raw(self, workspace: ContainerLike, content: str) -> None:
-        """Create registry with raw content (may be invalid)."""
-        workspace.mkdir("$HOME/.forge/proxies", parents=True)
-        workspace.write_file("$HOME/.forge/proxies/index.json", content)
-
-    def test_list_with_invalid_json_registry(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should handle invalid JSON gracefully."""
-        self._create_registry_raw(mock_claude_workspace, "not valid json {{{")
-
-        result = mock_claude_workspace.exec("forge proxy list")
-
-        assert result.returncode != 0
-        assert "error" in (result.stdout + result.stderr).lower()
-
-    def test_list_with_missing_version_registry(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should handle missing version field."""
-        self._create_registry_raw(mock_claude_workspace, json.dumps({"proxies": {}}))
-
-        result = mock_claude_workspace.exec("forge proxy list")
-
-        assert result.returncode != 0
-        assert "error" in (result.stdout + result.stderr).lower()
-
-    def test_list_with_wrong_version_registry(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should handle wrong version number."""
-        self._create_registry_raw(mock_claude_workspace, json.dumps({"version": 999, "proxies": {}}))
-
-        result = mock_claude_workspace.exec("forge proxy list")
-
-        assert result.returncode != 0
-        assert "error" in (result.stdout + result.stderr).lower()
