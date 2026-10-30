@@ -22,22 +22,40 @@ SMOKE_STARTED=false
 
 cleanup() {
     local smoke_exit_status=$?
+    local smoke_cleanup_status=0
     local smoke_backend_log="${SMOKE_FORGE_HOME}/logs/backend/litellm-${SMOKE_PORT}.log"
     if [[ "$smoke_exit_status" -ne 0 && -f "$smoke_backend_log" ]]; then
         echo "LiteLLM backend log before cleanup:" >&2
         tail -n 200 "$smoke_backend_log" >&2 || true
     fi
 
-    if [[ "$SMOKE_STARTED" == "true" && -x "${SMOKE_VENV}/bin/forge" ]]; then
-        FORGE_HOME="$SMOKE_FORGE_HOME" \
-            "${SMOKE_VENV}/bin/forge" model backend stop "litellm-${SMOKE_PORT}" >/dev/null 2>&1 || true
+    if [[ "$SMOKE_STARTED" == "true" ]]; then
+        if FORGE_HOME="$SMOKE_FORGE_HOME" \
+            "${SMOKE_VENV}/bin/python" -B "${SMOKE_REPO_ROOT}/scripts/wheel-smoke-cleanup.py" \
+            "$SMOKE_FORGE_HOME" "${SMOKE_VENV}/bin/forge" "$SMOKE_PORT"; then
+            :
+        else
+            smoke_cleanup_status=$?
+        fi
     fi
 
-    case "$SMOKE_ROOT" in
-        "${SMOKE_TEMP_BASE}"/multi-forge-wheel-smoke.*)
-            rm -rf -- "$SMOKE_ROOT"
-            ;;
-    esac
+    if [[ "$smoke_cleanup_status" -eq 0 ]]; then
+        case "$SMOKE_ROOT" in
+            "${SMOKE_TEMP_BASE}"/multi-forge-wheel-smoke.*)
+                rm -rf -- "$SMOKE_ROOT" || smoke_cleanup_status=$?
+                ;;
+        esac
+    fi
+    if [[ "$smoke_cleanup_status" -ne 0 ]]; then
+        echo "Wheel smoke cleanup incomplete; retained evidence at $SMOKE_ROOT" >&2
+        if [[ "$smoke_exit_status" -eq 0 && -f "$smoke_backend_log" ]]; then
+            tail -n 200 "$smoke_backend_log" >&2 || true
+        fi
+    fi
+    if [[ "$smoke_exit_status" -ne 0 ]]; then
+        exit "$smoke_exit_status"
+    fi
+    exit "$smoke_cleanup_status"
 }
 trap cleanup EXIT
 

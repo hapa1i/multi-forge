@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -30,11 +31,25 @@ def test_wheel_smoke_separates_consumer_resolution_from_locked_install(tmp_path:
     scripts.mkdir()
     script = scripts / "test-wheel-runtime.sh"
     shutil.copyfile(REPO_ROOT / "scripts/test-wheel-runtime.sh", script)
+    shutil.copyfile(REPO_ROOT / "scripts/wheel-smoke-cleanup.py", scripts / "wheel-smoke-cleanup.py")
     (tmp_path / "uv.toml").write_text('constraint-dependencies = ["example==1.0"]\n')
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
     calls_path = tmp_path / "uv-calls.jsonl"
     uv = fake_bin / "uv"
+    python_stub = f'#!/bin/sh\n[ "$1" = -c ] && exit 0\nexec {shlex.quote(sys.executable)} "$@"\n'
+    forge_stub = f"#!{sys.executable}\n" + dedent("""\
+        import json, os, sys
+        from pathlib import Path
+        if sys.argv[3] == 'start':
+            port = int(sys.argv[-1])
+            process_id = f'litellm-{port}'
+            registry = Path(os.environ['FORGE_HOME']) / 'backends/index.json'
+            registry.parent.mkdir(parents=True, exist_ok=True)
+            registry.write_text(json.dumps({'version': 2, 'processes': {process_id: {
+                'process_id': process_id, 'adapter_type': 'litellm', 'port': port, 'pid': 2147483647,
+            }}}))
+        """)
     uv.write_text(f"#!{sys.executable}\n" + dedent(f"""\
             import json, os, sys
             from pathlib import Path
@@ -49,9 +64,9 @@ def test_wheel_smoke_separates_consumer_resolution_from_locked_install(tmp_path:
             elif args[0] == 'venv':
                 directory = Path(args[-1]) / 'bin'
                 directory.mkdir(parents=True)
-                for name in ('python', 'forge'):
+                for name, source in {{'python': {python_stub!r}, 'forge': {forge_stub!r}}}.items():
                     executable = directory / name
-                    executable.write_text('#!/bin/sh\\nexit 0\\n')
+                    executable.write_text(source)
                     executable.chmod(0o755)
             """))
     uv.chmod(0o755)
