@@ -53,6 +53,7 @@ from forge.session.context_limit import (
     _get_context_limit_for_template,
     _resolve_context_limit,
 )
+from forge.session.derived_overrides import validate_derived_session_overrides
 from forge.session.exceptions import (
     CannotForkIncognitoError,
     ForgeSessionError,
@@ -278,6 +279,7 @@ def plan_session_fork(
     )
 
     parent, parent_entry = _load_parent_read_only(manager, request)
+    validate_derived_session_overrides(parent)
     parent_worktree = _parent_worktree(parent, parent_entry, request.cwd)
 
     parent_launch = parent.intent.launch

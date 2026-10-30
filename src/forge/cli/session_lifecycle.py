@@ -36,6 +36,10 @@ from forge.cli.session import (  # noqa: E402
     logger,
 )
 from forge.cli.session import session as _session_untyped  # noqa: E402
+from forge.cli.session_derived_preflight import (
+    handle_derived_session_error,
+    preflight_resume,
+)
 from forge.core.models.direct_model import (
     resolve_direct_model_pin,
     token_estimate_multiplier_for_direct_model,
@@ -1549,10 +1553,10 @@ def resume(
                 )
             sys.exit(1)
         except ForgeSessionError as e:
-            handle_session_error(e)
+            (handle_derived_session_error if fresh or force else handle_session_error)(e)
             return
     except ForgeSessionError as e:
-        handle_session_error(e)
+        (handle_derived_session_error if fresh or force else handle_session_error)(e)
         return
 
     from forge.session.launchability import require_session_worktree
@@ -1603,6 +1607,8 @@ def resume(
         sys.exit(1)
 
     enforce_target_project_compatibility(Path(target_forge_root))
+
+    preflight_resume(manifest, fresh=fresh, force_resumable=force and _has_confirmed_claude_session(manifest))
 
     # A --fresh child can select authority explicitly. Active --force relaunch
     # applies advisory-only inheritance when it creates the child below.
@@ -2074,7 +2080,7 @@ def _launch_as_child(
     try:
         parent, child = manager.relaunch_session(parent_name, forge_root=parent.forge_root)
     except ForgeSessionError as e:
-        handle_session_error(e)
+        handle_derived_session_error(e)
         return
 
     context_limit = (
@@ -2228,7 +2234,7 @@ def _resume_fresh(
             authority_explicit=authority_explicit,
         )
     except ForgeSessionError as e:
-        handle_session_error(e)
+        handle_derived_session_error(e)
         return
     except ValueError as e:
         print_error(str(e))

@@ -14,6 +14,7 @@ from forge.session.authority import read_authority_events
 from forge.session.manager import SessionManager, _inherit_intent_fields
 from forge.session.models import AuthorityIntent, SessionState, create_session_state
 from forge.session.store import SessionStore
+from tests.fixtures.session_state import publish_session
 
 
 @pytest.mark.parametrize(
@@ -85,7 +86,10 @@ def test_codex_child_inherits_advisory_and_explicit_producer_wins(
     assert explicit_event.origin_surface == "external_cli"
 
 
-def test_relaunch_inherits_advisory_but_not_producer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("operation", ["fork", "fresh", "relaunch"])
+def test_derivation_inherits_advisory_but_not_producer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str
+) -> None:
     home = tmp_path / "home"
     project = tmp_path / "project"
     home.mkdir()
@@ -95,26 +99,64 @@ def test_relaunch_inherits_advisory_but_not_producer(tmp_path: Path, monkeypatch
     monkeypatch.delenv("FORGE_SESSION", raising=False)
     monkeypatch.chdir(project)
     manager = SessionManager()
-    manager.start_session(
-        "advisory-parent",
-        worktree_path=str(project),
-        authority=AuthorityIntent("advisory"),
-        authority_explicit=True,
-    )
-    manager.start_session(
-        "producer-parent",
-        worktree_path=str(project),
-        authority=AuthorityIntent("producer"),
-        authority_explicit=True,
-    )
+    for role in ("advisory", "producer"):
+        parent = create_session_state(
+            f"{role}-parent",
+            worktree_path=str(project),
+            authority=AuthorityIntent(role),
+        )
+        publish_session(manager.index_store, parent, project)
 
-    _, advisory_child = manager.relaunch_session("advisory-parent", child_name="advisory-relaunch")
-    _, producer_child = manager.relaunch_session("producer-parent", child_name="producer-relaunch")
+    def derive(parent_name: str, child_name: str) -> SessionState:
+        if operation == "fork":
+            return manager.fork_session(parent_name, child_name)[1]
+        if operation == "fresh":
+            return manager.resume_session(parent_name, child_name=child_name, resume_mode="native")[0]
+        return manager.relaunch_session(parent_name, child_name=child_name)[1]
+
+    advisory_child = derive("advisory-parent", "advisory-child")
+    producer_child = derive("producer-parent", "producer-child")
 
     assert advisory_child.intent.authority == AuthorityIntent("advisory")
-    assert read_authority_events(str(project), "advisory-relaunch")[0].event_type == "authority_inherited"
+    assert read_authority_events(str(project), "advisory-child")[0].event_type == "authority_inherited"
     assert producer_child.intent.authority is None
-    assert read_authority_events(str(project), "producer-relaunch") == []
+    assert read_authority_events(str(project), "producer-child") == []
+    assert SessionStore(str(project), "advisory-child").read().intent.authority == AuthorityIntent("advisory")
+    assert SessionStore(str(project), "producer-child").read().intent.authority is None
+
+
+@pytest.mark.parametrize("operation", ["fork", "fresh"])
+def test_explicit_child_authority_wins_over_inherited_advisory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str
+) -> None:
+    project = tmp_path / "project"
+    (project / ".forge").mkdir(parents=True)
+    monkeypatch.chdir(project)
+    manager = SessionManager()
+    parent = create_session_state("parent", worktree_path=str(project), authority=AuthorityIntent("advisory"))
+    publish_session(manager.index_store, parent, project)
+    parent_store = SessionStore(str(project), "parent")
+    before = parent_store.manifest_path.read_bytes()
+
+    if operation == "fork":
+        manager.fork_session(
+            "parent",
+            "child",
+            authority=AuthorityIntent("producer"),
+            authority_explicit=True,
+        )
+    else:
+        manager.resume_session(
+            "parent",
+            child_name="child",
+            resume_mode="native",
+            authority=AuthorityIntent("producer"),
+            authority_explicit=True,
+        )
+
+    assert SessionStore(str(project), "child").read().intent.authority == AuthorityIntent("producer")
+    assert read_authority_events(str(project), "child")[0].event_type == "authority_configured"
+    assert parent_store.manifest_path.read_bytes() == before
 
 
 def test_creation_journal_failure_rolls_back_manifest_and_index(

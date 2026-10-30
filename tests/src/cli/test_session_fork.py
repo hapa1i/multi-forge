@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -2292,3 +2293,84 @@ class TestSessionForkIntoPreflight:
         mock_registry_cls.return_value.enroll.assert_called_once_with(child_nested_root, "worktree")
         installer_cls.assert_not_called()
         mock_invoke.assert_not_called()
+
+
+class TestDerivedForkPreflight:
+    @pytest.mark.parametrize("route_flags", [["--proxy", "unstarted-proxy"], ["--model", "claude-opus-5"]])
+    @pytest.mark.parametrize(
+        "overrides", [{"memory": {"auto_update": {"min_turns": "invalid"}}}, {"launch": {"runtime": "codex"}}]
+    )
+    def test_invalid_parent_refuses_before_route_supervisor_or_fork(
+        self, runner: CliRunner, temp_env: Path, route_flags: list[str], overrides: dict[str, object]
+    ) -> None:
+        parent = create_session_state("invalid-parent", worktree_path=str(temp_env))
+        parent.confirmed.claude_session_id = "parent-uuid"
+        index = _publish_fork_parent(parent, temp_env)
+        store = SessionStore(str(temp_env), parent.name)
+        # Simulate a legacy/manual invalid override after coherent publication.
+        data = json.loads(store.manifest_path.read_text())
+        data["overrides"] = overrides
+        store.manifest_path.write_text(json.dumps(data))
+        before_manifest = store.manifest_path.read_bytes()
+        before_index = index.index_path.read_bytes()
+
+        with (
+            patch("forge.cli.session_fork._plan_interactive_session_model_route") as plan_route,
+            patch("forge.cli.session_fork._realize_interactive_session_model_route") as realize_route,
+            patch("forge.cli.session_fork._resolve_routing_from_cli") as resolve_proxy,
+            patch("forge.policy.semantic.supervisor.ensure_supervisor_proxy") as ensure_supervisor,
+            patch("forge.cli.session_fork.execute_session_fork") as execute,
+        ):
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "fork",
+                    parent.name,
+                    "--name",
+                    "child",
+                    "--no-launch",
+                    "--supervise",
+                    "--supervisor-proxy",
+                    "unstarted-supervisor",
+                    *route_flags,
+                ],
+            )
+
+        assert result.exit_code == 1, result.output
+        assert "memory.auto_update.min_turns" in result.stderr or "launch.runtime" in result.stderr
+        assert result.stdout == ""
+        for effect in (plan_route, realize_route, resolve_proxy, ensure_supervisor, execute):
+            effect.assert_not_called()
+        assert store.manifest_path.read_bytes() == before_manifest
+        assert index.index_path.read_bytes() == before_index
+
+    @pytest.mark.parametrize(
+        "invalid_fields",
+        [
+            {"overrides": {"unknown": True}},
+            {"overrides": []},
+            {"schema_version": 999},
+        ],
+    )
+    def test_strict_manifest_failure_offers_only_repair_or_restore(
+        self, runner: CliRunner, temp_env: Path, invalid_fields: dict[str, object]
+    ) -> None:
+        parent = create_session_state("strict-parent", worktree_path=str(temp_env))
+        _publish_fork_parent(parent, temp_env)
+        store = SessionStore(str(temp_env), parent.name)
+        # Deliberately break the stored schema after publishing a valid parent.
+        data = json.loads(store.manifest_path.read_text())
+        data.update(invalid_fields)
+        store.manifest_path.write_text(json.dumps(data))
+        before = store.manifest_path.read_bytes()
+
+        result = runner.invoke(main, ["session", "fork", parent.name, "--no-launch"])
+
+        assert result.exit_code == 1, result.output
+        assert "Repair" in result.stderr and "restore" in result.stderr
+        assert result.stdout == ""
+        assert "delete" not in result.stderr.lower()
+        assert "forge clean" not in result.stderr
+        assert "reset" not in result.stderr
+        assert store.manifest_path.read_bytes() == before

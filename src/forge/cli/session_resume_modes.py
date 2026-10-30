@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from forge.cli.output import console, handle_session_error, print_error_with_tip
+from forge.cli.session_derived_preflight import handle_derived_session_error
 from forge.cli.session_routing import ResolvedRouting
 from forge.core.ops.claude_session import ClaudeResumeAction, ResumeLaunchPlan
 from forge.core.ops.session_model_routing import ResolvedModelRoute
@@ -67,7 +68,7 @@ def _resume_fresh_rewind(
             instance_sink=published_instances.append,
         )
     except ForgeSessionError as e:
-        handle_session_error(e)
+        handle_derived_session_error(e)
         return
 
     instance_id = published_instances[0] if published_instances else None
@@ -218,7 +219,7 @@ def _resume_fresh_native(
             instance_sink=published_instances.append,
         )
     except ForgeSessionError as e:
-        handle_session_error(e)
+        handle_derived_session_error(e)
         return
 
     instance_id = published_instances[0] if published_instances else None

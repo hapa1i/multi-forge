@@ -903,6 +903,252 @@ print(json.dumps({'overrides': child.overrides}))
         }
 
 
+class TestSessionManagerDerivedOverrideValidation:
+    """Persisted parent validation and inherited layers in the isolated runtime."""
+
+    @pytest.mark.parametrize("operation", ["fork", "fresh", "relaunch"])
+    @pytest.mark.parametrize("invalid_path", ["verification.bypass", "launch.runtime", "policy.supervisor"])
+    def test_invalid_parent_never_publishes_child(
+        self, manager_workspace: "WorktreeWorkspace", operation: str, invalid_path: str
+    ) -> None:
+        result = manager_workspace.run_python(
+            f"operation = {operation!r}\ninvalid_path = {invalid_path!r}\n" + """
+import json
+from pathlib import Path
+from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
+from forge.session.exceptions import ForgeSessionError
+from forge.session.models import LaunchIntent
+from forge.session.prev_sessions import parent_dir
+from tests.fixtures.session_state import publish_session
+
+root = Path('/workspace')
+index = IndexStore()
+parent = create_session_state('parent', worktree_path=str(root))
+parent.intent.launch = LaunchIntent()
+publish_session(index, parent, root)
+store = SessionStore(str(root), 'parent')
+# Deliberately corrupt one override only after coherent publication.
+raw = json.loads(store.manifest_path.read_text())
+raw['overrides'] = {
+    'verification.bypass': {'verification': {'bypass': 'bad'}},
+    'launch.runtime': {'launch': {'runtime': 'codex'}},
+    'policy.supervisor': {'policy': {'supervisor': 'bad'}},
+}[invalid_path]
+store.manifest_path.write_text(json.dumps(raw))
+before = store.manifest_path.read_bytes()
+index_before = index.index_path.read_bytes()
+manager = SessionManager(index)
+error = None
+try:
+    if operation == 'fork':
+        manager.fork_session('parent', 'child', forge_root=str(root))
+    elif operation == 'fresh':
+        manager.resume_session('parent', child_name='child', forge_root=str(root))
+    else:
+        manager.relaunch_session('parent', child_name='child', forge_root=str(root))
+except ForgeSessionError as exc:
+    error = str(exc)
+print(json.dumps({
+    'error': error,
+    'parent_unchanged': store.manifest_path.read_bytes() == before,
+    'index_unchanged': index.index_path.read_bytes() == index_before,
+    'child_exists': SessionStore(str(root), 'child').exists(),
+    'transfer_exists': parent_dir(root, 'parent').exists(),
+}))
+""",
+            home=HOME,
+        )
+        assert result.ok, result.stderr
+        assert result.data is not None
+        assert invalid_path in result.data["error"]
+        assert result.data["parent_unchanged"] and result.data["index_unchanged"]
+        assert not result.data["child_exists"] and not result.data["transfer_exists"]
+
+    @pytest.mark.parametrize("operation", ["fork", "fresh", "relaunch"])
+    def test_valid_layers_persist_and_reset_independently(
+        self, manager_workspace: "WorktreeWorkspace", operation: str
+    ) -> None:
+        result = manager_workspace.run_python(
+            f"operation = {operation!r}\n" + """
+import json
+from pathlib import Path
+from forge.core.ops.context import ExecutionContext
+from forge.core.ops.session import reset_session_overrides
+from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
+from forge.session.effective import compute_effective_intent
+from forge.session.models import MemoryIntent, MemoryWriterConfig, PolicyIntent, SupervisorConfig
+from tests.fixtures.session_state import publish_session
+
+root = Path('/workspace')
+index = IndexStore()
+parent = create_session_state('parent', worktree_path=str(root))
+parent.intent.policy = PolicyIntent(enabled=True, supervisor=SupervisorConfig(resume_id='planner', suspended=True))
+parent.intent.memory = MemoryIntent(auto_update=MemoryWriterConfig(enabled=False))
+parent.overrides = {'policy': {'enabled': False}, 'verification': {'bypass': True},
+                    'memory': {'auto_update': {'enabled': True, 'mode': 'review-only', 'min_turns': 9}}}
+publish_session(index, parent, root)
+store = SessionStore(str(root), 'parent')
+before = store.manifest_path.read_bytes()
+manager = SessionManager(index)
+if operation == 'fork':
+    manager.fork_session('parent', 'child', forge_root=str(root))
+elif operation == 'fresh':
+    manager.resume_session('parent', child_name='child', forge_root=str(root))
+else:
+    manager.relaunch_session('parent', child_name='child', forge_root=str(root))
+child_store = SessionStore(str(root), 'child')
+child = child_store.read()
+effective = compute_effective_intent(child)
+result = {
+    'policy_enabled': effective.policy.enabled,
+    'suspended': effective.policy.supervisor.suspended,
+    'verification': effective.verification is not None,
+    'overrides_retained': child.overrides == parent.overrides,
+    'writer': [effective.memory.auto_update.enabled, effective.memory.auto_update.mode,
+               effective.memory.auto_update.min_turns],
+}
+reset_session_overrides(ctx=ExecutionContext(root, root, root, root), session_name='child')
+reset = compute_effective_intent(child_store.read())
+result.update({'reset_policy': reset.policy.enabled, 'reset_suspended': reset.policy.supervisor.suspended,
+               'reset_verification': reset.verification is None,
+               'reset_writer': reset.memory.auto_update.enabled,
+               'parent_unchanged': store.manifest_path.read_bytes() == before})
+print(json.dumps(result))
+""",
+            home=HOME,
+        )
+        assert result.ok, result.stderr
+        assert result.data is not None
+        assert result.data["policy_enabled"] == (operation != "relaunch")
+        assert result.data["verification"] == (operation == "relaunch")
+        assert result.data["overrides_retained"] == (operation == "relaunch")
+        assert result.data["writer"] == [True, "review-only", 9]
+        assert result.data["suspended"] and result.data["reset_suspended"]
+        assert result.data["reset_policy"] and result.data["reset_verification"] and result.data["parent_unchanged"]
+        assert result.data["reset_writer"] == (operation != "relaunch")
+
+
+class TestNativeSourceOverrideAuthoring:
+    """Installed CLI authoring refuses native identity while retaining legal clears."""
+
+    @pytest.mark.parametrize("has_supervisor", [False, True], ids=["no-supervisor", "plan-supervisor"])
+    @pytest.mark.parametrize(
+        ("key", "value"),
+        [
+            ("policy.supervisor.native_source", None),
+            ("policy.supervisor", {"native_source": None}),
+            ("policy", {"supervisor": {"native_source": None}}),
+            ("policy.*", None),
+        ],
+        ids=["direct-null", "supervisor-object", "policy-object", "policy-wildcard"],
+    )
+    def test_native_source_writes_preserve_published_parent(
+        self,
+        manager_workspace: "WorktreeWorkspace",
+        has_supervisor: bool,
+        key: str,
+        value: dict[str, object] | None,
+    ) -> None:
+        result = manager_workspace.run_python(
+            f"has_supervisor = {has_supervisor!r}\nkey = {key!r}\nvalue = {value!r}\n" + """
+import json
+import os
+from pathlib import Path
+from click.testing import CliRunner
+from forge.cli.main import main
+from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session.models import PolicyIntent, SupervisorConfig
+from tests.fixtures.session_state import publish_session
+
+root = Path('/workspace')
+os.chdir(root)
+plan = root / 'approved.md'
+plan.write_text('Only change files named by the approved task.')
+index = IndexStore()
+parent = create_session_state('parent', worktree_path=str(root))
+parent.intent.policy = PolicyIntent(
+    enabled=True,
+    supervisor=SupervisorConfig(plan_override_path=str(plan), supervisor_model='opus') if has_supervisor else None,
+)
+publish_session(index, parent, root)
+store = SessionStore(str(root), parent.name)
+before = store.manifest_path.read_bytes()
+index_before = index.index_path.read_bytes()
+invoked = CliRunner().invoke(main, ['session', 'set', '--session', parent.name, key, json.dumps(value)])
+print(json.dumps({
+    'exit_code': invoked.exit_code,
+    'stdout': invoked.stdout,
+    'stderr': invoked.stderr,
+    'parent_unchanged': store.manifest_path.read_bytes() == before,
+    'index_unchanged': index.index_path.read_bytes() == index_before,
+}))
+""",
+            home=HOME,
+        )
+        assert result.ok, result.stderr
+        assert result.data is not None
+        assert result.data["exit_code"] == 1, result.data
+        assert result.data["stdout"] == ""
+        error = " ".join(result.data["stderr"].split())
+        assert "native_source is supervisor identity" in error
+        assert "forge policy supervisor set" in error
+        assert result.data["parent_unchanged"] and result.data["index_unchanged"]
+
+    @pytest.mark.parametrize("has_supervisor", [False, True], ids=["no-supervisor", "plan-supervisor"])
+    def test_nullable_parent_clears_remain_derivable(
+        self, manager_workspace: "WorktreeWorkspace", has_supervisor: bool
+    ) -> None:
+        result = manager_workspace.run_python(
+            f"has_supervisor = {has_supervisor!r}\n" + """
+import json
+import os
+from pathlib import Path
+from click.testing import CliRunner
+from forge.cli.main import main
+from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
+from forge.session.effective import compute_effective_intent
+from forge.session.models import PolicyIntent, SupervisorConfig
+from tests.fixtures.session_state import publish_session
+
+root = Path('/workspace')
+os.chdir(root)
+plan = root / 'approved.md'
+plan.write_text('Only change files named by the approved task.')
+index = IndexStore()
+manager = SessionManager(index)
+results = []
+for position, key in enumerate(('policy', 'policy.supervisor')):
+    name = f'parent-{position}'
+    parent = create_session_state(name, worktree_path=str(root))
+    parent.intent.policy = PolicyIntent(
+        enabled=True,
+        supervisor=SupervisorConfig(plan_override_path=str(plan), supervisor_model='opus') if has_supervisor else None,
+    )
+    publish_session(index, parent, root)
+    invoked = CliRunner().invoke(main, ['session', 'set', '--session', name, key, 'null'])
+    assert invoked.exit_code == 0, invoked.output
+    assert invoked.stderr == '', invoked.stderr
+    store = SessionStore(str(root), name)
+    before_derivation = store.manifest_path.read_bytes()
+    _, child = manager.relaunch_session(name, child_name=f'child-{position}', forge_root=str(root))
+    persisted = SessionStore(str(root), child.name).read()
+    expected_overrides = {'policy': None if key == 'policy' else {'supervisor': None}}
+    effective = compute_effective_intent(persisted)
+    results.append({
+        'overrides_preserved': persisted.overrides == expected_overrides,
+        'cleared': effective.policy is None if key == 'policy' else effective.policy.supervisor is None,
+        'parent_unchanged': store.manifest_path.read_bytes() == before_derivation,
+    })
+print(json.dumps({'results': results}))
+""",
+            home=HOME,
+        )
+        assert result.ok, result.stderr
+        assert result.data is not None
+        assert len(result.data["results"]) == 2
+        assert all(all(checks.values()) for checks in result.data["results"])
+
+
 class TestSessionManagerDeleteSession:
     """Tests for SessionManager.delete_session()."""
 

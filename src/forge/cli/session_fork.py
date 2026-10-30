@@ -17,12 +17,12 @@ from forge.cli.session import (  # noqa: E402
     _print_routing_summary,
     _resolve_routing_from_cli,
     console,
-    handle_session_error,
 )
 from forge.cli.session_authority_options import (
     authority_creation_options,
     parse_creation_authority,
 )
+from forge.cli.session_derived_preflight import handle_derived_session_error
 from forge.cli.session_effort_hint import ClaudeLaunchReady, print_derived_effort_hint
 from forge.cli.session_launch_args import (
     RuntimePassthroughCommand,
@@ -565,7 +565,7 @@ def fork(
             print_error(f"session '{parent}' not found")
         sys.exit(1)
     except ForgeSessionError as e:
-        handle_session_error(e)
+        handle_derived_session_error(e)
         return
 
     for notice in preflight.notices:
@@ -750,7 +750,7 @@ def fork(
             print_error(f"session '{parent}' not found")
         sys.exit(1)
     except ForgeSessionError as e:
-        handle_session_error(e)
+        handle_derived_session_error(e)
         return
 
     for event in execution.events:

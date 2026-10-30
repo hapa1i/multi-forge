@@ -222,6 +222,9 @@ def validate_key(key: str) -> list[str]:
     if _is_launch_model_route_path(key):
         _reject_launch_model_route_override(key)
 
+    if _is_native_supervisor_source_path(key):
+        _reject_native_supervisor_source_override(key)
+
     if first_part == "consumer_lanes":
         # Consumer-lane bindings are set only through resolving commands
         # (--supervisor-runtime at start/fork, 'forge policy supervisor set <target> --runtime'), which expand a
@@ -329,6 +332,10 @@ def set_override(overrides: dict[str, Any], key: str, value: Any) -> None:
             _reject_launch_runtime_override(key)
         if "model_route" in value:
             _reject_launch_model_route_override(key)
+    if key in {"policy", "policy.supervisor"} and isinstance(value, dict):
+        supervisor = value.get("supervisor") if key == "policy" else value
+        if isinstance(supervisor, dict) and "native_source" in supervisor:
+            _reject_native_supervisor_source_override(key)
     _set_path(overrides, parts, value)
 
 
@@ -366,11 +373,11 @@ def delete_override(overrides: dict[str, Any], key: str) -> bool:
                 any_deleted = True
         return any_deleted
 
-    # Runtime and resolved route state reject writes, but reset remains a
+    # Lifecycle-owned identity rejects writes, but reset remains a
     # recovery path for an illegal override persisted by an older Forge.
     if key == "launch.runtime":
         parts: list[str] = ["launch", "runtime"]
-    elif _is_launch_model_route_path(key):
+    elif _is_launch_model_route_path(key) or _is_native_supervisor_source_path(key):
         parts = key.split(".")
     else:
         parts = validate_key(key)
@@ -416,4 +423,19 @@ def _reject_launch_model_route_override(key: str) -> None:
         key,
         "model_route is resolved launch state, not an override surface",
         hint="choose a route with --model on session start, resume, fork, or incognito",
+    )
+
+
+def _is_native_supervisor_source_path(key: str) -> bool:
+    """Return whether ``key`` names native source identity or a valid descendant."""
+    prefix = "policy.supervisor.native_source"
+    return key == prefix or (key.startswith(f"{prefix}.") and key in get_valid_intent_paths())
+
+
+def _reject_native_supervisor_source_override(key: str) -> None:
+    """Keep native source identity on the supervisor setup path, even for no-op writes."""
+    raise InvalidOverrideKeyError(
+        key,
+        "native_source is supervisor identity, not an override surface",
+        hint="use 'forge policy supervisor set' to configure a native source",
     )

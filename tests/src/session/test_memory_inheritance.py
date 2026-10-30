@@ -5,17 +5,16 @@ Covers: create_shadow_file, apply_memory_inheritance (auto_update-only model).
 
 from __future__ import annotations
 
+from copy import deepcopy
+from dataclasses import asdict, replace
+
 import pytest
 
 from forge.session.memory_inheritance import (
     apply_memory_inheritance,
     create_shadow_file,
 )
-from forge.session.models import (
-    MemoryIntent,
-    MemoryWriterConfig,
-    create_session_state,
-)
+from forge.session.models import MemoryIntent, MemoryWriterConfig, create_session_state
 
 # ---------------------------------------------------------------------------
 # create_shadow_file
@@ -54,6 +53,40 @@ class TestCreateShadowFile:
 
 
 class TestApplyMemoryInheritance:
+    @pytest.mark.parametrize("parent_enabled", [False, True, None])
+    @pytest.mark.parametrize("memory_flag", [False, True, None])
+    def test_explicit_flags_use_effective_writer_or_disabled_defaults(self, parent_enabled, memory_flag):
+        parent = create_session_state(name="parent")
+        parent.intent.memory = MemoryIntent(auto_recall=True, auto_update=MemoryWriterConfig(enabled=True))
+        selected = MemoryWriterConfig(
+            enabled=bool(parent_enabled),
+            mode="review-only",
+            proxy="writer",
+            direct=True,
+            min_turns=12,
+            effort="high",
+        )
+        parent.overrides = {"memory": (None if parent_enabled is None else {"auto_update": asdict(selected)})}
+        before = deepcopy(parent)
+        child = create_session_state(name="child")
+
+        apply_memory_inheritance(parent_state=parent, child_state=child, memory_flag=memory_flag)
+
+        if memory_flag is False:
+            expected = MemoryIntent(auto_update=MemoryWriterConfig(enabled=False))
+        elif memory_flag is True:
+            expected = MemoryIntent(
+                auto_update=(
+                    replace(selected, enabled=True) if parent_enabled is not None else MemoryWriterConfig(enabled=True)
+                )
+            )
+        elif parent_enabled is None:
+            expected = None
+        else:
+            expected = MemoryIntent(auto_update=selected)
+        assert child.intent.memory == expected
+        assert parent == before
+
     def test_inherits_parent_auto_update(self):
         parent = create_session_state(name="parent")
         parent.intent.memory = MemoryIntent(
