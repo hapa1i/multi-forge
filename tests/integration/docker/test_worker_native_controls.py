@@ -5,12 +5,13 @@ import os
 import re
 import subprocess
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
 from forge.core.reactive.reviewer_runtime import MIN_REVIEWER_VERSION
-from tests.fixtures.release_artifact import WheelArtifact, build_qa_image, build_wheel
+from tests.fixtures.release_artifact import WheelArtifact, build_qa_image
 from tests.fixtures.runtime_versions import integration_runtime_versions
 
 pytestmark = [pytest.mark.integration, pytest.mark.docker_host]
@@ -18,20 +19,19 @@ REPO = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture(scope="module")
-def worker_artifact(tmp_path_factory, forge_test_image: str | None):
+def worker_artifact(release_wheel: WheelArtifact, forge_test_image: str | None) -> Iterator[tuple[WheelArtifact, str]]:
+    """Install the shared wheel with the native-worker image's runtime metadata."""
     assert forge_test_image is not None, "Native worker probes require the Docker-host lane"
-    directory = tmp_path_factory.mktemp("worker-native-wheel")
-    artifact = build_wheel(directory)
     claude_version, codex_version = integration_runtime_versions()
     image = build_qa_image(
-        artifact,
+        release_wheel,
         forge_test_image,
         runtime_track="worker-probe",
         claude_version=claude_version,
         codex_version=codex_version,
     )
     try:
-        yield artifact, image
+        yield release_wheel, image
     finally:
         subprocess.run(["docker", "image", "rm", image], capture_output=True, text=True, timeout=120)
 

@@ -1,7 +1,9 @@
 """Keep startup diagnostics when the wheel smoke removes its temporary install."""
 
 import os
+import shlex
 import subprocess
+import sys
 from pathlib import Path
 from textwrap import dedent
 
@@ -32,7 +34,7 @@ def test_failed_backend_start_prints_log_before_cleanup(tmp_path: Path, argument
                     ;;
             esac
             """,
-        "python": "#!/usr/bin/env bash\nexit 0\n",
+        "python": f'#!/usr/bin/env bash\n[[ "$1" == -c ]] && exit 0\nexec {shlex.quote(sys.executable)} "$@"\n',
         "forge": """\
             #!/usr/bin/env bash
             set -eu
@@ -72,5 +74,10 @@ def test_failed_backend_start_prints_log_before_cleanup(tmp_path: Path, argument
 
     assert result.returncode == 23
     assert "RuntimeError: startup diagnostic" in result.stderr
-    assert stopped.exists()
-    assert not list(smoke_temps.iterdir())
+    assert not stopped.exists()  # No registered process group exists to authorize stop.
+    assert "retained evidence" in result.stderr
+    retained = list(smoke_temps.iterdir())
+    assert len(retained) == 1
+    assert (retained[0] / "forge-home/logs/backend/litellm-49177.log").read_text().strip() == (
+        "RuntimeError: startup diagnostic"
+    )

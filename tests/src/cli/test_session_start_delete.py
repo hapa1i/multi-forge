@@ -93,8 +93,8 @@ class TestSessionStart:
             result = runner.invoke(main, ["session", "start", "new-session"])
 
         assert result.exit_code == 0
-        assert "Created session" in result.output
-        assert "new-session" in result.output
+        assert "Created session" in result.stdout
+        assert "new-session" in result.stdout
 
     def test_start_without_claude_fails_before_session_creation(self, runner: CliRunner, temp_env: Path) -> None:
         with patch(
@@ -151,7 +151,7 @@ class TestSessionStart:
         result = runner.invoke(main, ["session", "start", "direct-default", "--no-launch"])
 
         assert result.exit_code == 0
-        assert "Routing: direct" in result.output
+        assert "Routing: direct" in result.stdout
 
         manager = SessionManager()
         manifest = manager.get_session_store("direct-default").read()

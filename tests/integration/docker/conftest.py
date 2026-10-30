@@ -23,6 +23,7 @@ from tests.fixtures.docker import (
     local_claude_available,
     synced_container,
 )
+from tests.fixtures.release_artifact import WheelArtifact, build_wheel
 
 __all__ = [
     "ContainerLike",
@@ -34,12 +35,19 @@ __all__ = [
     "policy_workspace",
     "precompact_workspace",
     "read_container_usage_events",
+    "release_wheel",
     "relocate_and_resume",
     "rewind_prefix_and_resume",
     "run_claude_print",
     "setup_real_claude",
     "synced_container",
 ]
+
+
+@pytest.fixture(scope="session")
+def release_wheel(tmp_path_factory: pytest.TempPathFactory) -> WheelArtifact:
+    """Build one immutable wheel for the release-artifact consumers in this run."""
+    return build_wheel(tmp_path_factory.mktemp("release-wheel"))
 
 
 # ---------------------------------------------------------------------------

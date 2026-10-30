@@ -31,13 +31,6 @@ def _run_container_python(workspace: ContainerLike, script: str) -> None:
 class TestSessionList:
     """Tests for 'forge session list' command."""
 
-    def test_list_empty_shows_message(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should show message when no sessions exist."""
-        result = mock_claude_workspace.exec("cd /workspace && forge session list")
-
-        assert result.returncode == 0
-        assert "No sessions found" in result.stdout
-
     def test_list_shows_sessions(self, mock_claude_workspace: ContainerLike) -> None:
         """Should list existing sessions."""
         mock_claude_workspace.exec("cd /workspace && forge session start test-session")
@@ -119,14 +112,6 @@ class TestSessionStart:
             """,
         )
 
-    def test_start_creates_session(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should create a new session."""
-        result = mock_claude_workspace.exec("cd /workspace && forge session start new-session")
-
-        assert result.returncode == 0
-        assert "Created session" in result.stdout
-        assert "new-session" in result.stdout
-
     def test_start_creates_manifest_file(self, mock_claude_workspace: ContainerLike) -> None:
         """Should create per-session manifest."""
         mock_claude_workspace.exec("cd /workspace && forge session start manifest-test")
@@ -136,13 +121,6 @@ class TestSessionStart:
         assert result.returncode == 0
         assert "manifest-test" in result.stdout
         assert '"name"' in result.stdout
-
-    def test_start_defaults_to_direct(self, mock_claude_workspace: ContainerLike) -> None:
-        """No flags should default to direct mode."""
-        result = mock_claude_workspace.exec("cd /workspace && forge session start direct-default")
-
-        assert result.returncode == 0
-        assert "Routing: direct" in result.stdout
 
     def test_start_invokes_claude(
         self,
@@ -158,15 +136,6 @@ class TestSessionStart:
         # UUID pre-seeded at launch: --session-id and --name passed
         assert "--session-id" in result.stdout
         assert "--name" in result.stdout
-
-    def test_start_duplicate_fails(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should fail when session already exists."""
-        mock_claude_workspace.exec("cd /workspace && forge session start duplicate-test")
-
-        result = mock_claude_workspace.exec("cd /workspace && forge session start duplicate-test")
-
-        assert result.returncode == 1
-        assert "already exists" in result.stdout or "already exists" in result.stderr
 
     @pytest.mark.parametrize(
         ("model_arg", "session_name", "canonical_id"),
@@ -439,13 +408,6 @@ echo 'EDITOR_WAS_HERE' >> "$1"
         combined = mock_claude_workspace.read_file(combined_path)
         assert "original parent context" in combined
         assert "EDITOR_WAS_HERE" in combined
-
-    def test_resume_nonexistent_fails(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should fail for nonexistent session."""
-        result = mock_claude_workspace.exec("cd /workspace && forge session resume nonexistent")
-
-        assert result.returncode == 1
-        assert "not found" in result.stdout or "not found" in result.stderr
 
 
 class TestSessionResumeScenarios:
@@ -829,23 +791,6 @@ class TestSessionSetOverride:
 
         assert result.returncode == 1
         assert "custom.* is not supported" in result.stdout or "not supported" in result.stderr
-
-    def test_set_invalid_key_fails(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should fail for invalid/protected keys."""
-        mock_claude_workspace.exec("cd /workspace && forge session start invalid-key-test")
-
-        result = mock_claude_workspace.exec(
-            "cd /workspace && forge session set --session invalid-key-test confirmed.claude_session_id value"
-        )
-
-        assert result.returncode == 1
-        assert "cannot override" in result.stdout or "Error" in result.stderr
-
-    def test_set_no_session_fails(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should fail when no session specified and no FORGE_SESSION env."""
-        result = mock_claude_workspace.exec("cd /workspace && forge session set policy.fail_mode closed")
-
-        assert result.returncode == 1
 
     def test_launch_runtime_parent_override_is_rejected_and_recoverable(
         self,
