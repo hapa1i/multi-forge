@@ -236,9 +236,9 @@ Status line reads Claude Code's stdin JSON plus two env-var-addressed sources:
 **Information strategy:**
 
 1. **Session identity**: Read `FORGE_SESSION` -> locate `.forge/sessions/<name>/forge.session.json`
-2. **Proxy identity**: Reverse lookup `ANTHROPIC_BASE_URL` in `~/.forge/proxies/index.json`. A sole entry owns its URL;
-   when stopped template instances share the default port, only a sole routable entry does, and identity is otherwise
-   unknown rather than the first registered match
+2. **Proxy identity**: Use the live `GET /` identity when available. Otherwise, the status line selects the first
+   matching entry in `~/.forge/proxies/index.json` by port (or netloc when the URL has no explicit port), regardless of
+   status
 3. **Runtime truth**: Query proxy `GET /` for tier mappings, context windows, metrics, intercept posture, and spend caps
    (may fail gracefully)
 
