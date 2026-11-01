@@ -111,24 +111,31 @@ def get_proxy_registry_path() -> Path:
     return get_forge_home() / PROXIES_DIR / PROXY_INDEX_FILENAME
 
 
+# Proxy statuses that represent a routable (active) proxy.
+ROUTABLE_STATUSES = frozenset({"healthy", "starting"})
+
+
 def lookup_proxy_by_base_url(registry: ProxyRegistry, base_url: str) -> ProxyEntry | None:
-    """Reverse lookup: find proxy entry by base_url.
+    """Reverse lookup: find the proxy entry that owns base_url.
+
+    Template starts spawn new proxy ids on the template's default port, so stopped
+    instances accumulate on one base_url. A sole registered entry owns its URL in
+    any status; among several, only a sole routable entry does, mirroring the
+    template fallback in ``resolve_proxy``. Returning the first match instead would
+    attribute a live session to whichever stale instance was registered earliest.
 
     Args:
         registry: The proxy registry to search.
         base_url: The URL to match (e.g., "http://localhost:8084").
 
     Returns:
-        The matching ProxyEntry, or None if no proxy owns that base_url.
+        The owning ProxyEntry, or None if no entry, or no single routable entry, owns that base_url.
     """
-    for entry in registry.proxies.values():
-        if entry.base_url == base_url:
-            return entry
-    return None
-
-
-# Proxy statuses that represent a routable (active) proxy.
-ROUTABLE_STATUSES = frozenset({"healthy", "starting"})
+    matches = [entry for entry in registry.proxies.values() if entry.base_url == base_url]
+    if len(matches) == 1:
+        return matches[0]
+    active = [entry for entry in matches if entry.status in ROUTABLE_STATUSES]
+    return active[0] if len(active) == 1 else None
 
 
 class ProxyResolutionError(Exception):

@@ -66,7 +66,8 @@ The session file includes hook-confirmed facts such as:
 - `confirmed.route_commit` (the latest effective routing journal `{event_id, run_id}` pointer; not a copied route)
 
 > `proxy_id` is a same-machine convenience; `base_url` is the primary runtime truth, and `template` is best-effort
-> metadata.
+> metadata. The hook omits `proxy_id` when several registered proxies share `base_url` and no single one is running;
+> bare resume then validates the live proxy by template.
 
 ---
 

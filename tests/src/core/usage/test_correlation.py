@@ -178,6 +178,25 @@ class TestTargetIsForgeProxy:
         self._write_registry("http://localhost:8084")
         assert target_is_forge_proxy("http://localhost:9999") is False
 
+    def test_url_shared_by_unowned_entries_is_true(self) -> None:
+        # Stopped template instances accumulate on one default port; none owns
+        # the URL alone, but the URL is still a Forge proxy endpoint.
+        entries = {
+            proxy_id: {
+                "proxy_id": proxy_id,
+                "template": "openrouter-gemini",
+                "base_url": "http://localhost:8097",
+                "port": 8097,
+                "status": "unhealthy",
+            }
+            for proxy_id in ("p1", "p2")
+        }
+        path = get_proxy_registry_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"version": 1, "proxies": entries}))
+
+        assert target_is_forge_proxy("http://localhost:8097/") is True
+
 
 class TestResolveClientBaseUrl:
     def test_litellm_local_from_env(self, monkeypatch) -> None:
