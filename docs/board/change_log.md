@@ -9,6 +9,19 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-11-02
+
+### Attribute sessions to live proxies on shared ports
+
+**Goal**: Keep stopped proxy instances from causing a false identity mismatch on bare session resume.
+
+- Recover the sole routable proxy when registry entries share a URL; leave ambiguous identity unknown.
+- Preserve endpoint membership for usage correlation and document the status line's separate registry fallback.
+
+**Verification**: [PR #295](https://github.com/hapa1i/multi-forge/pull/295) merged as `e493da76`, with a tree identical
+to reviewed head `e1eb480c` and passing test/pre-commit CI. Local review checks passed 50 focused unit/regression tests
+and 18 Docker session/proxy integration tests; the documentation correction passed Markdown checks.
+
 ## 2026-10-30
 
 ### Validate parent overrides before deriving sessions
