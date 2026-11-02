@@ -22,6 +22,7 @@ from forge.proxy.proxies import (
     ProxyRegistryStore,
     _is_orphaned_starting,
     is_pid_alive,
+    lookup_proxy_by_base_url,
 )
 from forge.proxy.proxy_orchestrator import prune_stale_proxies
 
@@ -144,6 +145,44 @@ def test_read_write_roundtrip(tmp_path: Path) -> None:
     assert entry.port == 8085
     assert entry.pid == 123
     assert entry.status == "healthy"
+
+
+def _url_entry(proxy_id: str, *, base_url: str = "http://localhost:8097", status: str | None) -> ProxyEntry:
+    return ProxyEntry(proxy_id=proxy_id, template="openrouter-gemini", base_url=base_url, port=8097, status=status)
+
+
+def _url_registry(*entries: ProxyEntry) -> ProxyRegistry:
+    return ProxyRegistry(proxies={entry.proxy_id: entry for entry in entries})
+
+
+def test_lookup_by_base_url_returns_sole_entry_in_any_status() -> None:
+    registry = _url_registry(_url_entry("stopped", status="unhealthy"))
+
+    assert lookup_proxy_by_base_url(registry, "http://localhost:8097") is registry.proxies["stopped"]
+
+
+def test_lookup_by_base_url_prefers_sole_routable_entry_over_earlier_stale_ones() -> None:
+    registry = _url_registry(
+        _url_entry("oldest", status="unhealthy"),
+        _url_entry("unknown", status=None),
+        _url_entry("live", status="starting"),
+        _url_entry("elsewhere", base_url="http://localhost:8098", status="healthy"),
+    )
+
+    assert lookup_proxy_by_base_url(registry, "http://localhost:8097") is registry.proxies["live"]
+
+
+@pytest.mark.parametrize("status", ["healthy", "unhealthy"])
+def test_lookup_by_base_url_refuses_to_guess_between_shared_entries(status: str) -> None:
+    registry = _url_registry(_url_entry("first", status=status), _url_entry("second", status=status))
+
+    assert lookup_proxy_by_base_url(registry, "http://localhost:8097") is None
+
+
+def test_lookup_by_base_url_returns_none_without_match() -> None:
+    registry = _url_registry(_url_entry("elsewhere", base_url="http://localhost:8098", status="healthy"))
+
+    assert lookup_proxy_by_base_url(registry, "http://localhost:8097") is None
 
 
 def test_is_pid_alive_returns_false_for_invalid_pid() -> None:

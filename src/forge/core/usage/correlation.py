@@ -143,19 +143,21 @@ def resolve_client_base_url(model: str) -> str | None:
 def target_is_forge_proxy(base_url: str | None) -> bool:
     """True if ``base_url`` is a known Forge proxy endpoint.
 
-    Reverse-lookup in the proxy registry (``~/.forge/proxies/index.json``).
-    Best-effort: any failure (no registry, unreadable, lookup error) returns
-    False -- callers must not stamp ``cost_request_id`` unless this is certain,
-    or the ledger would carry a back-reference to a cost record that never
-    materialized.
+    Membership check in the proxy registry (``~/.forge/proxies/index.json``);
+    any registered entry qualifies, even when several share the URL and none
+    owns it alone. Best-effort: any failure (no registry, unreadable, lookup
+    error) returns False -- callers must not stamp ``cost_request_id`` unless
+    this is certain, or the ledger would carry a back-reference to a cost record
+    that never materialized.
     """
     if not base_url:
         return False
     try:
-        from forge.proxy.proxies import ProxyRegistryStore, lookup_proxy_by_base_url
+        from forge.proxy.proxies import ProxyRegistryStore
 
+        normalized = base_url.rstrip("/")
         registry = ProxyRegistryStore().read()
-        return lookup_proxy_by_base_url(registry, base_url.rstrip("/")) is not None
+        return any(entry.base_url == normalized for entry in registry.proxies.values())
     except Exception as e:
         logger.debug("target_is_forge_proxy(%s) failed, treating as non-proxy: %s", base_url, e)
         return False
