@@ -22,7 +22,9 @@ from tests.integration.proxy.conftest import (
 pytestmark = pytest.mark.integration
 
 
-@pytest.fixture(scope="module", params=["argon", "openrouter", "gpt5-tools", "passthrough"])
+@pytest.fixture(
+    scope="module", params=["carbon", "carbon-openrouter", "argon", "openrouter", "gpt5-tools", "passthrough"]
+)
 def effort_proxy(request, tmp_path_factory: pytest.TempPathFactory):
     route = request.param
     requests: list[dict[str, Any]] = []
@@ -92,12 +94,16 @@ def effort_proxy(request, tmp_path_factory: pytest.TempPathFactory):
     thread.start()
     home = tmp_path_factory.mktemp(f"effort-{route}")
     template = {
+        "carbon": "litellm-gemini",
+        "carbon-openrouter": "openrouter-gemini",
         "argon": "litellm-gemini",
         "openrouter": "openrouter-openai",
         "gpt5-tools": "litellm-openai",
         "passthrough": "anthropic-passthrough",
     }[route]
     mapped = {
+        "carbon": "vertex_ai/gemini-4-carbon",
+        "carbon-openrouter": "google/gemini-4-carbon",
         "argon": "vertex_ai/gemini-4-argon",
         "openrouter": "openai/gpt-6-astra",
         "gpt5-tools": "openai/gpt-5",
@@ -155,6 +161,8 @@ def test_reported_effort_matches_captured_outbound_request(effort_proxy, stream:
     launch = mint_run_id()
     requested = "low" if route == "passthrough" else "max"
     client_model = "claude-opus-4-6" if route == "passthrough" else "gemini-4-argon"
+    if route.startswith("carbon"):
+        client_model = "gemini-4-carbon"
     with httpx.Client(base_url=base_url, timeout=30) as client:
         assert client.get("/", params={"forge_launch": launch}).json()["runtime"]["effort"] == {}
         response = client.post(
@@ -162,7 +170,10 @@ def test_reported_effort_matches_captured_outbound_request(effort_proxy, stream:
             headers={FORGE_LAUNCH_HEADER: launch, "X-Forge-Model-Tier": "opus", "X-Forge-Effort-Source": "client"},
             json={
                 "model": client_model,
-                "max_tokens": 64,
+                "max_tokens": 65_536 if route.startswith("carbon") else 64,
+                "temperature": 0.2,
+                "top_p": 0.8,
+                "top_k": 20,
                 "stream": stream,
                 "thinking": {"type": "adaptive"},
                 "output_config": {"effort": requested},
@@ -180,6 +191,10 @@ def test_reported_effort_matches_captured_outbound_request(effort_proxy, stream:
     assert len(requests) == 1
     upstream_body = requests[0]["body"]
     assert not any(name.lower().startswith("x-forge-") for name in requests[0]["headers"])
+    if route.startswith("carbon"):
+        assert {"temperature", "top_p", "top_k"}.isdisjoint(upstream_body)
+        assert upstream_body["max_tokens"] == (32_768 if route == "carbon" and not stream else 65_536)
+        assert upstream_body["tools"][0]["function"]["name"] == "Read"
     assert observation["mapped_model"] == upstream_body["model"]
     assert observation["client_model"] == client_model
     assert observation["requested"] == requested
@@ -192,6 +207,8 @@ def test_reported_effort_matches_captured_outbound_request(effort_proxy, stream:
         assert observation["note"]
     else:
         wire = {
+            "carbon": "thinkingConfig.thinkingLevel",
+            "carbon-openrouter": "reasoning.effort",
             "argon": "thinkingConfig.thinkingLevel",
             "openrouter": "reasoning.effort",
             "passthrough": "output_config.effort",

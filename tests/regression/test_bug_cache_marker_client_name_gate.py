@@ -18,7 +18,8 @@ pytestmark = pytest.mark.regression
 @pytest.mark.parametrize(
     ("client_model", "backend", "forwarded"),
     [
-        ("claude-opus-5-5", "google/gemini-4-argon", False),  # plain --proxy launch on openrouter-gemini
+        ("claude-opus-5-5", "google/gemini-4-carbon", False),  # plain --proxy launch on openrouter-gemini
+        ("claude-opus-5-5", "google/gemini-4-argon", False),
         ("claude-opus-5-5", "moonshotai/kimi-k3", False),
         ("claude-opus-5-5", "openai/gpt-6-astra", False),
         ("anthropic/claude-opus-5.5", "anthropic/claude-opus-5.5", True),  # model-first Claude launch

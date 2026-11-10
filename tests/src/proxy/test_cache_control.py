@@ -57,6 +57,7 @@ class TestModelSupportsCacheControl:
         ("model", "expected"),
         [
             ("anthropic/claude-opus-5.5", True),
+            ("google/gemini-4-carbon", False),
             ("google/gemini-4-argon", False),
             ("google/gemini-3.8-flash", False),
             ("moonshotai/kimi-k3", False),

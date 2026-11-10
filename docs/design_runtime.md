@@ -634,26 +634,27 @@ Proxy/backend snapshots remain user-owned; upgrades preserve translated tier sel
 client's model. Context-estimator model pins apply only to translated Messages routes, including Responses-capable
 proxies; Anthropic passthrough and unknown wire shapes receive no pins.
 
-Gemini 4 Argon is the Gemini Sonnet/Opus default and default Gemini workflow worker. Gemini 3.8 Flash remains the Haiku
-and Flash-template default; explicit older Pro models remain selectable. Argon uses `google/gemini-4-argon` on
-OpenRouter, `gemini/gemini-4-argon` on local LiteLLM, and `vertex_ai/gemini-4-argon` on remote LiteLLM. Its
-1,048,576-token context is shared across input, thinking, and output. Google AI allows 65,536 output tokens for ordinary
-synchronous requests; Vertex allows 65,536 for streaming and 32,768 for unary requests. Reasoning supports `low`,
-`medium`, and `high` with a model default of `medium`. Sampling overrides are unsupported, and the translated request
-builder filters temperature, top-p, and top-k. Implicit caching is supported; explicit context-cache creation is not.
-The bundled Google AI deployment uses API-key authentication and a 4,096-token cache minimum. Remote Vertex deployments
-require Vertex route identities, Google Cloud credentials, and a 6,144-token cache minimum. Operators must adapt the
-full deployment metadata to the provider when updating saved configurations; the bundled Google AI entry cannot be
-copied unchanged into the remote Vertex route.
+Gemini 4 Carbon is the Gemini Sonnet/Opus default and default Gemini workflow worker. Gemini 3.8 Flash remains the Haiku
+and Flash-template default; Argon and older Pro models remain explicit selections. Carbon uses `google/gemini-4-carbon`
+on OpenRouter, `gemini/gemini-4-carbon` on local LiteLLM, and `vertex_ai/gemini-4-carbon` on remote LiteLLM. Existing
+request and workflow deadlines still apply.
 
-The intrinsic catalog retains Argon's 65,536 output maximum. Forge's LiteLLM client caps non-streaming requests using
-the explicit `vertex_ai/gemini-4-argon` route to 32,768 after merging request overrides; streaming and other provider
-routes retain their configured limits.
+Carbon and Argon share a 1,048,576-token context across input, thinking, and output. Ordinary Google AI requests allow
+65,536 output tokens. The catalog retains that maximum; Forge's LiteLLM client caps unary requests on their explicit
+`vertex_ai/` routes to 32,768 after merging request overrides. Streaming and other provider routes retain their
+configured limits. Long decode through continuation is outside Forge's request contract. Both models support `low`,
+`medium`, and `high` thinking with `medium` as the model default. The translated builder filters unsupported
+temperature, top-p, and top-k overrides. Both use implicit caching, without explicit cache creation.
 
-On pinned LiteLLM 1.102, Forge's LiteLLM client sends native `thinkingConfig` for the `gemini/gemini-4-argon`,
-`vertex_ai/gemini-4-argon`, and bare `gemini-4-argon` routes, for both streaming and unary requests. It replaces generic
-`reasoning_effort` with the validated `thinkingLevel` (`low`, `medium`, or `high`, default `medium`) and
-`includeThoughts: true` after merging request overrides. This bypasses the adapter's incompatible `thinkingBudget`
+Bundled Google AI deployments use API-key authentication. Remote Vertex deployments require Vertex route identities and
+Google Cloud credentials. Both providers currently document a 4,096-token cache minimum for Carbon and Argon. Operators
+must adapt the complete deployment metadata to the provider and model when updating saved configurations. See the
+[model migration guidance](end-user/model_selection.md#gemini-4-carbon) for sources and introductory pricing, including
+Argon's.
+
+On pinned LiteLLM 1.102, Forge sends native `thinkingConfig` for Carbon and Argon's `gemini/`, `vertex_ai/`, and bare
+routes, for both streaming and unary requests. It replaces generic `reasoning_effort` with the validated `thinkingLevel`
+and `includeThoughts: true` after merging request overrides. This bypasses the adapter's incompatible `thinkingBudget`
 conversion without changing the OpenRouter request shape or upgrading the managed backend runtime.
 
 Claude Opus 5.5 is the Anthropic/OpenRouter Opus default, stable `claude-opus` worker, and direct alias target; explicit
@@ -680,10 +681,10 @@ override validation reject manual budgets for every catalog model whose thinking
 translated request builder removes unsupported sampling fields after merging provider extras, using the intrinsic
 catalog even when gateway metadata does not yet recognize the model.
 
-LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Bundled Argon, GPT-6.1 Sol, GPT-6 Sol/Luna, Claude 5.5, and
-Fable 5.2 deployments supply capability and token/cache pricing in `model_info`. Sol/Luna metadata covers the above-272K
-premium; 6.1 Sol cache reads cost 5% of uncached input. Boundary tests require removing overrides when packaged support
-arrives. Pricing belongs to backend configuration, outside the intrinsic catalog. Sonnet 5.5's
+LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Bundled Carbon, Argon, GPT-6.1 Sol, GPT-6 Sol/Luna, Claude
+5.5, and Fable 5.2 deployments supply capability and token/cache pricing in `model_info`. Sol/Luna metadata covers the
+above-272K premium; 6.1 Sol cache reads cost 5% of uncached input. Boundary tests require removing overrides when
+packaged support arrives. Pricing belongs to backend configuration, outside the intrinsic catalog. Sonnet 5.5's
 `thinking_always_on: false` prevents LiteLLM from silently deleting invalid `disabled` requests and enabling adaptive
 thinking; native validation rejects them and directs callers to `between_tools`.
 

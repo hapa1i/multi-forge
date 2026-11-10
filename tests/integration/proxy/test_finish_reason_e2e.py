@@ -140,5 +140,5 @@ def test_vertex_cutoff_reaches_anthropic_client(
         if partial_tool:
             assert any(block["type"] == "tool_use" for block in body["content"])
     assert len(upstream.requests) == 1
-    assert upstream.requests[0]["model"] == "vertex_ai/gemini-4-argon"
+    assert upstream.requests[0]["model"] == "vertex_ai/gemini-4-carbon"
     assert upstream.requests[0]["max_tokens"] == expected_tokens

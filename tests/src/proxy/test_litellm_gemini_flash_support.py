@@ -16,7 +16,7 @@ import yaml
 
 from forge.backend.creation import create_backend_config
 
-# Verified packaged support floor for Gemini 3.8 and native Argon thinkingConfig passthrough.
+# Verified packaged support floor for Gemini 3.8 and native Gemini 4 thinkingConfig passthrough.
 MIN_PACKAGED_SUPPORT = (1, 102, 0)
 
 PACKAGED_MODELS = (
@@ -73,19 +73,22 @@ def test_gemini_38_has_offline_reasoning_tool_and_cost_metadata(model_key: str) 
     assert metadata["output_cost_per_reasoning_token"] > 0
 
 
-def test_argon_metadata_override_is_still_needed() -> None:
+@pytest.mark.parametrize("model", ["gemini-4-argon", "gemini-4-carbon"])
+def test_gemini_4_metadata_override_is_still_needed(model: str) -> None:
     assert not {
-        "gemini-4-argon",
-        "gemini/gemini-4-argon",
-        "vertex_ai/gemini-4-argon",
+        model,
+        f"gemini/{model}",
+        f"vertex_ai/{model}",
     }.intersection(_packaged_cost_map()), (
-        "LiteLLM now packages Argon; verify native costs/capabilities, remove the bundled model_info override, "
+        f"LiteLLM now packages {model}; verify native costs/capabilities, remove the bundled model_info override, "
         "and update this boundary test."
     )
 
 
-@pytest.mark.parametrize("model_name", ["gemini/gemini-4-argon", "gemini-4-argon"])
-def test_registered_argon_preserves_native_thinking_levels(model_name: str) -> None:
+@pytest.mark.parametrize(
+    "model_name", ["gemini/gemini-4-argon", "gemini-4-argon", "gemini/gemini-4-carbon", "gemini-4-carbon"]
+)
+def test_registered_gemini_4_preserves_native_thinking_levels(model_name: str) -> None:
     config = yaml.safe_load(create_backend_config(adapter_type="litellm").read_text())
     entry = next(entry for entry in config["model_list"] if entry["model_name"] == model_name)
     entry["litellm_params"]["api_key"] = "test-key"

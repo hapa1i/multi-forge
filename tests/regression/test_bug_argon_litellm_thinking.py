@@ -14,7 +14,10 @@ from forge.core.llm.types import Message, ModelHyperparameters, ModelReasoningEf
 pytestmark = [pytest.mark.regression, pytest.mark.asyncio]
 
 
-@pytest.mark.parametrize("model", ["gemini/gemini-4-argon", "vertex_ai/gemini-4-argon", "gemini-4-argon"])
+@pytest.mark.parametrize(
+    "model",
+    [f"{prefix}{model}" for model in ("gemini-4-argon", "gemini-4-carbon") for prefix in ("gemini/", "vertex_ai/", "")],
+)
 @pytest.mark.parametrize("effort", [None, "low", "medium", "high"])
 @pytest.mark.parametrize("stream", [False, True])
 async def test_argon_sends_native_thinking_config(
@@ -46,8 +49,11 @@ async def test_argon_sends_native_thinking_config(
 
 
 @pytest.mark.parametrize("nested_effort", [None, "low", "medium", "high"])
-async def test_argon_maps_final_effort_and_replaces_conflicting_native_extras(nested_effort: str | None) -> None:
-    client = LiteLLMClient("gemini/gemini-4-argon", provider="litellm_local")
+@pytest.mark.parametrize("model", ["gemini/gemini-4-argon", "gemini/gemini-4-carbon"])
+async def test_argon_maps_final_effort_and_replaces_conflicting_native_extras(
+    nested_effort: str | None, model: str
+) -> None:
+    client = LiteLLMClient(model, provider="litellm_local")
     params = ModelHyperparameters(
         max_tokens=65_536,
         reasoning_effort="high",
@@ -84,8 +90,9 @@ async def test_argon_maps_final_effort_and_replaces_conflicting_native_extras(ne
     assert params.model_dump() == original
 
 
-async def test_openrouter_keeps_standard_reasoning_effort() -> None:
-    client = OpenRouterClient("google/gemini-4-argon", provider="openrouter")
+@pytest.mark.parametrize("model", ["google/gemini-4-argon", "google/gemini-4-carbon"])
+async def test_openrouter_keeps_standard_reasoning_effort(model: str) -> None:
+    client = OpenRouterClient(model, provider="openrouter")
     requests: list[dict[str, Any]] = []
 
     async with _recording_sdk(requests) as sdk:
@@ -101,8 +108,9 @@ async def test_openrouter_keeps_standard_reasoning_effort() -> None:
 
 
 @pytest.mark.parametrize("effort", ["minimal", "max", "disable", "none"])
-async def test_argon_rejects_unsupported_effort_before_dispatch(effort: ModelReasoningEffort) -> None:
-    client = LiteLLMClient("gemini/gemini-4-argon", provider="litellm_local")
+@pytest.mark.parametrize("model", ["gemini/gemini-4-argon", "gemini/gemini-4-carbon"])
+async def test_argon_rejects_unsupported_effort_before_dispatch(effort: ModelReasoningEffort, model: str) -> None:
+    client = LiteLLMClient(model, provider="litellm_local")
 
     with pytest.raises(ValueError, match="reasoning_effort"):
         client._build_request_kwargs([], None, ModelHyperparameters(reasoning_effort=effort))

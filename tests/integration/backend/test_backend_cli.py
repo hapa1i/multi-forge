@@ -54,9 +54,10 @@ class TestBackendCLI:
         content = config_path.read_text()
         assert "model_list:" in content
         deployments = {entry["model_name"] for entry in yaml.safe_load(content)["model_list"]}
-        assert {"gemini/gemini-4-argon", "gemini/gemini-3.1-pro-preview"} <= deployments
+        assert {"gemini/gemini-4-carbon", "gemini/gemini-4-argon", "gemini/gemini-3.1-pro-preview"} <= deployments
 
-    def test_backend_create_already_exists(self, isolated_forge_home: Path) -> None:
+    @pytest.mark.parametrize("prior", ["gemini-3.1-pro-preview", "gemini-4-argon"])
+    def test_backend_create_already_exists(self, isolated_forge_home: Path, prior: str) -> None:
         """An upgrade cannot replace a user's older Gemini backend snapshot."""
         runner = CliRunner()
         config_path = isolated_forge_home / "backends" / "litellm" / "config.yaml"
@@ -64,9 +65,9 @@ class TestBackendCLI:
         config_path.write_text(
             "# Keep my provider configuration.\n"
             "model_list:\n"
-            "  - model_name: gemini/gemini-3.1-pro-preview\n"
+            f"  - model_name: gemini/{prior}\n"
             "    litellm_params:\n"
-            "      model: gemini/gemini-3.1-pro-preview\n"
+            f"      model: gemini/{prior}\n"
             "      api_key: os.environ/GEMINI_API_KEY\n"
         )
         config_path.chmod(0o600)
@@ -79,8 +80,8 @@ class TestBackendCLI:
         assert "forge model backend start" in result.output
         shown = runner.invoke(main, ["model", "backend", "show", "litellm-4000", "--raw"])
         assert shown.exit_code == 0
-        assert "gemini/gemini-3.1-pro-preview" in shown.output
-        assert "gemini-4-argon" not in shown.output
+        assert f"gemini/{prior}" in shown.output
+        assert "gemini-4-carbon" not in shown.output
         assert config_path.read_bytes() == original
         assert config_path.stat().st_mtime_ns == original_stat.st_mtime_ns
         assert config_path.stat().st_mode == original_stat.st_mode

@@ -23,7 +23,7 @@ def gemini_credentials_only(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     monkeypatch.setattr(runtime_config, "_config", None)
 
 
-@pytest.mark.parametrize("model", ["gemini-4-argon", "gemini-3.1-pro-preview", "gemini-2.5-pro"])
+@pytest.mark.parametrize("model", ["gemini-4-carbon", "gemini-4-argon", "gemini-3.1-pro-preview", "gemini-2.5-pro"])
 @pytest.mark.parametrize("tier", [None, "opus"])
 def test_pro_model_selects_serving_local_template(model: str, tier: str | None, gemini_credentials_only: None) -> None:
     plan = plan_session_model_route(model, model_tier=tier)

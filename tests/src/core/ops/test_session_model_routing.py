@@ -117,6 +117,7 @@ class TestSessionModelRoutePlanning:
         ("template", "current_model", "previous_model", "haiku_model"),
         [
             ("openrouter-openai", "gpt-6-astra", "gpt-5.6-sol", "openai/gpt-5.4-mini"),
+            ("openrouter-gemini", "gemini-4-carbon", "gemini-4-argon", "google/gemini-3.8-flash"),
             ("openrouter-gemini", "gemini-4-argon", "gemini-3.1-pro-preview", "google/gemini-3.8-flash"),
         ],
     )
