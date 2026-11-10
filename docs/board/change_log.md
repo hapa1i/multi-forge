@@ -11,6 +11,20 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 
 ## 2026-11-10
 
+### Patch OAuthLib and pyasn1 security advisories
+
+**Goal**: Resolve Dependabot alerts 63-68 while preserving runtime and optional-tooling dependency ownership.
+
+- Require OAuthLib 4.0.1 in wheel metadata and the runtime export; constrain optional provider-check tooling to pyasn1
+  0.6.5 without adding it to the wheel runtime.
+- Update only the two affected locked package versions and pin both security floors with regressions.
+
+**Verification**: [PR #297](https://github.com/hapa1i/multi-forge/pull/297) merged as `a87e5ca7`, with a tree identical
+to verified head `ea1a7bdc`. Checks passed 11,624 unit tests, 2,471 regressions, 15 targeted integrations, full
+pre-commit, build, clean-wheel runtime smoke, optional provider-check imports, and offline imports in both rebuilt
+Docker layers. GitHub reports all six alerts fixed and no open alerts. The
+[checklist](done/dependabot_november_2026/checklist.md) retains evidence.
+
 ### Add Claude Fable 5.2
 
 **Goal**: Make Fable 5.2 the stable Fable selection while retaining Claude defaults and explicit older Fable pins.

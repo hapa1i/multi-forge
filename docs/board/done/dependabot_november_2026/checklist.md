@@ -4,8 +4,8 @@
 
 ## Current focus
 
-Implementation and verification are complete. The candidate graph addresses all six open alerts; the card remains active
-until the separate security PR is merged and Dependabot confirms closure.
+Shipped in [PR #297](https://github.com/hapa1i/multi-forge/pull/297), merged as `a87e5ca7`. The merged tree matches
+verified head `ea1a7bdc`; GitHub reports alerts 63-68 fixed and no open Dependabot alerts on 2026-11-10.
 
 ## Implementation
 
@@ -52,4 +52,4 @@ until the separate security PR is merged and Dependabot confirms closure.
 
 ## Closeout
 
-- [ ] After merge, verify alerts close, record shipped evidence, and move the card to `done/`.
+- [x] After merge, verify alerts close, record shipped evidence, and move the card to `done/`.
