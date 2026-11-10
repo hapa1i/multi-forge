@@ -102,10 +102,11 @@ class TestSessionStart:
             proxy = get_model_route_candidates("gpt-5.6-sol")
             assert direct[0].kind == "direct"
             assert direct[0].model_ref == "claude-opus-4-8"
-            assert resolve_model_id("fable") == "claude-fable-5-1"
+            assert resolve_model_id("fable") == "claude-fable-5-2"
+            assert resolve_model_id("fable-5.1") == "claude-fable-5-1"
             assert resolve_model_id("fable-5") == "claude-fable-5"
             assert fable[0].kind == "direct"
-            assert fable[0].model_ref == "claude-fable-5-1"
+            assert fable[0].model_ref == "claude-fable-5-2"
             assert proxy[0].kind == "proxy"
             assert proxy[0].template == "openrouter-openai"
             assert proxy[0].model_ref == "openai/gpt-5.6-sol"
@@ -141,7 +142,8 @@ class TestSessionStart:
         ("model_arg", "session_name", "canonical_id"),
         [
             ("opus-4-8", "model-test", "claude-opus-4-8"),
-            ("fable", "fable-model-test", "claude-fable-5-1"),
+            ("fable", "fable-model-test", "claude-fable-5-2"),
+            ("fable-5.1", "fable-prior-test", "claude-fable-5-1"),
         ],
     )
     def test_start_with_direct_model_pins_claude_env(

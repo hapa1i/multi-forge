@@ -46,7 +46,10 @@ def test_astra_uses_packaged_pricing_without_a_deployment_override() -> None:
     assert "model_info" not in _backend_entry("openai/gpt-6-astra")
 
 
-@pytest.mark.parametrize("model", ["gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "claude-opus-5-5", "claude-sonnet-5-5"])
+@pytest.mark.parametrize(
+    "model",
+    ["gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-2"],
+)
 def test_new_model_metadata_override_is_still_needed(model: str) -> None:
     cost_map = _packaged_cost_map()
     provider = "anthropic" if model.startswith("claude-") else "openai"
@@ -128,6 +131,15 @@ def test_argon_metadata_covers_both_packaged_deployment_names() -> None:
             ],
         ),
         (
+            "anthropic/claude-fable-5-2",
+            [
+                (100, 0, 0, 0.0008, 0.0004),
+                (100, 80, 0, 0.000176, 0.0004),
+                (100, 0, 100, 0.001, 0.0004),
+                (900_000, 1_000, 0, 7.1922, 0.0004),
+            ],
+        ),
+        (
             "anthropic/claude-opus-5-5",
             [
                 (100, 0, 0, 0.0004, 0.0002),
@@ -196,10 +208,94 @@ def test_native_pricing_without_remote_model_metadata(model: str, cases: list[tu
         assert actual["hour_cache_cost"] == pytest.approx((0.0008, 0.0002))
     elif model == "anthropic/claude-sonnet-5-5":
         assert actual["hour_cache_cost"] == pytest.approx((0.0004, 0.0001))
+    elif model == "anthropic/claude-fable-5-2":
+        assert actual["hour_cache_cost"] == pytest.approx((0.0016, 0.0004))
 
 
-@pytest.mark.parametrize("model", ["claude-opus-5-5", "claude-sonnet-5-5"])
-def test_registered_claude_5_5_uses_native_adaptive_effort_contract(model: str) -> None:
+@pytest.mark.parametrize(
+    "model", ["anthropic/claude-opus-5-5", "anthropic/claude-sonnet-5-5", "anthropic/claude-fable-5-2"]
+)
+def test_claude_overrides_apply_us_inference_multiplier(model: str) -> None:
+    # Anthropic bills inference_geo="us" at 1.1x for Claude 4.6+; custom deployment pricing must keep that premium.
+    script = """\
+        import json
+        import sys
+        import litellm
+
+        entry = json.load(sys.stdin)["entry"]
+        router = litellm.Router(model_list=[entry])
+        deployment_id = router.model_list[0]["model_info"]["id"]
+        costs = {}
+        for geo in ("global", "us"):
+            usage = litellm.Usage(prompt_tokens=1000, completion_tokens=100)
+            usage.inference_geo = geo
+            response = litellm.ModelResponse(model=entry["model_name"], usage=usage)
+            costs[geo] = litellm.response_cost_calculator(
+                response_object=response, model=entry["model_name"], custom_llm_provider="anthropic",
+                call_type="completion", optional_params={}, router_model_id=deployment_id, custom_pricing=True,
+            )
+        print(json.dumps(costs))
+        """
+    actual = _run_offline(script, {"entry": _backend_entry(model)})
+
+    assert actual["global"] > 0
+    assert actual["us"] == pytest.approx(actual["global"] * 1.1)
+
+
+@pytest.mark.parametrize("drop_params", [False, True], ids=["strict", "drop-params"])
+def test_fable_52_offline_forced_tool_limitation(drop_params: bool) -> None:
+    # Pin the upstream limitation until LiteLLM registers this capability for its Anthropic adapter.
+    script = """\
+        import json
+        import sys
+        import litellm
+        from litellm.llms.anthropic.chat.transformation import AnthropicConfig
+
+        data = json.load(sys.stdin)
+        entry = data["entry"]
+        litellm.drop_params = data["drop_params"]
+        router = litellm.Router(model_list=[entry])
+        deployment_id = router.model_list[0]["model_info"]["id"]
+        model = entry["model_name"].split("/", 1)[1]
+        flag = "supports_forced_tool_use"
+        results = {
+            "deployment_flag": litellm.model_cost[deployment_id].get(flag),
+            "shared_flag": litellm.model_cost[entry["model_name"]].get(flag),
+            "choices": [],
+        }
+        config = AnthropicConfig()
+        choices = ["auto", "none", "required", {"type": "function", "function": {"name": "lookup"}}]
+        for choice in choices:
+            params = config.map_openai_params(
+                non_default_params={
+                    "reasoning_effort": "high", "max_tokens": 128000, "tool_choice": choice,
+                    "tools": [{"type": "function", "function": {
+                        "name": "lookup", "parameters": {"type": "object", "properties": {}},
+                    }}],
+                },
+                optional_params={}, model=model, drop_params=data["drop_params"],
+            )
+            body = config.transform_request(
+                model=model, messages=[{"role": "user", "content": "Look up the answer."}],
+                optional_params=params, litellm_params={}, headers={},
+            )
+            results["choices"].append(body["tool_choice"])
+        print(json.dumps(results))
+        """
+    actual = _run_offline(script, {"entry": _backend_entry("anthropic/claude-fable-5-2"), "drop_params": drop_params})
+
+    assert actual["deployment_flag"] is False
+    assert actual["shared_flag"] is None, "LiteLLM now registers the restriction; revisit the documented limitation."
+    assert actual["choices"] == [
+        {"type": "auto"},
+        {"type": "none"},
+        {"type": "any"},
+        {"type": "tool", "name": "lookup"},
+    ], "LiteLLM's offline forced-tool behavior changed; update this boundary test and the direct-caller guidance."
+
+
+@pytest.mark.parametrize("model", ["claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-2"])
+def test_registered_claude_uses_native_adaptive_effort_contract(model: str) -> None:
     script = """\
         import json
         import sys
@@ -254,7 +350,7 @@ def test_registered_claude_5_5_uses_native_adaptive_effort_contract(model: str) 
         assert actual[effort]["max_tokens"] == 128_000
         assert actual[effort]["tool_choice"] == {"type": "auto"}
         assert actual[effort]["tools"][0]["name"] == "lookup"
-    if model == "claude-opus-5-5":
+    if model in {"claude-opus-5-5", "claude-fable-5-2"}:
         assert "thinking" not in actual["disabled"]
     else:
         assert actual["disabled"]["thinking"] == {"type": "disabled"}

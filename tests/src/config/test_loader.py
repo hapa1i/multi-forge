@@ -264,6 +264,7 @@ class TestLoadConfig:
         assert config.proxy.openrouter.model_alternatives == {
             "opus": {
                 "claude-opus-5": "anthropic/claude-opus-5",
+                "claude-fable-5-2": "anthropic/claude-fable-5.2",
                 "claude-fable-5-1": "anthropic/claude-fable-5.1",
                 "claude-fable-5": "anthropic/claude-fable-5",
                 "claude-opus-4-8": "anthropic/claude-opus-4.8",
@@ -361,6 +362,7 @@ class TestLoadConfig:
             assert config.proxy.litellm.model_alternatives == {
                 "opus": {
                     "claude-opus-5": "anthropic/claude-opus-5",
+                    "claude-fable-5-2": "anthropic/claude-fable-5-2",
                     "claude-fable-5-1": "anthropic/claude-fable-5-1",
                     "claude-fable-5": "anthropic/claude-fable-5",
                     "claude-opus-4-8": "anthropic/claude-opus-4-8",
@@ -1235,6 +1237,7 @@ class TestTemplateResolution:
         }
         anthropic = load_config(template="openrouter-anthropic")
         assert anthropic.proxy.openrouter.zdr_fallbacks == {
+            "anthropic/claude-fable-5.2": "anthropic/claude-opus-5.5",
             "anthropic/claude-fable-5.1": "anthropic/claude-opus-5.5",
             "anthropic/claude-fable-5": "anthropic/claude-opus-5.5",
         }

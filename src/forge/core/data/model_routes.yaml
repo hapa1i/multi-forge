@@ -946,6 +946,11 @@ models:
       - kind: direct
         runtime: claude_code
         model_ref: claude-opus-5
+  claude-fable-5-2:
+    routes:
+      - kind: direct
+        runtime: claude_code
+        model_ref: claude-fable-5-2
   claude-fable-5-1:
     routes:
       - kind: direct

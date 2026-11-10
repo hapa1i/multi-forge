@@ -660,6 +660,15 @@ Claude Opus 5.5 is the Anthropic/OpenRouter Opus default, stable `claude-opus` w
 Opus 5 pins remain selectable. It uses always-on adaptive thinking at `medium` effort. OpenRouter uses
 `anthropic/claude-opus-5.5`; native Anthropic uses `claude-opus-5-5`.
 
+Fable 5.2 is the stable `fable`/`claude-fable` alias and named `claude-fable` worker target. Explicit Fable 5 and 5.1
+pins remain available; Claude tier defaults and the default worker quorum stay unchanged. Native/LiteLLM routes use
+`claude-fable-5-2`; OpenRouter uses `anthropic/claude-fable-5.2`. It supports a 1M context, 128K output, always-on
+adaptive thinking at `high` by default, all five effort levels, and a 512-token cache minimum. Sampling overrides and
+forced tool choice are unsupported; Fable 5.1 also declares `supports_forced_tool_choice: false`. Required-ZDR
+OpenRouter routes substitute Opus 5.5, including older proxy snapshots without a configured fallback. See the
+[Fable migration guidance](end-user/model_selection.md#claude-alternatives-and-fable-retention) for saved
+configurations, retention, and signed-thinking constraints.
+
 Claude Sonnet 5.5 is the Anthropic/OpenRouter Sonnet default. The `claude-sonnet` workflow worker and direct aliases
 select `claude-sonnet-5-5`; explicit Sonnet 5 pins and the `claude-sonnet-5` worker remain selectable. OpenRouter uses
 `anthropic/claude-sonnet-5.5`. Sonnet 5.5 defaults to `high` adaptive effort. Both Claude 5.5 models declare
@@ -671,12 +680,12 @@ override validation reject manual budgets for every catalog model whose thinking
 translated request builder removes unsupported sampling fields after merging provider extras, using the intrinsic
 catalog even when gateway metadata does not yet recognize the model.
 
-LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Bundled Argon, GPT-6.1 Sol, GPT-6 Sol/Luna, and Claude 5.5
-deployments supply capability and token/cache pricing in `model_info`. Sol/Luna metadata covers the above-272K premium;
-6.1 Sol cache reads cost 5% of uncached input. Boundary tests require removing overrides when packaged support arrives.
-Pricing belongs to backend configuration, outside the intrinsic catalog. Sonnet 5.5's `thinking_always_on: false`
-prevents LiteLLM from silently deleting invalid `disabled` requests and enabling adaptive thinking; native validation
-rejects them and directs callers to `between_tools`.
+LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Bundled Argon, GPT-6.1 Sol, GPT-6 Sol/Luna, Claude 5.5, and
+Fable 5.2 deployments supply capability and token/cache pricing in `model_info`. Sol/Luna metadata covers the above-272K
+premium; 6.1 Sol cache reads cost 5% of uncached input. Boundary tests require removing overrides when packaged support
+arrives. Pricing belongs to backend configuration, outside the intrinsic catalog. Sonnet 5.5's
+`thinking_always_on: false` prevents LiteLLM from silently deleting invalid `disabled` requests and enabling adaptive
+thinking; native validation rejects them and directs callers to `between_tools`.
 
 Kimi K3.1 Pro, MiniMax M3.1 Flash, and DeepSeek V4.1 Flash 1017 are explicit OpenRouter alternatives and workflow
 workers. Their family defaults and the default workflow quorum remain unchanged. All three use implicit prompt caching
