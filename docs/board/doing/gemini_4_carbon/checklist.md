@@ -44,7 +44,25 @@ Implementation and verification complete on `feat/gemini-4-carbon`; merge remain
   backend process group exited. An isolated wheel install outside the checkout passed Carbon aliases, 13 routes, fresh
   templates, backend metadata, historical worker retention, and CLI inventory checks. The first inventory assertion
   incorrectly expected unavailable workers in `--available`; the corrected check verifies both views.
-- Native Google AI and remote Vertex inference were not exercised. Their request shape, thinking, limits, capability
-  registration, and offline pricing have deterministic coverage; live model evidence is OpenRouter-only.
+- Native tool round trips and remote Vertex inference were not exercised. Their request shape, thinking, limits,
+  capability registration, and offline pricing have deterministic coverage; the review follow-up adds only short native
+  Google AI routing requests.
+
+### Review follow-up (after `d7d157f8`)
+
+- Review found two integration files outside the targeted set still asserting the Argon tier default:
+  `test_finish_reason_e2e.py` (not slow, so it would fail the default integration run) and
+  `test_session_routing_e2e.py`. Both now expect Carbon; together they passed 11 cases. Of the seven session-routing
+  cases, two send `gemini/gemini-4-carbon` generation requests through the isolated local LiteLLM to Google AI
+  (`max_tokens: 10`); the others check runtime metadata, Flash routing and local token estimation.
+- Strengthened snapshot preservation to compare saved alternatives exactly on both tiers. Added Carbon cases for the
+  pre-Carbon snapshot refusal, non-Vertex unary limits and cache-marker stripping; removed a duplicate defaults test.
+- Verified Argon's 4,096-token cache minimum on both Google AI and Vertex; restored its December 1 price doubling,
+  pricing sources and bundled backend provenance. Carbon's Google AI rates matched Google's Carbon page on November 10;
+  that page and the Vertex guide state no Vertex rates, so the guide asks operators to confirm them. The Vertex guide
+  confirms the 4,096-token cache minimum and the 65,536 streaming/32,768 unary limits.
+- After the fixes: `make test-unit` 11,652 passed; `make test-regression` 2,527 passed; full pre-commit on changed files
+  and the Markdown hook subset passed after a runtime-design token-cache refresh. Build and clean-wheel checks were not
+  rerun; the only packaged change is a backend YAML comment.
 - The catalog timeout field is not consumed by current clients. This change preserves existing request/workflow
   deadlines; it does not implement long decode or background execution.

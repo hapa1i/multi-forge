@@ -647,9 +647,10 @@ configured limits. Long decode through continuation is outside Forge's request c
 temperature, top-p, and top-k overrides. Both use implicit caching, without explicit cache creation.
 
 Bundled Google AI deployments use API-key authentication. Remote Vertex deployments require Vertex route identities and
-Google Cloud credentials. Both providers currently document a 4,096-token cache minimum for Carbon; operators must adapt
-the complete deployment metadata to the provider when updating saved configurations. See the
-[model migration guidance](end-user/model_selection.md#gemini-4-carbon) for sources and introductory pricing.
+Google Cloud credentials. Both providers currently document a 4,096-token cache minimum for Carbon and Argon. Operators
+must adapt the complete deployment metadata to the provider and model when updating saved configurations. See the
+[model migration guidance](end-user/model_selection.md#gemini-4-carbon) for sources and introductory pricing, including
+Argon's.
 
 On pinned LiteLLM 1.102, Forge sends native `thinkingConfig` for Carbon and Argon's `gemini/`, `vertex_ai/`, and bare
 routes, for both streaming and unary requests. It replaces generic `reasoning_effort` with the validated `thinkingLevel`

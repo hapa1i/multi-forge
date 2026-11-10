@@ -7,7 +7,7 @@ from fastapi import HTTPException
 
 from forge.core.llm.clients.openai_compat import build_chat_completion_kwargs
 from forge.core.llm.types import Message, ModelHyperparameters, ModelReasoningEffort
-from forge.core.models import get_model_spec, load_model_catalog, resolve_model_id
+from forge.core.models import get_model_spec
 from forge.core.models.model_routes import (
     load_model_route_catalog,
     normalize_model_route_request,
@@ -31,21 +31,6 @@ def test_argon_provider_aliases_share_one_route_identity(alias: str) -> None:
     assert request.route_key == "gemini-4-argon"
     assert request.claude_tier is None
     assert request.transport_1m is False
-
-
-def test_carbon_defaults_preserve_argon_and_explicit_prior_models() -> None:
-    catalog = load_model_catalog()
-
-    assert catalog.defaults["gemini"] == {
-        "haiku": "gemini-3.8-flash",
-        "sonnet": "gemini-4-carbon",
-        "opus": "gemini-4-carbon",
-    }
-    for model in ("gemini-3.1-pro-preview", "gemini-2.5-pro"):
-        for prefix in ("", "google/", "gemini/", "vertex_ai/"):
-            assert resolve_model_id(f"{prefix}{model}") == model
-    assert get_model_spec("gemini-3.1-pro-preview").thinking_levels == ("low", "high")
-    assert get_model_spec("gemini-3.1-pro-preview").default_reasoning_effort == "high"
 
 
 def test_argon_capabilities_exclude_unsupported_sampling_and_thinking_levels() -> None:

@@ -48,7 +48,10 @@ def test_carbon_defaults_preserve_saved_argon_tiers(
 
     assert existing is not None
     assert existing.tiers.sonnet == existing.tiers.opus == f"{prefix}/gemini-4-argon"
-    assert "gemini-4-carbon" not in existing.model_alternatives["sonnet"]
+    for tier in ("sonnet", "opus"):
+        # Saved alternatives load as written; current template alternatives are never merged back in.
+        assert "gemini-4-argon" not in existing.model_alternatives[tier]
+        assert existing.model_alternatives[tier] == saved["model_alternatives"][tier]
     assert existing.tier_overrides.sonnet is not None
     assert existing.tier_overrides.sonnet.reasoning_effort == "low"
     assert path.read_bytes() == before

@@ -413,8 +413,10 @@ adopting Carbon, so requests avoid the adapter's generic reasoning conversion to
   Vertex authentication (ADC or `vertex_credentials`) and configure `vertex_project` and `vertex_location`. Retain the
   complete capability and pricing metadata, changing `model_info.base_model` to `vertex_ai/gemini-4-carbon` and
   `prompt_cache_min_tokens: 4096`. The 65,536 output limit describes streaming; unary requests are limited to 32,768.
-  Forge's gateway connection still uses `LITELLM_BASE_URL` and `LITELLM_API_KEY`; Vertex credentials belong on the
-  server. See [LiteLLM's Vertex configuration](https://docs.litellm.ai/docs/providers/vertex) and Google's
+  Google's Carbon guides do not state Vertex rates, so confirm the copied pricing against Google Cloud's current Agent
+  Platform pricing before relying on Vertex cost reports. Forge's gateway connection still uses `LITELLM_BASE_URL` and
+  `LITELLM_API_KEY`; Vertex credentials belong on the server. See
+  [LiteLLM's Vertex configuration](https://docs.litellm.ai/docs/providers/vertex) and Google's
   [Vertex caching limits](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/context-cache/context-cache-overview).
 
 Carbon workflow requests select the model explicitly: an existing OpenRouter proxy can forward them without changing
@@ -425,9 +427,19 @@ its deployment check.
 
 #### Gemini 4 Argon
 
-Argon remains available through `--model gemini-4-argon` and the `gemini-4-argon` workflow worker. Its existing provider
-routes, thinking levels, and token limits remain supported. Saved Argon proxies and backends keep their configurations;
-use the [Carbon migration](#gemini-4-carbon) above only when adopting the new default.
+Argon remains available through `--model gemini-4-argon` and the `gemini-4-argon` workflow worker. It shares Carbon's
+context, output limits, thinking levels, and sampling restrictions, and uses `google/gemini-4-argon`,
+`gemini/gemini-4-argon`, or `vertex_ai/gemini-4-argon`. Saved Argon proxies and backends keep their configurations; use
+the [Carbon migration](#gemini-4-carbon) above only when adopting the new default.
+
+- **Cache minimum:** both Google AI and remote Vertex Argon deployments use `prompt_cache_min_tokens: 4096`. See
+  Google's
+  [Argon Vertex caching limits](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/4-argon).
+- **Introductory pricing:** the bundled Argon entry uses $2 input, $10 output (including thinking), and $0.10 cached
+  input per million tokens through November 30, 2026. Google AI and Google Cloud double those rates on December 1, so
+  update saved Argon `model_info` rates then. See the
+  [Gemini API pricing schedule](https://ai.google.dev/gemini-api/docs/latest-model#pricing) and
+  [Cloud launch pricing](https://cloud.google.com/blog/products/ai-machine-learning/gemini-4-argon-available-on-google-cloud).
 
 #### Gemini 3.8 Flash
 
