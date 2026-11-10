@@ -1,6 +1,6 @@
 # Gemini 4 Carbon execution
 
-Implementation and verification complete on `feat/gemini-4-carbon`; merge remains pending.
+Shipped on `main` November 10, 2026 via [PR #298](https://github.com/hapa1i/multi-forge/pull/298) (`a8fce9e0`).
 
 ## Implementation
 
@@ -26,7 +26,7 @@ Implementation and verification complete on `feat/gemini-4-carbon`; merge remain
 ## Closeout
 
 - [x] Review the complete diff and synchronize the changelog when implementation is verified.
-- [ ] Merge and record shipped closeout before moving the card to `done/`.
+- [x] Merge, record shipped closeout, and move the card to `done/`.
 
 ## Evidence and limits
 
@@ -66,3 +66,10 @@ Implementation and verification complete on `feat/gemini-4-carbon`; merge remain
   rerun; the only packaged change is a backend YAML comment.
 - The catalog timeout field is not consumed by current clients. This change preserves existing request/workflow
   deadlines; it does not implement long decode or background execution.
+
+### Merge verification
+
+- GitHub [Pre-commit Checks](https://github.com/hapa1i/multi-forge/actions/runs/42881970524) and
+  [Tests](https://github.com/hapa1i/multi-forge/actions/runs/42881970577) passed for the final PR head `ad83623c`.
+- The merged commit `a8fce9e0` has the same tree as that verified head. Local `main` was fast-forwarded to the merge
+  before recording closeout.

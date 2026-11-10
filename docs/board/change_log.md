@@ -23,8 +23,9 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 **Verification**: 11,652 unit tests, 2,527 regressions, and 54 distinct targeted integration cases passed, including two
 live OpenRouter tool round trips and two short native Google AI Carbon requests. Full pre-commit, wheel/sdist build,
 clean-wheel runtime smoke with verified teardown, and installed-wheel checks also passed. The
-[active checklist](doing/gemini_4_carbon/checklist.md) records the review follow-up, earlier failures and remaining
-native-provider limits. Merge and shipped closeout are pending.
+[completed checklist](done/gemini_4_carbon/checklist.md) records the review follow-up, earlier failures and remaining
+native-provider limits. Merged via [PR #298](https://github.com/hapa1i/multi-forge/pull/298) (`a8fce9e0`); GitHub Tests
+and Pre-commit Checks passed.
 
 ### Patch OAuthLib and pyasn1 security advisories
 

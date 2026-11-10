@@ -2,6 +2,8 @@
 
 User-authorized November 10, 2026. Branch: `feat/gemini-4-carbon`, based on `main` at `457c9a59`.
 
+Shipped November 10, 2026 via [PR #298](https://github.com/hapa1i/multi-forge/pull/298) (`a8fce9e0`).
+
 Add Gemini 4 Carbon across the intrinsic catalog, provider routes, Gemini templates, local LiteLLM deployments, and
 workflow selection. Make Carbon the Gemini Sonnet/Opus default and generic Gemini worker target. Keep Flash at Haiku and
 preserve explicit Argon/older Pro selections and saved user-owned proxy/backend configurations.
