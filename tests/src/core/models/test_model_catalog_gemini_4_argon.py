@@ -33,13 +33,13 @@ def test_argon_provider_aliases_share_one_route_identity(alias: str) -> None:
     assert request.transport_1m is False
 
 
-def test_argon_replaces_pro_defaults_without_changing_explicit_prior_models() -> None:
+def test_carbon_defaults_preserve_argon_and_explicit_prior_models() -> None:
     catalog = load_model_catalog()
 
     assert catalog.defaults["gemini"] == {
         "haiku": "gemini-3.8-flash",
-        "sonnet": "gemini-4-argon",
-        "opus": "gemini-4-argon",
+        "sonnet": "gemini-4-carbon",
+        "opus": "gemini-4-carbon",
     }
     for model in ("gemini-3.1-pro-preview", "gemini-2.5-pro"):
         for prefix in ("", "google/", "gemini/", "vertex_ai/"):

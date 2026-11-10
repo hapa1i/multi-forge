@@ -11,6 +11,20 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 
 ## 2026-11-10
 
+### Adopt Gemini 4 Carbon defaults
+
+**Goal**: Support Carbon across Gemini routes and make it the Gemini Sonnet/Opus and workflow default.
+
+- Add provider aliases, routes, complete local LiteLLM metadata, and native thinking/unary-limit handling. Retain Flash
+  at Haiku, explicit Argon/older Pro selections, and user-owned proxy/backend snapshots.
+- Document request limits, introductory pricing, and saved-configuration migration; update packaged QA expectations.
+
+**Verification**: 11,651 unit tests, 2,524 regressions, 43 distinct targeted integration cases including two live
+OpenRouter tool round trips, full pre-commit, wheel/sdist build, clean-wheel runtime smoke with verified teardown, and
+installed-wheel catalog/template/workflow checks passed. The [active checklist](doing/gemini_4_carbon/checklist.md)
+records earlier fixture/cache failures and the native-provider verification boundary. Merge and shipped closeout are
+pending.
+
 ### Patch OAuthLib and pyasn1 security advisories
 
 **Goal**: Resolve Dependabot alerts 63-68 while preserving runtime and optional-tooling dependency ownership.

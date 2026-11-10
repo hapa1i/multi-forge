@@ -346,10 +346,10 @@ deployment. Apply these changes with the
 [saved-proxy/backend upgrade procedure](proxy.md#updating-saved-proxy-and-backend-configurations), which covers editing,
 recreation and restart order.
 
-LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Argon, GPT-6.1 Sol, GPT-6 Sol/Luna, and Claude 5.5 require
-the bundled routes' `model_info` blocks for offline capability and cost support. The GPT-6 entries cover cache tokens
-and the above-272K input premium. For remote LiteLLM, its operator must install compatible deployments using that
-server's upstream providers and credentials; the [Gemini Vertex deployment](#gemini-4-argon) differs from the bundled
+LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Carbon, Argon, GPT-6.1 Sol, GPT-6 Sol/Luna, and Claude 5.5
+require the bundled routes' `model_info` blocks for offline capability and cost support. The GPT-6 entries cover cache
+tokens and the above-272K input premium. For remote LiteLLM, its operator must install compatible deployments using that
+server's upstream providers and credentials; the [Gemini Vertex deployment](#gemini-4-carbon) differs from the bundled
 Google AI deployment.
 
 For workflow worker selection and readiness, see [workflow.md](workflow.md#quick-start). Existing OpenRouter proxies can
@@ -369,56 +369,65 @@ New proxies created from the current built-in templates use these defaults:
 | `openrouter-qwen`                                   | haiku/sonnet -> Qwen3.8 27B, opus -> Qwen3.8 Max            |
 | `openrouter-glm`                                    | sonnet/opus -> GLM 5.3                                      |
 | `openrouter-gemini-flash`                           | all tiers -> Gemini 3.8 Flash                               |
-| `openrouter-gemini`                                 | haiku -> Gemini 3.8 Flash, sonnet/opus -> Gemini 4 Argon    |
-| `litellm-gemini`, `litellm-gemini-local`            | haiku -> Gemini 3.8 Flash, sonnet/opus -> Gemini 4 Argon    |
+| `openrouter-gemini`                                 | haiku -> Gemini 3.8 Flash, sonnet/opus -> Gemini 4 Carbon   |
+| `litellm-gemini`, `litellm-gemini-local`            | haiku -> Gemini 3.8 Flash, sonnet/opus -> Gemini 4 Carbon   |
 | `litellm-gemini-flash-local`                        | all tiers -> Gemini 3.8 Flash                               |
 
-#### Gemini 4 Argon
+#### Gemini 4 Carbon
 
-Gemini 4 Argon replaces the older Gemini Pro models as the Sonnet/Opus default. Select it explicitly with
-`--model gemini-4-argon`; prior Pro models, including `gemini-3.1-pro-preview`, remain explicit selections. Argon has a
-unified 1,048,576-token context shared by input, thinking, and output. Forge uses its 65,536-token synchronous output
-limit on Google AI. Vertex allows 65,536 output tokens per streaming request and 32,768 per unary request. Choose `low`,
+Gemini 4 Carbon replaces Argon as the Sonnet/Opus default. Select it explicitly with `--model gemini-4-carbon`; Argon
+and prior Pro models, including `gemini-3.1-pro-preview`, remain explicit selections. Carbon has a unified
+1,048,576-token context shared by input, thinking, and output. Forge uses its 65,536-token synchronous output limit on
+Google AI. Vertex allows 65,536 output tokens per streaming request and 32,768 per unary request. Choose `low`,
 `medium`, or `high` reasoning (`medium` is the model default); `temperature`, `top_p`, and `top_k` are ignored by Google
-and are not supported Forge overrides. Argon supports implicit caching but not explicit context caches. See Google's
-[model reference](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon) and
-[Vertex guide](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-argon).
+and are not supported Forge overrides. Carbon supports implicit caching but not explicit context caches. See Google's
+[model reference](https://ai.google.dev/gemini-api/docs/models/gemini-4-carbon) and
+[Vertex guide](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-carbon).
+
+Carbon can spend more tokens and time thinking than Argon. Existing request and workflow deadlines still apply; select
+`low` reasoning for shorter turns when appropriate. Sonnet retains `medium` effort and Opus retains `high`. Outputs
+beyond the ordinary limits require Google's continuation/background APIs, which Forge does not implement.
 
 Forge preserves output cutoffs, including partial tool calls; see the
 [translated response contract](proxy.md#translated-response-limits-and-history).
 
-The bundled LiteLLM entry uses Google's introductory Argon prices through November 30, 2026: $2 input, $10 output
+The bundled LiteLLM entry uses Google's introductory Carbon prices through November 30, 2026: $2 input, $10 output
 (including thinking), and $0.10 cached input per million tokens. Google doubles those rates on December 1. Saved backend
 configs retain their pricing metadata, so update the `model_info` rates explicitly when the promotion ends to keep cost
-reporting accurate. Google Cloud has the same introductory rates. See Google's
-[Gemini API pricing schedule](https://ai.google.dev/gemini-api/docs/latest-model#pricing) and
-[Cloud launch pricing](https://cloud.google.com/blog/products/ai-machine-learning/gemini-4-argon-available-on-google-cloud).
+reporting accurate. See Google's
+[Carbon migration and pricing schedule](https://aistudio.google.com/docs/whats-new-gemini-4-carbon#pricing).
 
-To adopt Argon, follow the
+To adopt Carbon, follow the
 [saved-configuration upgrade procedure](proxy.md#updating-saved-proxy-and-backend-configurations) with these Sonnet/Opus
-tier models: `google/gemini-4-argon` for OpenRouter, `gemini/gemini-4-argon` for local LiteLLM, or
-`vertex_ai/gemini-4-argon` for remote LiteLLM. Remove sampling overrides from those tiers and retain older models under
+tier models: `google/gemini-4-carbon` for OpenRouter, `gemini/gemini-4-carbon` for local LiteLLM, or
+`vertex_ai/gemini-4-carbon` for remote LiteLLM. Remove sampling overrides from those tiers and retain older models under
 `model_alternatives` if you need explicit selections. LiteLLM also needs the corresponding deployment in its saved
-backend config. Current Forge supports Argon on pinned LiteLLM 1.102 by sending native `thinkingConfig` with the
+backend config. Current Forge supports Carbon on pinned LiteLLM 1.102 by sending native `thinkingConfig` with the
 selected thinking level; no LiteLLM upgrade is required. Update Forge as well as the saved deployment metadata when
-adopting Argon, so requests avoid the adapter's generic reasoning conversion to an unsupported `thinkingBudget`.
+adopting Carbon, so requests avoid the adapter's generic reasoning conversion to an unsupported `thinkingBudget`.
 
-- **Local Google AI:** copy the complete bundled `gemini/gemini-4-argon` deployment into the saved backend config,
+- **Local Google AI:** copy the complete bundled `gemini/gemini-4-carbon` deployment into the saved backend config,
   including `model_info`. It uses `GEMINI_API_KEY` and `prompt_cache_min_tokens: 4096`.
 - **Remote Vertex:** the server operator must configure a Vertex deployment. Set both `model_name` and
-  `litellm_params.model` to `vertex_ai/gemini-4-argon`. Replace the bundled Google AI `api_key` with the server's Vertex
-  authentication (ADC or `vertex_credentials`) and configure `vertex_project` and `vertex_location`. Retain the complete
-  capability and pricing metadata, changing `model_info.base_model` to `vertex_ai/gemini-4-argon` and
-  `prompt_cache_min_tokens` to `6144`. The 65,536 output limit describes streaming; unary requests are limited to
-  32,768. Forge's gateway connection still uses `LITELLM_BASE_URL` and `LITELLM_API_KEY`; Vertex credentials belong on
-  the server. See [LiteLLM's Vertex configuration](https://docs.litellm.ai/docs/providers/vertex) and Google's
-  [Vertex caching limits](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/4-argon).
+  `litellm_params.model` to `vertex_ai/gemini-4-carbon`. Replace the bundled Google AI `api_key` with the server's
+  Vertex authentication (ADC or `vertex_credentials`) and configure `vertex_project` and `vertex_location`. Retain the
+  complete capability and pricing metadata, changing `model_info.base_model` to `vertex_ai/gemini-4-carbon` and
+  `prompt_cache_min_tokens: 4096`. The 65,536 output limit describes streaming; unary requests are limited to 32,768.
+  Forge's gateway connection still uses `LITELLM_BASE_URL` and `LITELLM_API_KEY`; Vertex credentials belong on the
+  server. See [LiteLLM's Vertex configuration](https://docs.litellm.ai/docs/providers/vertex) and Google's
+  [Vertex caching limits](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/context-cache/context-cache-overview).
 
-Argon workflow requests select the model explicitly: an existing OpenRouter proxy can forward them without changing tier
-defaults, and a saved LiteLLM proxy can keep its older tiers once its restarted backend serves Argon. A backend snapshot
-without Argon fails workflow preflight with migration guidance instead of falling back to an older Pro model. See
-[workflow readiness](workflow.md#quick-start) for `forge workflow list-models --available --json` and the limits of its
-deployment check.
+Carbon workflow requests select the model explicitly: an existing OpenRouter proxy can forward them without changing
+tier defaults, and a saved LiteLLM proxy can keep its older tiers once its restarted backend serves Carbon. A backend
+snapshot without Carbon fails workflow preflight with migration guidance instead of falling back to an older Pro model.
+See [workflow readiness](workflow.md#quick-start) for `forge workflow list-models --available --json` and the limits of
+its deployment check.
+
+#### Gemini 4 Argon
+
+Argon remains available through `--model gemini-4-argon` and the `gemini-4-argon` workflow worker. Its existing provider
+routes, thinking levels, and token limits remain supported. Saved Argon proxies and backends keep their configurations;
+use the [Carbon migration](#gemini-4-carbon) above only when adopting the new default.
 
 #### Gemini 3.8 Flash
 

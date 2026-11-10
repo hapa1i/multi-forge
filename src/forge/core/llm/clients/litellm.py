@@ -399,8 +399,15 @@ class LiteLLMClient:
         effort_wire = "reasoning_effort"
         effort_dropped = False
 
-        if self._model in ("gemini/gemini-4-argon", "vertex_ai/gemini-4-argon", "gemini-4-argon"):
-            # LiteLLM 1.102 maps Argon's generic effort to unsupported token budgets.
+        if self._model in (
+            "gemini/gemini-4-argon",
+            "vertex_ai/gemini-4-argon",
+            "gemini-4-argon",
+            "gemini/gemini-4-carbon",
+            "vertex_ai/gemini-4-carbon",
+            "gemini-4-carbon",
+        ):
+            # LiteLLM 1.102 maps Gemini 4 generic effort to unsupported token budgets.
             # Its native provider parameter preserves all three thinking levels.
             extra_body = dict(kwargs.get("extra_body") or {})
             effort = extra_body.pop("reasoning_effort", kwargs.pop("reasoning_effort", None))
@@ -539,9 +546,9 @@ class LiteLLMClient:
             )
 
         kwargs, effort = self._build_request_kwargs(messages, tools, merged_params)
-        if self._model == "vertex_ai/gemini-4-argon":
+        if self._model in ("vertex_ai/gemini-4-argon", "vertex_ai/gemini-4-carbon"):
             # Vertex generateContent allows 32K per hop; the catalog's 64K limit
-            # applies to streamGenerateContent and the other Argon providers.
+            # applies to streamGenerateContent and the Google AI routes.
             extra_body = kwargs.get("extra_body")
             if isinstance(extra_body, dict):
                 kwargs["extra_body"] = extra_body.copy()

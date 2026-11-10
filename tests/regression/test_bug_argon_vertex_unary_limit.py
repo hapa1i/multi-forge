@@ -18,15 +18,20 @@ from forge.proxy.client_factory import ModelProvider, TierClientFactory
 
 pytestmark = [pytest.mark.regression, pytest.mark.asyncio]
 
-VERTEX_MODEL = "vertex_ai/gemini-4-argon"
+
+@pytest.fixture(params=["vertex_ai/gemini-4-argon", "vertex_ai/gemini-4-carbon"])
+def vertex_model(request: pytest.FixtureRequest) -> str:
+    return request.param
 
 
 @pytest.mark.parametrize("provider", ["litellm_remote", "litellm_local"])
 @pytest.mark.parametrize("requested", [None, 65_536, 8_192])
-async def test_vertex_unary_caps_default_and_explicit_limits(provider: ProviderType, requested: int | None) -> None:
-    defaults = TierClientFactory()._resolve_tier_hyperparams(ModelProvider.LITELLM, "sonnet", VERTEX_MODEL)
+async def test_vertex_unary_caps_default_and_explicit_limits(
+    provider: ProviderType, requested: int | None, vertex_model: str
+) -> None:
+    defaults = TierClientFactory()._resolve_tier_hyperparams(ModelProvider.LITELLM, "sonnet", vertex_model)
     assert defaults.max_tokens == 65_536
-    client = get_client(VERTEX_MODEL, provider=provider, default_hyperparams=defaults)
+    client = get_client(vertex_model, provider=provider, default_hyperparams=defaults)
     assert isinstance(client, LiteLLMClient)
     params = ModelHyperparameters(max_tokens=requested) if requested is not None else None
     requests: list[dict[str, Any]] = []
@@ -39,17 +44,19 @@ async def test_vertex_unary_caps_default_and_explicit_limits(provider: ProviderT
     assert len(requests) == 1
     assert requests[0]["max_tokens"] == min(requested or defaults.max_tokens, 32_768)
     assert not requests[0].get("stream", False)
-    assert defaults.max_tokens == get_max_output_tokens(VERTEX_MODEL) == 65_536
+    assert defaults.max_tokens == get_max_output_tokens(vertex_model) == 65_536
     if params is not None:
         assert params.max_tokens == requested
 
 
 @pytest.mark.parametrize("provider", ["litellm_remote", "litellm_local"])
 @pytest.mark.parametrize("requested", [None, 65_536])
-async def test_translated_proxy_uses_vertex_unary_cap(provider: AdapterProviderType, requested: int | None) -> None:
-    defaults = TierClientFactory()._resolve_tier_hyperparams(ModelProvider.LITELLM, "sonnet", VERTEX_MODEL)
+async def test_translated_proxy_uses_vertex_unary_cap(
+    provider: AdapterProviderType, requested: int | None, vertex_model: str
+) -> None:
+    defaults = TierClientFactory()._resolve_tier_hyperparams(ModelProvider.LITELLM, "sonnet", vertex_model)
     adapter = CoreLLMClientAdapter(
-        VERTEX_MODEL,
+        vertex_model,
         provider,
         max_tokens_override=defaults.max_tokens,
         default_hyperparams=defaults,
@@ -66,16 +73,17 @@ async def test_translated_proxy_uses_vertex_unary_cap(provider: AdapterProviderT
 
     assert response["choices"][0]["message"]["content"] == "hello"
     assert len(requests) == 1
-    assert requests[0]["model"] == VERTEX_MODEL
+    assert requests[0]["model"] == vertex_model
     assert requests[0]["max_tokens"] == 32_768
 
 
 @pytest.mark.parametrize("provider", ["litellm_remote", "litellm_local"])
 async def test_vertex_streaming_keeps_full_catalog_limit(
     provider: ProviderType,
+    vertex_model: str,
 ) -> None:
     client = get_client(
-        VERTEX_MODEL,
+        vertex_model,
         provider=provider,
         default_hyperparams=ModelHyperparameters(max_tokens=65_536),
     )
@@ -129,13 +137,15 @@ async def test_other_routes_keep_their_unary_limit(model: str, provider: Provide
         ("maxOutputTokens", True),
     ],
 )
-async def test_vertex_unary_caps_provider_extras_without_mutating_them(token_field: str, nested: bool) -> None:
+async def test_vertex_unary_caps_provider_extras_without_mutating_them(
+    token_field: str, nested: bool, vertex_model: str
+) -> None:
     extra: dict[str, Any] = {token_field: 65_536}
     if nested:
         extra = {"extra_body": extra}
     params = ModelHyperparameters(max_tokens=8_192, extra={"openai": extra})
     original = params.model_dump()
-    client = LiteLLMClient(VERTEX_MODEL, provider="litellm_remote")
+    client = LiteLLMClient(vertex_model, provider="litellm_remote")
     requests: list[dict[str, Any]] = []
 
     async with _recording_sdk(requests) as sdk:

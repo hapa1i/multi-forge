@@ -188,10 +188,11 @@ class TestDefaultModels:
         routes = derive_model_routes(DEFAULT_MODELS[GEMINI_DEFAULT])
         assert preferred_proxy_for_routes(routes) == "openrouter-gemini"
 
-    def test_argon_is_default_and_prior_gemini_compact_alias_is_retained(self):
-        assert GEMINI_DEFAULT == "gemini-4-argon"
+    def test_carbon_is_default_and_prior_gemini_workers_are_retained(self):
+        assert GEMINI_DEFAULT == "gemini-4-carbon"
         assert MODEL_ALIASES["gemini-3.1-pro"] == "gemini-3.1-pro-preview"
 
+        assert resolve_model_specs("gemini-4-carbon")[0].name == GEMINI_DEFAULT
         specs = resolve_model_specs("gemini-4-argon,gemini-3.1-pro")
 
         assert [s.name for s in specs] == ["gemini-4-argon", "gemini-3.1-pro-preview"]
