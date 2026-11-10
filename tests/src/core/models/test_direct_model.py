@@ -45,24 +45,25 @@ def test_preserves_explicit_previous_opus_pin() -> None:
     assert pin.tier == "opus"
 
 
-def test_resolves_fable_5_1_to_opus_tier_pin() -> None:
+@pytest.mark.parametrize("model", ["claude-fable-5-2", "claude-fable-5-1", "claude-fable-5"])
+def test_resolves_fable_to_opus_tier_pin(model: str) -> None:
     # Fable has no tier word of its own; it rides the opus tier so Claude Code
     # pins ANTHROPIC_DEFAULT_OPUS_MODEL and the proxy routes it as opus.
-    pin = resolve_direct_model_pin("claude-fable-5-1")
+    pin = resolve_direct_model_pin(model)
 
-    assert pin.canonical_model == "claude-fable-5-1"
-    assert pin.env_model == "claude-fable-5-1"
+    assert pin.canonical_model == model
+    assert pin.env_model == model
     assert pin.tier == "opus"
     assert pin.env() == {
         "ANTHROPIC_MODEL": "opus",
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-fable-5-1",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": model,
     }
 
 
 def test_resolves_fable_alias_to_opus_tier_pin() -> None:
     pin = resolve_direct_model_pin("fable")
 
-    assert pin.canonical_model == "claude-fable-5-1"
+    assert pin.canonical_model == "claude-fable-5-2"
     assert pin.tier == "opus"
 
 

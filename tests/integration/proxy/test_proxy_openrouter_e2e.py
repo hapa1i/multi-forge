@@ -42,6 +42,7 @@ class TestProxyWithOpenRouter:
         assert data["provider"] == "openrouter"
         assert data["runtime"]["tier_mappings"]["haiku"] == "anthropic/claude-haiku-4.5"
         assert data["runtime"]["configured_tier_mappings"] == data["runtime"]["tier_mappings"]
+        assert data["runtime"]["model_alternatives"]["opus"]["claude-fable-5-2"] == "anthropic/claude-opus-5.5"
         assert data["runtime"]["model_alternatives"]["opus"]["claude-fable-5-1"] == "anthropic/claude-opus-5.5"
         assert data["runtime"]["data_policy"] == {"zdr": "required", "zdr_fallbacks": {}}
         assert data["runtime"]["llm_defaults_by_tier"]["haiku"]["extra"] == {

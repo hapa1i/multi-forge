@@ -217,8 +217,8 @@ Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`
 `claude-sonnet` worker resolves to Sonnet 5.5; `claude-sonnet-5` retains the prior version. The default `claude-opus`
 worker resolves to Opus 5.5; use `--models claude-opus-4.6,claude-opus-4.8` when you want both Opus 4.6 and the
 bounded-review Opus 4.8 worker in the panel, or add `claude-fable` for the top-tier model. The stable `claude-fable`
-worker resolves to Fable 5.1; the prior Fable 5 remains selectable as a session model with `--model claude-fable-5` but
-is not a separate workflow worker.
+worker resolves to Fable 5.2; Fable 5.1 and 5 remain selectable as session models with `--model claude-fable-5-1` and
+`--model claude-fable-5`, respectively. They do not have separate named workflow workers.
 
 `gpt-6.1-sol` is an explicit OpenAI worker, for example `forge workflow panel -p "Review these changes" -m gpt-6.1-sol`.
 GPT-6 Astra remains the default; `gpt-6-sol` keeps the prior Sol version. Existing OpenRouter proxies can serve the new

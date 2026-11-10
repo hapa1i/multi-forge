@@ -231,13 +231,14 @@ Forge checks the bundled OpenRouter routes against OpenRouter's
 [ZDR endpoint catalog](https://openrouter.ai/api/v1/endpoints/zdr). The September 2026 refresh confirmed eligible
 endpoints for Opus 5.5, Gemini 3.8 Flash, and the added DeepSeek and GLM models.
 
-Fable 5 had no eligible endpoint in the 2026-08-21 audit, nor Fable 5.1 in the 2026-09-02 check. The 2026-09-23 audit
-also found no ZDR endpoint for Qwen3.8 Flash or Max 0902. Fable and the listed Qwen routes use these required-ZDR
-fallbacks:
+Fable 5 had no eligible endpoint in the 2026-08-21 audit, nor Fable 5.1 in the 2026-09-02 check. The 2026-11-10 check
+found no Fable 5.2 ZDR endpoint and confirmed Opus 5.5 endpoints. The 2026-09-23 audit also found no ZDR endpoint for
+Qwen3.8 Flash or Max 0902. Fable and the listed Qwen routes use these required-ZDR fallbacks:
 
 ```yaml
 allow_non_zdr: false
 zdr_fallbacks:
+  anthropic/claude-fable-5.2: anthropic/claude-opus-5.5
   anthropic/claude-fable-5.1: anthropic/claude-opus-5.5
   anthropic/claude-fable-5: anthropic/claude-opus-5.5
   qwen/qwen3.6-flash: qwen/qwen3.8-27b

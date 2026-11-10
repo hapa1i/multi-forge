@@ -24,6 +24,7 @@ def _body(model: str) -> dict[str, object]:
     ("model", "floor"),
     [
         ("claude-opus-4-8[1m]", "high"),
+        ("anthropic/claude-fable-5.2[1m]", "max"),
         ("anthropic/claude-fable-5.1[1m]", "max"),
     ],
 )

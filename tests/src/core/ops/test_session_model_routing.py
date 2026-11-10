@@ -241,30 +241,32 @@ class TestSessionModelRoutePlanning:
                 candidate_inspector=unexpected_candidate,
             )
 
-    def test_repointed_fable_alias_fails_cleanly_on_an_old_proxy_snapshot(self) -> None:
+    @pytest.mark.parametrize("prior_model", ["claude-fable-5", "claude-fable-5-1"])
+    def test_repointed_fable_alias_fails_cleanly_on_an_old_proxy_snapshot(self, prior_model: str) -> None:
+        provider_model = f"anthropic/{prior_model.replace('5-1', '5.1')}"
         existing = _proxy_snapshot(
             template="openrouter-anthropic",
             proxy_id="old-anthropic",
             tiers={"opus": "anthropic/claude-opus-5"},
-            alternatives={"opus": {"claude-fable-5": "anthropic/claude-fable-5"}},
+            alternatives={"opus": {prior_model: provider_model}},
         )
 
         with pytest.raises(
             SessionModelRoutingError,
             match=(
                 r"persisted proxy instance 'old-anthropic' \(template 'openrouter-anthropic'\) "
-                r"does not serve model 'claude-fable-5-1'.+--proxy.+--no-proxy"
+                r"does not serve model 'claude-fable-5-2'.+--proxy.+--no-proxy"
             ),
         ):
             plan_session_model_route("fable", existing_kind="proxy", existing_proxy=existing)
 
         direct = plan_session_model_route("fable", no_proxy=True)
         assert direct.kind == "direct"
-        assert direct.selected_model == "claude-fable-5-1"
+        assert direct.selected_model == "claude-fable-5-2"
 
-        prior = plan_session_model_route("claude-fable-5", existing_kind="proxy", existing_proxy=existing)
+        prior = plan_session_model_route(prior_model, existing_kind="proxy", existing_proxy=existing)
         assert prior.proxy is existing
-        assert prior.selected_model == "anthropic/claude-fable-5"
+        assert prior.selected_model == provider_model
 
     @pytest.mark.parametrize(
         "model_id",

@@ -34,6 +34,7 @@ _PROXY_ID = "test-passthrough"
 # Models that are NOT the tier default and NOT in model_alternatives, yet must
 # stay pinnable on passthrough because the model is forwarded unchanged.
 _NON_DEFAULT_PINS = {
+    "claude-fable-5-2": ("opus", "claude-fable-5-2"),
     "claude-fable-5-1": ("opus", "claude-fable-5-1"),
     "claude-fable-5": ("opus", "claude-fable-5"),
     "claude-opus-4-8": ("opus", "claude-opus-4-8"),

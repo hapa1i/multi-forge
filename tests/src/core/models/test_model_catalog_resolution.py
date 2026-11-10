@@ -148,20 +148,25 @@ class TestClaudeFableFamily:
     def test_fable_versions_are_canonical(self):
         catalog = load_model_catalog()
 
-        for model_id in ("claude-fable-5-1", "claude-fable-5"):
+        for model_id in ("claude-fable-5-2", "claude-fable-5-1", "claude-fable-5"):
             assert model_id in catalog.models
             assert model_id not in catalog.aliases
 
     @pytest.mark.parametrize(
         ("alias", "canonical"),
         [
+            ("anthropic/claude-fable-5-2", "claude-fable-5-2"),
+            ("anthropic/claude-fable-5.2", "claude-fable-5-2"),
+            ("claude-fable-5.2", "claude-fable-5-2"),
+            ("fable-5-2", "claude-fable-5-2"),
+            ("fable-5.2", "claude-fable-5-2"),
             ("anthropic/claude-fable-5-1", "claude-fable-5-1"),
             ("anthropic/claude-fable-5.1", "claude-fable-5-1"),
             ("claude-fable-5.1", "claude-fable-5-1"),
             ("fable-5-1", "claude-fable-5-1"),
             ("fable-5.1", "claude-fable-5-1"),
-            ("claude-fable", "claude-fable-5-1"),
-            ("fable", "claude-fable-5-1"),
+            ("claude-fable", "claude-fable-5-2"),
+            ("fable", "claude-fable-5-2"),
             ("anthropic/claude-fable-5", "claude-fable-5"),
             ("fable-5", "claude-fable-5"),
         ],
@@ -169,7 +174,7 @@ class TestClaudeFableFamily:
     def test_aliases_resolve_to_the_expected_fable_version(self, alias, canonical):
         assert resolve_model_id(alias) == canonical
 
-    @pytest.mark.parametrize("model_id", ["claude-fable-5-1", "claude-fable-5"])
+    @pytest.mark.parametrize("model_id", ["claude-fable-5-2", "claude-fable-5-1", "claude-fable-5"])
     def test_fable_intrinsic_properties(self, model_id):
         spec = get_model_spec(model_id)
 
@@ -180,11 +185,20 @@ class TestClaudeFableFamily:
         assert spec.supports_sampling_overrides is False
         assert spec.native_thinking_param == "output_config.effort"
 
-    def test_fable_5_1_supports_every_documented_effort_level(self):
-        spec = get_model_spec("claude-fable-5-1")
+    @pytest.mark.parametrize("model_id", ["claude-fable-5-2", "claude-fable-5-1"])
+    def test_fable_supports_every_documented_effort_level(self, model_id):
+        spec = get_model_spec(model_id)
 
         assert spec.litellm_reasoning_efforts == ("low", "medium", "high", "xhigh", "max")
         assert spec.default_reasoning_effort == "high"
+
+    def test_fable_5_2_request_capabilities(self):
+        spec = get_model_spec("claude-fable-5-2")
+
+        assert spec.thinking_modes == ("adaptive",)
+        assert spec.supports_forced_tool_choice is False
+        assert spec.supports_images is True
+        assert spec.prompt_cache_mechanism == "cache_control"
 
 
 class TestClaudeOpus5:

@@ -228,7 +228,7 @@ class TestDefaultModels:
         spec = AVAILABLE_MODELS["claude-fable"]
         assert spec.family == "anthropic"
         assert [(route.provider, route.model_ref) for route in derive_model_routes(spec)] == [
-            ("direct", "claude-fable-5-1")
+            ("direct", "claude-fable-5-2")
         ]
 
 

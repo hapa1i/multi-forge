@@ -464,6 +464,7 @@ The bundled `openrouter-anthropic` template exposes these alternatives alongside
 ```yaml
 model_alternatives:
   opus:
+    claude-fable-5-2: anthropic/claude-fable-5.2
     claude-fable-5-1: anthropic/claude-fable-5.1
     claude-fable-5: anthropic/claude-fable-5
     claude-opus-5: anthropic/claude-opus-5
@@ -479,26 +480,45 @@ prefixed with `anthropic/` on LiteLLM routes. Use the
 [saved-configuration upgrade procedure](proxy.md#updating-saved-proxy-and-backend-configurations) to add these mappings
 to an existing proxy.
 
-`--model claude-fable` and `--model fable` select Fable 5.1, the current family default. Use `--model claude-fable-5` to
-retain the prior version explicitly:
+`--model claude-fable` and `--model fable` select Fable 5.2. The default Claude Opus model remains Opus 5.5. Use
+`--model claude-fable-5-1` or `--model claude-fable-5` to retain an earlier Fable version explicitly:
 
 ```bash
 forge session start fable-review --proxy openrouter-anthropic --model claude-fable
 ```
 
-On OpenRouter routes, Forge uses its required-ZDR fallback for both Fable versions by default. Check the
+On OpenRouter routes, Forge uses its required-ZDR fallback for all three Fable versions by default. Check the
 [ZDR policy](proxy.md#openrouter-zero-data-retention-zdr) for dated endpoint evidence, the effective model and the
 explicit opt-out needed to use Fable itself.
 
-An existing proxy is a user-owned snapshot. If it predates the 5.1 alternative, `--model fable` fails and names that
+An existing proxy is a user-owned snapshot. If it predates the 5.2 alternative, `--model fable` fails and names that
 proxy instead of silently changing to direct Anthropic. Update or recreate the proxy, select a compatible proxy with
-`--proxy`, or explicitly cross the boundary with `--no-proxy`.
+`--proxy`, or explicitly cross the boundary with `--no-proxy`. Existing LiteLLM backends also need the complete packaged
+`anthropic/claude-fable-5-2` deployment, including its `model_info` capabilities and pricing, followed by a backend
+restart. Follow the [saved-configuration procedure](proxy.md#updating-saved-proxy-and-backend-configurations).
 
-Anthropic's direct API requires 30-day retention for Fable 5 and 5.1 unless Anthropic expressly authorizes ZDR. The 5.1
-[migration contract](https://platform.claude.com/docs/en/models/fable-5-1/migration-guide) accepts only `auto` or `none`
-tool choice, and an older Claude model drops Fable 5.1 thinking blocks it cannot read and replans after a route switch.
-Use a fresh transfer (`forge session resume <name> --fresh --model <older-model>`) when you want that switch to start
-from an explicit summary boundary rather than native history.
+Fable 5.2 has a 1M context, 128K maximum output, and always-on adaptive thinking with `high` default effort. All five
+effort levels are supported; omit sampling overrides and use `auto` or `none` tool choice. The
+[migration contract](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide) confirms Fable 5.1 has the
+same tool-choice restriction, and translated routes reject forced choices for both versions with HTTP 400. Fable 5.2's
+standard prices are $8/$40 per million input/output tokens, with $0.20 cache reads; US-only inference
+(`inference_geo: "us"`) costs 1.1x. See the
+[provider specifications](https://platform.claude.com/docs/en/models/fable-5-2/overview) and
+[data-residency pricing](https://platform.claude.com/docs/en/about-claude/pricing#data-residency-pricing).
+
+Direct callers of the packaged LiteLLM backend must enforce this tool-choice restriction themselves. With only its
+packaged metadata, LiteLLM 1.102.2 retains `supports_forced_tool_use: false` on the deployment but omits it from the
+shared metadata used by its Anthropic adapter. It therefore forwards `required` and named choices for Fable 5.2, even
+with `drop_params: true`, leaving the provider to reject them. Downloaded metadata may change this behavior;
+`model_info` alone does not enforce it. Forge's translated proxy rejects those choices before reaching LiteLLM.
+
+Anthropic's direct API requires 30-day retention for Fable 5, 5.1, and 5.2 unless Anthropic expressly authorizes ZDR.
+The [5.2 migration contract](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide) enforces preserved
+thinking's prefix check on every account: changing earlier system instructions, tools, or messages can invalidate signed
+blocks. Native passthrough preserves signed history; translated routes do not provide that continuity. Older Claude
+models, including Fable 5.1, drop 5.2 thinking blocks they cannot read and replan after a route switch. Use a fresh
+transfer (`forge session resume <name> --fresh --model <older-model>`) when you want that switch to start from an
+explicit summary boundary rather than native history.
 
 #### OpenRouter family alternatives
 
