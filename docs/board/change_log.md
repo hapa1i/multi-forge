@@ -9,6 +9,21 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-11-10
+
+### Add Claude Fable 5.2
+
+**Goal**: Make Fable 5.2 the stable Fable selection while retaining Claude defaults and explicit older Fable pins.
+
+- Add direct and proxy routes, offline LiteLLM capability/pricing metadata, and saved-configuration guidance.
+- Preserve required-ZDR fallback and signed passthrough history; reject forced tool choices for Fable 5.1 and 5.2 before
+  translated dispatch and document the direct-LiteLLM limitation.
+
+**Verification**: [PR #296](https://github.com/hapa1i/multi-forge/pull/296) merged as `bdd963b0`, with a tree identical
+to verified head `e79d805c`. Checks passed 11,624 unit tests, 2,470 regressions, 18 targeted integrations, full
+pre-commit, build, and clean-wheel runtime smoke. The 13-case Fable proxy gate also passed after review fixes; native
+provider inference remains unverified. The [checklist](done/claude_fable_5_2/checklist.md) retains evidence and limits.
+
 ## 2026-11-02
 
 ### Attribute sessions to live proxies on shared ports

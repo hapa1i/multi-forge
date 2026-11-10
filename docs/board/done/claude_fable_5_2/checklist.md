@@ -4,8 +4,8 @@
 
 ## Current focus
 
-Implementation and verification complete; ready for review. Stable Fable selections use 5.2, and Claude defaults remain
-unchanged. The card stays active until merge.
+Merged through [PR #296](https://github.com/hapa1i/multi-forge/pull/296) on 2026-11-10 as `bdd963b0`. Its tree matches
+verified head `e79d805c`. Stable Fable selections use 5.2, and Claude defaults remain unchanged.
 
 ## Implementation
 
@@ -78,4 +78,4 @@ records the direct-LiteLLM limitation and uses the current migration page for Fa
 ## Closeout
 
 - [x] Record verification and any remaining limitations.
-- [ ] Review/merge and move to `done/`; add the completed-work changelog entry when shipped.
+- [x] Review/merge and move to `done/`; add the completed-work changelog entry when shipped.
