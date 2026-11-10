@@ -58,7 +58,8 @@ Use `uv` for dependencies and `make` for the standard workflow:
   preflight fails, follow the same-version `--no-cache` rebuild in `docs/developer/testing_guidelines.md`.
 - `./scripts/test-wheel-runtime.sh` builds a clean wheel with hashed build constraints, installs hash-checked runtime
   dependencies from `uv.lock`, and smoke-tests packaged LiteLLM start/health/stop. Use `--unconstrained` explicitly to
-  test consumer dependency resolution; see `docs/developer/dependency_security.md` for pin updates.
+  test consumer dependency resolution; see `docs/developer/dependency_security.md` for pin updates. Check the final exit
+  status after cleanup. If cleanup fails, inspect the temporary directory printed on stderr.
 - `make test-regression` runs regression tests with parallel workers.
 - `make test` runs unit and integration tests; run `make test-regression` separately.
 - `make pre-commit` runs the full hook suite (ruff, black, isort, mypy, pyright, mdformat, gitleaks); run it before
@@ -83,7 +84,8 @@ as `uv run --locked pytest tests/src/session/test_store.py -n 0 -v`. Integration
 CI tests Python 3.11 and 3.13 explicitly via `UV_PYTHON`, including controller/worker interpreter checks and exact
 test-selection comparison. See `docs/developer/testing_guidelines.md` for isolated local reproduction and evidence
 retention. Keep `.python-version` at the development default; installing a Python version alone does not select it for
-`uv`.
+`uv`. Set `FORGE_WHEEL_SMOKE_PYTHON` to the lane's version for the wheel smoke. Compare the two lanes' reports with
+`python3 scripts/check-python-matrix.py .test-evidence --output .test-evidence/summary.json`.
 
 The configured global pre-commit hook normalizes staged text, including replacing emoji with ASCII. Use `\U` escapes for
 emoji that must survive in source strings. If a hook reformats a staged file, review and restage it before retrying the
@@ -223,7 +225,9 @@ and remove the new session and snapshot. See `docs/end-user/transfer.md` for del
 For child configuration or reset changes, follow the configuration inheritance and reset section in
 `docs/end-user/session.md`. Fork/fresh children drop generic overrides but inherit effective memory-writer settings;
 relaunch children keep overrides. Verify `forge session reset --all` preserves baseline supervisor suspension; use
-`forge policy supervisor on --session <name>` to resume it.
+`forge policy supervisor on --session <name>` to resume it. Verify invalid parent overrides block fork, fresh resume,
+and active-session relaunch before proxy startup or child creation. Follow the diagnostic's recovery for the parent,
+using `forge session reset --session <parent> <key>` when it offers a keyed reset.
 
 For session-store, launchability, repair, or workspace-scope changes, preview orphan recovery with
 `forge session repair [--json]`, apply it with `forge session repair --yes`, check degraded records with
@@ -250,6 +254,16 @@ applicable restart or reroute commands, preserve the exact resume target and com
 already exists, recovery must target that child rather than create another from the parent. Verify that historical and
 non-Claude alternatives preserve the requested model and selected tier's hyperparameters through launch. A non-Claude
 `--model` may start a paid proxy even with `--no-launch`; Codex sessions reject these route-selection flags.
+
+When several registered proxies share a base URL, check `forge session show <name> --field context.proxy.proxy_id` after
+SessionStart. The field prints an ID when exactly one matching entry is `healthy` or `starting`. Otherwise it prints an
+empty line and bare resume validates the saved template.
+
+For Claude reasoning-effort changes, run
+`./scripts/test-integration.sh tests/integration/proxy/test_effort_observation_e2e.py`. Inspect `effort.observations` in
+`forge session model show <name> --json` for the last outbound effort per tier on that launch. In Claude,
+`%session model show` distinguishes an omitted effort parameter (`unset`), one the client removed (`dropped`), and
+missing evidence (`unknown`).
 
 For native-session adoption changes, run `forge session adopt [--json]` from the native launch directory, adopt a full
 Claude conversation or Codex thread id with `forge session adopt <conversation-id> --name <name>`, then resume the
