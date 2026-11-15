@@ -353,6 +353,7 @@ variables must be added here and documented in the relevant end-user guide befor
 | `FORGE_DEBUG`                      | Public diagnostic | User-settable logging override; allowed in troubleshooting surfaces  |
 | `FORGE_STATUS_TRUNCATE`            | Public diagnostic | User-settable status-line troubleshooting toggle                     |
 | `FORGE_AUTHORITY_MARKER`           | Internal wiring   | Advisory run id plus authority config/hook digests                   |
+| `FORGE_AUTO_MODE_SERVER_MANAGED`   | Internal wiring   | Marks Forge's translated-route auto-mode server default              |
 | `FORGE_CODEX_ENROLLMENT_NONCE`     | Internal wiring   | Binds empirical turn-hook receipts to one disposable enrollment turn |
 | `FORGE_CODEX_EXECUTOR_IDENTITY`    | Internal wiring   | Fresh launch facts for measured Codex feedback channels              |
 | `FORGE_CODEX_PROXY_TOKEN`          | Internal wiring   | Loopback proxy bearer between Forge and Codex                        |

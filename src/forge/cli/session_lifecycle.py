@@ -624,7 +624,7 @@ class _ClaudeStartCliPresenter:
         _warn_before_claude_launch(forge_root)
 
     def on_launch_ready(self, event: effort_hint.ClaudeLaunchReady) -> None:
-        effort_hint.print_derived_effort_hint(event)
+        effort_hint.print_launch_guidance(event)
 
     def on_routing_payload(self, payload: dict[str, Any]) -> None:
         _render_model_route_payload(payload)
@@ -699,7 +699,7 @@ class _ClaudeResumeCliPresenter:
         _warn_before_claude_launch(forge_root)
 
     def on_launch_ready(self, event: effort_hint.ClaudeLaunchReady) -> None:
-        effort_hint.print_derived_effort_hint(event)
+        effort_hint.print_launch_guidance(event)
 
     def on_routing_payload(self, payload: dict[str, Any]) -> None:
         _render_model_route_payload(payload)

@@ -7,10 +7,17 @@ from pathlib import Path
 
 import click
 
+from forge.cli.auto_mode_notice import print_session_auto_mode_judge_notice
 from forge.cli.output import err_console, print_tip
 from forge.core.ops.claude_session import ClaudeLaunchReady
 from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH
 from forge.session.artifacts import resolve_forge_root
+
+
+def print_launch_guidance(event: ClaudeLaunchReady) -> None:
+    """Render every launch-ready notice for an interactive managed Claude session."""
+    print_derived_effort_hint(event)
+    print_session_auto_mode_judge_notice(event)
 
 
 def print_derived_effort_hint(event: ClaudeLaunchReady) -> None:

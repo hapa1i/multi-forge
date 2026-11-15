@@ -73,6 +73,7 @@ def _setup_proxy_env(
     from forge.cli import claude as claude_module
 
     monkeypatch.setattr(claude_module, "_healthcheck_proxy", lambda **_: None)
+    monkeypatch.setattr("forge.session.launch_confirmation.read_proxy_cost_baseline", lambda *_a, **_kw: None)
     return forge_home
 
 
@@ -310,6 +311,69 @@ def test_proxy_launch_prints_summary(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert "proxy_1" in result.output
     assert "litellm-openai" in result.output
+
+
+def test_translated_proxy_launch_names_auto_mode_judge(tmp_path, monkeypatch):
+    """Bare translated launches name the backend that judges auto-mode actions on stderr."""
+    from forge.proxy.runtime_truth import ProxyRuntimeTruth
+    from forge.session.launch_confirmation import ProxyCostBaseline
+
+    monkeypatch.delenv("CLAUDE_CODE_AUTO_MODE_SERVER", raising=False)
+    monkeypatch.delenv("FORGE_AUTO_MODE_SERVER_MANAGED", raising=False)
+    monkeypatch.delenv("CLAUDE_CODE_AUTO_MODE_MODEL", raising=False)
+    monkeypatch.delenv("ANTHROPIC_DEFAULT_SONNET_MODEL", raising=False)
+    _setup_proxy_env(tmp_path, monkeypatch)
+    runtime = ProxyRuntimeTruth(
+        {
+            "is_proxy": True,
+            "wire_shape": "openai_translated",
+            "proxy": {"proxy_id": "proxy_1", "template": "litellm-openai"},
+            "runtime": {
+                "active_tier": "sonnet",
+                "backend_id": "litellm",
+                "tier_mappings": {"sonnet": "gpt-6-astra"},
+                "model_alternatives": {},
+            },
+        }
+    )
+    monkeypatch.setattr(
+        "forge.session.launch_confirmation.read_proxy_cost_baseline",
+        lambda *_a, **_kw: ProxyCostBaseline(cost_micros=None, started_at=None, runtime=runtime),
+    )
+
+    with patch(_INVOKE, return_value=0):
+        result = CliRunner().invoke(main, ["claude", "start", "--proxy", "proxy_1"])
+
+    assert result.exit_code == 0, result.output
+    assert "Auto mode: actions are judged by gpt-6-astra (requested as claude-sonnet-5, sonnet tier)" in result.stderr
+
+
+def test_sonnet_46_passthrough_model_names_its_own_classifier(tmp_path, monkeypatch):
+    """Claude Code reviews a Sonnet 4.6 session with Sonnet 4.6, not the Sonnet 5 default."""
+    for key in ("CLAUDE_CODE_AUTO_MODE_SERVER", "FORGE_AUTO_MODE_SERVER_MANAGED", "CLAUDE_CODE_AUTO_MODE_MODEL"):
+        monkeypatch.delenv(key, raising=False)
+    _setup_proxy_env(tmp_path, monkeypatch)
+
+    with patch(_INVOKE, return_value=0):
+        result = CliRunner().invoke(
+            main, ["claude", "start", "--proxy", "proxy_1", "--", "--model", "claude-sonnet-4-6"]
+        )
+
+    assert result.exit_code == 0, result.output
+    assert "the model this proxy serves for claude-sonnet-4-6" in result.stderr
+
+
+def test_user_auto_mode_server_choice_suppresses_bare_notice(tmp_path, monkeypatch):
+    """A user-set CLAUDE_CODE_AUTO_MODE_SERVER is theirs, so Forge says nothing about it."""
+    monkeypatch.setenv("CLAUDE_CODE_AUTO_MODE_SERVER", "1")
+    monkeypatch.delenv("FORGE_AUTO_MODE_SERVER_MANAGED", raising=False)
+    _setup_proxy_env(tmp_path, monkeypatch)
+
+    with patch(_INVOKE, return_value=0):
+        result = CliRunner().invoke(main, ["claude", "start", "--proxy", "proxy_1"])
+
+    assert result.exit_code == 0, result.output
+    assert "Auto mode" not in result.stderr
 
 
 def test_direct_launch_prints_summary(tmp_path, monkeypatch):
@@ -551,6 +615,21 @@ class TestBuildBareLaunchEnv:
             )
 
         assert env["FORGE_PROXY_WIRE_SHAPE"] == "anthropic_passthrough"
+
+    def test_unresolved_wire_shape_scrubs_inherited_value(self):
+        """A nested launch must not describe the new proxy with its parent's shape."""
+        from forge.cli.claude import _build_bare_launch_env
+
+        with patch("forge.cli.claude.resolve_proxy_wire_shape", return_value=None):
+            env, unset = _build_bare_launch_env(
+                base_url="http://localhost:8085",
+                template="private-template",
+                proxy_id="private-proxy",
+                context_limit=200000,
+            )
+
+        assert "FORGE_PROXY_WIRE_SHAPE" not in env
+        assert "FORGE_PROXY_WIRE_SHAPE" in unset
 
     def test_direct_mode(self):
         from forge.cli.claude import _build_bare_launch_env

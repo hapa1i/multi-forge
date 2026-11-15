@@ -634,6 +634,17 @@ Proxy/backend snapshots remain user-owned; upgrades preserve translated tier sel
 client's model. Context-estimator model pins apply only to translated Messages routes, including Responses-capable
 proxies; Anthropic passthrough and unknown wire shapes receive no pins.
 
+Claude Code's auto-mode server review travels inside the Messages request, so translated Messages routes cannot carry
+it. Those routes get `CLAUDE_CODE_AUTO_MODE_SERVER=0` with the `FORGE_AUTO_MODE_SERVER_MANAGED` marker, so the local
+classifier runs through the proxy. Passthrough, direct, and unknown-shape routes drop a marked inherited value; an
+unmarked value is user-owned and kept. `build_claude_env`, the interactive builder after `unset_vars`, and the sidecar
+launcher apply the policy; the sidecar carries the host's auto-mode server and model values into the container. When
+`build_claude_env` replaces the endpoint and the caller supplied no wire shape, it re-resolves the shape from that URL's
+subprocess metadata or registry entry, never the spawner's `FORGE_TEMPLATE`; both wire-shape policies use the result.
+Launch builders scrub an inherited shape when the selected proxy's shape is unknown. `ClaudeLaunchReady` records the
+predicted classifier request model, and the CLI names its backend through read-side route prediction on the launch
+snapshot.
+
 Gemini 4 Carbon is the Gemini Sonnet/Opus default and default Gemini workflow worker. Gemini 3.8 Flash remains the Haiku
 and Flash-template default; Argon and older Pro models remain explicit selections. Carbon uses `google/gemini-4-carbon`
 on OpenRouter, `gemini/gemini-4-carbon` on local LiteLLM, and `vertex_ai/gemini-4-carbon` on remote LiteLLM. Existing

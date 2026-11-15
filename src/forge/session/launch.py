@@ -96,6 +96,8 @@ def _build_session_env(
         env_vars["ANTHROPIC_BASE_URL"] = base_url
         if wire_shape := resolve_proxy_wire_shape(proxy_id=proxy_id, template=template):
             env_vars[FORGE_PROXY_WIRE_SHAPE_VAR] = wire_shape
+        else:
+            unset_env_vars.append(FORGE_PROXY_WIRE_SHAPE_VAR)  # an inherited shape described another proxy
         if template is None:
             unset_env_vars.append("ACTIVE_TEMPLATE")
         else:

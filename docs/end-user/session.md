@@ -1008,7 +1008,9 @@ forge claude start --proxy <proxy_id>
 ```
 
 This resolves the proxy, healthchecks it, sets `ANTHROPIC_BASE_URL`, applies `CLAUDE_CODE_ATTRIBUTION_HEADER=0` only for
-translated/third-party proxy routes, sets `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, and launches Claude.
+translated/third-party proxy routes, sets `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, and launches Claude. Translated routes also
+use Claude Code's local auto-mode classifier; see
+[Auto mode on translated proxies](proxy.md#auto-mode-on-translated-proxies).
 
 ### Start a session with a proxy
 

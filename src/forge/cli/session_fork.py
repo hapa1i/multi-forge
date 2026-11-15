@@ -23,7 +23,7 @@ from forge.cli.session_authority_options import (
     parse_creation_authority,
 )
 from forge.cli.session_derived_preflight import handle_derived_session_error
-from forge.cli.session_effort_hint import ClaudeLaunchReady, print_derived_effort_hint
+from forge.cli.session_effort_hint import ClaudeLaunchReady, print_launch_guidance
 from forge.cli.session_launch_args import (
     RuntimePassthroughCommand,
     checked_launch_args,
@@ -118,7 +118,7 @@ class _ClaudeForkCliPresenter:
         _warn_before_claude_launch(forge_root)
 
     def on_launch_ready(self, event: ClaudeLaunchReady) -> None:
-        print_derived_effort_hint(event)
+        print_launch_guidance(event)
 
     def on_routing_payload(self, payload: dict[str, Any]) -> None:
         _render_model_route_payload(payload)
