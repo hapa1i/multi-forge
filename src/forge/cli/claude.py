@@ -137,6 +137,8 @@ def _build_bare_launch_env(
         apply_proxy_context_model_defaults(env_vars, context_limit, wire_shape=wire_shape)
         if wire_shape:
             env_vars[FORGE_PROXY_WIRE_SHAPE_VAR] = wire_shape
+        else:
+            unset_vars.append(FORGE_PROXY_WIRE_SHAPE_VAR)  # an inherited shape described another proxy
         if template:
             env_vars["ACTIVE_TEMPLATE"] = template
         else:
@@ -146,10 +148,14 @@ def _build_bare_launch_env(
 
 
 def _print_bare_auto_mode_notice(
-    proxy_id: str, base_url: str | None, env_vars: dict[str, str], unset_vars: list[str]
+    proxy_id: str,
+    base_url: str | None,
+    env_vars: dict[str, str],
+    unset_vars: list[str],
+    claude_args: tuple[str, ...],
 ) -> None:
     """Name the auto-mode judge when Forge turns off the server-side check."""
-    classifier_model = predict_launch_auto_mode_classifier_model(env_vars, unset_vars)
+    classifier_model = predict_launch_auto_mode_classifier_model(env_vars, unset_vars, claude_args=claude_args)
     if classifier_model is None:
         return
     from forge.cli.auto_mode_notice import print_auto_mode_judge_notice
@@ -269,7 +275,7 @@ def start_cmd(
 
     if proxy_display:
         console.print(f"Starting Claude with proxy [green]{proxy_display}[/green] ({template})")
-        _print_bare_auto_mode_notice(proxy_display, base_url, env_vars, unset_vars)
+        _print_bare_auto_mode_notice(proxy_display, base_url, env_vars, unset_vars, claude_args)
     else:
         console.print("Starting Claude [green]direct[/green] (no proxy)")
 

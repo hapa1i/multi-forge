@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from forge.core.run_id import (
@@ -92,6 +92,9 @@ _AUTO_MODE_LOCAL_CLASSIFIER_WIRE_SHAPES = frozenset({OPENAI_TRANSLATED, OPENAI_R
 _AUTO_MODE_DEFAULT_CLASSIFIER_MODEL = "claude-sonnet-5"
 _AUTO_MODE_SONNET_DEFAULT_REMAPS = frozenset({"claude-sonnet-5-5", "claude-opus-5-5"})
 _AUTO_MODE_IGNORED_MODEL_OVERRIDES = frozenset({"claude-opus-5", "claude-sonnet-5-5", "claude-opus-5-5"})
+# A session running one of these models classifies with it instead of the default.
+_AUTO_MODE_SESSION_CLASSIFIER_MODELS = frozenset({"claude-sonnet-4-6"})
+_CLAUDE_CODE_TIER_ALIASES = frozenset({"haiku", "sonnet", "opus"})
 
 
 def can_use_bare(env: Mapping[str, str] | None = None) -> bool:
@@ -278,6 +281,8 @@ def build_claude_env(
     # A Claude child cannot carry admission facts for its parent Codex executor.
     env.pop("FORGE_CODEX_EXECUTOR_IDENTITY", None)
 
+    url_before_routing = env.get("ANTHROPIC_BASE_URL")
+    caller_wire_shape = bool(extra_vars and FORGE_PROXY_WIRE_SHAPE_VAR in extra_vars)
     if base_url:
         env["ANTHROPIC_BASE_URL"] = base_url
     elif direct:
@@ -301,8 +306,14 @@ def build_claude_env(
             else:
                 env.pop("ANTHROPIC_BASE_URL", None)
 
-    apply_attribution_header_policy(env)
-    apply_auto_mode_server_policy(env)
+    # Resolve the selected route's shape once; an inherited shape describes the
+    # spawner's endpoint, so a replaced endpoint must prove its own shape.
+    if not caller_wire_shape and env.get("ANTHROPIC_BASE_URL") not in (None, url_before_routing):
+        wire_shape = _refresh_wire_shape_for_new_route(env)
+    else:
+        wire_shape = _selected_route_wire_shape(env)
+    _apply_attribution_header(env, wire_shape)
+    _apply_auto_mode_server(env, wire_shape)
 
     # Increment FORGE_DEPTH so child subprocesses know their nesting level
     current_depth = get_forge_depth(env)
@@ -335,7 +346,11 @@ def apply_attribution_header_policy(env: dict[str, str]) -> None:
     scrub any inherited/global value so auto mode can classify when Anthropic's
     classifier is available through the route.
     """
-    if not env.get("ANTHROPIC_BASE_URL") or _proxy_wire_shape_for_env(env) == ANTHROPIC_PASSTHROUGH:
+    _apply_attribution_header(env, _selected_route_wire_shape(env))
+
+
+def _apply_attribution_header(env: dict[str, str], wire_shape: str | None) -> None:
+    if not env.get("ANTHROPIC_BASE_URL") or wire_shape == ANTHROPIC_PASSTHROUGH:
         env.pop(CLAUDE_CODE_ATTRIBUTION_HEADER_VAR, None)
         return
 
@@ -359,14 +374,16 @@ def apply_auto_mode_server_policy(env: dict[str, str]) -> bool:
 
     Returns True when ``env`` ends with Forge's managed ``0``.
     """
+    return _apply_auto_mode_server(env, _selected_route_wire_shape(env))
+
+
+def _apply_auto_mode_server(env: dict[str, str], wire_shape: str | None) -> bool:
     inherited_forge_default = env.pop(FORGE_AUTO_MODE_SERVER_MANAGED_VAR, None) is not None
     if inherited_forge_default and env.get(CLAUDE_CODE_AUTO_MODE_SERVER_VAR) == "0":
         del env[CLAUDE_CODE_AUTO_MODE_SERVER_VAR]
     if CLAUDE_CODE_AUTO_MODE_SERVER_VAR in env:
         return False
-    if not env.get("ANTHROPIC_BASE_URL"):
-        return False
-    if _proxy_wire_shape_for_env(env) not in _AUTO_MODE_LOCAL_CLASSIFIER_WIRE_SHAPES:
+    if not env.get("ANTHROPIC_BASE_URL") or wire_shape not in _AUTO_MODE_LOCAL_CLASSIFIER_WIRE_SHAPES:
         return False
     env[CLAUDE_CODE_AUTO_MODE_SERVER_VAR] = "0"
     env[FORGE_AUTO_MODE_SERVER_MANAGED_VAR] = "1"
@@ -374,7 +391,10 @@ def apply_auto_mode_server_policy(env: dict[str, str]) -> bool:
 
 
 def predict_launch_auto_mode_classifier_model(
-    env_vars: Mapping[str, str], unset_vars: Iterable[str] = ()
+    env_vars: Mapping[str, str],
+    unset_vars: Iterable[str] = (),
+    *,
+    claude_args: Sequence[str] | None = None,
 ) -> str | None:
     """Predict the auto-mode judge request model for an interactive Claude launch.
 
@@ -387,30 +407,52 @@ def predict_launch_auto_mode_classifier_model(
         launch_env.pop(key, None)
     if not apply_auto_mode_server_policy(launch_env):
         return None
-    return predict_auto_mode_classifier_model(launch_env)
+    return predict_auto_mode_classifier_model(launch_env, claude_args=claude_args)
 
 
-def predict_auto_mode_classifier_model(env: Mapping[str, str]) -> str:
+def predict_auto_mode_classifier_model(env: Mapping[str, str], *, claude_args: Sequence[str] | None = None) -> str:
     """Predict the model id on Claude Code's local auto-mode classifier requests.
 
     Follows Claude Code's documented precedence: ``CLAUDE_CODE_AUTO_MODE_MODEL``
-    unless it names a model Claude Code refuses to review with, then
-    ``ANTHROPIC_DEFAULT_SONNET_MODEL`` with Sonnet 5.5 and Opus 5.5 mapped to the
-    Sonnet 5 default. An Anthropic-configured classifier model or a provider
-    fallback is invisible to Forge, so callers must present this as a prediction.
+    unless it names a model Claude Code refuses to review with; then a Sonnet 4.6
+    session model (``--model`` in ``claude_args``, else ``ANTHROPIC_MODEL``, with
+    tier aliases resolved); then ``ANTHROPIC_DEFAULT_SONNET_MODEL`` with Sonnet 5.5
+    and Opus 5.5 mapped to the Sonnet 5 default. An Anthropic-configured
+    classifier model, a provider fallback, or a later ``/model`` switch is
+    invisible to Forge, so callers must present this as a prediction.
     """
     from forge.core.models.model_reference import strip_transport_model_suffix
 
+    def _normalize(value: str | None) -> str:
+        return strip_transport_model_suffix((value or "").strip())
+
     def _model_id(name: str) -> str:
-        return strip_transport_model_suffix(env.get(name, "").strip())
+        return _normalize(env.get(name))
 
     override = _model_id(CLAUDE_CODE_AUTO_MODE_MODEL_VAR)
     if override and override not in _AUTO_MODE_IGNORED_MODEL_OVERRIDES:
         return override
+    session_model = _normalize(_claude_args_model(claude_args)) or _model_id("ANTHROPIC_MODEL")
+    if session_model in _CLAUDE_CODE_TIER_ALIASES:
+        session_model = _model_id(f"ANTHROPIC_DEFAULT_{session_model.upper()}_MODEL")
+    if session_model in _AUTO_MODE_SESSION_CLASSIFIER_MODELS:
+        return session_model
     sonnet_default = _model_id("ANTHROPIC_DEFAULT_SONNET_MODEL")
     if sonnet_default and sonnet_default not in _AUTO_MODE_SONNET_DEFAULT_REMAPS:
         return sonnet_default
     return _AUTO_MODE_DEFAULT_CLASSIFIER_MODEL
+
+
+def _claude_args_model(claude_args: Sequence[str] | None) -> str | None:
+    """Return the last ``--model`` value in Claude Code arguments, if any."""
+    model = None
+    args = list(claude_args or ())
+    for index, arg in enumerate(args):
+        if arg == "--model" and index + 1 < len(args):
+            model = args[index + 1]
+        elif arg.startswith("--model="):
+            model = arg.removeprefix("--model=")
+    return model
 
 
 def resolve_proxy_wire_shape(*, proxy_id: str | None = None, template: str | None = None) -> str | None:
@@ -455,7 +497,25 @@ def _template_wire_shape(template: str) -> str | None:
         return None
 
 
-def _proxy_wire_shape_for_env(env: Mapping[str, str]) -> str | None:
+def _selected_route_wire_shape(env: Mapping[str, str]) -> str | None:
+    return _proxy_wire_shape_for_env(env) if env.get("ANTHROPIC_BASE_URL") else None
+
+
+def _refresh_wire_shape_for_new_route(env: dict[str, str]) -> str | None:
+    """Replace an inherited wire shape that described the spawner's endpoint.
+
+    Only the selected URL's own proof counts: subprocess-proxy metadata or the
+    proxy registry. ``FORGE_TEMPLATE`` names the spawner's template, so it is not
+    evidence for a different endpoint. An unresolvable route ends with no shape.
+    """
+    env.pop(FORGE_PROXY_WIRE_SHAPE_VAR, None)
+    wire_shape = _proxy_wire_shape_for_env(env, template_fallback=False)
+    if wire_shape:
+        env[FORGE_PROXY_WIRE_SHAPE_VAR] = wire_shape
+    return wire_shape
+
+
+def _proxy_wire_shape_for_env(env: Mapping[str, str], *, template_fallback: bool = True) -> str | None:
     explicit = env.get(FORGE_PROXY_WIRE_SHAPE_VAR)
     if explicit:
         return explicit
@@ -476,7 +536,7 @@ def _proxy_wire_shape_for_env(env: Mapping[str, str]) -> str | None:
             return wire_shape
 
     # Template-only sidecars have no host proxy id but do carry FORGE_TEMPLATE.
-    if template := env.get(FORGE_TEMPLATE_VAR):
+    if template_fallback and (template := env.get(FORGE_TEMPLATE_VAR)):
         return resolve_proxy_wire_shape(template=template)
 
     return None

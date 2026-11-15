@@ -638,7 +638,10 @@ Claude Code's auto-mode server review travels inside the Messages request, so tr
 it. Those routes get `CLAUDE_CODE_AUTO_MODE_SERVER=0` with the `FORGE_AUTO_MODE_SERVER_MANAGED` marker, so the local
 classifier runs through the proxy. Passthrough, direct, and unknown-shape routes drop a marked inherited value; an
 unmarked value is user-owned and kept. `build_claude_env`, the interactive builder after `unset_vars`, and the sidecar
-launcher apply the policy; the sidecar carries a host user value into the container. `ClaudeLaunchReady` records the
+launcher apply the policy; the sidecar carries the host's auto-mode server and model values into the container. When
+`build_claude_env` replaces the endpoint and the caller supplied no wire shape, it re-resolves the shape from that URL's
+subprocess metadata or registry entry, never the spawner's `FORGE_TEMPLATE`; both wire-shape policies use the result.
+Launch builders scrub an inherited shape when the selected proxy's shape is unknown. `ClaudeLaunchReady` records the
 predicted classifier request model, and the CLI names its backend through read-side route prediction on the launch
 snapshot.
 

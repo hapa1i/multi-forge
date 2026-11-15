@@ -16,6 +16,7 @@ from pathlib import Path
 from forge.core.paths import get_forge_home
 from forge.core.reactive.env import (
     CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
+    CLAUDE_CODE_AUTO_MODE_MODEL_VAR,
     CLAUDE_CODE_AUTO_MODE_SERVER_VAR,
     FORGE_AUTO_MODE_SERVER_MANAGED_VAR,
     FORGE_PROXY_WIRE_SHAPE_VAR,
@@ -168,6 +169,7 @@ def run_sidecar_session(
         FORGE_PROXY_WIRE_SHAPE_VAR,
         CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
         CLAUDE_CODE_AUTO_MODE_SERVER_VAR,
+        CLAUDE_CODE_AUTO_MODE_MODEL_VAR,
         FORGE_AUTO_MODE_SERVER_MANAGED_VAR,
     ):
         if value := route_policy_env.get(key):
@@ -275,11 +277,12 @@ def sidecar_route_policy_env(*, template: str, proxy_id: str | None) -> dict[str
     The sidecar entrypoint sets ``ANTHROPIC_BASE_URL`` after its local proxy is
     healthy; the host launcher owns the classifier/cache policy decision and
     passes the resulting env vars into the container so shell and Python cannot
-    drift. Host env does not otherwise cross into the container, so a user-set
-    ``CLAUDE_CODE_AUTO_MODE_SERVER`` is carried explicitly to keep it user-owned.
+    drift. Host env does not otherwise cross into the container, so the user's
+    ``CLAUDE_CODE_AUTO_MODE_SERVER`` and ``CLAUDE_CODE_AUTO_MODE_MODEL`` are
+    carried explicitly to keep them user-owned.
     """
     env = {"ANTHROPIC_BASE_URL": _SIDECAR_PROXY_BASE_URL}
-    for key in (CLAUDE_CODE_AUTO_MODE_SERVER_VAR, FORGE_AUTO_MODE_SERVER_MANAGED_VAR):
+    for key in (CLAUDE_CODE_AUTO_MODE_SERVER_VAR, CLAUDE_CODE_AUTO_MODE_MODEL_VAR, FORGE_AUTO_MODE_SERVER_MANAGED_VAR):
         if (value := os.environ.get(key)) is not None:
             env[key] = value
     if wire_shape := resolve_proxy_wire_shape(proxy_id=proxy_id, template=template):

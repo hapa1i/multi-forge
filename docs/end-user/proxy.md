@@ -445,17 +445,17 @@ the model that will judge them:
 Auto mode: actions are judged by google/gemini-4-carbon (requested as claude-sonnet-5, sonnet tier); Forge turned off the server-side check for translated proxies.
 ```
 
-- **The judge is the proxy's model.** Claude Code requests Claude Sonnet 5 by default, or the
-  `ANTHROPIC_DEFAULT_SONNET_MODEL` value, with Sonnet 5.5 and Opus 5.5 mapped to Sonnet 5. A translated proxy usually
-  answers with its sonnet-tier model. A non-Claude `--model` routed to the sonnet tier becomes the classifier model.
+- **The judge is the proxy's model.** Claude Code requests Claude Sonnet 5 by default. A Sonnet 4.6 session uses Sonnet
+  4.6, and `ANTHROPIC_DEFAULT_SONNET_MODEL` replaces the default unless it names Sonnet 5.5 or Opus 5.5. A translated
+  proxy usually answers with its sonnet-tier model; a non-Claude sonnet-tier `--model` becomes the judge.
 - **Classifier requests cost tokens.** Each one is a separate request through the proxy and appears in proxy metrics and
   telemetry. In Claude Code 2.1.325, a request at the start of a session carried about 140,000 characters of prompt.
 - **Keep a Claude judge on OpenRouter.** Set `CLAUDE_CODE_AUTO_MODE_MODEL=anthropic/claude-sonnet-5` before launching
   (the proxy forwards provider-prefixed slugs unchanged), or add the `claude-sonnet-5` alternative shown in
   [Model alternatives](#model-alternatives). The proxy's [ZDR policy](#openrouter-zero-data-retention-zdr) still
   applies.
-- **Your own setting wins.** Forge leaves a `CLAUDE_CODE_AUTO_MODE_SERVER` value you exported alone, and sidecars
-  receive it from the host.
+- **Your own settings win.** Forge leaves exported `CLAUDE_CODE_AUTO_MODE_SERVER` and `CLAUDE_CODE_AUTO_MODE_MODEL`
+  values alone, and sidecars receive them from the host.
 - **Passthrough and direct launches are unchanged.** `anthropic_passthrough` proxies and direct launches keep Claude
   Code's default server review, including direct or passthrough launches started from inside a translated session.
   Proxies whose wire shape Forge cannot determine are also left alone.

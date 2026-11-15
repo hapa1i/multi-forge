@@ -1646,7 +1646,7 @@ def _run_sidecar_claude_session(
                 direct_model=manifest.intent.launch.direct_model if manifest.intent.launch else None,
                 runtime=_sidecar_cost_baseline.runtime if _sidecar_cost_baseline else None,
                 auto_mode_classifier_model=(
-                    predict_auto_mode_classifier_model({**container_env, **route_policy_env})
+                    predict_auto_mode_classifier_model({**container_env, **route_policy_env}, claude_args=extra_args)
                     if route_policy_env.get(FORGE_AUTO_MODE_SERVER_MANAGED_VAR)
                     else None
                 ),
@@ -1876,7 +1876,9 @@ def _run_host_claude_session(
                 model_route=manifest.intent.launch.model_route if manifest.intent.launch else None,
                 direct_model=manifest.intent.launch.direct_model if manifest.intent.launch else None,
                 runtime=_proxy_cost_baseline.runtime if _proxy_cost_baseline else None,
-                auto_mode_classifier_model=predict_launch_auto_mode_classifier_model(env_vars, unset_env_vars),
+                auto_mode_classifier_model=predict_launch_auto_mode_classifier_model(
+                    env_vars, unset_env_vars, claude_args=extra_args
+                ),
             )
         )
     record_launch_confirmed(

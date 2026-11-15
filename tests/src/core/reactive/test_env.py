@@ -248,6 +248,49 @@ class TestAutoModeServerPolicy:
         assert env == {"ANTHROPIC_BASE_URL": "http://gateway.example:8080"}
 
 
+class TestChangedRouteWireShape:
+    def test_caller_supplied_shape_describes_the_selected_route(self):
+        """A shape passed with base_url is caller-owned route metadata, not an inherited one."""
+        with patch.dict("os.environ", {"ANTHROPIC_BASE_URL": "http://parent:8085"}, clear=True):
+            env = build_claude_env(
+                base_url="http://child:8086", extra_vars={FORGE_PROXY_WIRE_SHAPE_VAR: "anthropic_passthrough"}
+            )
+        assert env[FORGE_PROXY_WIRE_SHAPE_VAR] == "anthropic_passthrough"
+        assert CLAUDE_CODE_ATTRIBUTION_HEADER_VAR not in env
+
+    def test_unchanged_route_keeps_inherited_shape(self):
+        with patch.dict("os.environ", _TRANSLATED_ROUTE, clear=True):
+            env = build_claude_env(base_url=_TRANSLATED_ROUTE["ANTHROPIC_BASE_URL"])
+        assert env[FORGE_PROXY_WIRE_SHAPE_VAR] == "openai_translated"
+        assert env[CLAUDE_CODE_AUTO_MODE_SERVER_VAR] == "0"
+
+    def test_unresolvable_new_route_drops_inherited_shape_and_template_evidence(self):
+        """FORGE_TEMPLATE names the spawner's proxy, so it cannot type a different endpoint."""
+        inherited = {**_TRANSLATED_ROUTE, "FORGE_TEMPLATE": "openrouter-gemini", **_FORGE_AUTO_MODE_DEFAULT}
+        with (
+            patch.dict("os.environ", inherited, clear=True),
+            patch("forge.core.reactive.env._wire_shape_from_registry_base_url", return_value=None),
+        ):
+            env = build_claude_env(base_url="http://gateway.example:8080")
+        assert FORGE_PROXY_WIRE_SHAPE_VAR not in env
+        assert env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR] == "0"  # unknown routes keep the conservative workaround
+        assert CLAUDE_CODE_AUTO_MODE_SERVER_VAR not in env
+
+    def test_subprocess_proxy_fallback_uses_its_own_metadata(self):
+        inherited = {
+            "ANTHROPIC_BASE_URL": "http://session:8085",
+            FORGE_PROXY_WIRE_SHAPE_VAR: "openai_translated",
+            "FORGE_SUBPROCESS_BASE_URL": "http://subprocess:8086",
+            "FORGE_SUBPROCESS_PROXY_ID": "pass-proxy",
+            "FORGE_SUBPROCESS_TEMPLATE": "anthropic-passthrough",
+        }
+        with patch.dict("os.environ", inherited, clear=True):
+            env = build_claude_env()
+        assert env["ANTHROPIC_BASE_URL"] == "http://subprocess:8086"
+        assert env[FORGE_PROXY_WIRE_SHAPE_VAR] == "anthropic_passthrough"
+        assert CLAUDE_CODE_AUTO_MODE_SERVER_VAR not in env
+
+
 class TestPredictAutoModeClassifierModel:
     @pytest.mark.parametrize(
         ("env", "expected"),
@@ -265,6 +308,29 @@ class TestPredictAutoModeClassifierModel:
     )
     def test_follows_claude_code_default_classifier_precedence(self, env, expected):
         assert predict_auto_mode_classifier_model(env) == expected
+
+    @pytest.mark.parametrize(
+        ("env", "claude_args", "expected"),
+        [
+            ({}, ["--model", "claude-sonnet-4-6"], "claude-sonnet-4-6"),
+            ({}, ["--debug", "--model=claude-sonnet-4-6[1m]"], "claude-sonnet-4-6"),
+            ({"ANTHROPIC_MODEL": "claude-sonnet-4-6"}, None, "claude-sonnet-4-6"),
+            (
+                {"ANTHROPIC_MODEL": "opus", "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-sonnet-4-6"},
+                None,
+                "claude-sonnet-4-6",
+            ),
+            ({"ANTHROPIC_MODEL": "claude-sonnet-4-6"}, ["--model", "claude-opus-5-5"], "claude-sonnet-5"),
+            (
+                {CLAUDE_CODE_AUTO_MODE_MODEL_VAR: "anthropic/claude-sonnet-5"},
+                ["--model", "claude-sonnet-4-6"],
+                "anthropic/claude-sonnet-5",
+            ),
+        ],
+    )
+    def test_sonnet_46_session_classifies_with_its_own_model(self, env, claude_args, expected):
+        """Claude Code reviews a Sonnet 4.6 session with Sonnet 4.6 unless an override applies."""
+        assert predict_auto_mode_classifier_model(env, claude_args=claude_args) == expected
 
     def test_launch_prediction_layers_over_user_environment(self):
         """The prediction sees the same user-owned overrides the child inherits."""

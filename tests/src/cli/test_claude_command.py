@@ -348,6 +348,21 @@ def test_translated_proxy_launch_names_auto_mode_judge(tmp_path, monkeypatch):
     assert "Auto mode: actions are judged by gpt-6-astra (requested as claude-sonnet-5, sonnet tier)" in result.stderr
 
 
+def test_sonnet_46_passthrough_model_names_its_own_classifier(tmp_path, monkeypatch):
+    """Claude Code reviews a Sonnet 4.6 session with Sonnet 4.6, not the Sonnet 5 default."""
+    for key in ("CLAUDE_CODE_AUTO_MODE_SERVER", "FORGE_AUTO_MODE_SERVER_MANAGED", "CLAUDE_CODE_AUTO_MODE_MODEL"):
+        monkeypatch.delenv(key, raising=False)
+    _setup_proxy_env(tmp_path, monkeypatch)
+
+    with patch(_INVOKE, return_value=0):
+        result = CliRunner().invoke(
+            main, ["claude", "start", "--proxy", "proxy_1", "--", "--model", "claude-sonnet-4-6"]
+        )
+
+    assert result.exit_code == 0, result.output
+    assert "the model this proxy serves for claude-sonnet-4-6" in result.stderr
+
+
 def test_user_auto_mode_server_choice_suppresses_bare_notice(tmp_path, monkeypatch):
     """A user-set CLAUDE_CODE_AUTO_MODE_SERVER is theirs, so Forge says nothing about it."""
     monkeypatch.setenv("CLAUDE_CODE_AUTO_MODE_SERVER", "1")
@@ -600,6 +615,21 @@ class TestBuildBareLaunchEnv:
             )
 
         assert env["FORGE_PROXY_WIRE_SHAPE"] == "anthropic_passthrough"
+
+    def test_unresolved_wire_shape_scrubs_inherited_value(self):
+        """A nested launch must not describe the new proxy with its parent's shape."""
+        from forge.cli.claude import _build_bare_launch_env
+
+        with patch("forge.cli.claude.resolve_proxy_wire_shape", return_value=None):
+            env, unset = _build_bare_launch_env(
+                base_url="http://localhost:8085",
+                template="private-template",
+                proxy_id="private-proxy",
+                context_limit=200000,
+            )
+
+        assert "FORGE_PROXY_WIRE_SHAPE" not in env
+        assert "FORGE_PROXY_WIRE_SHAPE" in unset
 
     def test_direct_mode(self):
         from forge.cli.claude import _build_bare_launch_env

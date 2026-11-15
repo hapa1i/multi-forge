@@ -28,6 +28,16 @@ Current focus: review and PR for `fix/auto-mode-translated-proxy`.
 - [x] Run focused, aggregate unit/regression suites and targeted Docker integration tests.
 - [x] Run `make pre-commit` on the final tree.
 
+## Review follow-up
+
+- [x] Sidecars forward a host `CLAUDE_CODE_AUTO_MODE_MODEL`, and the sidecar notice predicts from it.
+- [x] `build_claude_env` re-resolves the wire shape when it replaces the endpoint without a caller-supplied shape, from
+  that URL's subprocess metadata or registry entry only, and both policies use that one result. Bare and session launch
+  builders scrub an inherited shape when the selected proxy's shape is unknown. Attribution had the same defect.
+- [x] Classifier prediction applies the Sonnet 4.6 session-model rule from `--model` or `ANTHROPIC_MODEL`.
+- [x] Regression `tests/regression/test_bug_subprocess_route_stale_wire_shape.py` fails both directions on the prior
+  `env.py`; unit tests cover caller-owned shapes, unchanged routes, unresolvable routes, and subprocess fallback.
+
 ## Closeout
 
 - [ ] Open the PR, then record shipped closeout, change log entry, and move the card to `done/` after merge.

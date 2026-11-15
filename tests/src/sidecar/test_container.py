@@ -13,6 +13,7 @@ import pytest
 
 from forge.core.reactive.env import (
     CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
+    CLAUDE_CODE_AUTO_MODE_MODEL_VAR,
     CLAUDE_CODE_AUTO_MODE_SERVER_VAR,
     FORGE_AUTO_MODE_SERVER_MANAGED_VAR,
     FORGE_PROXY_WIRE_SHAPE_VAR,
@@ -303,14 +304,26 @@ class TestRunSidecarSession:
         [
             ({}, [f"{CLAUDE_CODE_AUTO_MODE_SERVER_VAR}=0", f"{FORGE_AUTO_MODE_SERVER_MANAGED_VAR}=1"]),
             ({CLAUDE_CODE_AUTO_MODE_SERVER_VAR: "1"}, [f"{CLAUDE_CODE_AUTO_MODE_SERVER_VAR}=1"]),
+            (
+                {CLAUDE_CODE_AUTO_MODE_MODEL_VAR: "anthropic/claude-sonnet-5"},
+                [
+                    f"{CLAUDE_CODE_AUTO_MODE_SERVER_VAR}=0",
+                    f"{CLAUDE_CODE_AUTO_MODE_MODEL_VAR}=anthropic/claude-sonnet-5",
+                    f"{FORGE_AUTO_MODE_SERVER_MANAGED_VAR}=1",
+                ],
+            ),
         ],
     )
     def test_run_sidecar_session_carries_auto_mode_server_policy(
         self, monkeypatch: pytest.MonkeyPatch, host_env: dict[str, str], expected: list[str]
     ) -> None:
         """Translated sidecars get Forge's default; a host user value crosses the boundary instead."""
-        monkeypatch.delenv(CLAUDE_CODE_AUTO_MODE_SERVER_VAR, raising=False)
-        monkeypatch.delenv(FORGE_AUTO_MODE_SERVER_MANAGED_VAR, raising=False)
+        for key in (
+            CLAUDE_CODE_AUTO_MODE_SERVER_VAR,
+            CLAUDE_CODE_AUTO_MODE_MODEL_VAR,
+            FORGE_AUTO_MODE_SERVER_MANAGED_VAR,
+        ):
+            monkeypatch.delenv(key, raising=False)
         for key, value in host_env.items():
             monkeypatch.setenv(key, value)
         with (
@@ -328,7 +341,13 @@ class TestRunSidecarSession:
         auto_mode_values = [
             part
             for part in cmd
-            if part.startswith((f"{CLAUDE_CODE_AUTO_MODE_SERVER_VAR}=", f"{FORGE_AUTO_MODE_SERVER_MANAGED_VAR}="))
+            if part.startswith(
+                (
+                    f"{CLAUDE_CODE_AUTO_MODE_SERVER_VAR}=",
+                    f"{CLAUDE_CODE_AUTO_MODE_MODEL_VAR}=",
+                    f"{FORGE_AUTO_MODE_SERVER_MANAGED_VAR}=",
+                )
+            )
         ]
         assert auto_mode_values == expected
 
