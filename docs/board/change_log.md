@@ -9,6 +9,27 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-11-15
+
+### Use the local auto-mode classifier on translated proxies
+
+**Goal**: Keep Claude Code auto mode working through translated proxies, which cannot carry Anthropic's in-band server
+review.
+
+- Forge-managed launches on translated and Responses-capable routes set `CLAUDE_CODE_AUTO_MODE_SERVER=0` with an
+  ownership marker. User values win; direct, passthrough, and unknown routes drop an inherited Forge default; sidecars
+  carry the host's auto-mode server and model values.
+- Launches print the predicted judge model and its proxy backend. The proxy guide covers judge cost and keeping a Claude
+  judge on OpenRouter.
+- A child that changes proxy routes re-resolves its wire shape, fixing workers that applied the spawner's attribution
+  policy.
+
+**Verification**: 11,704 unit tests, 2,533 regressions, 5 targeted Docker integration cases, and pre-commit passed.
+Fake-endpoint probes of Claude Code 2.1.325 confirmed the local classifier runs with server review off. The
+[completed checklist](done/auto_mode_translated_proxy/checklist.md) records the review follow-up and unexercised live
+paths. Merged via [PR #299](https://github.com/hapa1i/multi-forge/pull/299) (`f10a66d3`); GitHub Tests and Pre-commit
+Checks passed.
+
 ## 2026-11-10
 
 ### Adopt Gemini 4 Carbon defaults

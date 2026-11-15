@@ -1,6 +1,6 @@
 # Auto mode on translated proxies execution
 
-Current focus: review and PR for `fix/auto-mode-translated-proxy`.
+Shipped on `main` November 15, 2026 via [PR #299](https://github.com/hapa1i/multi-forge/pull/299) (`f10a66d3`).
 
 ## Implementation
 
@@ -40,7 +40,8 @@ Current focus: review and PR for `fix/auto-mode-translated-proxy`.
 
 ## Closeout
 
-- [ ] Open the PR, then record shipped closeout, change log entry, and move the card to `done/` after merge.
+- [x] Open the PR; GitHub Tests (3.11, 3.13), test-selection comparison, Pre-commit, and CodeQL passed on `dbf341aa`.
+- [x] Squash-merge, record shipped closeout and the change log entry, and move the card to `done/`.
 
 ## Evidence and limits
 

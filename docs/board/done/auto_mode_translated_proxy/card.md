@@ -2,6 +2,8 @@
 
 User-authorized November 15, 2026. Branch: `fix/auto-mode-translated-proxy`, based on `main` at `37422ee1`.
 
+Shipped November 15, 2026 via [PR #299](https://github.com/hapa1i/multi-forge/pull/299) (`f10a66d3`).
+
 Claude Code 2.1.278+ asks Anthropic's server to review auto-mode actions whenever `ANTHROPIC_BASE_URL` points at a
 gateway. The request carries a `safeguards` body field and a `dangerous-tool-use-2026-09-03` beta; the review runs
 in-band against the model's tool calls. Forge's translated proxy drops the unknown field and the non-Anthropic upstream
