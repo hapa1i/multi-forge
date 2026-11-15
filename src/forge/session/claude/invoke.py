@@ -216,6 +216,7 @@ def _build_environment(
     from forge.core.reactive.env import (
         FORGE_PARENT_RUN_ID_VAR,
         apply_attribution_header_policy,
+        apply_auto_mode_server_policy,
         apply_forge_effort_source_header,
         apply_forge_launch_header,
         apply_forge_model_tier_header,
@@ -236,6 +237,8 @@ def _build_environment(
     apply_forge_effort_source_header(env, client=client_effort_source)
     apply_forge_launch_header(env, root.run_id)
     apply_attribution_header_policy(env)
+    # Re-run after unset_vars: a direct launch removes the proxy route only here.
+    apply_auto_mode_server_policy(env)
     # Finalize ANTHROPIC_API_KEY LAST -- after extra_vars and unset_vars -- so the
     # interactive_anthropic_api_key policy wins over anything merged above.
     apply_interactive_api_key(env, interactive=True)

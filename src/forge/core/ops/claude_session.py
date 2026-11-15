@@ -25,6 +25,7 @@ from forge.core.models.direct_model import (
     resolve_direct_model_pin,
 )
 from forge.core.reactive.env import (
+    FORGE_AUTO_MODE_SERVER_MANAGED_VAR,
     FORGE_FORGE_ROOT_VAR,
     FORGE_SIDECAR_HOST_FORGE_ROOT_VAR,
     FORGE_SIDECAR_HOST_WORKTREE_PATH_VAR,
@@ -33,6 +34,8 @@ from forge.core.reactive.env import (
     apply_forge_effort_source_header,
     compute_interactive_api_key_decision,
     new_root_run_identity,
+    predict_auto_mode_classifier_model,
+    predict_launch_auto_mode_classifier_model,
     resolve_proxy_wire_shape,
 )
 from forge.core.runtime.launch_args import RuntimeLaunchArgs
@@ -108,7 +111,12 @@ _DEFAULT_CLAUDE_INVOKER = invoke_claude
 
 @dataclass(frozen=True)
 class ClaudeLaunchReady:
-    """Actual launch target and the proxy snapshot already read for cost accounting."""
+    """Actual launch target and the proxy snapshot already read for cost accounting.
+
+    ``auto_mode_classifier_model`` is set only when Forge turned off Claude Code's
+    server-side auto-mode review for this launch; it is the predicted model id on
+    Claude Code's own classifier requests through the proxy.
+    """
 
     session: str
     operation: str
@@ -119,6 +127,7 @@ class ClaudeLaunchReady:
     runtime: ProxyRuntimeTruth | None
     direct_model: str | None = None
     forge_root: str | None = None
+    auto_mode_classifier_model: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1509,7 +1518,11 @@ def _run_sidecar_claude_session(
         proxy_id = recover_proxy_id_from_base_url(runtime_base_url)
 
     from forge.sidecar import get_secrets_for_template, run_sidecar_session
-    from forge.sidecar.container import ContainerExistsError, parse_mounts
+    from forge.sidecar.container import (
+        ContainerExistsError,
+        parse_mounts,
+        sidecar_route_policy_env,
+    )
     from forge.sidecar.docker import is_docker_available
 
     if not is_docker_available():
@@ -1620,6 +1633,7 @@ def _run_sidecar_claude_session(
         )
     _sidecar_cost_baseline = read_proxy_cost_baseline(runtime_base_url)
     if on_launch_ready is not None:
+        route_policy_env = sidecar_route_policy_env(template=effective_template, proxy_id=proxy_id)
         on_launch_ready(
             ClaudeLaunchReady(
                 session=manifest.name,
@@ -1631,6 +1645,11 @@ def _run_sidecar_claude_session(
                 model_route=manifest.intent.launch.model_route if manifest.intent.launch else None,
                 direct_model=manifest.intent.launch.direct_model if manifest.intent.launch else None,
                 runtime=_sidecar_cost_baseline.runtime if _sidecar_cost_baseline else None,
+                auto_mode_classifier_model=(
+                    predict_auto_mode_classifier_model({**container_env, **route_policy_env})
+                    if route_policy_env.get(FORGE_AUTO_MODE_SERVER_MANAGED_VAR)
+                    else None
+                ),
             )
         )
     record_launch_confirmed(
@@ -1857,6 +1876,7 @@ def _run_host_claude_session(
                 model_route=manifest.intent.launch.model_route if manifest.intent.launch else None,
                 direct_model=manifest.intent.launch.direct_model if manifest.intent.launch else None,
                 runtime=_proxy_cost_baseline.runtime if _proxy_cost_baseline else None,
+                auto_mode_classifier_model=predict_launch_auto_mode_classifier_model(env_vars, unset_env_vars),
             )
         )
     record_launch_confirmed(

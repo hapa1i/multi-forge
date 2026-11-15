@@ -16,9 +16,12 @@ from pathlib import Path
 from forge.core.paths import get_forge_home
 from forge.core.reactive.env import (
     CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
+    CLAUDE_CODE_AUTO_MODE_SERVER_VAR,
+    FORGE_AUTO_MODE_SERVER_MANAGED_VAR,
     FORGE_PROXY_WIRE_SHAPE_VAR,
     RunIdentity,
     apply_attribution_header_policy,
+    apply_auto_mode_server_policy,
     apply_forge_launch_header,
     new_root_run_identity,
     resolve_proxy_wire_shape,
@@ -117,7 +120,7 @@ def run_sidecar_session(
     # mints a fresh identity with no parent — host env inheritance does not cross the
     # container boundary, and a sidecar session begins its own run tree.
     run_identity = run_identity or new_root_run_identity()
-    attribution_env = _sidecar_attribution_header_env(template=template, proxy_id=proxy_id)
+    route_policy_env = sidecar_route_policy_env(template=template, proxy_id=proxy_id)
     container_env = dict(env_vars or {})
     # The entrypoint owns and health-checks this local Forge proxy before Claude starts.
     header_env = {
@@ -161,10 +164,14 @@ def run_sidecar_session(
         "-w",
         "/workspace",
     ]
-    if wire_shape := attribution_env.get(FORGE_PROXY_WIRE_SHAPE_VAR):
-        cmd.extend(["-e", f"{FORGE_PROXY_WIRE_SHAPE_VAR}={wire_shape}"])
-    if attribution_header := attribution_env.get(CLAUDE_CODE_ATTRIBUTION_HEADER_VAR):
-        cmd.extend(["-e", f"{CLAUDE_CODE_ATTRIBUTION_HEADER_VAR}={attribution_header}"])
+    for key in (
+        FORGE_PROXY_WIRE_SHAPE_VAR,
+        CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
+        CLAUDE_CODE_AUTO_MODE_SERVER_VAR,
+        FORGE_AUTO_MODE_SERVER_MANAGED_VAR,
+    ):
+        if value := route_policy_env.get(key):
+            cmd.extend(["-e", f"{key}={value}"])
 
     # Audit plumbing: proxy id + FORGE_HOME so the in-container server starts under
     # the proxy id (entrypoint.sh passes --proxy-id when FORGE_PROXY_ID is set) and
@@ -262,18 +269,23 @@ def _ensure_audit_plumbing_mounts(proxy_id: str) -> list[tuple[str, str, str]]:
     return mounts
 
 
-def _sidecar_attribution_header_env(*, template: str, proxy_id: str | None) -> dict[str, str]:
-    """Derive Claude attribution-header policy for the in-container proxy route.
+def sidecar_route_policy_env(*, template: str, proxy_id: str | None) -> dict[str, str]:
+    """Derive Claude Code's wire-shape env policies for the in-container proxy route.
 
     The sidecar entrypoint sets ``ANTHROPIC_BASE_URL`` after its local proxy is
     healthy; the host launcher owns the classifier/cache policy decision and
-    passes the resulting env var into the container so shell and Python cannot
-    drift.
+    passes the resulting env vars into the container so shell and Python cannot
+    drift. Host env does not otherwise cross into the container, so a user-set
+    ``CLAUDE_CODE_AUTO_MODE_SERVER`` is carried explicitly to keep it user-owned.
     """
     env = {"ANTHROPIC_BASE_URL": _SIDECAR_PROXY_BASE_URL}
+    for key in (CLAUDE_CODE_AUTO_MODE_SERVER_VAR, FORGE_AUTO_MODE_SERVER_MANAGED_VAR):
+        if (value := os.environ.get(key)) is not None:
+            env[key] = value
     if wire_shape := resolve_proxy_wire_shape(proxy_id=proxy_id, template=template):
         env[FORGE_PROXY_WIRE_SHAPE_VAR] = wire_shape
     apply_attribution_header_policy(env)
+    apply_auto_mode_server_policy(env)
     return env
 
 

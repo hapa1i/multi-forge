@@ -24,7 +24,11 @@ from forge.core.models.direct_model import (
     resolve_default_direct_model_pin,
 )
 from forge.core.paths import display_path
-from forge.core.reactive.env import FORGE_PROXY_WIRE_SHAPE_VAR, resolve_proxy_wire_shape
+from forge.core.reactive.env import (
+    FORGE_PROXY_WIRE_SHAPE_VAR,
+    predict_launch_auto_mode_classifier_model,
+    resolve_proxy_wire_shape,
+)
 from forge.proxy.proxies import (
     ProxyNotFoundError,
     ProxyResolutionError,
@@ -141,6 +145,23 @@ def _build_bare_launch_env(
     return env_vars, unset_vars
 
 
+def _print_bare_auto_mode_notice(
+    proxy_id: str, base_url: str | None, env_vars: dict[str, str], unset_vars: list[str]
+) -> None:
+    """Name the auto-mode judge when Forge turns off the server-side check."""
+    classifier_model = predict_launch_auto_mode_classifier_model(env_vars, unset_vars)
+    if classifier_model is None:
+        return
+    from forge.cli.auto_mode_notice import print_auto_mode_judge_notice
+    from forge.session.launch_confirmation import read_proxy_cost_baseline
+
+    baseline = read_proxy_cost_baseline(base_url)
+    runtime = baseline.runtime if baseline else None
+    if runtime is not None and (not runtime.is_proxy or runtime.proxy_id != proxy_id):
+        runtime = None
+    print_auto_mode_judge_notice(classifier_model, runtime)
+
+
 @claude.command("start")
 @click.option(
     "--proxy",
@@ -248,6 +269,7 @@ def start_cmd(
 
     if proxy_display:
         console.print(f"Starting Claude with proxy [green]{proxy_display}[/green] ({template})")
+        _print_bare_auto_mode_notice(proxy_display, base_url, env_vars, unset_vars)
     else:
         console.print("Starting Claude [green]direct[/green] (no proxy)")
 

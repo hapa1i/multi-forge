@@ -84,6 +84,8 @@ Environment overrides:
 - Do not export `CLAUDE_CODE_ATTRIBUTION_HEADER=0` globally. Forge sets it only for translated/third-party proxy routes
   that need the prompt-cache workaround, and scrubs it from direct Anthropic and `anthropic_passthrough` launches
   because global inheritance can break Claude Code auto-mode classification.
+- Exporting `CLAUDE_CODE_AUTO_MODE_SERVER` overrides Forge's translated-proxy default of `0`; see
+  [Auto mode on translated proxies](proxy.md#auto-mode-on-translated-proxies).
 
 **Note on running processes:** Runtime config is cached per-process. Changes via `forge config set` take effect for new
 CLI invocations and new sessions, but **already-running proxies do not pick up changes until restart**. Restart a live

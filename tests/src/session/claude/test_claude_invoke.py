@@ -12,7 +12,10 @@ import pytest
 
 from forge.core.reactive.env import (
     CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
+    CLAUDE_CODE_AUTO_MODE_SERVER_VAR,
+    FORGE_AUTO_MODE_SERVER_MANAGED_VAR,
     FORGE_PARENT_RUN_ID_VAR,
+    FORGE_PROXY_WIRE_SHAPE_VAR,
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_RUN_ID_VAR,
 )
@@ -243,6 +246,35 @@ class TestBuildEnvironment:
 
         assert env["ANTHROPIC_BASE_URL"] == "http://localhost:8085"
         assert env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR] == "0"
+
+    def test_translated_proxy_launch_turns_off_auto_mode_server(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Interactive translated launches use Claude Code's local auto-mode classifier."""
+        monkeypatch.delenv(CLAUDE_CODE_AUTO_MODE_SERVER_VAR, raising=False)
+        monkeypatch.delenv(FORGE_AUTO_MODE_SERVER_MANAGED_VAR, raising=False)
+
+        env = _build_environment(
+            {"ANTHROPIC_BASE_URL": "http://localhost:8085", FORGE_PROXY_WIRE_SHAPE_VAR: "openai_translated"}
+        )
+
+        assert env[CLAUDE_CODE_AUTO_MODE_SERVER_VAR] == "0"
+        assert env[FORGE_AUTO_MODE_SERVER_MANAGED_VAR] == "1"
+
+    def test_nested_direct_launch_drops_inherited_auto_mode_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A direct launch from inside a translated session regains the server review.
+
+        The shared builder still sees the parent's proxy route before ``unset_vars``
+        removes it, so the final pass in the interactive builder must drop the default.
+        """
+        monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://localhost:8085")
+        monkeypatch.setenv(FORGE_PROXY_WIRE_SHAPE_VAR, "openai_translated")
+        monkeypatch.setenv(CLAUDE_CODE_AUTO_MODE_SERVER_VAR, "0")
+        monkeypatch.setenv(FORGE_AUTO_MODE_SERVER_MANAGED_VAR, "1")
+
+        env = _build_environment(None, ["ANTHROPIC_BASE_URL", "ACTIVE_TEMPLATE", FORGE_PROXY_WIRE_SHAPE_VAR])
+
+        assert "ANTHROPIC_BASE_URL" not in env
+        assert CLAUDE_CODE_AUTO_MODE_SERVER_VAR not in env
+        assert FORGE_AUTO_MODE_SERVER_MANAGED_VAR not in env
 
     def test_mints_fresh_root_identity(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """An interactive launch is a run-tree root: FORGE_RUN_ID == FORGE_ROOT_RUN_ID, no parent."""

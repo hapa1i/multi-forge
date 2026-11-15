@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from forge.core.run_id import (
@@ -28,7 +28,12 @@ from forge.core.run_id import (
     mint_run_id,
     sanitize_label,
 )
-from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE
+from forge.core.wire_shapes import (
+    ANTHROPIC_PASSTHROUGH,
+    DEFAULT_WIRE_SHAPE,
+    OPENAI_RESPONSES_PASSTHROUGH,
+    OPENAI_TRANSLATED,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +61,12 @@ FORGE_SESSION_VAR = "FORGE_SESSION"
 FORGE_COMMAND_VAR = "FORGE_COMMAND"
 
 CLAUDE_CODE_ATTRIBUTION_HEADER_VAR = "CLAUDE_CODE_ATTRIBUTION_HEADER"
+CLAUDE_CODE_AUTO_MODE_SERVER_VAR = "CLAUDE_CODE_AUTO_MODE_SERVER"
+CLAUDE_CODE_AUTO_MODE_MODEL_VAR = "CLAUDE_CODE_AUTO_MODE_MODEL"
+# Distinguishes Forge's translated-route CLAUDE_CODE_AUTO_MODE_SERVER=0 from a
+# user-owned value, so a nested direct or passthrough launch can drop the
+# inherited default without discarding the user's choice.
+FORGE_AUTO_MODE_SERVER_MANAGED_VAR = "FORGE_AUTO_MODE_SERVER_MANAGED"
 FORGE_SUBPROCESS_PROXY_VAR = "FORGE_SUBPROCESS_PROXY"
 FORGE_SUBPROCESS_BASE_URL_VAR = "FORGE_SUBPROCESS_BASE_URL"
 FORGE_SUBPROCESS_PROXY_ID_VAR = "FORGE_SUBPROCESS_PROXY_ID"
@@ -71,6 +82,16 @@ FORGE_TEMPLATE_VAR = "FORGE_TEMPLATE"
 # --bare (Claude Code >= 2.1.81) disables OAuth/keychain auth, requiring
 # ANTHROPIC_API_KEY in the environment. Only safe when the key is present.
 _BARE_AUTH_KEY = "ANTHROPIC_API_KEY"
+
+# Claude Messages requests on these shapes are rebuilt for a non-Anthropic
+# upstream, so the server-side auto-mode review request is dropped in transit.
+_AUTO_MODE_LOCAL_CLASSIFIER_WIRE_SHAPES = frozenset({OPENAI_TRANSLATED, OPENAI_RESPONSES_PASSTHROUGH})
+# Claude Code's documented default-classifier rules: Sonnet 5 unless
+# ANTHROPIC_DEFAULT_SONNET_MODEL names another model, and these overrides fall
+# back to that default instead of reviewing.
+_AUTO_MODE_DEFAULT_CLASSIFIER_MODEL = "claude-sonnet-5"
+_AUTO_MODE_SONNET_DEFAULT_REMAPS = frozenset({"claude-sonnet-5-5", "claude-opus-5-5"})
+_AUTO_MODE_IGNORED_MODEL_OVERRIDES = frozenset({"claude-opus-5", "claude-sonnet-5-5", "claude-opus-5-5"})
 
 
 def can_use_bare(env: Mapping[str, str] | None = None) -> bool:
@@ -281,6 +302,7 @@ def build_claude_env(
                 env.pop("ANTHROPIC_BASE_URL", None)
 
     apply_attribution_header_policy(env)
+    apply_auto_mode_server_policy(env)
 
     # Increment FORGE_DEPTH so child subprocesses know their nesting level
     current_depth = get_forge_depth(env)
@@ -318,6 +340,77 @@ def apply_attribution_header_policy(env: dict[str, str]) -> None:
         return
 
     env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR] = "0"
+
+
+def apply_auto_mode_server_policy(env: dict[str, str]) -> bool:
+    """Use Claude Code's local auto-mode classifier on translated proxy routes.
+
+    Behind a custom ``ANTHROPIC_BASE_URL``, Claude Code asks Anthropic's server to
+    review auto-mode actions in-band. A translated route rebuilds the request for a
+    non-Anthropic upstream, so the review request never arrives and interactive
+    Claude Code stops to ask the user to approve each action. Forge sets
+    ``CLAUDE_CODE_AUTO_MODE_SERVER=0`` there so Claude Code sends its own classifier
+    requests through the proxy from the first action.
+
+    A value the user set is left alone. Forge's own default carries a marker so a
+    nested direct, passthrough, or unknown route drops the inherited ``0``; a
+    marked value the user has since changed counts as user-owned. Unknown wire
+    shapes are left alone because an opaque gateway may carry the server review.
+
+    Returns True when ``env`` ends with Forge's managed ``0``.
+    """
+    inherited_forge_default = env.pop(FORGE_AUTO_MODE_SERVER_MANAGED_VAR, None) is not None
+    if inherited_forge_default and env.get(CLAUDE_CODE_AUTO_MODE_SERVER_VAR) == "0":
+        del env[CLAUDE_CODE_AUTO_MODE_SERVER_VAR]
+    if CLAUDE_CODE_AUTO_MODE_SERVER_VAR in env:
+        return False
+    if not env.get("ANTHROPIC_BASE_URL"):
+        return False
+    if _proxy_wire_shape_for_env(env) not in _AUTO_MODE_LOCAL_CLASSIFIER_WIRE_SHAPES:
+        return False
+    env[CLAUDE_CODE_AUTO_MODE_SERVER_VAR] = "0"
+    env[FORGE_AUTO_MODE_SERVER_MANAGED_VAR] = "1"
+    return True
+
+
+def predict_launch_auto_mode_classifier_model(
+    env_vars: Mapping[str, str], unset_vars: Iterable[str] = ()
+) -> str | None:
+    """Predict the auto-mode judge request model for an interactive Claude launch.
+
+    Layers ``env_vars`` over ``os.environ`` and removes ``unset_vars`` as the
+    interactive env builder does, so user-owned overrides count. Returns None
+    unless Forge turns off the server-side review for that env.
+    """
+    launch_env = {**os.environ, **env_vars}
+    for key in unset_vars:
+        launch_env.pop(key, None)
+    if not apply_auto_mode_server_policy(launch_env):
+        return None
+    return predict_auto_mode_classifier_model(launch_env)
+
+
+def predict_auto_mode_classifier_model(env: Mapping[str, str]) -> str:
+    """Predict the model id on Claude Code's local auto-mode classifier requests.
+
+    Follows Claude Code's documented precedence: ``CLAUDE_CODE_AUTO_MODE_MODEL``
+    unless it names a model Claude Code refuses to review with, then
+    ``ANTHROPIC_DEFAULT_SONNET_MODEL`` with Sonnet 5.5 and Opus 5.5 mapped to the
+    Sonnet 5 default. An Anthropic-configured classifier model or a provider
+    fallback is invisible to Forge, so callers must present this as a prediction.
+    """
+    from forge.core.models.model_reference import strip_transport_model_suffix
+
+    def _model_id(name: str) -> str:
+        return strip_transport_model_suffix(env.get(name, "").strip())
+
+    override = _model_id(CLAUDE_CODE_AUTO_MODE_MODEL_VAR)
+    if override and override not in _AUTO_MODE_IGNORED_MODEL_OVERRIDES:
+        return override
+    sonnet_default = _model_id("ANTHROPIC_DEFAULT_SONNET_MODEL")
+    if sonnet_default and sonnet_default not in _AUTO_MODE_SONNET_DEFAULT_REMAPS:
+        return sonnet_default
+    return _AUTO_MODE_DEFAULT_CLASSIFIER_MODEL
 
 
 def resolve_proxy_wire_shape(*, proxy_id: str | None = None, template: str | None = None) -> str | None:

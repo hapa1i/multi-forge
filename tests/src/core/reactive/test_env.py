@@ -8,6 +8,9 @@ import pytest
 
 from forge.core.reactive.env import (
     CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
+    CLAUDE_CODE_AUTO_MODE_MODEL_VAR,
+    CLAUDE_CODE_AUTO_MODE_SERVER_VAR,
+    FORGE_AUTO_MODE_SERVER_MANAGED_VAR,
     FORGE_COMMAND_VAR,
     FORGE_DEPTH_VAR,
     FORGE_MAX_DEPTH,
@@ -18,6 +21,7 @@ from forge.core.reactive.env import (
     FORGE_SESSION_VAR,
     InteractiveApiKeyDecision,
     RunIdentity,
+    apply_auto_mode_server_policy,
     apply_interactive_api_key,
     build_claude_env,
     can_use_bare,
@@ -27,6 +31,8 @@ from forge.core.reactive.env import (
     get_run_identity,
     mint_run_id,
     new_root_run_identity,
+    predict_auto_mode_classifier_model,
+    predict_launch_auto_mode_classifier_model,
     should_spawn_subprocesses,
 )
 
@@ -176,6 +182,100 @@ class TestBuildClaudeEnv:
             env = build_claude_env()
         assert env["ANTHROPIC_BASE_URL"] == "http://inherited-proxy:8085"
         assert env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR] == "0"
+
+
+_FORGE_AUTO_MODE_DEFAULT = {CLAUDE_CODE_AUTO_MODE_SERVER_VAR: "0", FORGE_AUTO_MODE_SERVER_MANAGED_VAR: "1"}
+_TRANSLATED_ROUTE = {"ANTHROPIC_BASE_URL": "http://localhost:8085", FORGE_PROXY_WIRE_SHAPE_VAR: "openai_translated"}
+
+
+class TestAutoModeServerPolicy:
+    @pytest.mark.parametrize("wire_shape", ["openai_translated", "openai_responses_passthrough"])
+    def test_translated_route_turns_off_server_review(self, wire_shape):
+        """Translated Claude Messages routes drop the server review, so use the local classifier."""
+        with patch.dict("os.environ", {}, clear=True):
+            env = build_claude_env(
+                base_url="http://localhost:8085", extra_vars={FORGE_PROXY_WIRE_SHAPE_VAR: wire_shape}
+            )
+        assert env[CLAUDE_CODE_AUTO_MODE_SERVER_VAR] == "0"
+        assert env[FORGE_AUTO_MODE_SERVER_MANAGED_VAR] == "1"
+
+    def test_anthropic_passthrough_keeps_server_review_and_scrubs_inherited_default(self):
+        """Anthropic passthrough can carry the review, so Forge's inherited 0 must not survive."""
+        with patch.dict("os.environ", _FORGE_AUTO_MODE_DEFAULT, clear=True):
+            env = build_claude_env(
+                base_url="http://localhost:8085",
+                extra_vars={FORGE_PROXY_WIRE_SHAPE_VAR: "anthropic_passthrough"},
+            )
+        assert CLAUDE_CODE_AUTO_MODE_SERVER_VAR not in env
+        assert FORGE_AUTO_MODE_SERVER_MANAGED_VAR not in env
+
+    def test_direct_route_scrubs_inherited_forge_default(self):
+        """A direct child of a translated session must get Claude Code's default server review."""
+        with patch.dict("os.environ", {**_TRANSLATED_ROUTE, **_FORGE_AUTO_MODE_DEFAULT}, clear=True):
+            env = build_claude_env(direct=True)
+        assert "ANTHROPIC_BASE_URL" not in env
+        assert CLAUDE_CODE_AUTO_MODE_SERVER_VAR not in env
+        assert FORGE_AUTO_MODE_SERVER_MANAGED_VAR not in env
+
+    @pytest.mark.parametrize("user_value", ["0", "1"])
+    def test_user_value_wins_on_direct_and_translated_routes(self, user_value):
+        """An unmarked value is the user's, including an explicit 1 on a translated route."""
+        with patch.dict("os.environ", {CLAUDE_CODE_AUTO_MODE_SERVER_VAR: user_value}, clear=True):
+            direct = build_claude_env(direct=True)
+            translated = build_claude_env(base_url="http://localhost:8085", extra_vars=dict(_TRANSLATED_ROUTE))
+        for env in (direct, translated):
+            assert env[CLAUDE_CODE_AUTO_MODE_SERVER_VAR] == user_value
+            assert FORGE_AUTO_MODE_SERVER_MANAGED_VAR not in env
+
+    def test_marked_value_changed_by_user_stays_user_owned(self):
+        """A user who flips Forge's 0 inside a session keeps that value; the stale marker goes."""
+        env = {CLAUDE_CODE_AUTO_MODE_SERVER_VAR: "1", FORGE_AUTO_MODE_SERVER_MANAGED_VAR: "1"}
+        assert apply_auto_mode_server_policy(env) is False
+        assert env == {CLAUDE_CODE_AUTO_MODE_SERVER_VAR: "1"}
+
+    def test_policy_is_idempotent_on_translated_route(self):
+        """Interactive launches apply the policy twice; the second pass must keep Forge's default."""
+        env = dict(_TRANSLATED_ROUTE)
+        assert apply_auto_mode_server_policy(env) is True
+        assert apply_auto_mode_server_policy(env) is True
+        assert env == {**_TRANSLATED_ROUTE, **_FORGE_AUTO_MODE_DEFAULT}
+
+    def test_unknown_wire_shape_is_left_alone(self):
+        """An opaque gateway may carry the server review, so Forge does not guess."""
+        env = {"ANTHROPIC_BASE_URL": "http://gateway.example:8080"}
+        with patch("forge.core.reactive.env._wire_shape_from_registry_base_url", return_value=None):
+            assert apply_auto_mode_server_policy(env) is False
+        assert env == {"ANTHROPIC_BASE_URL": "http://gateway.example:8080"}
+
+
+class TestPredictAutoModeClassifierModel:
+    @pytest.mark.parametrize(
+        ("env", "expected"),
+        [
+            ({}, "claude-sonnet-5"),
+            ({"ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5-5[1m]"}, "claude-sonnet-5"),
+            ({"ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-opus-5-5"}, "claude-sonnet-5"),
+            ({"ANTHROPIC_DEFAULT_SONNET_MODEL": "gemini-4-carbon"}, "gemini-4-carbon"),
+            ({CLAUDE_CODE_AUTO_MODE_MODEL_VAR: "anthropic/claude-sonnet-5"}, "anthropic/claude-sonnet-5"),
+            (
+                {CLAUDE_CODE_AUTO_MODE_MODEL_VAR: "claude-opus-5", "ANTHROPIC_DEFAULT_SONNET_MODEL": "gemini-4-carbon"},
+                "gemini-4-carbon",
+            ),
+        ],
+    )
+    def test_follows_claude_code_default_classifier_precedence(self, env, expected):
+        assert predict_auto_mode_classifier_model(env) == expected
+
+    def test_launch_prediction_layers_over_user_environment(self):
+        """The prediction sees the same user-owned overrides the child inherits."""
+        with patch.dict("os.environ", {CLAUDE_CODE_AUTO_MODE_MODEL_VAR: "anthropic/claude-sonnet-5"}, clear=True):
+            assert predict_launch_auto_mode_classifier_model(_TRANSLATED_ROUTE) == "anthropic/claude-sonnet-5"
+
+    def test_launch_prediction_is_none_without_forge_default(self):
+        with patch.dict("os.environ", {CLAUDE_CODE_AUTO_MODE_SERVER_VAR: "1"}, clear=True):
+            assert predict_launch_auto_mode_classifier_model(_TRANSLATED_ROUTE) is None
+        with patch.dict("os.environ", _TRANSLATED_ROUTE, clear=True):
+            assert predict_launch_auto_mode_classifier_model({}, ["ANTHROPIC_BASE_URL"]) is None
 
 
 class TestGetForgeDepth:
