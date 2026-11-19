@@ -48,7 +48,16 @@ def test_astra_uses_packaged_pricing_without_a_deployment_override() -> None:
 
 @pytest.mark.parametrize(
     "model",
-    ["gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-2"],
+    [
+        "gpt-6.2-astra",
+        "gpt-6.2-sol",
+        "gpt-6.1-sol",
+        "gpt-6-sol",
+        "gpt-6-luna",
+        "claude-opus-5-5",
+        "claude-sonnet-5-5",
+        "claude-fable-5-2",
+    ],
 )
 def test_new_model_metadata_override_is_still_needed(model: str) -> None:
     cost_map = _packaged_cost_map()
@@ -98,6 +107,26 @@ def test_gemini_4_metadata_covers_both_packaged_deployment_names(model: str) -> 
                 (100, 0, 100, 0.00125, 0.0005),
                 (272_000, 1_000, 0, 2.711, 0.0005),
                 (272_001, 1_000, 500, 5.42452, 0.00075),
+            ],
+        ),
+        (
+            "openai/gpt-6.2-astra",
+            [
+                (100, 0, 0, 0.0008, 0.0004),
+                (100, 80, 0, 0.000192, 0.0004),
+                (100, 0, 100, 0.001, 0.0004),
+                (272_000, 1_000, 0, 2.1684, 0.0004),
+                (272_001, 1_000, 500, 4.338816, 0.0006),
+            ],
+        ),
+        (
+            "openai/gpt-6.2-sol",
+            [
+                (100, 0, 0, 0.0002, 0.0001),
+                (100, 80, 0, 0.000048, 0.0001),
+                (100, 0, 100, 0.00025, 0.0001),
+                (272_000, 1_000, 0, 0.5421, 0.0001),
+                (272_001, 1_000, 500, 1.084704, 0.00015),
             ],
         ),
         (
@@ -205,14 +234,28 @@ def test_native_pricing_without_remote_model_metadata(model: str, cases: list[tu
     if model.startswith("openai/"):
         # OpenAI bills Flex at half and Fast/legacy Priority at twice the applicable standard rate.
         tiers.update({"default": 1.0, "flex": 0.5, "priority": 2.0, "fast": 2.0})
-    actual = _run_offline(script, {"entry": _backend_entry(model), "cases": cases, "tiers": list(tiers)})
-
-    for tier_result, multiplier in zip(actual["tiers"], tiers.values(), strict=True):
-        for costs, response_cost, (*_, expected_input, expected_output) in zip(
-            tier_result["costs"], tier_result["response_costs"], cases, strict=True
+    entry = _backend_entry(model)
+    if model.startswith("openai/gpt-6.2-"):
+        tiers["ultrafast"] = 3.0
+        info = entry["model_info"]
+        for rate in (
+            "input_cost_per_token",
+            "output_cost_per_token",
+            "cache_read_input_token_cost",
+            "cache_creation_input_token_cost",
         ):
-            assert costs == pytest.approx((expected_input * multiplier, expected_output * multiplier))
-            assert response_cost == pytest.approx((expected_input + expected_output) * multiplier)
+            long_rate = f"{rate}_above_272k_tokens"
+            assert info[f"{long_rate}_ultrafast"] == pytest.approx(info[long_rate] * 3)
+    actual = _run_offline(script, {"entry": entry, "cases": cases, "tiers": list(tiers)})
+
+    for tier_result, (tier, multiplier) in zip(actual["tiers"], tiers.items(), strict=True):
+        for costs, response_cost, case in zip(tier_result["costs"], tier_result["response_costs"], cases, strict=True):
+            prompt, _, _, expected_input, expected_output = case
+            # LiteLLM 1.102 drops long-context Ultrafast keys from get_model_info().
+            # When upstream fixes this, remove the exception and update the upgrade guide.
+            applied = 1.0 if tier == "ultrafast" and prompt > 272_000 else multiplier
+            assert costs == pytest.approx((expected_input * applied, expected_output * applied))
+            assert response_cost == pytest.approx((expected_input + expected_output) * applied)
     if model == "anthropic/claude-opus-5-5":
         assert actual["hour_cache_cost"] == pytest.approx((0.0008, 0.0002))
     elif model == "anthropic/claude-sonnet-5-5":

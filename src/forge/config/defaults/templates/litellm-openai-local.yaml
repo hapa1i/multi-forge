@@ -18,17 +18,21 @@ proxy:
   litellm:
     tiers:
       haiku: openai/gpt-5.4-mini
-      sonnet: openai/gpt-6-astra
-      opus: openai/gpt-6-astra
+      sonnet: openai/gpt-6.2-astra
+      opus: openai/gpt-6.2-astra
     model_alternatives:
       haiku:
         gpt-6-luna: openai/gpt-6-luna
       sonnet:
+        gpt-6.2-sol: openai/gpt-6.2-sol
+        gpt-6-astra: openai/gpt-6-astra
         gpt-6.1-sol: openai/gpt-6.1-sol
         gpt-6-sol: openai/gpt-6-sol
         gpt-6-luna: openai/gpt-6-luna
         gpt-5.6-sol: openai/gpt-5.6-sol
       opus:
+        gpt-6.2-sol: openai/gpt-6.2-sol
+        gpt-6-astra: openai/gpt-6-astra
         gpt-6.1-sol: openai/gpt-6.1-sol
         gpt-6-sol: openai/gpt-6-sol
         gpt-6-luna: openai/gpt-6-luna

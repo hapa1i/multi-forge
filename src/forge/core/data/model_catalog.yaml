@@ -35,8 +35,8 @@ schema_version: 2
 defaults:
   openai:
     haiku: gpt-5.4-mini
-    sonnet: gpt-6-astra
-    opus: gpt-6-astra
+    sonnet: gpt-6.2-astra
+    opus: gpt-6.2-astra
   gemini:
     haiku: gemini-3.8-flash
     sonnet: gemini-4-carbon
@@ -77,6 +77,46 @@ models:
   # ---------------------------------------------------------------------------
   # OpenAI Models (via Azure or direct)
   # ---------------------------------------------------------------------------
+  gpt-6.2-astra: &gpt_62
+    friendly_name: GPT-6.2 Astra
+    context_window_tokens: 1050000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [low, medium, high, xhigh, max]
+    default_reasoning_effort: medium
+    use_responses_api: true
+    system_prompt_addendum: system_prompt_addendums/openai.md
+    tags: []
+
+  gpt-6.2-sol:
+    <<: *gpt_62
+    friendly_name: GPT-6.2 Sol
+
+  # OpenRouter exposes Pro reasoning mode under its own model IDs.
+  gpt-6.2-astra-pro:
+    <<: *gpt_62
+    friendly_name: GPT-6.2 Astra Pro
+    default_timeout_seconds: 300
+
+  gpt-6.2-sol-pro:
+    <<: *gpt_62
+    friendly_name: GPT-6.2 Sol Pro
+    default_timeout_seconds: 300
+
   gpt-6-astra:
     friendly_name: GPT-6 Astra
     context_window_tokens: 1050000
@@ -2433,18 +2473,22 @@ models:
 # ALIASES - Provider-prefixed IDs map to canonical models
 # =============================================================================
 aliases:
-  astra: gpt-6-astra
-  gpt-astra: gpt-6-astra
+  astra: gpt-6.2-astra
+  gpt-astra: gpt-6.2-astra
+  openai/gpt-6.2-astra: gpt-6.2-astra
   openai/gpt-6-astra: gpt-6-astra
-  astra-pro: gpt-6-astra-pro
-  gpt-astra-pro: gpt-6-astra-pro
+  astra-pro: gpt-6.2-astra-pro
+  gpt-astra-pro: gpt-6.2-astra-pro
+  openai/gpt-6.2-astra-pro: gpt-6.2-astra-pro
   openai/gpt-6-astra-pro: gpt-6-astra-pro
-  sol: gpt-6.1-sol
-  gpt-sol: gpt-6.1-sol
+  sol: gpt-6.2-sol
+  gpt-sol: gpt-6.2-sol
+  openai/gpt-6.2-sol: gpt-6.2-sol
   openai/gpt-6.1-sol: gpt-6.1-sol
   openai/gpt-6-sol: gpt-6-sol
-  sol-pro: gpt-6-sol-pro
-  gpt-sol-pro: gpt-6-sol-pro
+  sol-pro: gpt-6.2-sol-pro
+  gpt-sol-pro: gpt-6.2-sol-pro
+  openai/gpt-6.2-sol-pro: gpt-6.2-sol-pro
   openai/gpt-6-sol-pro: gpt-6-sol-pro
   luna: gpt-6-luna
   gpt-luna: gpt-6-luna

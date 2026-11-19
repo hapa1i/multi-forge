@@ -1,10 +1,10 @@
 # Template: openrouter-openai
 # OpenAI models via OpenRouter (direct, no LiteLLM)
 #
-# Access to GPT-6.1 Sol, GPT-6 Astra/Sol/Luna and their Pro variants, and GPT-5.4-mini.
+# OpenRouter serves standard GPT-6.2 models and their Pro variants.
 # Requires OPENROUTER_API_KEY in .env (or environment).
 #
-# Haiku uses gpt-5.4-mini; sonnet and opus both use gpt-6-astra,
+# Haiku uses gpt-5.4-mini. Sonnet and Opus use gpt-6.2-astra,
 # differentiated by tier_overrides (reasoning_effort and verbosity).
 
 proxy:
@@ -17,13 +17,17 @@ proxy:
     allow_non_zdr: false
     tiers:
       haiku: openai/gpt-5.4-mini
-      sonnet: openai/gpt-6-astra
-      opus: openai/gpt-6-astra
+      sonnet: openai/gpt-6.2-astra
+      opus: openai/gpt-6.2-astra
     model_alternatives:
       haiku:
         gpt-6-luna: openai/gpt-6-luna
         gpt-6-luna-pro: openai/gpt-6-luna-pro
       sonnet:
+        gpt-6.2-sol: openai/gpt-6.2-sol
+        gpt-6-astra: openai/gpt-6-astra
+        gpt-6.2-sol-pro: openai/gpt-6.2-sol-pro
+        gpt-6.2-astra-pro: openai/gpt-6.2-astra-pro
         gpt-6.1-sol: openai/gpt-6.1-sol
         gpt-6-sol: openai/gpt-6-sol
         gpt-6-sol-pro: openai/gpt-6-sol-pro
@@ -32,6 +36,10 @@ proxy:
         gpt-5.6-sol: openai/gpt-5.6-sol
         gpt-6-astra-pro: openai/gpt-6-astra-pro
       opus:
+        gpt-6.2-sol: openai/gpt-6.2-sol
+        gpt-6-astra: openai/gpt-6-astra
+        gpt-6.2-sol-pro: openai/gpt-6.2-sol-pro
+        gpt-6.2-astra-pro: openai/gpt-6.2-astra-pro
         gpt-6.1-sol: openai/gpt-6.1-sol
         gpt-6-sol: openai/gpt-6-sol
         gpt-6-sol-pro: openai/gpt-6-sol-pro

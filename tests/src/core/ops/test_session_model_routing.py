@@ -85,7 +85,10 @@ class TestSessionModelRoutePlanning:
             ("codex-responses-local", "opus"),
         ],
     )
-    @pytest.mark.parametrize("model", ["gpt-6-astra", "gpt-5.6-sol"])
+    @pytest.mark.parametrize(
+        "model",
+        ["gpt-6.2-astra", "gpt-6.2-sol", "gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-sol"],
+    )
     def test_current_gpt_templates_serve_astra_and_retained_sol(self, template: str, tier: str, model: str) -> None:
         snapshot = inspect_proxy_reference(template)
 
@@ -98,24 +101,49 @@ class TestSessionModelRoutePlanning:
         ("template", "tier"),
         [("openrouter-openai", "sonnet"), ("openrouter-openai", "opus"), ("openrouter-openai-codex", "opus")],
     )
-    def test_astra_pro_alias_selects_the_openrouter_alternative(self, template: str, tier: str) -> None:
+    @pytest.mark.parametrize("alias", ["astra-pro", "sol-pro"])
+    def test_pro_alias_selects_the_openrouter_alternative(self, template: str, tier: str, alias: str) -> None:
         snapshot = inspect_proxy_reference(template)
 
-        plan = plan_session_model_route("astra-pro", explicit_proxy=snapshot, model_tier=tier)
+        plan = plan_session_model_route(alias, explicit_proxy=snapshot, model_tier=tier)
 
-        assert plan.request.requested_model == "gpt-6-astra-pro"
-        assert plan.selected_model == "openai/gpt-6-astra-pro"
+        assert plan.request.requested_model == f"gpt-6.2-{alias}"
+        assert plan.selected_model == f"openai/gpt-6.2-{alias}"
         assert plan.selected_tier == tier
 
-    def test_astra_pro_has_no_native_litellm_route(self) -> None:
+    @pytest.mark.parametrize("alias", ["astra-pro", "sol-pro"])
+    def test_pro_has_no_native_litellm_route(self, alias: str) -> None:
         snapshot = inspect_proxy_reference("litellm-openai-local")
 
         with pytest.raises(SessionModelRoutingError, match="does not serve model"):
-            plan_session_model_route("astra-pro", explicit_proxy=snapshot)
+            plan_session_model_route(alias, explicit_proxy=snapshot)
+
+    @pytest.mark.parametrize("alias", ["astra", "sol"])
+    @pytest.mark.parametrize(
+        ("credential", "template"),
+        [("OPENAI_API_KEY", "codex-responses-local"), ("OPENROUTER_API_KEY", "openrouter-openai")],
+    )
+    def test_automatic_gpt_62_route_with_one_provider_key(
+        self, alias: str, credential: str, template: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from forge.core.auth import template_secrets
+
+        monkeypatch.setattr(
+            template_secrets, "resolve_env_or_credential", lambda name: "configured" if name == credential else None
+        )
+        plan = plan_session_model_route(alias)
+        assert plan.proxy is not None and plan.proxy.template == template
+        assert plan.selected_model == f"openai/gpt-6.2-{alias}"
 
     @pytest.mark.parametrize(
         ("template", "current_model", "previous_model", "haiku_model"),
         [
+            (
+                "openrouter-openai",
+                "gpt-6.2-astra",
+                "gpt-6-astra",
+                "openai/gpt-5.4-mini",
+            ),
             ("openrouter-openai", "gpt-6-astra", "gpt-5.6-sol", "openai/gpt-5.4-mini"),
             ("openrouter-gemini", "gemini-4-carbon", "gemini-4-argon", "google/gemini-3.8-flash"),
             ("openrouter-gemini", "gemini-4-argon", "gemini-3.1-pro-preview", "google/gemini-3.8-flash"),

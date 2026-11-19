@@ -27,7 +27,16 @@ CLAUDE_MODELS = (
     "haiku",
     *(model for model in load_model_catalog().models if model.startswith("claude-")),
 )
-CODEX_MODELS = ("gpt-5-codex", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-6-astra")
+CODEX_MODELS = (
+    "gpt-5-codex",
+    "gpt-6.2-astra",
+    "gpt-6.2-sol",
+    "gpt-6.1-sol",
+    "gpt-6-sol",
+    "gpt-6-luna",
+    "gpt-5.6-sol",
+    "gpt-6-astra",
+)
 
 SUPERVISOR_CONSUMER = Consumer(
     id="supervisor",

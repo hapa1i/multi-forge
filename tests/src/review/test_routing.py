@@ -246,17 +246,20 @@ _EXPECTED_WORKFLOW_ROUTES = {
     ),
 }
 
+_OPENROUTER_GPT_ROUTES = tuple(
+    template for template in _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"] if template.startswith("openrouter-")
+)
 _EXPECTED_WORKFLOW_ROUTES.update(
     {
+        "gpt-6.2-astra": _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"],
+        "gpt-6.2-sol": _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"],
+        "gpt-6.2-astra-pro": _OPENROUTER_GPT_ROUTES,
+        "gpt-6.2-sol-pro": _OPENROUTER_GPT_ROUTES,
         "gpt-6.1-sol": _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"],
         "gpt-6-sol": _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"],
         "gpt-6-luna": _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"],
-        "gpt-6-sol-pro": tuple(
-            template for template in _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"] if template.startswith("openrouter-")
-        ),
-        "gpt-6-luna-pro": tuple(
-            template for template in _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"] if template.startswith("openrouter-")
-        ),
+        "gpt-6-sol-pro": _OPENROUTER_GPT_ROUTES,
+        "gpt-6-luna-pro": _OPENROUTER_GPT_ROUTES,
         "gemini-4-carbon": _EXPECTED_WORKFLOW_ROUTES["gemini-3.1-pro-preview"],
         "gemini-4-argon": _EXPECTED_WORKFLOW_ROUTES["gemini-3.1-pro-preview"],
         "gemini-3.8-flash": (
@@ -339,6 +342,10 @@ class TestResolveInvocationRouting:
         from forge.review.models import resolve_model_specs
 
         model_refs = (
+            "openai/gpt-6.2-astra",
+            "openai/gpt-6.2-sol",
+            "openai/gpt-6.2-astra-pro",
+            "openai/gpt-6.2-sol-pro",
             "openai/gpt-6.1-sol",
             "openai/gpt-6-sol",
             "openai/gpt-6-sol-pro",

@@ -203,6 +203,10 @@ def _build_available_models() -> dict[str, ModelSpec]:
         ),
     }
     for name, family, description in (
+        ("gpt-6.2-sol", "openai", "Coding and agent workflow review"),
+        ("gpt-6.2-astra-pro", "openai", "GPT-6.2 Astra Pro review through OpenRouter"),
+        ("gpt-6.2-sol-pro", "openai", "GPT-6.2 Sol Pro review through OpenRouter"),
+        ("gpt-6-astra", "openai", "Explicit prior GPT-6 Astra review"),
         ("gpt-6-astra-pro", "openai", "Explicit Astra Pro review through OpenRouter"),
         ("gpt-6.1-sol", "openai", "Coding and professional workflow review"),
         ("gpt-6-sol", "openai", "Coding and agent workflow review"),

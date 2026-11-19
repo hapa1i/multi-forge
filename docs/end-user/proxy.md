@@ -114,11 +114,13 @@ local backend whose credential it is configured for. The default config serves G
 it `(shared)`; starting a second matching backend reuses the running process rather than launching a new one. This is
 expected -- there is one local LiteLLM process, not one per backend.
 
-### Picking up GPT-6 Astra defaults after an upgrade
+<a name="picking-up-gpt-6-astra-defaults-after-an-upgrade"></a>
 
-The [OpenAI model upgrade notes](model_selection.md#picking-up-gpt-6-astra-defaults-after-an-upgrade) cover Astra tier
-defaults, Sol/Luna alternatives, effort limits and required backend routes. Apply those choices with the shared
-[saved-configuration upgrade procedure](#updating-saved-proxy-and-backend-configurations).
+### Picking up GPT-6.2 defaults after an upgrade
+
+Check your saved tiers and backend deployments before selecting 6.2 Astra or Sol.
+[OpenAI model upgrade notes](model_selection.md#gpt-62-astra-and-sol) ·
+[Saved-configuration upgrade procedure](#updating-saved-proxy-and-backend-configurations)
 
 ### Picking up current model defaults and alternatives after an upgrade
 
@@ -221,19 +223,17 @@ Models not in Forge's catalog (e.g., `meta-llama/llama-3.1-70b`) work -- the pro
 
 ### OpenRouter zero data retention (ZDR)
 
-Direct OpenRouter proxies require ZDR by default. All six GPT-6 entries had eligible ZDR endpoints when checked on
-2026-09-23. With `allow_non_zdr: false` (also the compatibility default when the key is absent), Forge sends
-`provider.zdr: true` on every request. OpenRouter then restricts routing to endpoints it currently marks ZDR-compatible.
-This request policy is the enforcement boundary; Forge's small `zdr_fallbacks` map only replaces models already known to
-lack a compatible endpoint before dispatch.
+Direct OpenRouter proxies send `provider.zdr: true` on every request when `allow_non_zdr` is false or omitted.
+OpenRouter enforces ZDR. Forge uses `zdr_fallbacks` to replace known ineligible models before dispatch.
 
-Forge checks the bundled OpenRouter routes against OpenRouter's
-[ZDR endpoint catalog](https://openrouter.ai/api/v1/endpoints/zdr). The September 2026 refresh confirmed eligible
-endpoints for Opus 5.5, Gemini 3.8 Flash, and the added DeepSeek and GLM models.
+GPT-6 Astra, Sol, Luna and their three Pro variants had ZDR endpoints on September 23, 2026. September checks also
+confirmed endpoints for Opus 5.5, Gemini 3.8 Flash and the added DeepSeek and GLM models. On November 19, 2026,
+OpenRouter listed Azure ZDR endpoints for all six GPT-6 models plus GPT-6.2 Astra, Sol and both 6.2 Pro variants.
+[OpenRouter ZDR endpoint catalog](https://openrouter.ai/api/v1/endpoints/zdr)
 
-Fable 5 had no eligible endpoint in the 2026-08-21 audit, nor Fable 5.1 in the 2026-09-02 check. The 2026-11-10 check
-found no Fable 5.2 ZDR endpoint and confirmed Opus 5.5 endpoints. The 2026-09-23 audit also found no ZDR endpoint for
-Qwen3.8 Flash or Max 0902. Fable and the listed Qwen routes use these required-ZDR fallbacks:
+Fable 5 (2026-08-21), Fable 5.1 (2026-09-02) and Fable 5.2 (2026-11-10) lacked ZDR endpoints. The November audit
+confirmed Opus 5.5. Qwen3.8 Flash and Max 0902 lacked eligible endpoints on 2026-09-23. Forge applies these Fable and
+Qwen fallbacks when ZDR is required.
 
 ```yaml
 allow_non_zdr: false
@@ -640,8 +640,8 @@ zdr_fallbacks: {}
 
 tiers:
   haiku: openai/gpt-5.4-mini
-  sonnet: openai/gpt-6-astra
-  opus: openai/gpt-6-astra
+  sonnet: openai/gpt-6.2-astra
+  opus: openai/gpt-6.2-astra
 
 default_tier: sonnet
 tool_prefixes_to_ignore: []

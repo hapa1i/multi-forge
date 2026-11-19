@@ -55,20 +55,30 @@ class TestBackendCLI:
         assert "model_list:" in content
         deployments = {entry["model_name"] for entry in yaml.safe_load(content)["model_list"]}
         assert {"gemini/gemini-4-carbon", "gemini/gemini-4-argon", "gemini/gemini-3.1-pro-preview"} <= deployments
+        assert {"openai/gpt-6.2-astra", "openai/gpt-6.2-sol", "openai/gpt-6-astra"} <= deployments
 
-    @pytest.mark.parametrize("prior", ["gemini-3.1-pro-preview", "gemini-4-argon"])
-    def test_backend_create_already_exists(self, isolated_forge_home: Path, prior: str) -> None:
-        """An upgrade cannot replace a user's older Gemini backend snapshot."""
+    @pytest.mark.parametrize(
+        ("provider", "prior", "current"),
+        [
+            ("gemini", "gemini-3.1-pro-preview", "gemini-4-carbon"),
+            ("gemini", "gemini-4-argon", "gemini-4-carbon"),
+            ("openai", "gpt-6-astra", "gpt-6.2-astra"),
+        ],
+    )
+    def test_backend_create_already_exists(
+        self, isolated_forge_home: Path, provider: str, prior: str, current: str
+    ) -> None:
+        """An upgrade cannot replace a user's older backend snapshot."""
         runner = CliRunner()
         config_path = isolated_forge_home / "backends" / "litellm" / "config.yaml"
         config_path.parent.mkdir(parents=True)
         config_path.write_text(
             "# Keep my provider configuration.\n"
             "model_list:\n"
-            f"  - model_name: gemini/{prior}\n"
+            f"  - model_name: {provider}/{prior}\n"
             "    litellm_params:\n"
-            f"      model: gemini/{prior}\n"
-            "      api_key: os.environ/GEMINI_API_KEY\n"
+            f"      model: {provider}/{prior}\n"
+            f"      api_key: os.environ/{provider.upper()}_API_KEY\n"
         )
         config_path.chmod(0o600)
         original = config_path.read_bytes()
@@ -80,8 +90,8 @@ class TestBackendCLI:
         assert "forge model backend start" in result.output
         shown = runner.invoke(main, ["model", "backend", "show", "litellm-4000", "--raw"])
         assert shown.exit_code == 0
-        assert f"gemini/{prior}" in shown.output
-        assert "gemini-4-carbon" not in shown.output
+        assert f"{provider}/{prior}" in shown.output
+        assert current not in shown.output
         assert config_path.read_bytes() == original
         assert config_path.stat().st_mtime_ns == original_stat.st_mtime_ns
         assert config_path.stat().st_mode == original_stat.st_mode

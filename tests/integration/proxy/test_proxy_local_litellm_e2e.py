@@ -107,7 +107,7 @@ class TestGeminiFlashLiteLLMGate:
 class TestOpenAIProxyWithLocalLiteLLM:
     """The OpenAI template serves its Astra tier and explicit Sol/Luna alternatives."""
 
-    def test_sonnet_completion_resolves_to_gpt_6_astra(self, proxy_server_local_openai: str) -> None:
+    def test_sonnet_completion_resolves_to_gpt_62_astra(self, proxy_server_local_openai: str) -> None:
         with httpx.Client(timeout=90) as client:
             resp = client.post(
                 f"{proxy_server_local_openai}/v1/messages",
@@ -123,9 +123,19 @@ class TestOpenAIProxyWithLocalLiteLLM:
 
         assert resp.status_code == 200, resp.text[:500]
         assert resp.headers.get("X-Resolved-Tier") == "sonnet"
-        assert resp.headers.get("X-Resolved-Model") == "openai/gpt-6-astra"
+        assert resp.headers.get("X-Resolved-Model") == "openai/gpt-6.2-astra"
 
-    @pytest.mark.parametrize("model", ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna"])
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "gpt-6.2-astra",
+            "gpt-6.2-sol",
+            "gpt-6-astra",
+            "gpt-6.1-sol",
+            "gpt-6-sol",
+            "gpt-6-luna",
+        ],
+    )
     def test_gpt6_responses_cost_without_model_metadata_refresh(self, local_litellm_openai: str, model: str) -> None:
         with httpx.Client(timeout=90) as client:
             resp = client.post(
@@ -145,6 +155,10 @@ class TestOpenAIProxyWithLocalLiteLLM:
     @pytest.mark.parametrize(
         ("model", "proxy_fixture"),
         [
+            ("gpt-6.2-astra", "proxy_server_local_openai"),
+            ("gpt-6.2-astra", "proxy_server_openrouter_openai"),
+            ("gpt-6.2-sol", "proxy_server_local_openai"),
+            ("gpt-6.2-sol", "proxy_server_openrouter_openai"),
             ("gpt-6.1-sol", "proxy_server_local_openai"),
             ("gpt-6.1-sol", "proxy_server_openrouter_openai"),
             ("gpt-6-sol", "proxy_server_local_openai"),
