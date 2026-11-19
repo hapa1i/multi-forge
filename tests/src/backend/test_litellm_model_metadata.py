@@ -251,6 +251,9 @@ def test_native_pricing_without_remote_model_metadata(model: str, cases: list[tu
     if model.startswith("openai/"):
         # OpenAI bills Flex at half and Fast/legacy Priority at twice the applicable standard rate.
         tiers.update({"default": 1.0, "flex": 0.5, "priority": 2.0, "fast": 2.0})
+    elif model in ("gemini/gemini-4-neon", "gemini/gemini-4-hydrogen"):
+        # Google bills Flex at half and Priority at 1.8 times the standard rate.
+        tiers.update({"flex": 0.5, "priority": 1.8})
     entry = _backend_entry(model)
     if model.startswith("openai/gpt-6.2-"):
         tiers["ultrafast"] = 3.0

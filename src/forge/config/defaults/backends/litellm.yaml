@@ -36,7 +36,9 @@
 
 model_list:
   # LiteLLM 1.102 needs Gemini 4 metadata; Forge sends each model's native thinkingConfig explicitly.
-  # Neon and Hydrogen use flat standard prices with no introductory schedule.
+  # Without supports_system_messages, LiteLLM folds the system prompt into the first user turn.
+  # Neon and Hydrogen use flat standard prices with no introductory schedule. Flex is half and Priority
+  # is 1.8 times standard: https://aistudio.google.com/docs/pricing (verified 2026-11-19)
   # Neon: https://aistudio.google.com/docs/whats-new-gemini-4-neon (verified 2026-11-19)
   - model_name: gemini/gemini-4-neon
     litellm_params:
@@ -52,6 +54,13 @@ model_list:
       output_cost_per_token: 0.000015
       output_cost_per_reasoning_token: 0.000015
       cache_read_input_token_cost: 0.00000015
+      input_cost_per_token_flex: 0.0000015
+      output_cost_per_token_flex: 0.0000075
+      cache_read_input_token_cost_flex: 0.000000075
+      input_cost_per_token_priority: 0.0000054
+      output_cost_per_token_priority: 0.000027
+      cache_read_input_token_cost_priority: 0.00000027
+      supports_system_messages: true
       supports_vision: true
       supports_function_calling: true
       supports_tool_choice: true
@@ -77,6 +86,13 @@ model_list:
       output_cost_per_token: 0.0000075
       output_cost_per_reasoning_token: 0.0000075
       cache_read_input_token_cost: 0.000000075
+      input_cost_per_token_flex: 0.00000075
+      output_cost_per_token_flex: 0.00000375
+      cache_read_input_token_cost_flex: 0.0000000375
+      input_cost_per_token_priority: 0.0000027
+      output_cost_per_token_priority: 0.0000135
+      cache_read_input_token_cost_priority: 0.000000135
+      supports_system_messages: true
       supports_vision: true
       supports_function_calling: true
       supports_tool_choice: true
@@ -103,6 +119,7 @@ model_list:
       output_cost_per_token: 0.000010
       output_cost_per_reasoning_token: 0.000010
       cache_read_input_token_cost: 0.0000001
+      supports_system_messages: true
       supports_vision: true
       supports_function_calling: true
       supports_tool_choice: true
@@ -128,6 +145,7 @@ model_list:
       output_cost_per_token: 0.000010
       output_cost_per_reasoning_token: 0.000010
       cache_read_input_token_cost: 0.0000001
+      supports_system_messages: true
       supports_vision: true
       supports_function_calling: true
       supports_tool_choice: true
@@ -207,6 +225,13 @@ model_list:
       output_cost_per_token: 0.000015
       output_cost_per_reasoning_token: 0.000015
       cache_read_input_token_cost: 0.00000015
+      input_cost_per_token_flex: 0.0000015
+      output_cost_per_token_flex: 0.0000075
+      cache_read_input_token_cost_flex: 0.000000075
+      input_cost_per_token_priority: 0.0000054
+      output_cost_per_token_priority: 0.000027
+      cache_read_input_token_cost_priority: 0.00000027
+      supports_system_messages: true
       supports_vision: true
       supports_function_calling: true
       supports_tool_choice: true
@@ -231,6 +256,13 @@ model_list:
       output_cost_per_token: 0.0000075
       output_cost_per_reasoning_token: 0.0000075
       cache_read_input_token_cost: 0.000000075
+      input_cost_per_token_flex: 0.00000075
+      output_cost_per_token_flex: 0.00000375
+      cache_read_input_token_cost_flex: 0.0000000375
+      input_cost_per_token_priority: 0.0000027
+      output_cost_per_token_priority: 0.0000135
+      cache_read_input_token_cost_priority: 0.000000135
+      supports_system_messages: true
       supports_vision: true
       supports_function_calling: true
       supports_tool_choice: true
@@ -255,6 +287,7 @@ model_list:
       output_cost_per_token: 0.000010
       output_cost_per_reasoning_token: 0.000010
       cache_read_input_token_cost: 0.0000001
+      supports_system_messages: true
       supports_vision: true
       supports_function_calling: true
       supports_tool_choice: true
@@ -279,6 +312,7 @@ model_list:
       output_cost_per_token: 0.000010
       output_cost_per_reasoning_token: 0.000010
       cache_read_input_token_cost: 0.0000001
+      supports_system_messages: true
       supports_vision: true
       supports_function_calling: true
       supports_tool_choice: true

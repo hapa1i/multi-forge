@@ -390,13 +390,17 @@ implicit-only caching with a 4,096-token minimum. They differ from Carbon in thr
 - **Vertex unary output:** 65,536 tokens for streaming and unary requests. Forge does not apply Carbon's 32,768 unary
   cap to either model.
 - **Price per million tokens:** Neon costs $3 input, $15 output (including thinking), and $0.15 cached input. Hydrogen
-  costs $1.50, $7.50, and $0.075. Both are flat across the context window with no introductory schedule.
+  costs $1.50, $7.50, and $0.075. Both are flat across the context window with no introductory schedule. The bundled
+  LiteLLM entries also carry Google's Flex rates (half of standard) and Priority rates (1.8 times standard) for callers
+  that select a service tier.
 
 Sonnet retains `medium` effort and Opus retains `high`. Fresh Pro-family templates also set Haiku to `low`. Without it,
 Haiku requests that carry no thinking configuration would run at Hydrogen's default, which is `high` on LiteLLM routes.
-These settings are floors: a larger thinking budget still raises the effort. A budget of at least 25,000 tokens, or a
-client `max` effort, resolves to `xhigh` on Neon and Hydrogen where Carbon stops at `high`, so the same client setting
-spends more. Send an explicit `reasoning_effort` to bound it.
+These settings are floors: a larger thinking budget still raises the effort. A budget of at least 25,000 tokens resolves
+to `xhigh` on Neon and Hydrogen where Carbon stops at `high`, so the same budget spends more. With adaptive thinking and
+no `--effort`, the Sonnet default resolves to `medium`. A client `max` reaches `xhigh` only when the launch passed
+`--effort` and thinking is not `between_tools` or `disabled`; see
+[launch effort](proxy.md#launch-effort-on-translated-routes). Send an explicit `reasoning_effort` to bound the level.
 
 Check cost and access before adopting:
 
@@ -408,15 +412,29 @@ Check cost and access before adopting:
   Sonnet/Opus default. Google limits Neon on Vertex to verified enterprise customers in `global`, `us`, and `eu`.
 - OpenRouter lists ZDR endpoints for both models, so the templates keep their required-ZDR policy.
 
-To adopt them, follow the
-[saved-configuration upgrade procedure](proxy.md#updating-saved-proxy-and-backend-configurations) with `gemini-4-neon`
-on the Sonnet/Opus tiers and `gemini-4-hydrogen` on Haiku, using the `google/`, `gemini/`, or `vertex_ai/` prefix for
-OpenRouter, local LiteLLM, or remote LiteLLM. Keep `gemini-4-carbon` and `gemini-3.8-flash` under `model_alternatives`
-if you still select them. LiteLLM also needs both deployments in its saved backend config: copy the complete bundled
-entries, including `model_info`. For remote Vertex, apply the changes described in the
-[Carbon migration](#gemini-4-carbon), keeping the 65,536-token limit for unary requests. Google's guides do not state
-Vertex rates for either model, so confirm the copied pricing before relying on Vertex cost reports. A backend snapshot
-without Neon fails workflow preflight with migration guidance instead of falling back to an older model.
+To adopt them on a saved proxy, follow the
+[saved-configuration upgrade procedure](proxy.md#updating-saved-proxy-and-backend-configurations). Use the `google/`,
+`gemini/`, or `vertex_ai/` prefix for OpenRouter, local LiteLLM, or remote LiteLLM. The tiers depend on the template the
+proxy was created from:
+
+- **Flash templates** (`openrouter-gemini-flash`, `litellm-gemini-flash-local`): set all three tiers to
+  `gemini-4-hydrogen`. Neon on Sonnet and Opus would double their token price and fail with a free-tier
+  `GEMINI_API_KEY`.
+- **General Gemini templates** (`openrouter-gemini`, `litellm-gemini`, `litellm-gemini-local`): set Sonnet and Opus to
+  `gemini-4-neon` and Haiku to `gemini-4-hydrogen`. Also add `reasoning_effort: low` under `tier_overrides.haiku`,
+  because a proxy saved from an earlier release has no Haiku floor.
+
+Keep `gemini-4-carbon` and `gemini-3.8-flash` under `model_alternatives` if you still select them. LiteLLM also needs
+both deployments in its saved backend config: copy the complete bundled entries, including `model_info`. Its
+`supports_system_messages: true` keeps LiteLLM 1.102 from sending the system prompt as user text. For remote Vertex,
+apply the changes described in the [Carbon migration](#gemini-4-carbon), keeping the 65,536-token limit for unary
+requests. Google's guides do not state Vertex rates for either model, so confirm the copied pricing before relying on
+Vertex cost reports. A backend snapshot without Neon fails workflow preflight with migration guidance instead of falling
+back to an older model.
+
+A session can switch to any Gemini 4 model while a tool call from another provider's model is pending. Google requires a
+thought signature on Gemini 4 tool history, so on LiteLLM routes Forge marks such calls with a placeholder signature
+that Google accepts. OpenRouter accepts them unchanged.
 
 The policy plan-check and team-tagger defaults stay on [Gemini 3.8 Flash](#gemini-38-flash).
 
@@ -460,7 +478,9 @@ selected thinking level; no LiteLLM upgrade is required. Update Forge as well as
 adopting Carbon, so requests avoid the adapter's generic reasoning conversion to an unsupported `thinkingBudget`.
 
 - **Local Google AI:** copy the complete bundled `gemini/gemini-4-carbon` deployment into the saved backend config,
-  including `model_info`. It uses `GEMINI_API_KEY` and `prompt_cache_min_tokens: 4096`.
+  including `model_info`. It uses `GEMINI_API_KEY` and `prompt_cache_min_tokens: 4096`. Carbon and Argon entries copied
+  before Neon and Hydrogen were added lack `supports_system_messages: true`; add it to each saved Gemini 4 `model_info`
+  so LiteLLM stops sending the system prompt as user text.
 - **Remote Vertex:** the server operator must configure a Vertex deployment. Set both `model_name` and
   `litellm_params.model` to `vertex_ai/gemini-4-carbon`. Replace the bundled Google AI `api_key` with the server's
   Vertex authentication (ADC or `vertex_credentials`) and configure `vertex_project` and `vertex_location`. Retain the
@@ -505,8 +525,9 @@ the OpenRouter Flash template. See Google's
 [3.8 model reference](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash),
 [Gemini API release notes](https://ai.google.dev/gemini-api/docs/changelog).
 
-The tier-1 cascade checker and team tagger still default to Gemini 3.8 Flash through OpenRouter, local LiteLLM as
-`gemini/gemini-3.8-flash`, and remote LiteLLM as `vertex_ai/gemini-3.8-flash` (see [policy.md](policy.md)).
+The tier-1 cascade checker still defaults to Gemini 3.8 Flash through OpenRouter, local LiteLLM as
+`gemini/gemini-3.8-flash`, and remote LiteLLM as `vertex_ai/gemini-3.8-flash`. The team tagger defaults to
+`gemini/gemini-3.8-flash` on local LiteLLM only (see [policy.md](policy.md)).
 
 #### Claude Sonnet and Opus 5.5
 

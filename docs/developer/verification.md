@@ -51,11 +51,12 @@ required-ZDR substitution, sampling filtering, forced-tool refusals, and signed-
 `docs/end-user/model_selection.md` for saved-proxy alias recovery and the direct-LiteLLM tool-choice limitation.
 
 For Gemini 4 tool-history or default-tier changes, run
-`./scripts/test-integration.sh tests/integration/proxy/test_gemini_4_defaults_e2e.py -m slow` with `OPENROUTER_API_KEY`.
-This live gate covers streaming and non-streaming tool round trips on the Neon and Hydrogen default tiers and `xhigh`
-acceptance under required ZDR; the default no-argument integration run excludes it. Follow the Neon and Hydrogen
-migration in `docs/end-user/model_selection.md` before using the default Gemini workflow worker with a saved LiteLLM
-backend.
+`./scripts/test-integration.sh tests/integration/proxy/test_gemini_4_defaults_e2e.py -m slow` with `OPENROUTER_API_KEY`
+and a paid-tier `GEMINI_API_KEY`. This live gate covers streaming and non-streaming tool round trips on the Neon and
+Hydrogen default tiers, `xhigh` acceptance under required ZDR, and continuing another model's tool call through
+OpenRouter and through local LiteLLM to Google AI. The default no-argument integration run excludes it, along with the
+live Google AI cases in `test_session_routing_e2e.py`. Follow the Neon and Hydrogen migration in
+`docs/end-user/model_selection.md` before using the default Gemini workflow worker with a saved LiteLLM backend.
 
 ## Backends, telemetry and costs
 

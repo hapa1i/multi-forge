@@ -655,11 +655,17 @@ allow 65,536 output tokens, and the catalog retains that maximum. Forge's LiteLL
 and Argon's explicit `vertex_ai/` routes to 32,768 after merging request overrides. Neon and Hydrogen allow 65,536 on
 unary Vertex requests and are not capped. Streaming and other provider routes retain their configured limits. Long
 decode through continuation is outside Forge's request contract. Carbon and Argon support `low`, `medium`, and `high`
-thinking with `medium` as the model default. Neon and Hydrogen add `xhigh` and default to `high`, so a client `max` or a
-thinking budget of at least 25,000 tokens resolves to `xhigh` on them and to `high` on Carbon. Fresh Pro-family
-templates pin Haiku to `low` so Hydrogen requests without thinking do not inherit its default. The translated builder
-filters unsupported temperature, top-p, and top-k overrides. All four use implicit caching, without explicit cache
-creation.
+thinking with `medium` as the model default. Neon and Hydrogen add `xhigh` and default to `high`, so a thinking budget
+of at least 25,000 tokens, or a client `max` on a launch that opted into client effort, resolves to `xhigh` on them and
+to `high` on Carbon. Fresh Pro-family templates pin Haiku to `low` so Hydrogen requests without thinking do not inherit
+its default. The translated builder filters unsupported temperature, top-p, and top-k overrides. All four use implicit
+caching, without explicit cache creation.
+
+LiteLLM 1.102 special-cases Gemini 3 model names and packages no Gemini 4 metadata, so Forge covers three gaps. The
+LiteLLM client sends the native thinking level instead of a generic effort. It also gives the first tool call of each
+unsigned assistant step a placeholder thought signature, because Google rejects Gemini 4 tool history without one and a
+call made by another provider's model has none. The bundled deployments set `supports_system_messages` so the system
+prompt travels as a system instruction instead of user text. OpenRouter needs none of these.
 
 Bundled Google AI deployments use API-key authentication; Neon requires a paid-tier key. Remote Vertex deployments
 require Vertex route identities and Google Cloud credentials. Both providers currently document a 4,096-token cache

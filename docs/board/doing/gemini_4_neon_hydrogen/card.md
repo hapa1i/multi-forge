@@ -28,9 +28,15 @@ Forge's request contract.
   Google's Gemini API and Vertex guides state `high`. The intrinsic catalog records Google's value.
 - **Haiku pins `low` on the Pro-family templates.** Those templates set no Haiku effort, so a Haiku request without
   thinking would otherwise run Hydrogen at its native `high` on LiteLLM routes. The Flash templates already pin `low`.
-- **Policy helpers stay on Gemini 3.8 Flash.** The plan-check and team-tagger defaults are owned by the policy domain,
-  have lagged the template Flash default before, and run under a 15-second review budget without an explicit effort.
-  Moving them needs its own latency and verdict evaluation.
+- **Policy helpers stay on Gemini 3.8 Flash.** The plan-check and team-tagger defaults are owned by the policy domain
+  and have lagged the template Flash default before. The plan checker has three provider routes and a 15-second review
+  budget without an explicit effort; the team tagger uses local LiteLLM only. Moving either needs its own latency and
+  verdict evaluation.
+- **Forge covers LiteLLM 1.102's Gemini 4 gaps for all four models.** Review found that the bundled metadata sent the
+  system prompt as user text and that Google AI rejected unsigned tool history from another model. Carbon and Argon had
+  both defects, so the fixes include them. OpenRouter needed neither fix.
+- **Flex and Priority rates cover Neon and Hydrogen only.** Carbon and Argon still report Standard cost for those tiers;
+  their rates change with the December 1 price increase.
 
 ## Risks
 

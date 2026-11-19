@@ -17,16 +17,21 @@ Forge now supports Gemini 4 Neon and Hydrogen on OpenRouter, local LiteLLM, and 
 
 - New Gemini proxies use Neon at Sonnet and Opus and Hydrogen at Haiku. The Flash templates use Hydrogen on every tier.
   Neon is also the default Gemini workflow worker.
-- Both models add an `xhigh` thinking level and default to `high`. A client `max` or a thinking budget of at least
-  25,000 tokens now reaches `xhigh`, where Carbon stops at `high`. New Pro-family templates pin Haiku to `low`.
+- Both models add an `xhigh` thinking level and default to `high`. A thinking budget of at least 25,000 tokens, or a
+  client `max` on a launch that passed `--effort`, now reaches `xhigh`, where Carbon stops at `high`. New Pro-family
+  templates pin Haiku to `low`.
 - Unary Vertex requests keep the full 65,536-token limit on both models. Carbon and Argon keep their 32,768 cap.
+- On LiteLLM routes, all four Gemini 4 models now receive the system prompt as a system instruction and can continue a
+  tool call made by another provider's model. Carbon and Argon had both defects before this change.
+- The bundled Neon and Hydrogen deployments price Flex and Priority requests at Google's tier rates.
 - Saved proxies and backends keep their previous models. Carbon, Argon, and Gemini 3.8 Flash remain selectable, and the
   policy plan-check and team-tagger defaults stay on Gemini 3.8 Flash.
 
-Verification covered 11,942 unit tests, 2,564 regressions, 593 integration tests, native Google AI requests, OpenRouter
-tool calls and `xhigh` under required ZDR, saved-proxy upgrades, and a clean-wheel install. Two unit runs each hit one
-intermittent failure; the one captured was a watchdog timing test outside this change. Remote Vertex inference was not
-exercised. [Checklist](doing/gemini_4_neon_hydrogen/checklist.md)
+Verification covered 11,950 unit tests, 2,604 regressions, 593 integration tests, and a 17-case live gate: tool calls
+and `xhigh` on OpenRouter under required ZDR, both models through local LiteLLM to Google AI, and another model's tool
+call continued on both routes. It also covered saved-proxy upgrades and a clean-wheel install. Two unit runs each hit
+one intermittent failure; the one captured was a watchdog timing test outside this change. Remote Vertex inference was
+not exercised. [Checklist](doing/gemini_4_neon_hydrogen/checklist.md)
 
 ### Fix excessive resource use in DNS zone parsing
 

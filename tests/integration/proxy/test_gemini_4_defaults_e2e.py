@@ -1,4 +1,4 @@
-"""Bounded Neon and Hydrogen tool round trips through the default Gemini OpenRouter tiers."""
+"""Bounded Neon and Hydrogen tool round trips through the default Gemini tiers."""
 
 from __future__ import annotations
 
@@ -19,6 +19,11 @@ NEON = "google/gemini-4-neon"
 HYDROGEN = "google/gemini-4-hydrogen"
 # Claude tier names reach each default the way Claude Code does; Hydrogen is served at Haiku only.
 DEFAULT_TIER_REQUESTS = [("claude-sonnet-5-5", NEON), ("claude-haiku-4-5", HYDROGEN)]
+TOOL = {
+    "name": "get_value",
+    "description": "Return the requested value.",
+    "input_schema": {"type": "object", "properties": {"key": {"type": "string"}}, "required": ["key"]},
+}
 
 
 @pytest.fixture(scope="module")
@@ -76,13 +81,7 @@ def test_default_tier_tool_call_and_continuation(gemini_proxy: str, stream: bool
         "temperature": 0.7,
         "top_p": 0.9,
         "messages": messages,
-        "tools": [
-            {
-                "name": "get_value",
-                "description": "Return the requested value.",
-                "input_schema": {"type": "object", "properties": {"key": {"type": "string"}}, "required": ["key"]},
-            }
-        ],
+        "tools": [TOOL],
         "tool_choice": {"type": "auto"},
     }
     with httpx.Client(timeout=180) as client:
@@ -133,3 +132,52 @@ def test_xhigh_is_accepted_under_required_zdr(gemini_proxy: str, model: str, slu
     # Thinking shares the output budget, so the deepest level may exhaust it before answering.
     assert message["stop_reason"] in {"end_turn", "max_tokens"}
     assert message["usage"]["output_tokens"] > 0
+
+
+@pytest.mark.parametrize(("model", "slug"), DEFAULT_TIER_REQUESTS)
+def test_openrouter_continues_a_tool_call_from_another_model(gemini_proxy: str, model: str, slug: str) -> None:
+    _assert_foreign_tool_call_continues(gemini_proxy, model, slug)
+
+
+@pytest.mark.parametrize(("model", "slug"), DEFAULT_TIER_REQUESTS)
+def test_google_ai_continues_a_tool_call_from_another_model(proxy_server: str, model: str, slug: str) -> None:
+    # The local LiteLLM route addresses the same models with the gemini/ prefix.
+    _assert_foreign_tool_call_continues(proxy_server, model, slug.replace("google/", "gemini/"))
+
+
+def _assert_foreign_tool_call_continues(base_url: str, model: str, resolved: str) -> None:
+    # Claude made this call before the session switched models, so it carries no Gemini thought signature.
+    body = {
+        "model": model,
+        "max_tokens": 512,
+        "reasoning_effort": "low",
+        "messages": [
+            {
+                "role": "user",
+                "content": "Call get_value with key sample. After receiving it, reply with that value only.",
+            },
+            {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "toolu_01ForeignModelCall",
+                        "name": "get_value",
+                        "input": {"key": "sample"},
+                    }
+                ],
+            },
+            {
+                "role": "user",
+                "content": [{"type": "tool_result", "tool_use_id": "toolu_01ForeignModelCall", "content": "42"}],
+            },
+        ],
+        "tools": [TOOL],
+    }
+    with httpx.Client(timeout=180) as client:
+        response = client.post(f"{base_url}/v1/messages", json=body, headers={"x-api-key": "test"})
+
+    message = _message(response, stream=False)
+    assert response.headers.get("X-Resolved-Model") == resolved
+    assert message["stop_reason"] == "end_turn"
+    assert "42" in "".join(block["text"] for block in message["content"] if block["type"] == "text")

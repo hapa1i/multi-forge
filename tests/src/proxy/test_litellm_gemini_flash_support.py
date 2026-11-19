@@ -15,6 +15,13 @@ import pytest
 import yaml
 
 from forge.backend.creation import create_backend_config
+from forge.core.llm.clients.litellm import (
+    _PLACEHOLDER_THOUGHT_SIGNATURE,
+    _THOUGHT_SIGNATURE_SEPARATOR,
+    LiteLLMClient,
+)
+from forge.core.llm.clients.openai_compat import message_to_openai
+from forge.core.llm.types import Message, ModelHyperparameters, ToolCall
 from forge.core.models import get_model_spec
 
 # Verified packaged support floor for Gemini 3.8 and native Gemini 4 thinkingConfig passthrough.
@@ -28,6 +35,7 @@ PACKAGED_MODELS = (
     "gemini/gemini-3.8-flash",
     "vertex_ai/gemini-3.8-flash",
 )
+GEMINI_4_MODELS = ["gemini-4-argon", "gemini-4-carbon", "gemini-4-neon", "gemini-4-hydrogen"]
 
 
 def _installed_litellm_version() -> tuple[int, int, int]:
@@ -74,7 +82,7 @@ def test_gemini_38_has_offline_reasoning_tool_and_cost_metadata(model_key: str) 
     assert metadata["output_cost_per_reasoning_token"] > 0
 
 
-@pytest.mark.parametrize("model", ["gemini-4-argon", "gemini-4-carbon", "gemini-4-neon", "gemini-4-hydrogen"])
+@pytest.mark.parametrize("model", GEMINI_4_MODELS)
 def test_gemini_4_metadata_override_is_still_needed(model: str) -> None:
     assert not {
         model,
@@ -87,7 +95,7 @@ def test_gemini_4_metadata_override_is_still_needed(model: str) -> None:
 
 
 @pytest.mark.parametrize("prefix", ["gemini/", ""])
-@pytest.mark.parametrize("model", ["gemini-4-argon", "gemini-4-carbon", "gemini-4-neon", "gemini-4-hydrogen"])
+@pytest.mark.parametrize("model", GEMINI_4_MODELS)
 def test_registered_gemini_4_preserves_native_thinking_levels(model: str, prefix: str) -> None:
     config = yaml.safe_load(create_backend_config(adapter_type="litellm").read_text())
     entry = next(entry for entry in config["model_list"] if entry["model_name"] == f"{prefix}{model}")
@@ -147,3 +155,73 @@ def test_registered_gemini_4_preserves_native_thinking_levels(model: str, prefix
         assert generation["max_output_tokens"] == 65_536
         assert body["tools"][0]["function_declarations"][0]["name"] == "lookup"
         assert body["toolConfig"]["functionCallingConfig"]["mode"] == "AUTO"
+
+
+@pytest.mark.parametrize("prefix", ["gemini/", ""])
+@pytest.mark.parametrize("model", GEMINI_4_MODELS)
+def test_registered_gemini_4_sends_system_instruction_and_signed_tool_history(model: str, prefix: str) -> None:
+    config = yaml.safe_load(create_backend_config(adapter_type="litellm").read_text())
+    entry = next(entry for entry in config["model_list"] if entry["model_name"] == f"{prefix}{model}")
+    entry["litellm_params"]["api_key"] = "test-key"
+    # Another provider's model made this tool call, so it carries no Gemini thought signature.
+    history = [
+        Message(role="system", content="Follow the rules."),
+        Message(role="user", content="Look it up."),
+        Message(role="assistant", content="", tool_calls=[ToolCall(id="toolu_01A", name="lookup", arguments={})]),
+        Message(role="tool", content="found", tool_call_id="toolu_01A"),
+    ]
+    client = LiteLLMClient(f"{prefix}{model}", provider="litellm_local")
+    histories = {
+        "unsigned": [message_to_openai(message) for message in history],
+        "forge": client._build_request_kwargs(history, None, ModelHyperparameters())[0]["messages"],
+    }
+    script = """\
+        import json
+        import sys
+        import litellm
+        from litellm.litellm_core_utils.prompt_templates import factory
+        from litellm.llms.vertex_ai.gemini.transformation import _transform_request_body
+
+        payload = json.load(sys.stdin)
+        entry = payload["entry"]
+        provider, model = entry["litellm_params"]["model"].split("/", 1)
+        router = litellm.Router(model_list=[entry])
+        results = {
+            "placeholder": factory._get_dummy_thought_signature(),
+            "separator": factory.THOUGHT_SIGNATURE_SEPARATOR,
+        }
+        for name, messages in payload["histories"].items():
+            results[name] = _transform_request_body(
+                messages=messages, model=model, optional_params={},
+                custom_llm_provider=provider, litellm_params={}, cached_content=None,
+            )
+        print(json.dumps(results))
+        """
+    # Router registration changes capability caches; isolate it from other model tests.
+    result = subprocess.run(
+        [sys.executable, "-c", dedent(script)],
+        input=json.dumps({"entry": entry, "histories": histories}),
+        env={**os.environ, "LITELLM_LOCAL_MODEL_COST_MAP": "true"},
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    )
+    actual = json.loads(result.stdout)
+
+    assert actual["placeholder"] == _PLACEHOLDER_THOUGHT_SIGNATURE
+    assert actual["separator"] == _THOUGHT_SIGNATURE_SEPARATOR
+    for name in histories:
+        body = actual[name]
+        # Without supports_system_messages, LiteLLM folds the system prompt into the first user turn.
+        assert body["system_instruction"] == {"parts": [{"text": "Follow the rules."}]}
+        assert [content["role"] for content in body["contents"]] == ["user", "model", "user"]
+        assert body["contents"][0]["parts"] == [{"text": "Look it up."}]
+    unsigned_call, forge_call = (
+        next(part for part in actual[name]["contents"][1]["parts"] if "function_call" in part) for name in histories
+    )
+    assert "thoughtSignature" not in unsigned_call, (
+        f"LiteLLM now signs unsigned {model} tool calls; verify it against Google AI, remove Forge's placeholder, "
+        "and update this boundary test."
+    )
+    assert forge_call["thoughtSignature"] == _PLACEHOLDER_THOUGHT_SIGNATURE
