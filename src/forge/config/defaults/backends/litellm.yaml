@@ -3,12 +3,14 @@
 #
 # Supported models:
 #   Gemini (requires GEMINI_API_KEY):
-#     - gemini/gemini-4-carbon (Sonnet/Opus default)
+#     - gemini/gemini-4-neon (Sonnet/Opus default; requires a paid-tier key)
+#     - gemini/gemini-4-hydrogen (Haiku and Flash-template default)
+#     - gemini/gemini-4-carbon
 #     - gemini/gemini-4-argon
 #     - gemini/gemini-3.1-pro-preview
 #     - gemini/gemini-3.1-pro-preview-customtools (optimized for custom tools + bash)
 #     - gemini/gemini-3-flash-preview
-#     - gemini/gemini-3.8-flash (LiteLLM Flash default)
+#     - gemini/gemini-3.8-flash
 #     - gemini/gemini-3.7-flash
 #     - gemini/gemini-3.6-flash (Gemini 3.6 Flash - efficiency release)
 #     - gemini/gemini-3.5-flash
@@ -33,8 +35,59 @@
 # Start with: forge model backend start litellm --port 4000
 
 model_list:
-  # LiteLLM 1.102 needs Carbon/Argon metadata; Forge sends its native thinkingConfig explicitly.
-  # Both use introductory token/cache prices through 2026-11-30; they double on 2026-12-01.
+  # LiteLLM 1.102 needs Gemini 4 metadata; Forge sends each model's native thinkingConfig explicitly.
+  # Neon and Hydrogen use flat standard prices with no introductory schedule.
+  # Neon: https://aistudio.google.com/docs/whats-new-gemini-4-neon (verified 2026-11-19)
+  - model_name: gemini/gemini-4-neon
+    litellm_params:
+      model: gemini/gemini-4-neon
+      api_key: os.environ/GEMINI_API_KEY
+    model_info:
+      base_model: gemini/gemini-4-neon
+      mode: chat
+      max_input_tokens: 1048576
+      max_output_tokens: 65536
+      max_tokens: 65536
+      input_cost_per_token: 0.000003
+      output_cost_per_token: 0.000015
+      output_cost_per_reasoning_token: 0.000015
+      cache_read_input_token_cost: 0.00000015
+      supports_vision: true
+      supports_function_calling: true
+      supports_tool_choice: true
+      supports_response_schema: true
+      supports_reasoning: true
+      supports_prompt_caching: true
+      prompt_cache_min_tokens: 4096
+      default_reasoning_effort: high
+      reasoning_effort_levels: [low, medium, high, xhigh]
+
+  # Hydrogen: https://aistudio.google.com/docs/whats-new-gemini-4-hydrogen (verified 2026-11-19)
+  - model_name: gemini/gemini-4-hydrogen
+    litellm_params:
+      model: gemini/gemini-4-hydrogen
+      api_key: os.environ/GEMINI_API_KEY
+    model_info:
+      base_model: gemini/gemini-4-hydrogen
+      mode: chat
+      max_input_tokens: 1048576
+      max_output_tokens: 65536
+      max_tokens: 65536
+      input_cost_per_token: 0.0000015
+      output_cost_per_token: 0.0000075
+      output_cost_per_reasoning_token: 0.0000075
+      cache_read_input_token_cost: 0.000000075
+      supports_vision: true
+      supports_function_calling: true
+      supports_tool_choice: true
+      supports_response_schema: true
+      supports_reasoning: true
+      supports_prompt_caching: true
+      prompt_cache_min_tokens: 4096
+      default_reasoning_effort: high
+      reasoning_effort_levels: [low, medium, high, xhigh]
+
+  # Carbon and Argon use introductory token/cache prices through 2026-11-30; they double on 2026-12-01.
   # Carbon: https://aistudio.google.com/docs/whats-new-gemini-4-carbon (verified 2026-11-10)
   - model_name: gemini/gemini-4-carbon
     litellm_params:
@@ -103,7 +156,7 @@ model_list:
       model: gemini/gemini-3-flash-preview
       api_key: os.environ/GEMINI_API_KEY
 
-  # Gemini 3.8 Flash - current LiteLLM Flash default
+  # Gemini 3.8 Flash - prior Flash default; the policy plan-check and tagger defaults still use it
   - model_name: gemini/gemini-3.8-flash
     litellm_params:
       model: gemini/gemini-3.8-flash
@@ -140,6 +193,54 @@ model_list:
       api_key: os.environ/GEMINI_API_KEY
 
   # Aliases for convenience (match config.yaml model names)
+  - model_name: gemini-4-neon
+    litellm_params:
+      model: gemini/gemini-4-neon
+      api_key: os.environ/GEMINI_API_KEY
+    model_info:
+      base_model: gemini/gemini-4-neon
+      mode: chat
+      max_input_tokens: 1048576
+      max_output_tokens: 65536
+      max_tokens: 65536
+      input_cost_per_token: 0.000003
+      output_cost_per_token: 0.000015
+      output_cost_per_reasoning_token: 0.000015
+      cache_read_input_token_cost: 0.00000015
+      supports_vision: true
+      supports_function_calling: true
+      supports_tool_choice: true
+      supports_response_schema: true
+      supports_reasoning: true
+      supports_prompt_caching: true
+      prompt_cache_min_tokens: 4096
+      default_reasoning_effort: high
+      reasoning_effort_levels: [low, medium, high, xhigh]
+
+  - model_name: gemini-4-hydrogen
+    litellm_params:
+      model: gemini/gemini-4-hydrogen
+      api_key: os.environ/GEMINI_API_KEY
+    model_info:
+      base_model: gemini/gemini-4-hydrogen
+      mode: chat
+      max_input_tokens: 1048576
+      max_output_tokens: 65536
+      max_tokens: 65536
+      input_cost_per_token: 0.0000015
+      output_cost_per_token: 0.0000075
+      output_cost_per_reasoning_token: 0.0000075
+      cache_read_input_token_cost: 0.000000075
+      supports_vision: true
+      supports_function_calling: true
+      supports_tool_choice: true
+      supports_response_schema: true
+      supports_reasoning: true
+      supports_prompt_caching: true
+      prompt_cache_min_tokens: 4096
+      default_reasoning_effort: high
+      reasoning_effort_levels: [low, medium, high, xhigh]
+
   - model_name: gemini-4-carbon
     litellm_params:
       model: gemini/gemini-4-carbon

@@ -54,14 +54,21 @@ class TestBackendCLI:
         content = config_path.read_text()
         assert "model_list:" in content
         deployments = {entry["model_name"] for entry in yaml.safe_load(content)["model_list"]}
-        assert {"gemini/gemini-4-carbon", "gemini/gemini-4-argon", "gemini/gemini-3.1-pro-preview"} <= deployments
+        assert {
+            "gemini/gemini-4-neon",
+            "gemini/gemini-4-hydrogen",
+            "gemini/gemini-4-carbon",
+            "gemini/gemini-4-argon",
+            "gemini/gemini-3.1-pro-preview",
+        } <= deployments
         assert {"openai/gpt-6.2-astra", "openai/gpt-6.2-sol", "openai/gpt-6-astra"} <= deployments
 
     @pytest.mark.parametrize(
         ("provider", "prior", "current"),
         [
-            ("gemini", "gemini-3.1-pro-preview", "gemini-4-carbon"),
-            ("gemini", "gemini-4-argon", "gemini-4-carbon"),
+            ("gemini", "gemini-4-argon", "gemini-4-neon"),
+            ("gemini", "gemini-4-carbon", "gemini-4-neon"),
+            ("gemini", "gemini-3.8-flash", "gemini-4-hydrogen"),
             ("openai", "gpt-6-astra", "gpt-6.2-astra"),
         ],
     )

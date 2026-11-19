@@ -69,7 +69,7 @@ def test_new_model_metadata_override_is_still_needed(model: str) -> None:
     )
 
 
-@pytest.mark.parametrize("model", ["gemini-4-argon", "gemini-4-carbon"])
+@pytest.mark.parametrize("model", ["gemini-4-argon", "gemini-4-carbon", "gemini-4-neon", "gemini-4-hydrogen"])
 def test_gemini_4_metadata_covers_both_packaged_deployment_names(model: str) -> None:
     cost_map = _packaged_cost_map()
     assert not {model, f"gemini/{model}"}.intersection(cost_map)
@@ -97,6 +97,23 @@ def test_gemini_4_metadata_covers_both_packaged_deployment_names(model: str) -> 
                 (100, 0, 0, 0.0002, 0.0001),
                 (100, 80, 0, 0.000048, 0.0001),
                 (272_001, 1_000, 0, 0.542102, 0.0001),
+            ],
+        ),
+        (
+            # Flat pricing: the long-context case must not pick up a tiered rate.
+            "gemini/gemini-4-neon",
+            [
+                (100, 0, 0, 0.0003, 0.00015),
+                (100, 80, 0, 0.000072, 0.00015),
+                (272_001, 1_000, 0, 0.813153, 0.00015),
+            ],
+        ),
+        (
+            "gemini/gemini-4-hydrogen",
+            [
+                (100, 0, 0, 0.00015, 0.000075),
+                (100, 80, 0, 0.000036, 0.000075),
+                (272_001, 1_000, 0, 0.4065765, 0.000075),
             ],
         ),
         (

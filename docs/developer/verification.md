@@ -50,11 +50,12 @@ For Fable 5.2 routing or translation changes, run
 required-ZDR substitution, sampling filtering, forced-tool refusals, and signed-history passthrough. See
 `docs/end-user/model_selection.md` for saved-proxy alias recovery and the direct-LiteLLM tool-choice limitation.
 
-For Gemini 4 Carbon tool-history changes, run
-`./scripts/test-integration.sh tests/integration/proxy/test_gemini_carbon_e2e.py -m slow` with `OPENROUTER_API_KEY`.
-This live gate covers streaming and non-streaming tool round trips; the default no-argument integration run excludes it.
-Follow the Carbon migration in `docs/end-user/model_selection.md` before using the default Gemini workflow worker with a
-saved LiteLLM backend.
+For Gemini 4 tool-history or default-tier changes, run
+`./scripts/test-integration.sh tests/integration/proxy/test_gemini_4_defaults_e2e.py -m slow` with `OPENROUTER_API_KEY`.
+This live gate covers streaming and non-streaming tool round trips on the Neon and Hydrogen default tiers and `xhigh`
+acceptance under required ZDR; the default no-argument integration run excludes it. Follow the Neon and Hydrogen
+migration in `docs/end-user/model_selection.md` before using the default Gemini workflow worker with a saved LiteLLM
+backend.
 
 ## Backends, telemetry and costs
 
@@ -201,8 +202,8 @@ For Claude reasoning-effort changes, run
 `./scripts/test-integration.sh tests/integration/proxy/test_effort_observation_e2e.py`. Inspect `effort.observations` in
 `forge session model show <name> --json` for the last outbound effort per tier on that launch. In Claude,
 `%session model show` distinguishes an omitted effort parameter (`unset`), one the client removed (`dropped`), and
-missing evidence (`unknown`). The same gate checks Carbon thinking-level translation, sampling filtering, and Vertex
-unary/streaming output limits against local stub upstreams.
+missing evidence (`unknown`). The same gate checks Gemini 4 thinking-level translation, including the `xhigh` ceiling on
+Neon and Hydrogen, sampling filtering, and Vertex unary/streaming output limits against local stub upstreams.
 
 ## Codex runtime, consumer lanes and supervision
 

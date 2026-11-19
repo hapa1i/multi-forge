@@ -182,9 +182,16 @@ class TestResolveModelWithAlternatives:
             ("litellm-anthropic-local", "claude-opus-5", "anthropic/claude-opus-5"),
             (
                 "litellm-gemini-flash-local",
+                "gemini-4-hydrogen",
+                "gemini/gemini-4-hydrogen",
+            ),
+            (
+                "litellm-gemini-flash-local",
                 "gemini-3.8-flash",
                 "gemini/gemini-3.8-flash",
             ),
+            ("openrouter-gemini", "gemini-4-neon", "google/gemini-4-neon"),
+            ("openrouter-gemini", "gemini-4-carbon", "google/gemini-4-carbon"),
             (
                 "litellm-gemini-flash-local",
                 "gemini-3.7-flash",

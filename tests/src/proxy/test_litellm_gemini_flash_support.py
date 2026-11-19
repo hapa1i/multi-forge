@@ -15,6 +15,7 @@ import pytest
 import yaml
 
 from forge.backend.creation import create_backend_config
+from forge.core.models import get_model_spec
 
 # Verified packaged support floor for Gemini 3.8 and native Gemini 4 thinkingConfig passthrough.
 MIN_PACKAGED_SUPPORT = (1, 102, 0)
@@ -73,7 +74,7 @@ def test_gemini_38_has_offline_reasoning_tool_and_cost_metadata(model_key: str) 
     assert metadata["output_cost_per_reasoning_token"] > 0
 
 
-@pytest.mark.parametrize("model", ["gemini-4-argon", "gemini-4-carbon"])
+@pytest.mark.parametrize("model", ["gemini-4-argon", "gemini-4-carbon", "gemini-4-neon", "gemini-4-hydrogen"])
 def test_gemini_4_metadata_override_is_still_needed(model: str) -> None:
     assert not {
         model,
@@ -85,13 +86,15 @@ def test_gemini_4_metadata_override_is_still_needed(model: str) -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "model_name", ["gemini/gemini-4-argon", "gemini-4-argon", "gemini/gemini-4-carbon", "gemini-4-carbon"]
-)
-def test_registered_gemini_4_preserves_native_thinking_levels(model_name: str) -> None:
+@pytest.mark.parametrize("prefix", ["gemini/", ""])
+@pytest.mark.parametrize("model", ["gemini-4-argon", "gemini-4-carbon", "gemini-4-neon", "gemini-4-hydrogen"])
+def test_registered_gemini_4_preserves_native_thinking_levels(model: str, prefix: str) -> None:
     config = yaml.safe_load(create_backend_config(adapter_type="litellm").read_text())
-    entry = next(entry for entry in config["model_list"] if entry["model_name"] == model_name)
+    entry = next(entry for entry in config["model_list"] if entry["model_name"] == f"{prefix}{model}")
     entry["litellm_params"]["api_key"] = "test-key"
+    efforts = entry["model_info"]["reasoning_effort_levels"]
+    assert tuple(efforts) == get_model_spec(model).litellm_reasoning_efforts
+    assert entry["model_info"]["default_reasoning_effort"] == get_model_spec(model).default_reasoning_effort
     script = """\
         import json
         import sys
@@ -99,7 +102,8 @@ def test_registered_gemini_4_preserves_native_thinking_levels(model_name: str) -
         from litellm.llms.vertex_ai.gemini.transformation import _transform_request_body
         from litellm.utils import get_optional_params
 
-        entry = json.load(sys.stdin)
+        payload = json.load(sys.stdin)
+        entry = payload["entry"]
         provider, model = entry["litellm_params"]["model"].split("/", 1)
         router = litellm.Router(model_list=[entry])
         results = {
@@ -107,7 +111,7 @@ def test_registered_gemini_4_preserves_native_thinking_levels(model_name: str) -
             "tools": litellm.supports_function_calling(model=model, custom_llm_provider=provider),
             "efforts": {},
         }
-        for effort in ("low", "medium", "high"):
+        for effort in payload["efforts"]:
             params = get_optional_params(
                 model=model, custom_llm_provider=provider,
                 thinkingConfig={"thinkingLevel": effort, "includeThoughts": True},
@@ -125,7 +129,7 @@ def test_registered_gemini_4_preserves_native_thinking_levels(model_name: str) -
     # Router registration changes capability caches; isolate it from other model tests.
     result = subprocess.run(
         [sys.executable, "-c", dedent(script)],
-        input=json.dumps(entry),
+        input=json.dumps({"entry": entry, "efforts": efforts}),
         env={**os.environ, "LITELLM_LOCAL_MODEL_COST_MAP": "true"},
         capture_output=True,
         text=True,
@@ -136,6 +140,7 @@ def test_registered_gemini_4_preserves_native_thinking_levels(model_name: str) -
 
     assert actual["reasoning"] is True
     assert actual["tools"] is True
+    assert list(actual["efforts"]) == efforts
     for effort, body in actual["efforts"].items():
         generation = body["generationConfig"]
         assert generation["thinkingConfig"] == {"thinkingLevel": effort, "includeThoughts": True}

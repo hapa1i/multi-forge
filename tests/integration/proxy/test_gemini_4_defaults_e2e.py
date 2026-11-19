@@ -1,4 +1,4 @@
-"""Bounded Carbon tool round trips through the default Gemini OpenRouter tiers."""
+"""Bounded Neon and Hydrogen tool round trips through the default Gemini OpenRouter tiers."""
 
 from __future__ import annotations
 
@@ -15,13 +15,19 @@ from tests.integration.proxy.conftest import _openrouter_family_proxy
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 
+NEON = "google/gemini-4-neon"
+HYDROGEN = "google/gemini-4-hydrogen"
+# Claude tier names reach each default the way Claude Code does; Hydrogen is served at Haiku only.
+DEFAULT_TIER_REQUESTS = [("claude-sonnet-5-5", NEON), ("claude-haiku-4-5", HYDROGEN)]
+
+
 @pytest.fixture(scope="module")
-def carbon_proxy(module_forge_home: Path, tmp_path_factory: pytest.TempPathFactory) -> Generator[str, None, None]:
+def gemini_proxy(module_forge_home: Path, tmp_path_factory: pytest.TempPathFactory) -> Generator[str, None, None]:
     yield from _openrouter_family_proxy(
         "openrouter-gemini",
         module_forge_home,
         tmp_path_factory,
-        "Carbon proxy unreachable",
+        "Gemini proxy unreachable",
         preflight=False,
     )
 
@@ -56,8 +62,9 @@ def _message(response: httpx.Response, stream: bool) -> dict[str, Any]:
 
 
 @pytest.mark.parametrize("stream", [False, True])
-def test_carbon_tool_call_and_continuation(carbon_proxy: str, stream: bool) -> None:
-    base_url, model, slug = carbon_proxy, "gemini-4-carbon", "google/gemini-4-carbon"
+@pytest.mark.parametrize(("model", "slug"), DEFAULT_TIER_REQUESTS)
+def test_default_tier_tool_call_and_continuation(gemini_proxy: str, stream: bool, model: str, slug: str) -> None:
+    base_url = gemini_proxy
     messages: list[dict[str, Any]] = [
         {"role": "user", "content": "Call get_value with key sample. After receiving it, reply with that value only."}
     ]
@@ -81,8 +88,7 @@ def test_carbon_tool_call_and_continuation(carbon_proxy: str, stream: bool) -> N
     with httpx.Client(timeout=180) as client:
         health = client.get(f"{base_url}/").json()
         assert health["runtime"]["data_policy"]["zdr"] == "required"
-        assert health["runtime"]["tier_mappings"]["sonnet"] == slug
-        assert health["runtime"]["tier_mappings"]["opus"] == slug
+        assert health["runtime"]["tier_mappings"] == {"haiku": HYDROGEN, "sonnet": NEON, "opus": NEON}
         response = client.post(f"{base_url}/v1/messages", json=body, headers={"x-api-key": "test"})
         assert response.headers.get("X-Resolved-Model") == slug
         first = _message(response, stream)
@@ -109,3 +115,21 @@ def test_carbon_tool_call_and_continuation(carbon_proxy: str, stream: bool) -> N
         assert final["stop_reason"] == "end_turn"
         assert any(block["type"] == "text" and block["text"].strip() for block in final["content"])
         assert final["usage"]["output_tokens"] > 0
+
+
+@pytest.mark.parametrize(("model", "slug"), DEFAULT_TIER_REQUESTS)
+def test_xhigh_is_accepted_under_required_zdr(gemini_proxy: str, model: str, slug: str) -> None:
+    body = {
+        "model": model,
+        "max_tokens": 4096,
+        "reasoning_effort": "xhigh",
+        "messages": [{"role": "user", "content": "Reply with OK."}],
+    }
+    with httpx.Client(timeout=180) as client:
+        response = client.post(f"{gemini_proxy}/v1/messages", json=body, headers={"x-api-key": "test"})
+
+    assert response.headers.get("X-Resolved-Model") == slug
+    message = _message(response, stream=False)
+    # Thinking shares the output budget, so the deepest level may exhaust it before answering.
+    assert message["stop_reason"] in {"end_turn", "max_tokens"}
+    assert message["usage"]["output_tokens"] > 0

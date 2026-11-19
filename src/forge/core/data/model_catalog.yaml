@@ -38,9 +38,9 @@ defaults:
     sonnet: gpt-6.2-astra
     opus: gpt-6.2-astra
   gemini:
-    haiku: gemini-3.8-flash
-    sonnet: gemini-4-carbon
-    opus: gemini-4-carbon
+    haiku: gemini-4-hydrogen
+    sonnet: gemini-4-neon
+    opus: gemini-4-neon
   anthropic:
     haiku: claude-haiku-4-5-20251001
     sonnet: claude-sonnet-5-5
@@ -1004,6 +1004,56 @@ models:
   # ---------------------------------------------------------------------------
   # Gemini Models (via Vertex AI or Google AI Studio)
   # ---------------------------------------------------------------------------
+  gemini-4-neon:
+    friendly_name: Gemini 4 Neon
+    context_window_tokens: 1048576
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 180
+    prompt_caching:
+      # Implicit caching only; explicit cache creation is unsupported.
+      supports: true
+      mechanism: auto
+    native_thinking_param: thinking_level
+    # Google's native default is high. OpenRouter's metadata reports medium.
+    thinking_levels: [low, medium, high, xhigh]
+    default_thinking_level: high
+    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    default_reasoning_effort: high
+    system_prompt_addendum: system_prompt_addendums/gemini.md
+    tags: []
+
+  gemini-4-hydrogen:
+    friendly_name: Gemini 4 Hydrogen
+    context_window_tokens: 1048576
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 120
+    prompt_caching:
+      # Implicit caching only; explicit cache creation is unsupported.
+      supports: true
+      mechanism: auto
+    native_thinking_param: thinking_level
+    # Google's native default is high. OpenRouter's metadata reports medium.
+    thinking_levels: [low, medium, high, xhigh]
+    default_thinking_level: high
+    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    default_reasoning_effort: high
+    system_prompt_addendum: system_prompt_addendums/gemini.md
+    tags: []
+
   gemini-4-carbon:
     friendly_name: Gemini 4 Carbon
     context_window_tokens: 1048576
@@ -2531,6 +2581,8 @@ aliases:
   openai/o1: o1
 
   # Vertex AI provider prefix (LiteLLM style)
+  vertex_ai/gemini-4-neon: gemini-4-neon
+  vertex_ai/gemini-4-hydrogen: gemini-4-hydrogen
   vertex_ai/gemini-4-carbon: gemini-4-carbon
   vertex_ai/gemini-4-argon: gemini-4-argon
   vertex_ai/gemini-3.1-pro-preview: gemini-3.1-pro-preview
@@ -2544,6 +2596,8 @@ aliases:
   vertex_ai/gemini-3.8-flash: gemini-3.8-flash
 
   # Google AI Studio provider prefix (LiteLLM style)
+  gemini/gemini-4-neon: gemini-4-neon
+  gemini/gemini-4-hydrogen: gemini-4-hydrogen
   gemini/gemini-4-carbon: gemini-4-carbon
   gemini/gemini-4-argon: gemini-4-argon
   gemini/gemini-3.1-pro-preview: gemini-3.1-pro-preview
@@ -2557,6 +2611,8 @@ aliases:
   gemini/gemini-3.8-flash: gemini-3.8-flash
 
   # Google provider prefix (OpenRouter style)
+  google/gemini-4-neon: gemini-4-neon
+  google/gemini-4-hydrogen: gemini-4-hydrogen
   google/gemini-4-carbon: gemini-4-carbon
   google/gemini-4-argon: gemini-4-argon
   google/gemini-3.1-pro-preview: gemini-3.1-pro-preview

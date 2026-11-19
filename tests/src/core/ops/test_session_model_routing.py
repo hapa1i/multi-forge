@@ -118,6 +118,36 @@ class TestSessionModelRoutePlanning:
         with pytest.raises(SessionModelRoutingError, match="does not serve model"):
             plan_session_model_route(alias, explicit_proxy=snapshot)
 
+    @pytest.mark.parametrize(
+        ("template", "prefix", "model", "tier"),
+        [
+            ("openrouter-gemini", "google", "gemini-4-neon", "sonnet"),
+            ("openrouter-gemini", "google", "gemini-4-carbon", "sonnet"),
+            ("openrouter-gemini", "google", "gemini-4-hydrogen", "haiku"),
+            ("openrouter-gemini", "google", "gemini-3.8-flash", "haiku"),
+            ("openrouter-gemini-flash", "google", "gemini-4-hydrogen", "sonnet"),
+            ("openrouter-gemini-flash", "google", "gemini-3.8-flash", "sonnet"),
+            ("litellm-gemini", "vertex_ai", "gemini-4-neon", "sonnet"),
+            ("litellm-gemini", "vertex_ai", "gemini-4-carbon", "sonnet"),
+            ("litellm-gemini", "vertex_ai", "gemini-4-hydrogen", "sonnet"),
+            ("litellm-gemini", "vertex_ai", "gemini-3.8-flash", "sonnet"),
+            ("litellm-gemini-local", "gemini", "gemini-4-neon", "sonnet"),
+            ("litellm-gemini-local", "gemini", "gemini-4-carbon", "sonnet"),
+            ("litellm-gemini-local", "gemini", "gemini-4-hydrogen", "sonnet"),
+            ("litellm-gemini-local", "gemini", "gemini-3.8-flash", "sonnet"),
+            ("litellm-gemini-flash-local", "gemini", "gemini-4-hydrogen", "sonnet"),
+            ("litellm-gemini-flash-local", "gemini", "gemini-3.8-flash", "sonnet"),
+        ],
+    )
+    def test_fresh_gemini_templates_serve_new_and_replaced_defaults(
+        self, template: str, prefix: str, model: str, tier: str
+    ) -> None:
+        # A replaced default must stay reachable as an alternative on every template its routes name.
+        plan = plan_session_model_route(model, explicit_proxy=inspect_proxy_reference(template))
+
+        assert plan.selected_model == f"{prefix}/{model}"
+        assert plan.selected_tier == tier
+
     @pytest.mark.parametrize("alias", ["astra", "sol"])
     @pytest.mark.parametrize(
         ("credential", "template"),
@@ -145,6 +175,8 @@ class TestSessionModelRoutePlanning:
                 "openai/gpt-5.4-mini",
             ),
             ("openrouter-openai", "gpt-6-astra", "gpt-5.6-sol", "openai/gpt-5.4-mini"),
+            ("openrouter-gemini", "gemini-4-neon", "gemini-4-carbon", "google/gemini-3.8-flash"),
+            ("openrouter-gemini", "gemini-4-hydrogen", "gemini-4-carbon", "google/gemini-3.8-flash"),
             ("openrouter-gemini", "gemini-4-carbon", "gemini-4-argon", "google/gemini-3.8-flash"),
             ("openrouter-gemini", "gemini-4-argon", "gemini-3.1-pro-preview", "google/gemini-3.8-flash"),
         ],
@@ -305,6 +337,7 @@ class TestSessionModelRoutePlanning:
             "gemini-3.6-flash",
             "gemini-3.7-flash",
             "gemini-3.8-flash",
+            "gemini-4-hydrogen",
         ],
     )
     def test_automatic_openrouter_route_serves_current_and_earlier_flash_models(

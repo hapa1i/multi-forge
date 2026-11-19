@@ -1,7 +1,7 @@
 # Template: openrouter-gemini
 # Google Gemini models via OpenRouter (direct, no LiteLLM)
 #
-# Access to Gemini 4 Carbon and Gemini 3.8 Flash.
+# Access to Gemini 4 Neon and Gemini 4 Hydrogen.
 # Requires OPENROUTER_API_KEY in .env (or environment).
 
 proxy:
@@ -13,19 +13,26 @@ proxy:
   openrouter:
     allow_non_zdr: false
     tiers:
-      haiku: google/gemini-3.8-flash
-      sonnet: google/gemini-4-carbon
-      opus: google/gemini-4-carbon
+      haiku: google/gemini-4-hydrogen
+      sonnet: google/gemini-4-neon
+      opus: google/gemini-4-neon
     model_alternatives:
+      haiku:
+        gemini-3.8-flash: google/gemini-3.8-flash
       sonnet:
+        gemini-4-carbon: google/gemini-4-carbon
         gemini-4-argon: google/gemini-4-argon
         gemini-3.1-pro-preview: google/gemini-3.1-pro-preview
         gemini-2.5-pro: google/gemini-2.5-pro
       opus:
+        gemini-4-carbon: google/gemini-4-carbon
         gemini-4-argon: google/gemini-4-argon
         gemini-3.1-pro-preview: google/gemini-3.1-pro-preview
         gemini-2.5-pro: google/gemini-2.5-pro
     tier_overrides:
+      # Hydrogen's native default is high; keep Haiku requests without thinking fast.
+      haiku:
+        reasoning_effort: low
       sonnet:
         reasoning_effort: medium
       opus:

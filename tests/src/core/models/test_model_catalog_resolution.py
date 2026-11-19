@@ -369,7 +369,7 @@ class TestGemini37Flash:
 
         assert "gemini-3.7-flash" in catalog.models
         assert "gemini-3.7-flash" not in catalog.aliases
-        assert catalog.defaults["gemini"]["haiku"] == "gemini-3.8-flash"
+        assert catalog.defaults["gemini"]["haiku"] != "gemini-3.7-flash"
 
     @pytest.mark.parametrize(
         "alias",
@@ -399,12 +399,12 @@ class TestGemini37Flash:
 class TestGemini38Flash:
     """Tests for the Gemini 3.8 Flash catalog entry and family default."""
 
-    def test_gemini_38_flash_is_canonical_and_the_haiku_default(self):
+    def test_gemini_38_flash_remains_canonical_but_is_not_the_family_default(self):
         catalog = load_model_catalog()
 
         assert "gemini-3.8-flash" in catalog.models
         assert "gemini-3.8-flash" not in catalog.aliases
-        assert catalog.defaults["gemini"]["haiku"] == "gemini-3.8-flash"
+        assert catalog.defaults["gemini"]["haiku"] == "gemini-4-hydrogen"
 
     @pytest.mark.parametrize(
         "alias",

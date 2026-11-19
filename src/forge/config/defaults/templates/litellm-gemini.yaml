@@ -2,7 +2,7 @@
 # Gemini models via remote/shared LiteLLM
 #
 # Default template for Gemini access through a shared LiteLLM gateway.
-# The shared instance must serve vertex_ai/gemini-4-carbon and vertex_ai/gemini-3.8-flash.
+# The shared instance must serve vertex_ai/gemini-4-neon and vertex_ai/gemini-4-hydrogen.
 # Requires LITELLM_API_KEY and LITELLM_BASE_URL in .env (or environment).
 
 proxy:
@@ -13,34 +13,42 @@ proxy:
 
   litellm:
     tiers:
-      haiku: vertex_ai/gemini-3.8-flash
-      sonnet: vertex_ai/gemini-4-carbon
-      opus: vertex_ai/gemini-4-carbon
+      haiku: vertex_ai/gemini-4-hydrogen
+      sonnet: vertex_ai/gemini-4-neon
+      opus: vertex_ai/gemini-4-neon
     model_alternatives:
       haiku:
+        gemini-3.8-flash: vertex_ai/gemini-3.8-flash
         gemini-2.5-flash: vertex_ai/gemini-2.5-flash
         gemini-3.5-flash: vertex_ai/gemini-3.5-flash
         gemini-3.6-flash: vertex_ai/gemini-3.6-flash
         gemini-3.7-flash: vertex_ai/gemini-3.7-flash
       sonnet:
+        gemini-4-carbon: vertex_ai/gemini-4-carbon
         gemini-4-argon: vertex_ai/gemini-4-argon
         gemini-3.1-pro-preview: vertex_ai/gemini-3.1-pro-preview
         gemini-2.5-pro: vertex_ai/gemini-2.5-pro
+        gemini-4-hydrogen: vertex_ai/gemini-4-hydrogen
         gemini-3.8-flash: vertex_ai/gemini-3.8-flash
         gemini-2.5-flash: vertex_ai/gemini-2.5-flash
         gemini-3.5-flash: vertex_ai/gemini-3.5-flash
         gemini-3.6-flash: vertex_ai/gemini-3.6-flash
         gemini-3.7-flash: vertex_ai/gemini-3.7-flash
       opus:
+        gemini-4-carbon: vertex_ai/gemini-4-carbon
         gemini-4-argon: vertex_ai/gemini-4-argon
         gemini-3.1-pro-preview: vertex_ai/gemini-3.1-pro-preview
         gemini-2.5-pro: vertex_ai/gemini-2.5-pro
+        gemini-4-hydrogen: vertex_ai/gemini-4-hydrogen
         gemini-3.8-flash: vertex_ai/gemini-3.8-flash
         gemini-2.5-flash: vertex_ai/gemini-2.5-flash
         gemini-3.5-flash: vertex_ai/gemini-3.5-flash
         gemini-3.6-flash: vertex_ai/gemini-3.6-flash
         gemini-3.7-flash: vertex_ai/gemini-3.7-flash
     tier_overrides:
+      # Hydrogen's native default is high; keep Haiku requests without thinking fast.
+      haiku:
+        reasoning_effort: low
       sonnet:
         reasoning_effort: medium
       opus:

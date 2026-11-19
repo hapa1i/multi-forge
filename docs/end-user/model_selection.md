@@ -370,15 +370,66 @@ New proxies created from the current built-in templates use these defaults:
 | `openrouter-kimi`                                   | sonnet/opus -> Kimi K3                                      |
 | `openrouter-qwen`                                   | haiku/sonnet -> Qwen3.8 27B, opus -> Qwen3.8 Max            |
 | `openrouter-glm`                                    | sonnet/opus -> GLM 5.3                                      |
-| `openrouter-gemini-flash`                           | all tiers -> Gemini 3.8 Flash                               |
-| `openrouter-gemini`                                 | haiku -> Gemini 3.8 Flash, sonnet/opus -> Gemini 4 Carbon   |
-| `litellm-gemini`, `litellm-gemini-local`            | haiku -> Gemini 3.8 Flash, sonnet/opus -> Gemini 4 Carbon   |
-| `litellm-gemini-flash-local`                        | all tiers -> Gemini 3.8 Flash                               |
+| `openrouter-gemini-flash`                           | all tiers -> Gemini 4 Hydrogen                              |
+| `openrouter-gemini`                                 | haiku -> Gemini 4 Hydrogen, sonnet/opus -> Gemini 4 Neon    |
+| `litellm-gemini`, `litellm-gemini-local`            | haiku -> Gemini 4 Hydrogen, sonnet/opus -> Gemini 4 Neon    |
+| `litellm-gemini-flash-local`                        | all tiers -> Gemini 4 Hydrogen                              |
+
+#### Gemini 4 Neon and Hydrogen
+
+Gemini 4 Neon replaces Carbon as the Sonnet/Opus default, and Gemini 4 Hydrogen replaces Gemini 3.8 Flash as the Haiku
+and Flash-template default. Select them explicitly with `--model gemini-4-neon` or `--model gemini-4-hydrogen`. Carbon,
+Argon, Gemini 3.8 Flash, and prior Pro models remain explicit selections. Google positions Hydrogen as its everyday
+default and the upgrade from Gemini 3.8 Flash, Neon between Hydrogen and Carbon, and Carbon for the hardest problems.
+
+Both share Carbon's unified 1,048,576-token context, 65,536-token synchronous output, ignored sampling parameters, and
+implicit-only caching with a 4,096-token minimum. They differ from Carbon in three ways:
+
+- **Thinking:** `low`, `medium`, `high`, and `xhigh`, with `high` as the model default. Carbon stops at `high` and
+  defaults to `medium`. Google rejects `minimal` and thinking budgets.
+- **Vertex unary output:** 65,536 tokens for streaming and unary requests. Forge does not apply Carbon's 32,768 unary
+  cap to either model.
+- **Price per million tokens:** Neon costs $3 input, $15 output (including thinking), and $0.15 cached input. Hydrogen
+  costs $1.50, $7.50, and $0.075. Both are flat across the context window with no introductory schedule.
+
+Sonnet retains `medium` effort and Opus retains `high`. Fresh Pro-family templates also set Haiku to `low`. Without it,
+Haiku requests that carry no thinking configuration would run at Hydrogen's default, which is `high` on LiteLLM routes.
+These settings are floors: a larger thinking budget still raises the effort. A budget of at least 25,000 tokens, or a
+client `max` effort, resolves to `xhigh` on Neon and Hydrogen where Carbon stops at `high`, so the same client setting
+spends more. Send an explicit `reasoning_effort` to bound it.
+
+Check cost and access before adopting:
+
+- Hydrogen costs twice Gemini 3.8 Flash's promotional price ($0.75 input, $3.75 output), which Google lists through
+  December 31, 2026.
+- Neon costs 50% more than Carbon's introductory price through November 30, 2026, and 25% less once Carbon doubles on
+  December 1.
+- Neon is not available on the Gemini API free tier, so a free-tier `GEMINI_API_KEY` serves Hydrogen but not the
+  Sonnet/Opus default. Google limits Neon on Vertex to verified enterprise customers in `global`, `us`, and `eu`.
+- OpenRouter lists ZDR endpoints for both models, so the templates keep their required-ZDR policy.
+
+To adopt them, follow the
+[saved-configuration upgrade procedure](proxy.md#updating-saved-proxy-and-backend-configurations) with `gemini-4-neon`
+on the Sonnet/Opus tiers and `gemini-4-hydrogen` on Haiku, using the `google/`, `gemini/`, or `vertex_ai/` prefix for
+OpenRouter, local LiteLLM, or remote LiteLLM. Keep `gemini-4-carbon` and `gemini-3.8-flash` under `model_alternatives`
+if you still select them. LiteLLM also needs both deployments in its saved backend config: copy the complete bundled
+entries, including `model_info`. For remote Vertex, apply the changes described in the
+[Carbon migration](#gemini-4-carbon), keeping the 65,536-token limit for unary requests. Google's guides do not state
+Vertex rates for either model, so confirm the copied pricing before relying on Vertex cost reports. A backend snapshot
+without Neon fails workflow preflight with migration guidance instead of falling back to an older model.
+
+The policy plan-check and team-tagger defaults stay on [Gemini 3.8 Flash](#gemini-38-flash).
+
+See Google's [Neon](https://aistudio.google.com/docs/whats-new-gemini-4-neon) and
+[Hydrogen](https://aistudio.google.com/docs/whats-new-gemini-4-hydrogen) migration guides, its
+[pricing page](https://aistudio.google.com/docs/pricing), and the Vertex
+[Neon](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-neon) and
+[Hydrogen](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-hydrogen) guides.
 
 #### Gemini 4 Carbon
 
-Gemini 4 Carbon replaces Argon as the Sonnet/Opus default. Select it explicitly with `--model gemini-4-carbon`; Argon
-and prior Pro models, including `gemini-3.1-pro-preview`, remain explicit selections. Carbon has a unified
+Gemini 4 Carbon remains available through `--model gemini-4-carbon` and the `gemini-4-carbon` workflow worker; Argon and
+prior Pro models, including `gemini-3.1-pro-preview`, also remain explicit selections. Carbon has a unified
 1,048,576-token context shared by input, thinking, and output. Forge uses its 65,536-token synchronous output limit on
 Google AI. Vertex allows 65,536 output tokens per streaming request and 32,768 per unary request. Choose `low`,
 `medium`, or `high` reasoning (`medium` is the model default); `temperature`, `top_p`, and `top_k` are ignored by Google
@@ -399,7 +450,7 @@ configs retain their pricing metadata, so update the `model_info` rates explicit
 reporting accurate. See Google's
 [Carbon migration and pricing schedule](https://aistudio.google.com/docs/whats-new-gemini-4-carbon#pricing).
 
-To adopt Carbon, follow the
+To select Carbon on a saved proxy, follow the
 [saved-configuration upgrade procedure](proxy.md#updating-saved-proxy-and-backend-configurations) with these Sonnet/Opus
 tier models: `google/gemini-4-carbon` for OpenRouter, `gemini/gemini-4-carbon` for local LiteLLM, or
 `vertex_ai/gemini-4-carbon` for remote LiteLLM. Remove sampling overrides from those tiers and retain older models under
@@ -421,18 +472,18 @@ adopting Carbon, so requests avoid the adapter's generic reasoning conversion to
   [LiteLLM's Vertex configuration](https://docs.litellm.ai/docs/providers/vertex) and Google's
   [Vertex caching limits](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/context-cache/context-cache-overview).
 
-Carbon workflow requests select the model explicitly: an existing OpenRouter proxy can forward them without changing
-tier defaults, and a saved LiteLLM proxy can keep its older tiers once its restarted backend serves Carbon. A backend
-snapshot without Carbon fails workflow preflight with migration guidance instead of falling back to an older Pro model.
-See [workflow readiness](workflow.md#quick-start) for `forge workflow list-models --available --json` and the limits of
-its deployment check.
+Workflow requests select their model explicitly: an existing OpenRouter proxy can forward them without changing tier
+defaults, and a saved LiteLLM proxy can keep its older tiers once its restarted backend serves the selected model. A
+backend snapshot without that model fails workflow preflight with migration guidance instead of falling back. See
+[workflow readiness](workflow.md#quick-start) for `forge workflow list-models --available --json` and the limits of its
+deployment check.
 
 #### Gemini 4 Argon
 
 Argon remains available through `--model gemini-4-argon` and the `gemini-4-argon` workflow worker. It shares Carbon's
 context, output limits, thinking levels, and sampling restrictions, and uses `google/gemini-4-argon`,
 `gemini/gemini-4-argon`, or `vertex_ai/gemini-4-argon`. Saved Argon proxies and backends keep their configurations; use
-the [Carbon migration](#gemini-4-carbon) above only when adopting the new default.
+the [Neon and Hydrogen migration](#gemini-4-neon-and-hydrogen) above only when adopting the new defaults.
 
 - **Cache minimum:** both Google AI and remote Vertex Argon deployments use `prompt_cache_min_tokens: 4096`. See
   Google's
@@ -445,15 +496,16 @@ the [Carbon migration](#gemini-4-carbon) above only when adopting the new defaul
 
 #### Gemini 3.8 Flash
 
-Gemini 3.8 Flash is the current Gemini Flash default across OpenRouter and LiteLLM. It is a GA model with a
-1,048,576-token input limit, 65,536-token output limit, and `low`/`medium`/`high` thinking levels (`medium` by default).
-Google documents sampling parameters as deprecated and ignored, so Forge does not advertise sampling overrides. Gemini
-2.5, 3.5, 3.6, and 3.7 Flash remain selectable through the OpenRouter Flash template. See Google's
+Gemini 3.8 Flash remains available through `--model gemini-3.8-flash`, the `gemini-3.8-flash` workflow worker, and the
+Gemini templates' alternatives. It is a GA model with a 1,048,576-token input limit, 65,536-token output limit, and
+`low`/`medium`/`high` thinking levels (`medium` by default). Google documents sampling parameters as deprecated and
+ignored, so Forge does not advertise sampling overrides. Gemini 2.5, 3.5, 3.6, and 3.7 Flash remain selectable through
+the OpenRouter Flash template. See Google's
 [3.8 announcement](https://blog.google/innovation-and-ai/models-and-research/gemini-models/3-8-flash-and-3-8-flash-cyber/),
 [3.8 model reference](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash),
 [Gemini API release notes](https://ai.google.dev/gemini-api/docs/changelog).
 
-The tier-1 cascade checker also defaults to Gemini 3.8 Flash through OpenRouter, local LiteLLM as
+The tier-1 cascade checker and team tagger still default to Gemini 3.8 Flash through OpenRouter, local LiteLLM as
 `gemini/gemini-3.8-flash`, and remote LiteLLM as `vertex_ai/gemini-3.8-flash` (see [policy.md](policy.md)).
 
 #### Claude Sonnet and Opus 5.5

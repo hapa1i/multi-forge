@@ -214,6 +214,8 @@ def _build_available_models() -> dict[str, ModelSpec]:
         ("gpt-6-luna", "openai", "Fast, cost-efficient review"),
         ("gpt-6-luna-pro", "openai", "Explicit Luna Pro review through OpenRouter"),
         ("gpt-5.6-sol", "openai", "Explicit GPT-5.6 Sol review"),
+        ("gemini-4-hydrogen", "gemini", "Fast, cost-efficient Gemini 4 review"),
+        ("gemini-4-carbon", "gemini", "Explicit Gemini 4 Carbon review for hard architecture and debugging"),
         ("gemini-4-argon", "gemini", "Explicit prior Gemini 4 Argon review"),
         ("gemini-3.1-pro-preview", "gemini", "Explicit prior Gemini 3.1 Pro review"),
         ("gemini-3.8-flash", "gemini", "Fast multimodal review with large context"),
