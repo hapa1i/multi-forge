@@ -11,6 +11,12 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 
 ## 2026-11-19
 
+### Fix excessive resource use in DNS zone parsing
+
+The wheel requires dnspython 2.9.2 or newer. The lock and runtime export pin 2.9.2. Both Python CI lanes and the
+clean-wheel smoke test passed. [PR #301](https://github.com/hapa1i/multi-forge/pull/301) ·
+[Completed checklist](done/dnspython_security_floor/checklist.md)
+
 ### Make GPT-6.2 Astra the default OpenAI model
 
 Forge now supports GPT-6.2 Astra and Sol on native OpenAI and OpenRouter routes, plus both Pro variants on OpenRouter.
