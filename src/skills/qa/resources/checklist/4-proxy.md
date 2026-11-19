@@ -429,7 +429,7 @@ forge model backend show litellm-4000 --raw
 - [ ] Backend config created (or reports it already exists)
 - [ ] `forge model backend show` displays config YAML
 - [ ] A freshly created backend includes Gemini 4 Carbon, Gemini 4 Argon, Gemini 3.8 Flash, Claude Opus 5.5, Claude
-  Sonnet 5.5, GPT-6.1 Sol, GPT-6 Sol, and GPT-6 Luna routes; an existing user-owned config is preserved
+  Sonnet 5.5, GPT-6.2 Astra and Sol, GPT-6.1 Sol, and GPT-6 Sol/Luna routes; an existing user-owned config is preserved
 
 ### 4.17 OpenRouter Templates
 
@@ -474,10 +474,11 @@ forge proxy template show openrouter-qwen
 - [ ] Every OpenRouter template defaults `allow_non_zdr` to false; no LiteLLM template contains ZDR fields
 - [ ] The dated ZDR audit fallbacks map Fable 5.2/5.1/5 to Opus 5.5 and cover all eight bundled non-ZDR Qwen slugs; both
   Qwen3.8 Max entries map to `qwen/qwen3.8-2.4t-a95b`, and Qwen3.8 Flash maps to `qwen/qwen3.8-27b`
-- [ ] `openrouter-openai` maps tiers to GPT models (haiku=gpt-5.4-mini, sonnet=gpt-6-astra, opus=gpt-6-astra)
+- [ ] `openrouter-openai` maps tiers to GPT models (haiku=gpt-5.4-mini, sonnet=gpt-6.2-astra, opus=gpt-6.2-astra)
 - [ ] `openrouter-openai-codex` maps tiers to Codex models (haiku=gpt-5.1-codex-mini, sonnet=gpt-5.3-codex,
-  opus=gpt-6-astra)
-- [ ] Both OpenRouter OpenAI templates expose GPT-6.1 Sol, GPT-6 Sol/Sol Pro, and Luna/Luna Pro alternatives
+  opus=gpt-6.2-astra)
+- [ ] Both OpenRouter OpenAI templates expose GPT-6.2 Sol and both GPT-6.2 Pro models, plus the prior versioned
+  alternatives
 - [ ] `openrouter-gemini` maps tiers to Gemini models (haiku=gemini-3.8-flash, sonnet/opus=gemini-4-carbon) and retains
   explicit older Pro alternatives
 - [ ] `openrouter-gemini-flash` maps all tiers to gemini-3.8-flash with tier_overrides for reasoning_effort

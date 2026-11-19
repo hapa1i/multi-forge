@@ -10,6 +10,7 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from forge.core.models import get_default_model
 from forge.core.reactive.routing import ModelRoute, RoutingResult
 from forge.core.runtime.codex_preflight import CodexPreflight
 from forge.proxy.proxies import ProxyNotFoundError
@@ -1239,7 +1240,7 @@ class TestRunDebate:
         assert result.exit_code == 0
         assert "--check" in result.output
         assert "--code" in result.output
-        assert "gpt-6-astra:for" in result.output
+        assert "gpt-6.2-astra:for" in result.output
         assert "gpt-5.5:for" not in result.output
         # No --context flag for debate (blinding is mandatory)
         assert "--context" not in result.output
@@ -1347,11 +1348,8 @@ class TestRunDebate:
     @patch("forge.review.adversarial.run_multi_review")
     def test_debate_json_includes_stance_per_result(self, mock_run, _mock_routing):
         """Each result record should include its stance for JSON consumers."""
-        mock_run.return_value = _mock_output(
-            results=[
-                ReviewResult("gpt-6-astra-for", "analysis", "", True, 1.0),
-            ]
-        )
+        for_worker = f"{get_default_model('openai', 'opus')}-for"
+        mock_run.return_value = _mock_output(results=[ReviewResult(for_worker, "analysis", "", True, 1.0)])
         runner = CliRunner()
         result = runner.invoke(
             main,
@@ -1359,7 +1357,7 @@ class TestRunDebate:
         )
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["results"]["gpt-6-astra-for"]["stance"] == "for"
+        assert data["results"][for_worker]["stance"] == "for"
 
     @patch(
         "forge.review.routing.resolve_invocation_routing",
@@ -1541,11 +1539,8 @@ class TestRunDebateCode:
     )
     @patch("forge.review.adversarial.run_multi_review")
     def test_code_mode_json_output(self, mock_run, _mock_routing):
-        mock_run.return_value = _mock_output(
-            results=[
-                ReviewResult("gpt-6-astra-for", "analysis", "", True, 1.0),
-            ]
-        )
+        for_worker = f"{get_default_model('openai', 'opus')}-for"
+        mock_run.return_value = _mock_output(results=[ReviewResult(for_worker, "analysis", "", True, 1.0)])
         runner = CliRunner()
         result = runner.invoke(
             main,
@@ -1553,7 +1548,7 @@ class TestRunDebateCode:
         )
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["results"]["gpt-6-astra-for"]["stance"] == "for"
+        assert data["results"][for_worker]["stance"] == "for"
         assert data["resource_path"] == "(generated)"
 
     @patch(

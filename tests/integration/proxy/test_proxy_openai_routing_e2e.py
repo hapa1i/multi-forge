@@ -47,7 +47,7 @@ def test_litellm_openai_sonnet_forwards_exact_astra_model(
 
     assert response.status_code == 200, response.text[:500]
     assert response.headers.get("X-Resolved-Tier") == "sonnet"
-    assert response.headers.get("X-Resolved-Model") == "openai/gpt-6-astra"
+    assert response.headers.get("X-Resolved-Model") == "openai/gpt-6.2-astra"
     if stream:
         assert "event: content_block_delta" in response.text
         assert '"text": "FAKE-SOL-OK"' in response.text
@@ -59,7 +59,7 @@ def test_litellm_openai_sonnet_forwards_exact_astra_model(
     assert upstream_request["path"] == "/v1/responses"
     assert upstream_request["body"]["input"] == [{"role": "user", "content": "Say hello"}]
     assert upstream_request["body"]["max_output_tokens"] == 16
-    assert upstream_request["body"]["model"] == "openai/gpt-6-astra"
+    assert upstream_request["body"]["model"] == "openai/gpt-6.2-astra"
     assert upstream_request["body"]["reasoning"] == {"effort": "medium"}
     assert "temperature" not in upstream_request["body"]
     assert "top_p" not in upstream_request["body"]

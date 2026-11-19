@@ -100,7 +100,19 @@ class TestModelSpec:
 class TestDefaultModels:
     @pytest.mark.parametrize(
         "default",
-        ["gpt-6-astra-pro", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-sol-pro", "gpt-6-luna", "gpt-6-luna-pro", "gpt-5.6-sol"],
+        [
+            "gpt-6.2-astra-pro",
+            "gpt-6.2-sol",
+            "gpt-6.2-sol-pro",
+            "gpt-6-astra",
+            "gpt-6-astra-pro",
+            "gpt-6.1-sol",
+            "gpt-6-sol",
+            "gpt-6-sol-pro",
+            "gpt-6-luna",
+            "gpt-6-luna-pro",
+            "gpt-5.6-sol",
+        ],
     )
     def test_explicit_gpt_choices_do_not_replace_the_default_worker(self, default: str) -> None:
         with patch(
@@ -114,10 +126,18 @@ class TestDefaultModels:
         assert {"gpt-6-astra-pro", "gpt-5.6-sol"} <= models.keys()
 
     def test_astra_is_default_and_pro_and_sol_are_explicit_choices(self):
-        assert OPENAI_DEFAULT == "gpt-6-astra"
-        assert "gpt-6-astra" in DEFAULT_MODELS
-        specs = resolve_model_specs("gpt-6-astra-pro,gpt-5.6-sol")
-        assert [spec.model_id for spec in specs] == ["gpt-6-astra-pro", "gpt-5.6-sol"]
+        assert OPENAI_DEFAULT == "gpt-6.2-astra"
+        assert OPENAI_DEFAULT in DEFAULT_MODELS
+        explicit = [
+            "gpt-6.2-astra-pro",
+            "gpt-6.2-sol-pro",
+            "gpt-6.2-sol",
+            "gpt-6-astra",
+            "gpt-6-astra-pro",
+            "gpt-5.6-sol",
+        ]
+        specs = resolve_model_specs(",".join(explicit))
+        assert [spec.model_id for spec in specs] == explicit
         assert all(spec.name not in DEFAULT_MODELS for spec in specs)
         assert {route.provider for route in derive_model_routes(specs[0])} == {"openrouter"}
 

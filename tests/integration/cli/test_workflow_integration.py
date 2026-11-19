@@ -96,8 +96,25 @@ def _read_capture_files(workspace: ContainerLike, glob_expr: str) -> list[str]:
 
 
 class TestRunMultiReviewE2E:
-    def test_october_workers_keep_exact_models_on_a_shared_proxy(
-        self, mock_claude_workspace: ContainerLike, request: pytest.FixtureRequest
+    @pytest.mark.parametrize(
+        "models",
+        [
+            {
+                "kimi-k3.1-pro": "moonshotai/kimi-k3.1-pro",
+                "minimax-m3.1-flash": "minimax/minimax-m3.1-flash",
+                "deepseek-v4.1-flash-1017": "deepseek/deepseek-v4.1-flash-1017",
+            },
+            {
+                "gpt-6.2-astra": "openai/gpt-6.2-astra",
+                "gpt-6.2-sol": "openai/gpt-6.2-sol",
+                "gpt-6.2-astra-pro": "openai/gpt-6.2-astra-pro",
+                "gpt-6.2-sol-pro": "openai/gpt-6.2-sol-pro",
+            },
+        ],
+        ids=["october-models", "gpt-6.2"],
+    )
+    def test_workers_keep_exact_models_on_a_shared_proxy(
+        self, mock_claude_workspace: ContainerLike, request: pytest.FixtureRequest, models: dict[str, str]
     ) -> None:
         _write_proxy_registry(
             mock_claude_workspace,
@@ -106,12 +123,6 @@ class TestRunMultiReviewE2E:
             base_url="http://127.0.0.1:4001",
             port=4001,
         )
-        models = {
-            "kimi-k3.1-pro": "moonshotai/kimi-k3.1-pro",
-            "minimax-m3.1-flash": "minimax/minimax-m3.1-flash",
-            "deepseek-v4.1-flash-1017": "deepseek/deepseek-v4.1-flash-1017",
-        }
-
         result = mock_claude_workspace.exec(
             f"cd /workspace && PYTHON_DOTENV_DISABLED=1 forge workflow panel --models {','.join(models)} "
             "--proxy openrouter-kimi --context blind -p 'ping' --timeout 5 --json",
@@ -121,8 +132,8 @@ class TestRunMultiReviewE2E:
         assert result.returncode == 0, result.stderr
         data = json.loads(result.stdout)
         assert set(data["results"]) == set(models)
-        assert data["successful"] == 3
-        _assert_invocation_count(mock_claude_workspace, 3)
+        assert data["successful"] == len(models)
+        _assert_invocation_count(mock_claude_workspace, len(models))
         invocations = mock_claude_workspace.read_file("/tmp/claude_invocations.log")
         for slug in models.values():
             assert f"--model {slug}" in invocations

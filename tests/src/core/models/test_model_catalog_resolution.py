@@ -62,15 +62,29 @@ class TestGetModelSpec:
             get_model_spec("nonexistent-model")
 
 
-class TestGPTAstraFamily:
-    """Pin Astra's distinct provider identities and mandatory reasoning contract."""
+class TestGPTAstraAndSol:
+    """Pin provider identities and mandatory reasoning for Astra and the 6.2 family."""
 
-    @pytest.mark.parametrize("model", ["gpt-6-astra", "gpt-6-astra-pro"])
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "gpt-6-astra",
+            "gpt-6-astra-pro",
+            "gpt-6.2-astra",
+            "gpt-6.2-astra-pro",
+            "gpt-6.2-sol",
+            "gpt-6.2-sol-pro",
+        ],
+    )
     def test_profiles_and_aliases(self, model):
         catalog = load_model_catalog()
         assert model in catalog.models
         assert resolve_model_id(f"openai/{model}") == model
-        assert resolve_model_id(model.removeprefix("gpt-6-")) == model
+        assert resolve_model_id(model) == model
+        if model.startswith("gpt-6.2-"):
+            alias = model.removeprefix("gpt-6.2-")
+            assert resolve_model_id(alias) == model
+            assert resolve_model_id(f"gpt-{alias}") == model
         spec = get_model_spec(model)
         assert spec.context_window_tokens == 1_050_000
         assert spec.max_output_tokens == 128_000

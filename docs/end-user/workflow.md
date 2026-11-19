@@ -29,7 +29,7 @@ forge runtime preflight codex
 # Deep analysis on a topic (single model, default: claude-opus)
 forge workflow analyze "Should we use event sourcing for the audit log?"
 
-# Multi-model code review (default worker set: gpt-6-astra, gemini-4-carbon, claude-opus)
+# Multi-model code review (default worker set: gpt-6.2-astra, gemini-4-carbon, claude-opus)
 forge workflow panel src/forge/session/store.py --code
 
 # Multi-model document review
@@ -50,19 +50,17 @@ forge workflow consensus "Should we adopt gRPC for internal services?"
 
 Unless you pass `-m`, the multi-model workflows use this built-in worker set:
 
-- `gpt-6-astra` -- OpenRouter (preferred proxy: `openrouter-openai`)
+- `gpt-6.2-astra` -- OpenRouter (preferred proxy: `openrouter-openai`)
 - `gemini-4-carbon` -- OpenRouter (preferred proxy: `openrouter-gemini`)
 - `claude-opus` -- direct Anthropic, pinned to Claude Opus 5.5
 
 This default set is entirely Claude-backed. Add `-m codex` explicitly to run the runtime-native Codex worker. Codex
 selects its own model; Forge does not pass a model pin.
 
-`gpt-6-astra-pro`, `gpt-6-sol`, `gpt-6-sol-pro`, `gpt-6-luna`, and `gpt-6-luna-pro` are explicit workers; the Pro
-variants require OpenRouter. `gpt-5.6-sol` remains selectable for previous-model comparisons. Existing OpenRouter
-proxies can forward these explicit worker model IDs without changing their tier defaults. LiteLLM backends must serve
-the selected native GPT-6 route through Responses; see the
-[Astra upgrade steps](model_selection.md#picking-up-gpt-6-astra-defaults-after-an-upgrade) for backend configuration and
-for adopting the new proxy tier defaults.
+`gpt-6.2-sol` is an explicit worker. The `gpt-6.2-astra-pro` and `gpt-6.2-sol-pro` workers use OpenRouter. Use versioned
+IDs such as `gpt-6-astra`, `gpt-6.1-sol`, or `gpt-6-astra-pro` for comparisons with older models. Existing OpenRouter
+proxies can forward explicit worker IDs. A LiteLLM backend needs a loaded Responses deployment for each standard model
+you select. [GPT-6.2 migration](model_selection.md#gpt-62-astra-and-sol)
 
 `gemini-4-argon` and `gemini-3.8-flash` remain explicit workers. Local and remote LiteLLM backends need the selected
 model's deployment; upgrading Forge preserves previously materialized backend configurations. See the
@@ -83,7 +81,7 @@ route proxy-backed workers through a specific proxy:
 
 ```bash
 # Route all workers through one proxy (single OPENROUTER_API_KEY setup)
-forge workflow panel src/ --code -m gpt-6-astra,deepseek-v4-pro --proxy openrouter-openai
+forge workflow panel src/ --code -m gpt-6.2-astra,deepseek-v4-pro --proxy openrouter-openai
 
 # Explicit direct Claude workers
 forge workflow panel src/ --code -m claude-opus-4.6,claude-opus-4.8
@@ -146,7 +144,7 @@ forge workflow panel src/ --code --review-type security --severity high
 - `--code` -- use code review framework (default: document review)
 - `-p` -- custom review prompt (overrides target+framework and --review-type)
 - `--context` -- `blind` (default: fresh subprocess) or `resume:<uuid>` (fork session context)
-- `-m` -- models to use (default: `gpt-6-astra,gemini-4-carbon,claude-opus`)
+- `-m` -- models to use (default: `gpt-6.2-astra,gemini-4-carbon,claude-opus`)
 - `--roles` -- comma-separated reviewer roles (security, performance, architecture, maintainability, correctness)
 - `--review-type` -- review focus: `full` (default), `security`, `performance`, `quick` (security/performance need
   --code)
@@ -163,7 +161,7 @@ to code evaluation.
 forge workflow debate "Should we use event sourcing?"                    # proposal evaluation (default)
 forge workflow debate src/forge/session/ --code                          # code evaluation
 forge workflow debate "Evaluate the auth module" --check
-forge workflow debate --worker gpt-6-astra:for --worker "claude-opus:Focus on security" "proposal"
+forge workflow debate --worker gpt-6.2-astra:for --worker "claude-opus:Focus on security" "proposal"
 ```
 
 - First argument -- subject to evaluate (proposal text, or file/directory path with `--code`)
@@ -187,7 +185,7 @@ shared recommendation in round 2. Uses proposal evaluation by default; `--code` 
 forge workflow consensus "Should we adopt gRPC for internal services?"      # proposal evaluation
 forge workflow consensus src/forge/proxy/ --code                             # code evaluation
 forge workflow consensus "Evaluate the caching strategy" --check
-forge workflow consensus --worker gpt-6-astra:architect --worker claude-opus:security "proposal"
+forge workflow consensus --worker gpt-6.2-astra:architect --worker claude-opus:security "proposal"
 ```
 
 - First argument -- subject to evaluate (proposal text, or file/directory path with `--code`)

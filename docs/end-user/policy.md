@@ -293,8 +293,10 @@ helpers cannot run in the reviewer. Forge carries the trusted helper command in 
 works with supported Claude versions that reject anonymous settings-file paths. Other customizations stay disabled.
 Select a proxy with `--supervisor-proxy <id-or-template>` and use its `opus`, `sonnet`, or `haiku` tier. For a Codex
 reviewer, run `forge runtime preflight codex`, then set
-`--plan ... --runtime codex --model <supported-model> --supervisor-effort <level>` with inherited auth. Stale readiness
-produces an actionable unavailable result; hooks do not run readiness probes.
+`--plan ... --runtime codex --model <supported-model> --supervisor-effort <level>` with inherited auth. Fresh plan-file
+reviewers accept `gpt-6.2-astra` and `gpt-6.2-sol`. A reviewer that forks a native thread uses the separately verified
+[native source and reviewer matrix](native_supervision.md). Stale readiness produces an actionable unavailable result;
+hooks do not run readiness probes.
 
 The plan must be readable, nonempty UTF-8. Target plus `--plan` resumes the target but makes the file authoritative.
 Claude resumes from the planner directory and receives the action checkout as an additional directory; action paths are

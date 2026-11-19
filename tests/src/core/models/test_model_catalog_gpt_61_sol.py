@@ -1,24 +1,23 @@
-"""GPT-6.1 Sol aliases and request constraints preserve explicit prior versions."""
+"""Explicit GPT-6.1 Sol pins retain their request constraints."""
 
 from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
 
-from forge.core.models import get_model_spec, load_model_catalog, resolve_model_id
+from forge.core.models import get_model_spec, resolve_model_id
 from forge.core.models.model_routes import normalize_model_route_request
 from forge.proxy.reasoning import resolve_reasoning_effort_record
 
 
-@pytest.mark.parametrize("alias", ["sol", "gpt-sol", "gpt-6.1-sol", "openai/gpt-6.1-sol"])
-def test_sol_aliases_adopt_61_without_retargeting_versioned_pins(alias: str) -> None:
+@pytest.mark.parametrize("alias", ["gpt-6.1-sol", "openai/gpt-6.1-sol"])
+def test_versioned_sol_pins_keep_the_requested_generation(alias: str) -> None:
     request = normalize_model_route_request(alias)
 
     assert request.requested_model == "gpt-6.1-sol"
     assert request.route_key == "gpt-6.1-sol"
     assert resolve_model_id("gpt-6-sol") == "gpt-6-sol"
     assert resolve_model_id("openai/gpt-6-sol") == "gpt-6-sol"
-    assert load_model_catalog().defaults["openai"]["opus"] == "gpt-6-astra"
     spec = get_model_spec(alias)
     assert spec.context_window_tokens == 1_050_000
     assert spec.max_output_tokens == 128_000

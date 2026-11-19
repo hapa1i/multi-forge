@@ -295,67 +295,64 @@ different providers within a single workflow (GPT for planning, Claude for execu
 The tradeoff is cost: you pay API rates instead of bundled subscription pricing. Use Forge
 [spend caps](proxy.md#cost-tracking-and-spend-caps) when you want warn/reject limits on that spend.
 
-### Picking up GPT-6 Astra defaults after an upgrade
+### GPT-6.2 Astra and Sol
 
-New proxies created from the current built-in OpenAI templates use GPT-6 Astra as follows:
+New general OpenAI proxies use `openai/gpt-6.2-astra` for Sonnet and Opus. The `openrouter-openai`, `litellm-openai`,
+and `litellm-openai-local` templates set Sonnet to medium effort and Opus to high. The Codex-specialized templates use
+Astra at Opus.
 
-| Template                     | GPT-6 Astra tiers |
-| ---------------------------- | ----------------- |
-| `openrouter-openai`          | sonnet, opus      |
-| `litellm-openai`             | sonnet, opus      |
-| `litellm-openai-local`       | sonnet, opus      |
-| `openrouter-openai-codex`    | opus              |
-| `litellm-openai-codex-local` | opus              |
-| `codex-responses-local`      | sonnet, opus      |
+| Templates                                                                              | Haiku              | Sonnet        | Opus          |
+| -------------------------------------------------------------------------------------- | ------------------ | ------------- | ------------- |
+| `openrouter-openai`, `litellm-openai`, `litellm-openai-local`, `codex-responses-local` | GPT-5.4 Mini       | GPT-6.2 Astra | GPT-6.2 Astra |
+| `openrouter-openai-codex`, `litellm-openai-codex-local`                                | GPT-5.1 Codex Mini | GPT-5.3 Codex | GPT-6.2 Astra |
 
-The general Haiku tier remains GPT-5.4 Mini; Codex-specialized templates retain their coding Haiku/Sonnet models. GPT-6
-Sol and Luna, GPT-6.1 Sol, and GPT-5.6 Sol are explicit alternatives. The OpenRouter OpenAI templates also expose
-`gpt-6-astra-pro`, `gpt-6-sol-pro`, and `gpt-6-luna-pro`. For example:
+Use `--model astra` or `--model sol` for the standard 6.2 models. The session aliases `gpt-astra` and `gpt-sol` also
+select 6.2. OpenRouter exposes `openai/gpt-6.2-astra-pro` and `openai/gpt-6.2-sol-pro` as separate IDs. Their session
+aliases are `astra-pro` and `sol-pro`, also accepted with the `gpt-` prefix. Native OpenAI represents Pro as a reasoning
+mode. [OpenRouter Astra Pro](https://openrouter.ai/openai/gpt-6.2-astra-pro) ·
+[OpenRouter Sol Pro](https://openrouter.ai/openai/gpt-6.2-sol-pro)
 
 ```bash
-forge session start astra-review --model astra-pro --proxy openrouter-openai
+forge session start sol-review --proxy openrouter-openai --model sol --model-tier sonnet
+forge session start astra-pro-review --proxy openrouter-openai --model astra-pro --model-tier opus
+forge workflow panel -p "Review the proposed changes" -m gpt-6.2-astra,gpt-6.2-sol
 ```
 
-Both Astra variants require reasoning; supported efforts are `low`, `medium`, `high`, `xhigh`, and `max`. Replace
-`reasoning_effort: none` with `low` or another supported effort, and remove temperature overrides when migrating an
-older custom configuration. Forge routes standard Astra through Responses on LiteLLM backends. Pro is available through
-OpenRouter in Forge; OpenAI's native API uses a reasoning mode on `gpt-6-astra` rather than a separate Pro model ID. See
-the [OpenAI model reference](https://developers.openai.com/api/docs/models/gpt-6-astra) and
-[reasoning guide](https://developers.openai.com/api/docs/guides/reasoning).
+GPT-6.2 supports a 1,050,000-token context, up to 922,000 input tokens and up to 128,000 output tokens. Reasoning
+efforts are `low`, `medium`, `high`, `xhigh`, and `max`. When moving a tier to GPT-6.2, replace `none` or `minimal` with
+`low` and remove temperature and top-p overrides. Forge uses Responses for native tool calls.
+[OpenAI migration guide](https://developers.openai.com/api/docs/guides/latest-model) ·
+[Astra model](https://developers.openai.com/api/docs/models/gpt-6.2-astra) ·
+[Sol model](https://developers.openai.com/api/docs/models/gpt-6.2-sol)
 
-GPT-6.1 Sol is selectable with `--model gpt-6.1-sol`, `--model sol`, or `--model gpt-sol`; explicit `gpt-6-sol` pins
-retain the prior version. Astra remains the OpenAI tier default. Like Astra, 6.1 Sol requires reasoning (`low` through
-`max`, default `medium`) and rejects sampling overrides; `none` and `minimal` are unsupported. Forge uses Responses for
-its native tool calls. Cache reads cost $0.10 per million tokens, half GPT-6 Sol's rate. See the
-[GPT-6.1 Sol reference](https://developers.openai.com/api/docs/models/gpt-6.1-sol).
+Explicit versioned selections include `gpt-6-astra`, `gpt-6.1-sol`, `gpt-6-sol`, `gpt-6-luna` and `gpt-5.6-sol`, plus
+the earlier OpenRouter Pro IDs. GPT-6.1 Sol requires reasoning and rejects sampling overrides. Its cached input costs
+$0.10 per million tokens. GPT-6 Sol and Luna default to medium effort and accept temperature and top-p overrides only at
+`none` effort. Set `reasoning_effort: none` explicitly on those tiers to configure a temperature override. Forge filters
+sampling for a selected alternative and uses Responses for tool calls with reasoning.
+[GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol) ·
+[GPT-6 Sol](https://developers.openai.com/api/docs/models/gpt-6-sol) ·
+[GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna)
 
-GPT-6 Sol and Luna support `none` as well as `low`, `medium`, `high`, `xhigh`, and `max` reasoning effort, with `medium`
-as their model default. They accept temperature and `top_p` overrides only with `none` effort. A tier mapped to Sol or
-Luna must explicitly set `reasoning_effort: none` to configure a temperature override; otherwise proxy and template
-validation reject the configuration. When Sol or Luna is selected as a model alternative, request-time filtering still
-removes sampling overrides that may be valid for the tier's default model. Forge uses Responses for their native OpenAI
-routes because reasoning with tool calls requires that API; Chat Completions accepts tool calls only with
-`reasoning_effort: none`. Their Pro entries are OpenRouter-only alternatives, following Astra Pro's separate-slug
-convention. See the [Sol](https://developers.openai.com/api/docs/models/gpt-6-sol) and
-[Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) model references. Selecting them explicitly does not
-change the Astra tier defaults.
+**Upgrading a saved configuration.** To adopt the new tiers on an existing proxy, use `forge proxy edit <proxy_id>` and
+set the desired tiers to `openai/gpt-6.2-astra`. Add `gpt-6.2-sol: openai/gpt-6.2-sol` under a tier's
+`model_alternatives` for session selection. On OpenRouter the same pattern works for the two Pro IDs. If a custom
+alternative uses a short alias as its key, replace it with the versioned ID corresponding to the deployment you intend.
+An existing OpenRouter proxy can already forward explicit workflow model IDs.
 
-For an existing translated proxy, the Astra tier model is `openai/gpt-6-astra`. Local LiteLLM backends
-(`litellm-openai-local`, `litellm-openai-codex-local`, and `codex-responses-local`) also need the `openai/gpt-6-astra`
-deployment. Apply these changes with the
-[saved-proxy/backend upgrade procedure](proxy.md#updating-saved-proxy-and-backend-configurations), which covers editing,
-recreation and restart order.
+On local LiteLLM, copy the complete bundled deployments for `openai/gpt-6.2-astra` and `openai/gpt-6.2-sol`, including
+`use_responses_api: true` and their `model_info` blocks. On remote LiteLLM, the gateway operator must deploy the same
+names with the correct upstream credentials. Start the updated backend, then run
+`forge proxy start <proxy_id> --smoke-test` on the stopped proxy. Check worker readiness with
+`forge workflow list-models --available --json`.
+[Saved proxy and backend upgrade procedure](proxy.md#updating-saved-proxy-and-backend-configurations)
 
-LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Carbon, Argon, GPT-6.1 Sol, GPT-6 Sol/Luna, and Claude 5.5
-require the bundled routes' `model_info` blocks for offline capability and cost support. The GPT-6 entries cover cache
-tokens and the above-272K input premium. For remote LiteLLM, its operator must install compatible deployments using that
-server's upstream providers and credentials; the [Gemini Vertex deployment](#gemini-4-carbon) differs from the bundled
-Google AI deployment.
-
-For workflow worker selection and readiness, see [workflow.md](workflow.md#quick-start). Existing OpenRouter proxies can
-forward explicit GPT-6.1 Sol workflow requests. To select it as a session alternative, edit or recreate the proxy to
-include `gpt-6.1-sol: openai/gpt-6.1-sol` in the intended tier's `model_alternatives`. Existing LiteLLM backends also
-need the complete `openai/gpt-6.1-sol` deployment, including `use_responses_api: true` and `model_info`.
+Standard short-context prices per million tokens are $8 input, $0.40 cached input, and $40 output for Astra. Sol costs
+$2, $0.10, and $10 respectively. Above 272,000 input tokens, input and cache rates double and output costs 1.5 times the
+short-context rate for the whole request. LiteLLM 1.102 reports the Standard long-context cost for an Ultrafast request
+above that threshold, which undercounts spend against a Forge cap. The Ultrafast rate is 3 times Standard through
+February 28, 2027 and 6 times Standard from March 1. Operators using Ultrafast should refresh the saved backend pricing
+when the rate changes. [OpenAI pricing](https://developers.openai.com/api/docs/pricing)
 
 ### Picking up current model defaults and alternatives after an upgrade
 

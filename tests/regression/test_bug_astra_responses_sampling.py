@@ -12,7 +12,15 @@ pytestmark = [pytest.mark.regression, pytest.mark.asyncio]
 
 @pytest.mark.parametrize("temperature", [0.7, 1.0])
 @pytest.mark.parametrize("stream", [False, True])
-@pytest.mark.parametrize("model", ["openai/gpt-6-astra", "openai/gpt-6.1-sol"])
+@pytest.mark.parametrize(
+    "model",
+    [
+        "openai/gpt-6.2-astra",
+        "openai/gpt-6.2-sol",
+        "openai/gpt-6-astra",
+        "openai/gpt-6.1-sol",
+    ],
+)
 async def test_responses_omits_unsupported_client_sampling_parameters(
     temperature: float, stream: bool, model: str
 ) -> None:

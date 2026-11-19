@@ -619,16 +619,16 @@ The model catalog is **authoritative internal data**:
 - Defines: intrinsic model capabilities, context windows, aliases, and per-family defaults
 - **NOT a user edit surface**
 
-GPT-6 Astra is the OpenAI Sonnet/Opus default and GPT workflow worker. GPT-5.4 Mini remains the general Haiku default;
-Codex templates retain their coding Sonnet model. Astra and the explicit GPT-6.1 Sol alternative require reasoning
-(`low` through `max`) and reject sampling overrides. `sol` and `gpt-sol` select 6.1. Both use Responses on LiteLLM
-routes; the translated builder filters sampling by catalog capabilities and effort.
+GPT-6.2 Astra is the general OpenAI Sonnet/Opus default and the OpenAI workflow worker. The Codex templates use it at
+Opus. The general Haiku tier uses GPT-5.4 Mini. Session aliases `astra` and `sol` select the standard 6.2 models. Both
+require reasoning (`low` through `max`), reject sampling overrides, and use Responses on LiteLLM routes. The versioned
+GPT-6 Astra and GPT-6.1 Sol IDs retain their profiles and routes. OpenRouter serves both 6.2 Pro variants under separate
+IDs. Only the two standard IDs have native LiteLLM deployments.
 
-Explicit GPT-6 Sol/Luna pins retain native Responses and OpenRouter routes. Their sampling overrides require `none`
-reasoning (`sampling_requires_no_reasoning`). Proxy/template validation requires explicit `reasoning_effort: none` for
-temperature overrides; alternatives also need request-time filtering because tier defaults can differ. Native reasoning
-with tools requires Responses. The three GPT-6 Pro entries have only OpenRouter routes: native OpenAI exposes Pro as a
-reasoning mode.
+GPT-6 Sol and Luna accept sampling overrides at `none` effort (`sampling_requires_no_reasoning`). A temperature override
+on either model requires an explicit `reasoning_effort: none` in the proxy configuration. The request builder also
+filters sampling for alternatives, which inherit their selected tier's settings. Native reasoning with tools uses
+Responses. The three earlier Pro entries keep their OpenRouter routes.
 
 Proxy/backend snapshots remain user-owned; upgrades preserve translated tier selections. Passthrough forwards the
 client's model. Context-estimator model pins apply only to translated Messages routes, including Responses-capable
@@ -692,10 +692,12 @@ override validation reject manual budgets for every catalog model whose thinking
 translated request builder removes unsupported sampling fields after merging provider extras, using the intrinsic
 catalog even when gateway metadata does not yet recognize the model.
 
-LiteLLM 1.102 packages Astra and Gemini 3.8 Flash metadata. Bundled Carbon, Argon, GPT-6.1 Sol, GPT-6 Sol/Luna, Claude
-5.5, and Fable 5.2 deployments supply capability and token/cache pricing in `model_info`. Sol/Luna metadata covers the
-above-272K premium; 6.1 Sol cache reads cost 5% of uncached input. Boundary tests require removing overrides when
-packaged support arrives. Pricing belongs to backend configuration, outside the intrinsic catalog. Sonnet 5.5's
+LiteLLM 1.102 packages original GPT-6 Astra and Gemini 3.8 Flash metadata. Bundled GPT-6.2 Astra/Sol, GPT-6.1 Sol, GPT-6
+Sol/Luna, Carbon, Argon, Claude 5.5, and Fable 5.2 deployments supply capability and token/cache pricing in
+`model_info`. GPT-6.2 and 6.1 Sol cache reads cost 5% of uncached input. The GPT-6.2 deployments include the premium
+above 272K tokens. LiteLLM 1.102 omits the long-context Ultrafast pricing fields when calculating reported cost.
+[GPT-6.2 upgrade guide](end-user/model_selection.md#gpt-62-astra-and-sol). Boundary tests require removing overrides
+when packaged support arrives. Pricing belongs to backend configuration, outside the intrinsic catalog. Sonnet 5.5's
 `thinking_always_on: false` prevents LiteLLM from silently deleting invalid `disabled` requests and enabling adaptive
 thinking; native validation rejects them and directs callers to `between_tools`.
 
@@ -740,7 +742,7 @@ ModelSpec(name, model_id, family, description,
           prompt=None, prompt_mode="override", worker_id=None, runtime="claude_code")
 ```
 
-`model_id` is Forge-canonical (for example, `gpt-6-astra`, not a provider slug), and `family` is the model's intrinsic
+`model_id` is Forge-canonical (for example, `gpt-6.2-astra`, not a provider slug), and `family` is the model's intrinsic
 family. A spec owns worker identity, description, prompt, and runtime only. `derive_model_routes()` normalizes
 `model_id`, reads the shared route catalog's already ordered candidates, and combines them with static template/source
 metadata to produce `ModelRoute` values. It does not scan or mutate the proxy registry. Runtime-native workers such as

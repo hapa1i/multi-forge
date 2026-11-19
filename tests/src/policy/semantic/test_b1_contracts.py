@@ -176,6 +176,13 @@ def test_incompatible_reviewer_identity_refuses(config, lane):
         validate_reviewer(config, lane)
 
 
+@pytest.mark.parametrize("alias", ["astra", "sol"])
+def test_fresh_codex_plan_reviewer_accepts_gpt_62_aliases(alias: str) -> None:
+    lane = select_supervisor_lane(runtime="codex", model=alias)
+    assert lane.model == f"gpt-6.2-{alias}"
+    validate_reviewer(SupervisorConfig(supervisor_model=lane.model, supervisor_effort="low"), lane)
+
+
 def test_legacy_frozen_subscription_lane_keeps_api_auth(tmp_path, monkeypatch):
     from forge.core.usage.billing import resolve_billing_mode
     from forge.session import SessionStore, create_session_state

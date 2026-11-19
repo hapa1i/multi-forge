@@ -95,6 +95,8 @@ def test_native_setup_has_distinct_v5_source_and_no_legacy_resume(native_setup):
         ("--trigger", "stop"),
         ("--supervisor-proxy", "unexpected"),
         ("--supervisor-effort", "high"),
+        ("--model", "gpt-6.2-astra"),
+        ("--model", "gpt-6.2-sol"),
     ],
 )
 def test_invalid_setup_never_partially_writes_configuration(native_setup, extra):

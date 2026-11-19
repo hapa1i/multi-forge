@@ -15,7 +15,7 @@ def test_gpt6_sol_and_luna_allow_none_but_route_reasoning_through_responses(mode
     spec = get_model_spec(model)
 
     assert resolve_model_id(f"openai/{model}") == model
-    if model != "gpt-6-sol":
+    if model.startswith("gpt-6-luna"):
         assert resolve_model_id(model.removeprefix("gpt-6-")) == model
     assert resolve_model_id(model) == model
     assert spec.context_window_tokens == 1_050_000

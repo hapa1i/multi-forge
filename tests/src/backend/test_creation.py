@@ -28,6 +28,8 @@ class TestCreateBackendConfig:
     @pytest.mark.parametrize(
         ("model_name", "upstream_model"),
         [
+            ("openai/gpt-6.2-astra", "openai/gpt-6.2-astra"),
+            ("openai/gpt-6.2-sol", "openai/gpt-6.2-sol"),
             ("openai/gpt-6-astra", "openai/gpt-6-astra"),
             ("openai/gpt-6.1-sol", "openai/gpt-6.1-sol"),
             ("openai/gpt-6-sol", "openai/gpt-6-sol"),
@@ -54,7 +56,16 @@ class TestCreateBackendConfig:
 
         assert (model_name, upstream_model) in model_pairs
 
-    @pytest.mark.parametrize("model_name", ["openai/gpt-6.1-sol", "openai/gpt-6-sol", "openai/gpt-6-luna"])
+    @pytest.mark.parametrize(
+        "model_name",
+        [
+            "openai/gpt-6.2-astra",
+            "openai/gpt-6.2-sol",
+            "openai/gpt-6.1-sol",
+            "openai/gpt-6-sol",
+            "openai/gpt-6-luna",
+        ],
+    )
     def test_gpt_6_base_alternatives_use_responses_for_reasoning_and_tools(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, model_name: str
     ) -> None:

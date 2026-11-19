@@ -202,7 +202,17 @@ class TestCurrentDefaultsWithOpenRouter:
 class TestOpenAIProxyWithOpenRouter:
     """GPT-family defaults and alternatives route through their exact OpenRouter slugs."""
 
-    @pytest.mark.parametrize("model", ["gpt-6-astra-pro", "gpt-5.6-sol"])
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "gpt-6.2-astra-pro",
+            "gpt-6.2-sol-pro",
+            "gpt-6.2-sol",
+            "gpt-6-astra",
+            "gpt-6-astra-pro",
+            "gpt-5.6-sol",
+        ],
+    )
     def test_alternative_worker_is_advertised_without_warning(
         self, proxy_server_openrouter_openai: str, model: str
     ) -> None:
@@ -217,8 +227,16 @@ class TestOpenAIProxyWithOpenRouter:
 
         assert _live_advisory_warning(proxy_server_openrouter_openai, route, metadata) is None
 
-    @pytest.mark.parametrize("model", ["claude-sonnet-4-6", "gpt-6-astra-pro"])
-    def test_astra_completion_resolves_to_exact_model(self, proxy_server_openrouter_openai: str, model: str) -> None:
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "claude-sonnet-4-6",
+            "gpt-6.2-astra-pro",
+            "gpt-6.2-sol-pro",
+            "gpt-6-astra-pro",
+        ],
+    )
+    def test_gpt_completion_resolves_to_exact_model(self, proxy_server_openrouter_openai: str, model: str) -> None:
         with httpx.Client(timeout=90) as client:
             resp = client.post(
                 f"{proxy_server_openrouter_openai}/v1/messages",
@@ -235,5 +253,5 @@ class TestOpenAIProxyWithOpenRouter:
 
         assert resp.status_code == 200, resp.text[:500]
         assert resp.headers.get("X-Resolved-Tier") == "sonnet"
-        expected_model = "gpt-6-astra" if model == "claude-sonnet-4-6" else model
+        expected_model = "gpt-6.2-astra" if model == "claude-sonnet-4-6" else model
         assert resp.headers.get("X-Resolved-Model") == f"openai/{expected_model}"

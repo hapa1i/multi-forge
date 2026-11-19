@@ -150,8 +150,8 @@ class TestLoadConfig:
         assert config.proxy.preferred_provider == "litellm"
         assert config.proxy.default_port == 8089
         assert config.proxy.litellm.tiers.haiku == "openai/gpt-5.4-mini"
-        assert config.proxy.litellm.tiers.sonnet == "openai/gpt-6-astra"
-        assert config.proxy.litellm.tiers.opus == "openai/gpt-6-astra"
+        assert config.proxy.litellm.tiers.sonnet == "openai/gpt-6.2-astra"
+        assert config.proxy.litellm.tiers.opus == "openai/gpt-6.2-astra"
 
     def test_template_loading_openai_codex_local(self):
         """OpenAI Codex local template loads with correct tier models."""
@@ -162,7 +162,7 @@ class TestLoadConfig:
         assert config.proxy.default_port == 8090
         assert config.proxy.litellm.tiers.haiku == "openai/gpt-5.1-codex-mini"
         assert config.proxy.litellm.tiers.sonnet == "openai/gpt-5.3-codex"
-        assert config.proxy.litellm.tiers.opus == "openai/gpt-6-astra"
+        assert config.proxy.litellm.tiers.opus == "openai/gpt-6.2-astra"
 
     @pytest.mark.parametrize(
         ("template", "provider", "expected_tiers"),
@@ -170,17 +170,17 @@ class TestLoadConfig:
             (
                 "openrouter-openai",
                 "openrouter",
-                ("openai/gpt-5.4-mini", "openai/gpt-6-astra", "openai/gpt-6-astra"),
+                ("openai/gpt-5.4-mini", "openai/gpt-6.2-astra", "openai/gpt-6.2-astra"),
             ),
             (
                 "litellm-openai",
                 "litellm",
-                ("openai/gpt-5.4-mini", "openai/gpt-6-astra", "openai/gpt-6-astra"),
+                ("openai/gpt-5.4-mini", "openai/gpt-6.2-astra", "openai/gpt-6.2-astra"),
             ),
             (
                 "litellm-openai-local",
                 "litellm",
-                ("openai/gpt-5.4-mini", "openai/gpt-6-astra", "openai/gpt-6-astra"),
+                ("openai/gpt-5.4-mini", "openai/gpt-6.2-astra", "openai/gpt-6.2-astra"),
             ),
             (
                 "openrouter-openai-codex",
@@ -188,7 +188,7 @@ class TestLoadConfig:
                 (
                     "openai/gpt-5.1-codex-mini",
                     "openai/gpt-5.3-codex",
-                    "openai/gpt-6-astra",
+                    "openai/gpt-6.2-astra",
                 ),
             ),
             (
@@ -197,27 +197,28 @@ class TestLoadConfig:
                 (
                     "openai/gpt-5.1-codex-mini",
                     "openai/gpt-5.3-codex",
-                    "openai/gpt-6-astra",
+                    "openai/gpt-6.2-astra",
                 ),
             ),
             (
                 "codex-responses-local",
                 "litellm",
-                ("openai/gpt-5.4-mini", "openai/gpt-6-astra", "openai/gpt-6-astra"),
+                ("openai/gpt-5.4-mini", "openai/gpt-6.2-astra", "openai/gpt-6.2-astra"),
             ),
         ],
     )
-    def test_openai_templates_use_expected_gpt_6_astra_tiers(
+    def test_openai_templates_use_expected_astra_tiers(
         self,
         template: str,
         provider: str,
         expected_tiers: tuple[str, str, str],
     ) -> None:
-        """OpenAI templates promote GPT-6 Astra without changing their other tiers."""
+        """OpenAI templates select GPT-6.2 Astra at the general Sonnet and Opus tiers and the Codex Opus tier."""
         config = load_config(template=template)
         provider_config = getattr(config.proxy, provider)
 
         for tier in ("sonnet", "opus"):
+            assert provider_config.model_alternatives[tier]["gpt-6.2-sol"] == "openai/gpt-6.2-sol"
             assert provider_config.model_alternatives[tier]["gpt-6.1-sol"] == "openai/gpt-6.1-sol"
             assert provider_config.model_alternatives[tier]["gpt-6-sol"] == "openai/gpt-6-sol"
 
