@@ -1,4 +1,4 @@
-"""Non-inference admission for the Claude reviewer's required isolation flags."""
+"""Non-inference admission for host reviewer runtimes."""
 
 from __future__ import annotations
 
@@ -8,10 +8,12 @@ import shutil
 from pathlib import Path
 from time import monotonic
 
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 
 from forge.core.paths import get_forge_home
 from forge.core.reactive.watchdog import run_guarded
+from forge.core.runtime.codex_preflight import CodexPreflight
+from forge.core.runtime.registry import get_runtime
 from forge.core.state import atomic_write_json
 from forge.session.models import LaneRecord, SessionState, SupervisorConfig
 
@@ -28,6 +30,7 @@ READ_ONLY_FLAGS = (
     "",
 )
 MIN_REVIEWER_VERSION = "2.1.248"
+_GPT_62_CODEX_MIN_VERSION = Version("0.166.0")
 _CONTRACT_VERSION = 1
 
 
@@ -89,14 +92,35 @@ def require_reviewer_runtime(*, env: dict[str, str], deadline: float) -> str:
     return str(binary)
 
 
+def require_codex_reviewer_model(model: str | None, *, preflight: CodexPreflight | None = None) -> None:
+    """Check the GPT-6.2 CLI floor at setup and against cached readiness in hooks."""
+    if model not in ("gpt-6.2-astra", "gpt-6.2-sol"):
+        return
+    version = preflight.version if preflight is not None else get_runtime("codex").detect()
+    try:
+        if Version(version or "") >= _GPT_62_CODEX_MIN_VERSION:
+            return
+    except InvalidVersion:
+        pass
+    raise ValueError(
+        f"{model} requires Codex CLI {_GPT_62_CODEX_MIN_VERSION} or later (detected {version or 'unknown'}). "
+        "Update Codex and run 'forge runtime preflight codex'."
+    )
+
+
 def preflight_supervisor_runtime(config: SupervisorConfig, lane: LaneRecord, *, cwd: str | None) -> None:
-    """Refuse unusable host Claude supervision before saving or launching it."""
-    if config.native_source and config.active:
+    """Refuse unusable host supervision before saving or launching it."""
+    if not config.active:
+        return
+    if config.native_source:
         from forge.policy.semantic.native_codex import preflight_native
 
         preflight_native(config)
         return
-    if lane.runtime_id != "claude_code" or not config.active:
+    if lane.runtime_id == "codex":
+        require_codex_reviewer_model(config.supervisor_model)
+        return
+    if lane.runtime_id != "claude_code":
         return
     from forge.core.reactive.env import build_claude_env
     from forge.core.reactive.supervisor_auth import (

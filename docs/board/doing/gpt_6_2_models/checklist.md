@@ -16,7 +16,25 @@
 | Pricing            | LiteLLM 1.102.2 with offline model metadata                | Standard, Flex and Priority pass across the 272K boundary. Above it Ultrafast reports the Standard price despite the configured premium. |
 | Installed CLI      | Clean wheel, isolated Forge home and live OpenRouter proxy | All four workers appear ready. A blind `gpt-6.2-astra` panel completes. The wheel's local LiteLLM starts, reports healthy and stops.     |
 
-`make test-unit` passed 11,761 tests and `make test-regression` passed 2,541. The focused integration runs covered 32
-cases, including the local and remote LiteLLM templates against a disposable gateway, retained backend configurations,
-shared-proxy routing, and direct Codex and mixed Claude/Codex panels. `make pre-commit` passed, including the Markdown
-link audit across 796 source files.
+With an OpenRouter proxy saved from `24568e35`, all four short aliases identified the proxy and showed its edit command,
+both with automatic reuse and with `--proxy saved-oai`. All four corresponding previous model IDs started sessions with
+`--no-launch` in both modes. The saved `proxy.yaml` stayed byte-identical. Both original upgrade links resolve.
+[Proxy upgrade](../../../end-user/proxy.md#picking-up-gpt-6-astra-defaults-after-an-upgrade) ·
+[Model selection upgrade](../../../end-user/model_selection.md#picking-up-gpt-6-astra-defaults-after-an-upgrade)
+
+A fresh plan-file review explicitly pinned to `gpt-6.2-astra` received HTTP 400 `model_not_found` on the QA binary
+(0.149.1). The same ChatGPT subscription completed a low-effort review on 0.170.0. Forge parsed an `allow` verdict and
+recorded 17,503 input and 33 output tokens. Both standard IDs appeared in the newer CLI's model list. With the version
+check in place, supervisor setup refused both IDs on 0.149.1 and accepted them on 0.170.0. Regression tests exercise the
+0.166.0 boundary and the exact `-m` argument for each model at dispatch.
+[Codex model requirements](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex)
+
+The March 1, 2027 rate change and gateway verification are tracked on the
+[Ultrafast pricing card](../../proposed/gpt_62_ultrafast_pricing/card.md).
+
+The initial 32 integration cases covered local and remote LiteLLM templates against a disposable gateway, retained
+backend configurations, shared-proxy routing, and direct Codex and mixed Claude/Codex panels. The follow-up passed 15
+integration cases covering saved routes, both plan-file hook adapters and native Codex reviewer isolation.
+
+`make test-unit TEST_WORKERS=2` passed 11,761 tests, `make test-regression` passed 2,555 and `make pre-commit` passed.
+The watchdog deadline test needed a rerun on macOS.

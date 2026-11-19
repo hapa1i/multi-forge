@@ -535,9 +535,14 @@ def _plan_proxy_route(
         )
     serving = _serving_proxy_tiers(request, proxy, candidate=candidate)
     if not serving:
-        raise SessionModelRoutingError(
-            f"{_proxy_route_identity(proxy)} does not serve model {request.requested_model!r}"
-        )
+        message = f"{_proxy_route_identity(proxy)} does not serve model {request.requested_model!r}"
+        if proxy.proxy_id is not None:
+            message += (
+                f". Use 'forge proxy show {proxy.proxy_id} --raw' to find a configured versioned ID for --model. "
+                f"If the backend serves {request.requested_model!r}, run 'forge proxy edit {proxy.proxy_id}' "
+                "to add it to a tier or its model_alternatives, then restart the proxy."
+            )
+        raise SessionModelRoutingError(message)
     selected_tier = _select_proxy_tier(request, proxy, serving, model_tier=model_tier)
     selected_model = serving[selected_tier]
     return SessionModelRoutePlan(

@@ -294,7 +294,12 @@ works with supported Claude versions that reject anonymous settings-file paths. 
 Select a proxy with `--supervisor-proxy <id-or-template>` and use its `opus`, `sonnet`, or `haiku` tier. For a Codex
 reviewer, run `forge runtime preflight codex`, then set
 `--plan ... --runtime codex --model <supported-model> --supervisor-effort <level>` with inherited auth. Fresh plan-file
-reviewers accept `gpt-6.2-astra` and `gpt-6.2-sol`. A reviewer that forks a native thread uses the separately verified
+reviewers using `gpt-6.2-astra` or `gpt-6.2-sol` require Codex CLI 0.166.0 or later and access to the selected model on
+the signed-in account. Check the models available to that login with `codex debug models`. The repository's pinned
+0.149.1 is below this floor.
+[OpenAI's Codex model requirements](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex)
+
+A reviewer that forks a native thread uses the separately verified
 [native source and reviewer matrix](native_supervision.md). Stale readiness produces an actionable unavailable result;
 hooks do not run readiness probes.
 

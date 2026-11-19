@@ -109,14 +109,16 @@ supervisor, shadow-curation, memory-writer, and team-supervisor. Policy-check re
   the claude arm; T5/WS1 resolved T4's documented double-count). Every failure (bad override, cold/stale/unready cache,
   plan-absent, or any setup exception) **fails open** -- the supervisor's contract (design_workflows §1.2).
 
-For supervisor, shadow-curation, and memory-writer, `runtime_id` selects the Claude Code or Codex arm. Codex
-`backend_id`/`model` are placement metadata: Codex selects its model; preflight auth determines billing. Claude Code
-`backend_id` drives `resolve_billing_mode` (for example, `claude-max`). Team-supervisor lacks a Codex candidate and is
-billing-only. T1b replaced `supervisor_runtime` with a persisted consumer-lane `LaneRecord`. The **first policy check**
-for a registered supervisor freezes an explicit `intent.consumer_lanes` override into `confirmed.consumer_lanes` -- a
-commitment, not a dispatch. Default lanes never freeze and remain re-pinnable. `--supervisor-runtime` and
-`policy supervisor set <target> --runtime` set the override; raw `set` is rejected. Re-pinning is an idempotent no-op;
-`policy supervisor remove` clears intent and confirmed.
+For supervisor, shadow-curation, and memory-writer, `runtime_id` selects the Claude Code or Codex arm. A fresh plan-file
+supervisor with an explicit Codex model passes it to `codex exec -m`. For GPT-6.2 Astra and Sol, configuration and
+executor launch check the installed CLI against the 0.166.0 minimum. The review hook checks the version in the fresh
+preflight cache before dispatch. When a consumer omits the model pin, Codex selects the model. Preflight auth determines
+Codex billing. Claude Code `backend_id` drives `resolve_billing_mode` (for example, `claude-max`). Team-supervisor lacks
+a Codex candidate and is billing-only. T1b replaced `supervisor_runtime` with a persisted consumer-lane `LaneRecord`.
+The **first policy check** for a registered supervisor freezes an explicit `intent.consumer_lanes` override into
+`confirmed.consumer_lanes` -- a commitment, not a dispatch. Default lanes never freeze and remain re-pinnable.
+`--supervisor-runtime` and `policy supervisor set <target> --runtime` set the override; raw `set` is rejected.
+Re-pinning is an idempotent no-op; `policy supervisor remove` clears intent and confirmed.
 
 **Worker native controls.** Review preparation and every consumer lane explicitly select the profiles in
 `core/worker_controls.py`. Claude controls are finalized after environment overrides/removals, and Codex controls follow

@@ -706,6 +706,7 @@ def _dispatch_codex_supervisor(
     instead of the codex arm double-counting with an extra mis-categorized ``workflow.worker`` row.
     """
     from forge.core.invoker.codex import CodexHeadlessInvoker, prepare_codex_request
+    from forge.core.reactive.reviewer_runtime import require_codex_reviewer_model
     from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
 
     entered_invoker = False
@@ -717,6 +718,7 @@ def _dispatch_codex_supervisor(
                 f"Codex supervisor lane unavailable: {reason}. Run 'forge runtime preflight codex' to refresh.",
                 failure_type="codex_unavailable",
             )
+        require_codex_reviewer_model(config.supervisor_model, preflight=preflight)
         request = prepare_codex_request(
             prompt=prompt,
             worker=True,

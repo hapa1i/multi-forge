@@ -295,6 +295,8 @@ different providers within a single workflow (GPT for planning, Claude for execu
 The tradeoff is cost: you pay API rates instead of bundled subscription pricing. Use Forge
 [spend caps](proxy.md#cost-tracking-and-spend-caps) when you want warn/reject limits on that spend.
 
+<a name="picking-up-gpt-6-astra-defaults-after-an-upgrade"></a>
+
 ### GPT-6.2 Astra and Sol
 
 New general OpenAI proxies use `openai/gpt-6.2-astra` for Sonnet and Opus. The `openrouter-openai`, `litellm-openai`,
@@ -334,8 +336,10 @@ sampling for a selected alternative and uses Responses for tool calls with reaso
 [GPT-6 Sol](https://developers.openai.com/api/docs/models/gpt-6-sol) ·
 [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna)
 
-**Upgrading a saved configuration.** To adopt the new tiers on an existing proxy, use `forge proxy edit <proxy_id>` and
-set the desired tiers to `openai/gpt-6.2-astra`. Add `gpt-6.2-sol: openai/gpt-6.2-sol` under a tier's
+**Upgrading a saved configuration.** The short aliases resolve to 6.2 even when Forge automatically reuses a saved
+proxy. To keep using its previous models, select the versioned IDs it serves, such as `gpt-6-astra`, `gpt-6.1-sol`,
+`gpt-6-astra-pro`, or `gpt-6-sol-pro`. To adopt the new tiers on an existing proxy, use `forge proxy edit <proxy_id>`
+and set the desired tiers to `openai/gpt-6.2-astra`. Add `gpt-6.2-sol: openai/gpt-6.2-sol` under a tier's
 `model_alternatives` for session selection. On OpenRouter the same pattern works for the two Pro IDs. If a custom
 alternative uses a short alias as its key, replace it with the versioned ID corresponding to the deployment you intend.
 An existing OpenRouter proxy can already forward explicit workflow model IDs.
@@ -349,10 +353,11 @@ names with the correct upstream credentials. Start the updated backend, then run
 
 Standard short-context prices per million tokens are $8 input, $0.40 cached input, and $40 output for Astra. Sol costs
 $2, $0.10, and $10 respectively. Above 272,000 input tokens, input and cache rates double and output costs 1.5 times the
-short-context rate for the whole request. LiteLLM 1.102 reports the Standard long-context cost for an Ultrafast request
-above that threshold, which undercounts spend against a Forge cap. The Ultrafast rate is 3 times Standard through
-February 28, 2027 and 6 times Standard from March 1. Operators using Ultrafast should refresh the saved backend pricing
-when the rate changes. [OpenAI pricing](https://developers.openai.com/api/docs/pricing)
+short-context rate for the whole request. LiteLLM 1.102.2 reports the Standard long-context cost for an Ultrafast
+request above that threshold. A Forge cap therefore counts one third of the published Ultrafast launch price. The
+Ultrafast rate is 3 times Standard through February 28, 2027 and 6 times Standard from March 1 (Pacific time). Operators
+using Ultrafast should refresh the saved backend pricing when the rate changes.
+[OpenAI pricing](https://developers.openai.com/api/docs/pricing)
 
 ### Picking up current model defaults and alternatives after an upgrade
 

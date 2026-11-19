@@ -9,9 +9,10 @@ from forge.core.models.model_reference import strip_transport_model_suffix
 
 # Full bundled-default/alternative audit against OpenRouter's ZDR endpoint
 # catalog on 2026-08-21, refreshed for the September releases on 2026-09-23.
-# Fable 5.2 was checked separately on 2026-11-10.
-# These slugs had no eligible endpoint. Request-level provider.zdr remains authoritative
-# if this dated snapshot becomes stale.
+# Fable 5.2 was checked separately on 2026-11-10. On 2026-11-19, Azure listed ZDR endpoints
+# for GPT-6.2 Astra/Sol, both Pro variants, and all six earlier GPT-6 Astra/Sol/Luna entries.
+# The slugs in the fallback map had no eligible endpoint at their last audit.
+# Request-level provider.zdr remains authoritative.
 BUILTIN_OPENROUTER_ZDR_FALLBACKS = {
     "anthropic/claude-fable-5.2": "anthropic/claude-opus-5.5",
     "anthropic/claude-fable-5.1": "anthropic/claude-opus-5.5",
