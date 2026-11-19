@@ -54,7 +54,7 @@ dependencies = [
     "certifi>=2026.10.19",
     "cryptography>=50.0.0",
     # Keep email-validator's transitive DNS security floor in wheel metadata despite no direct Forge import.
-    "dnspython>=2.9.0",
+    "dnspython>=2.9.2",
     # LiteLLM 1.95 imports outbound-credential tagged unions at startup.
     "expression>=5.6.0,<6",
     # Keep FastAPI's lock-proven route-tree behavior; upgrade it separately.

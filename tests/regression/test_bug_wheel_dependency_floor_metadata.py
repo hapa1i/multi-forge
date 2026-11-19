@@ -44,7 +44,7 @@ def _assert_minimum(requirement: Requirement, expected: str) -> None:
         ("aiohttp", "3.14.4"),
         ("certifi", "2026.10.19"),
         ("cryptography", "50.0.0"),
-        ("dnspython", "2.9.0"),
+        ("dnspython", "2.9.2"),
         ("filelock", "4.2.1"),
         ("multidict", "6.9.1"),
         ("oauthlib", "4.0.1"),
