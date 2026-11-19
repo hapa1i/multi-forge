@@ -1,5 +1,7 @@
 # Adopt GPT-6.2 Astra and Sol
 
+Merged to `main` on November 19, 2026 as `1d710f90`. [PR #300](https://github.com/hapa1i/multi-forge/pull/300)
+
 Add the November 17 GPT-6.2 release to Forge. Use standard Astra for the general OpenAI Sonnet and Opus tiers, the
 Codex-template Opus tier, and the OpenAI workflow worker. Operators can select Sol explicitly or use either Pro variant
 through OpenRouter. Versioned model IDs continue to select the requested generation.

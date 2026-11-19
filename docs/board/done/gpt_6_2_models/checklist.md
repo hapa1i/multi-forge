@@ -5,7 +5,8 @@
 - [x] Verify bundled LiteLLM capabilities and token/cache prices. Record the pinned gateway's Ultrafast limitation.
 - [x] Update the operator guide and packaged QA expectations. Build an sdist and wheel and exercise a clean
   installation.
-- [ ] Record the merge in the change log and move the card to `done/`.
+- [x] Record the merge in the [change log](../../change_log.md#make-gpt-62-astra-the-default-openai-model) and move the
+  card to `done/`.
 
 | Check              | Fixture                                                    | Verified result                                                                                                                          |
 | ------------------ | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -38,3 +39,16 @@ integration cases covering saved routes, both plan-file hook adapters and native
 
 `make test-unit TEST_WORKERS=2` passed 11,761 tests, `make test-regression` passed 2,555 and `make pre-commit` passed.
 The watchdog deadline test needed a rerun on macOS.
+
+## Merge verification
+
+On November 19, 2026, PR #300 merged as `1d710f90`. Its Git tree matches the verified PR head `1a14598e`.
+[Merged PR](https://github.com/hapa1i/multi-forge/pull/300)
+
+Both Python 3.11 and 3.13 passed the unit and regression suites and the clean-wheel LiteLLM smoke test. The
+test-selection comparison, pre-commit and CodeQL also passed.
+[Tests](https://github.com/hapa1i/multi-forge/actions/runs/44504103480) ·
+[Pre-commit](https://github.com/hapa1i/multi-forge/actions/runs/44504103463) ·
+[CodeQL](https://github.com/hapa1i/multi-forge/actions/runs/44504092611)
+
+`make pre-commit-md` passed after the card moved to `done/`. The link audit checked 797 Markdown sources.

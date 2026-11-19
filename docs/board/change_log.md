@@ -9,6 +9,23 @@ Older entries are retained verbatim in [2026-08-21](archive/change_log_2026-08-2
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-11-19
+
+### Make GPT-6.2 Astra the default OpenAI model
+
+Forge now supports GPT-6.2 Astra and Sol on native OpenAI and OpenRouter routes, plus both Pro variants on OpenRouter.
+
+- New general OpenAI proxies use Astra at Sonnet and Opus. The Codex-specific templates use it at Opus. Astra is also
+  the default OpenAI workflow worker.
+- Saved proxies keep their previous models. When a short alias selects an unavailable 6.2 model, Forge identifies the
+  saved proxy and gives its inspection and edit commands.
+- Fresh Codex plan-file reviewers check the 0.166.0 CLI minimum for both standard models. A live Astra review completed
+  on 0.170.0 using a ChatGPT subscription.
+
+Verification covered 11,761 unit tests, 2,555 regressions, native and OpenRouter tool calls, saved-proxy upgrades, and
+clean-wheel checks on Python 3.11 and 3.13. The merged commit `1d710f90` has the same tree as the tested PR head.
+[PR #300](https://github.com/hapa1i/multi-forge/pull/300) · [Completed checklist](done/gpt_6_2_models/checklist.md)
+
 ## 2026-11-15
 
 ### Use the local auto-mode classifier on translated proxies
