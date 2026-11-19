@@ -213,7 +213,7 @@ Default tiers use Anthropic Claude models on OpenRouter. Edit the proxy to use a
 ```bash
 forge proxy edit <proxy_id>
 # Change tiers to e.g.:
-#   haiku: google/gemini-3.8-flash
+#   haiku: google/gemini-4-hydrogen
 #   sonnet: anthropic/claude-sonnet-4.6
 #   opus: openai/gpt-5.5
 ```
@@ -442,7 +442,7 @@ its own classifier requests through the proxy from the first action. At launch, 
 the model that will judge them:
 
 ```text
-Auto mode: actions are judged by google/gemini-4-carbon (requested as claude-sonnet-5, sonnet tier); Forge turned off the server-side check for translated proxies.
+Auto mode: actions are judged by google/gemini-4-neon (requested as claude-sonnet-5, sonnet tier); Forge turned off the server-side check for translated proxies.
 ```
 
 - **The judge is the proxy's model.** Claude Code requests Claude Sonnet 5 by default. A Sonnet 4.6 session uses Sonnet

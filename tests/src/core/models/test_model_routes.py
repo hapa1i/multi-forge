@@ -78,7 +78,7 @@ class TestPackagedCatalog:
                 model_ref=route_key,
             )
 
-    @pytest.mark.parametrize("model", ["gemini-3.7-flash", "gemini-3.8-flash"])
+    @pytest.mark.parametrize("model", ["gemini-3.7-flash", "gemini-3.8-flash", "gemini-4-hydrogen"])
     def test_gemini_flash_has_remote_and_local_litellm_routes(self, model: str) -> None:
         routes = load_model_route_catalog().models[model]
 
@@ -104,6 +104,9 @@ class TestPackagedCatalog:
     @pytest.mark.parametrize(
         "model_id",
         [
+            "gemini-4-neon",
+            "gemini-4-hydrogen",
+            "gemini-4-carbon",
             "gemini-4-argon",
             "gemini-3.1-pro-preview",
             "gemini-3.1-pro-preview-customtools",

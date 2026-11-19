@@ -107,7 +107,7 @@ async def test_openrouter_keeps_standard_reasoning_effort(model: str) -> None:
     assert "thinkingConfig" not in requests[0]
 
 
-@pytest.mark.parametrize("effort", ["minimal", "max", "disable", "none"])
+@pytest.mark.parametrize("effort", ["minimal", "xhigh", "max", "disable", "none"])
 @pytest.mark.parametrize("model", ["gemini/gemini-4-argon", "gemini/gemini-4-carbon"])
 async def test_argon_rejects_unsupported_effort_before_dispatch(effort: ModelReasoningEffort, model: str) -> None:
     client = LiteLLMClient(model, provider="litellm_local")

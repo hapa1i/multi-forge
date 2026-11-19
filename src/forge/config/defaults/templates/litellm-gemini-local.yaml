@@ -15,26 +15,34 @@ proxy:
 
   litellm:
     tiers:
-      haiku: gemini/gemini-3.8-flash
-      sonnet: gemini/gemini-4-carbon
-      opus: gemini/gemini-4-carbon
+      haiku: gemini/gemini-4-hydrogen
+      sonnet: gemini/gemini-4-neon
+      opus: gemini/gemini-4-neon
     model_alternatives:
       haiku:
+        gemini-3.8-flash: gemini/gemini-3.8-flash
         gemini-3.7-flash: gemini/gemini-3.7-flash
       sonnet:
+        gemini-4-carbon: gemini/gemini-4-carbon
         gemini-4-argon: gemini/gemini-4-argon
         gemini-3.1-pro-preview: gemini/gemini-3.1-pro-preview
         gemini-2.5-pro: gemini/gemini-2.5-pro
+        gemini-4-hydrogen: gemini/gemini-4-hydrogen
         gemini-3.8-flash: gemini/gemini-3.8-flash
         gemini-3.7-flash: gemini/gemini-3.7-flash
       opus:
+        gemini-4-carbon: gemini/gemini-4-carbon
         gemini-4-argon: gemini/gemini-4-argon
         gemini-3.1-pro-preview: gemini/gemini-3.1-pro-preview
         gemini-2.5-pro: gemini/gemini-2.5-pro
+        gemini-4-hydrogen: gemini/gemini-4-hydrogen
         gemini-3.8-flash: gemini/gemini-3.8-flash
         gemini-3.7-flash: gemini/gemini-3.7-flash
     # Per-tier overrides to differentiate sonnet/opus (both use same model)
     tier_overrides:
+      # Hydrogen's native default is high; keep Haiku requests without thinking fast.
+      haiku:
+        reasoning_effort: low
       sonnet:
         reasoning_effort: medium
       opus:

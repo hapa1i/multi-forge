@@ -108,8 +108,20 @@ def cutoff_proxy(
 
 @pytest.mark.parametrize("stream", [False, True])
 @pytest.mark.parametrize("partial_tool", [False, True])
+@pytest.mark.parametrize(
+    ("request_model", "upstream_model", "unary_limit"),
+    [
+        ("claude-sonnet-4-6", "vertex_ai/gemini-4-neon", 64_000),
+        ("gemini-4-carbon", "vertex_ai/gemini-4-carbon", 32_768),
+    ],
+)
 def test_vertex_cutoff_reaches_anthropic_client(
-    cutoff_proxy: tuple[str, FakeOpenAIUpstream], stream: bool, partial_tool: bool
+    cutoff_proxy: tuple[str, FakeOpenAIUpstream],
+    stream: bool,
+    partial_tool: bool,
+    request_model: str,
+    upstream_model: str,
+    unary_limit: int,
 ) -> None:
     base_url, upstream = cutoff_proxy
     upstream.requests.clear()
@@ -118,7 +130,7 @@ def test_vertex_cutoff_reaches_anthropic_client(
             f"{base_url}/v1/messages",
             headers={"x-api-key": "test"},
             json={
-                "model": "claude-sonnet-4-6",
+                "model": request_model,
                 "max_tokens": 64_000,
                 "stream": stream,
                 "messages": [{"role": "user", "content": "partial tool" if partial_tool else "partial text"}],
@@ -126,7 +138,7 @@ def test_vertex_cutoff_reaches_anthropic_client(
             },
         )
     assert response.status_code == 200, response.text[:500]
-    expected_tokens = 64_000 if stream else 32_768
+    expected_tokens = 64_000 if stream else unary_limit
     if stream:
         events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: ")]
         final = next(event for event in events if event["type"] == "message_delta" and "stop_reason" in event["delta"])
@@ -140,5 +152,5 @@ def test_vertex_cutoff_reaches_anthropic_client(
         if partial_tool:
             assert any(block["type"] == "tool_use" for block in body["content"])
     assert len(upstream.requests) == 1
-    assert upstream.requests[0]["model"] == "vertex_ai/gemini-4-carbon"
+    assert upstream.requests[0]["model"] == upstream_model
     assert upstream.requests[0]["max_tokens"] == expected_tokens

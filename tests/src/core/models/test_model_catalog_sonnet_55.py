@@ -46,9 +46,9 @@ def test_sonnet55_defaults_and_capabilities() -> None:
         assert catalog.defaults[provider]["sonnet"] == "claude-sonnet-5-5"
         assert catalog.defaults[provider]["opus"] == "claude-opus-5-5"
     assert catalog.defaults["gemini"] == {
-        "haiku": "gemini-3.8-flash",
-        "sonnet": "gemini-4-carbon",
-        "opus": "gemini-4-carbon",
+        "haiku": "gemini-4-hydrogen",
+        "sonnet": "gemini-4-neon",
+        "opus": "gemini-4-neon",
     }
     assert spec.context_window_tokens == 1_000_000
     assert spec.max_output_tokens == 128_000
