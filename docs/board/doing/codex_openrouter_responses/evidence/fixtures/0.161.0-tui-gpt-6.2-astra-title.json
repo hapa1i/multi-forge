@@ -1,0 +1,81 @@
+{
+  "client_metadata": {
+    "root_turn_id": "018bcfe5-6800-7000-8000-00000000004b",
+    "session_id": "018bcfe5-6800-7000-8000-00000000004a",
+    "thread_id": "018bcfe5-6800-7000-8000-00000000004a",
+    "turn_id": "018bcfe5-6800-7000-8000-00000000004b",
+    "x-codex-installation-id": "00000000-0000-4000-8000-000000000044",
+    "x-codex-turn-metadata": "{\"installation_id\":\"00000000-0000-4000-8000-000000000044\",\"session_id\":\"018bcfe5-6800-7000-8000-00000000004a\",\"thread_id\":\"018bcfe5-6800-7000-8000-00000000004a\",\"agent_name\":\"/synthetic/bin/codex\",\"turn_id\":\"018bcfe5-6800-7000-8000-00000000004b\",\"window_id\":\"018bcfe5-6800-7000-8000-00000000004a:0\",\"window_number\":0,\"context_window_id\":\"018bcfe5-6800-7000-8000-00000000004c\",\"request_kind\":\"turn\",\"root_turn_id\":\"018bcfe5-6800-7000-8000-00000000004b\",\"thread_source\":\"thread_title\",\"sandbox\":\"seatbelt\",\"sandbox_mode\":\"read-only\",\"auto_review_enabled\":false,\"node_repl_auto_review_required\":false,\"node_repl_disabled\":false,\"turn_started_at_unix_ms\":1700000000000,\"analytics_enabled\":false,\"model\":\"openai/gpt-6.2-astra\"}",
+    "x-codex-window-id": "018bcfe5-6800-7000-8000-00000000004a:0"
+  },
+  "include": [
+    "reasoning.encrypted_content"
+  ],
+  "input": [
+    {
+      "content": [
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        }
+      ],
+      "id": "msg_018bcfe5-6800-7000-8000-000000000047",
+      "role": "developer",
+      "type": "message"
+    },
+    {
+      "content": [
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        }
+      ],
+      "id": "msg_018bcfe5-6800-7000-8000-000000000048",
+      "role": "user",
+      "type": "message"
+    },
+    {
+      "content": [
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        }
+      ],
+      "id": "msg_018bcfe5-6800-7000-8000-000000000049",
+      "role": "user",
+      "type": "message"
+    }
+  ],
+  "instructions": "Synthetic fixture.",
+  "model": "openai/gpt-6.2-astra",
+  "parallel_tool_calls": true,
+  "prompt_cache_key": "018bcfe5-6800-7000-8000-00000000004a",
+  "reasoning": {
+    "summary": "auto"
+  },
+  "store": false,
+  "stream": true,
+  "text": {
+    "format": {
+      "name": "codex_output_schema",
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "maxLength": 36,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
+      "strict": true,
+      "type": "json_schema"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": []
+}

@@ -1,0 +1,83 @@
+{
+  "accepted_refusal": {
+    "body_sha256": "1c77a1dda340b6aef7f83c07465f232af64cfaea2f3b4270fd269add4a499eca",
+    "http": 404,
+    "manifest_sha256": "2feeec7f089df57f2927735a7f36d0e5244bb4afb4844971c0924f641a2e0163",
+    "message": "No endpoints found matching your data policy (Zero data retention). Configure: https://openrouter.ai/settings/privacy",
+    "model": "qwen/qwen4-max",
+    "path": "evidence/paid-2feeec7f/zdr.json",
+    "receipt_sha256": "9010c657c3f705f3f4944f717fb8c8309190de5c36bb744d0803f6c19d413206"
+  },
+  "catalog": {
+    "entries": 1051,
+    "epoch": 1795140153.469718,
+    "excluded": true,
+    "included": true,
+    "negative_model_ids": [
+      "qwen/qwen4-max",
+      "qwen/qwen4-max-20261115"
+    ],
+    "positive_model": "openai/gpt-6.2-astra",
+    "sha256": "1271c1237bee8eb4b834df0b1b7de488b0853fc808108d46365f9e3913cd2a0d"
+  },
+  "credit": {
+    "includes_byok": true,
+    "resets": false,
+    "usd_limit": 2,
+    "usd_remaining": 2
+  },
+  "criterion": "account_zdr_accepted_refusal",
+  "historical_baseline": {
+    "body_sha256": "6ae1793c7b1c43899a5569ce8adf967485e631f164e20024034e64e9a1e623ab",
+    "http": 404,
+    "model": "qwen/qwen4-max",
+    "path": "evidence/paid-3bb021f0/zdr.json",
+    "reason": "zdr-violation-by-account",
+    "receipt_sha256": "6a04008c3b2921062d4346be4f11e695101bbb737fb8e9dea5f339c9d5b69d7d"
+  },
+  "independent_request_zdr": "unverified",
+  "manifest_sha256": "1ee865aae6c817e5b16d72f8ec1fed98db0a49d0aa865b5e4c48674cd4e2a2bc",
+  "positive": {
+    "http": 200,
+    "response": {
+      "output_types": [
+        "message"
+      ],
+      "selected": [],
+      "selected_endpoints": [],
+      "status": "completed",
+      "terminal": null,
+      "usage_cost": 0.000304,
+      "usage_cost_present": true,
+      "usage_keys": [
+        "cost",
+        "cost_details",
+        "input_tokens",
+        "input_tokens_details",
+        "is_byok",
+        "output_tokens",
+        "output_tokens_details",
+        "total_tokens"
+      ]
+    }
+  },
+  "requests": [
+    {
+      "model": null,
+      "operation": "key",
+      "status": 200
+    },
+    {
+      "model": null,
+      "operation": "endpoints/zdr",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    }
+  ],
+  "stage": "zdr",
+  "verdict": "passed"
+}

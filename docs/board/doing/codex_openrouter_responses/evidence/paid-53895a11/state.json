@@ -1,0 +1,26 @@
+{
+  "attempts": [
+    {
+      "kind": "metadata",
+      "operation": "key",
+      "stage": "zdr",
+      "time": 1795101519.083018
+    },
+    {
+      "kind": "metadata",
+      "operation": "endpoints/zdr",
+      "stage": "zdr",
+      "time": 1795101519.490874
+    },
+    {
+      "kind": "generation",
+      "operation": "responses",
+      "stage": "zdr",
+      "time": 1795101520.331548
+    }
+  ],
+  "deadline": 1795102419.0825222,
+  "stages": {
+    "zdr": "inconclusive"
+  }
+}

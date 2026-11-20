@@ -17,7 +17,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 HEADLESS_STAGES=(00-preflight 10-genid 30-session-transport)
 GUIDED_STAGES=(20-cancel)
-EXPLICIT_STAGES=(40-session-routing) # never auto-run; explicit name only
+EXPLICIT_STAGES=(40-session-routing 50-responses-loopback 60-responses-zdr 70-responses-cost 80-responses-codex)
 
 declare_budget() {
     cat <<'EOB'
@@ -27,6 +27,10 @@ Approximate OpenRouter call budget (cheap model):
   20-cancel             ~2 calls (cancelled + completed baseline) + polled /generation + /activity GETs (~23s)   [operator]
   30-session-transport  ~2-4 calls (session_id + user, x direct[, gateway])
   40-session-routing    ~18 calls (3 arms x 5 repeats, LARGE prompt)                            [explicit-only]
+  50-responses-loopback 0 upstream calls (isolated native Codex clients + local Responses stub)
+  60-responses-zdr      approval-bound Responses ZDR controls
+  70-responses-cost     approval-bound Responses usage, identity and lookup controls
+  80-responses-codex    approval-bound synthetic Codex task and policy replay
 EOB
 }
 
@@ -65,8 +69,11 @@ FAILED=()
 for s in "${STAGES[@]}"; do
     echo "==================== stage $s ===================="
     if ! bash "$HERE/stages/$s.sh"; then
-        echo "stage $s FAILED (continuing)" >&2
+        echo "stage $s FAILED" >&2
         FAILED+=("$s")
+        case "$s" in
+            *-responses-*) break ;;
+        esac
     fi
     echo
 done

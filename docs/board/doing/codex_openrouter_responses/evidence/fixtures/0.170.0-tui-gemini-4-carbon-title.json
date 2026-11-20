@@ -1,0 +1,91 @@
+{
+  "client_metadata": {
+    "root_turn_id": "018bcfe5-6800-7000-8000-00000000006d",
+    "session_id": "018bcfe5-6800-7000-8000-00000000006c",
+    "thread_id": "018bcfe5-6800-7000-8000-00000000006c",
+    "turn_id": "018bcfe5-6800-7000-8000-00000000006d",
+    "x-codex-installation-id": "00000000-0000-4000-8000-000000000065",
+    "x-codex-turn-metadata": "{\"installation_id\":\"00000000-0000-4000-8000-000000000065\",\"session_id\":\"018bcfe5-6800-7000-8000-00000000006c\",\"thread_id\":\"018bcfe5-6800-7000-8000-00000000006c\",\"agent_name\":\"/synthetic/bin/codex\",\"turn_id\":\"018bcfe5-6800-7000-8000-00000000006d\",\"window_id\":\"018bcfe5-6800-7000-8000-00000000006c:0\",\"window_number\":0,\"context_window_id\":\"018bcfe5-6800-7000-8000-00000000006e\",\"request_kind\":\"turn\",\"history_initialization\":\"new\",\"root_turn_id\":\"018bcfe5-6800-7000-8000-00000000006d\",\"thread_source\":\"thread_title\",\"sandbox\":\"seatbelt\",\"sandbox_mode\":\"read-only\",\"auto_review_enabled\":false,\"node_repl_auto_review_required\":false,\"node_repl_disabled\":false,\"turn_started_at_unix_ms\":1700000000000,\"analytics_enabled\":false,\"model\":\"google/gemini-4-carbon\"}",
+    "x-codex-window-id": "018bcfe5-6800-7000-8000-00000000006c:0"
+  },
+  "include": [
+    "reasoning.encrypted_content"
+  ],
+  "input": [
+    {
+      "content": [
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        }
+      ],
+      "id": "msg_00000000-0000-5000-8000-000000000068",
+      "role": "developer",
+      "type": "message"
+    },
+    {
+      "content": [
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        }
+      ],
+      "id": "msg_018bcfe5-6800-7000-8000-000000000069",
+      "role": "developer",
+      "type": "message"
+    },
+    {
+      "content": [
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        }
+      ],
+      "id": "msg_018bcfe5-6800-7000-8000-00000000006a",
+      "role": "user",
+      "type": "message"
+    },
+    {
+      "content": [
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        }
+      ],
+      "id": "msg_018bcfe5-6800-7000-8000-00000000006b",
+      "role": "user",
+      "type": "message"
+    }
+  ],
+  "model": "google/gemini-4-carbon",
+  "parallel_tool_calls": true,
+  "prompt_cache_key": "018bcfe5-6800-7000-8000-00000000006c",
+  "reasoning": {
+    "summary": "auto"
+  },
+  "store": false,
+  "stream": true,
+  "text": {
+    "format": {
+      "name": "codex_output_schema",
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "maxLength": 36,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
+      "strict": true,
+      "type": "json_schema"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": []
+}

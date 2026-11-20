@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "status": "proposed for operator approval",
+  "scope": "Three pre-implementation OpenRouter probes. This approval ends before product implementation and live acceptance.",
+  "stages": [
+    "zdr",
+    "cost",
+    "codex"
+  ],
+  "models": {
+    "default": "openai/gpt-6.2-astra",
+    "alternate": "google/gemini-4-carbon",
+    "non_zdr": "qwen/qwen4-max"
+  },
+  "binary": {
+    "version": "0.170.0",
+    "platform": "aarch64-apple-darwin",
+    "sha256": "9248cfeebec9b4cc3034d5114caab10fbf426cbfa79dba410c5fa1b72762abd6"
+  },
+  "origin": "https://openrouter.ai",
+  "operations": [
+    "GET /api/v1/key",
+    "GET /api/v1/endpoints/zdr",
+    "POST /api/v1/responses",
+    "POST /api/v1/chat/completions",
+    "GET /api/v1/generation?id=<observed ID>"
+  ],
+  "limits": {
+    "usd": 2.0,
+    "seconds": 900,
+    "generation_attempts": 48,
+    "metadata_attempts": 19,
+    "stage_attempts": {
+      "zdr": {
+        "generation": 3,
+        "metadata": 2
+      },
+      "cost": {
+        "generation": 5,
+        "metadata": 16
+      },
+      "codex": {
+        "generation": 40,
+        "metadata": 1
+      }
+    }
+  },
+  "ledger_root": "~/.cache/forge-openrouter-probe/response-approvals",
+  "controls": [
+    "Approval binds the exact SHA-256 of this file. All stages share its persisted deadline and attempt ledger. Each HTTP attempt consumes a reservation before sending, including retries, auxiliary creates and tool continuations. Each stage may start once.",
+    "Verify the dedicated OpenRouter key immediately before each stage. Require a positive available balance, a non-resetting limit of at most USD 2.00 and BYOK charges included in the key limit. The provider-side key limit applies even if Responses omits cost.",
+    "Use only the named operations and models. Stop on a missing prerequisite, an expired deadline, an exhausted budget, or an inconclusive stage. All redirects stay unfollowed."
+  ],
+  "zdr": [
+    "Require the default model in the current ZDR catalog. The negative control must be absent under both its public and canonical slugs. Stop on changed membership.",
+    "Use the prompt 'Respond with the single word OK.' with at most 128 output tokens. Require a completed text response on the unrestricted negative control and a policy refusal on the same model with provider.zdr=true. Set reasoning.effort=none on both to reserve the budget for the answer. Require a completed text response on the default model with provider.zdr=true."
+  ],
+  "cost": [
+    "Use the same synthetic prompt and default model under required ZDR. Compare unary and streamed Responses with X-OpenRouter-Metadata omitted and enabled.",
+    "Use one completed Chat Completions call as an indexing control. Poll the control and observed candidate generation IDs at most three times each. Record missing, explicit zero and numeric cost separately, along with response identity and evidence of the selected provider."
+  ],
+  "codex": [
+    "Run native Codex exec and exec resume on both slugs with the client's default tool declarations and no policy mutation. A fresh isolated home, workspace, thread and loopback credential belong to each run. Only the test bridge holds the OpenRouter key.",
+    "The scratch project has a single input file, fixture.txt, containing FORGE_FIXTURE_173. The first prompt requests exactly 'cat fixture.txt'. The resumed prompt asks the client to write the word from turn one to proof.txt with 'echo WORD > proof.txt'. Verify the resulting file. These are the only local commands the bridge accepts.",
+    "Replay each checksum-pinned synthetic fixture with provider.zdr=true. For each tool request, append the freshly returned output items, including any opaque reasoning and matching call ID, followed by the synthetic read result. Record whether encrypted replay was exercised. Title fixtures require a strict JSON object with a 1–36 character title and no additional fields.",
+    "If streaming metadata identifies one selected provider, apply the candidate metadata header to the policy replays and an additional real Codex read/edit run on the default model with required ZDR and web search disabled.",
+    "Native calls may send bundled client instructions, tool schemas, scratch paths and newly generated client IDs. Synthetic HTTP fixtures replace local paths, client-generated IDs and prose. Native default-tool declarations can include web search on Gemini. The task requires only the two local scratch commands.",
+    "The 10 tool fixtures use two creates each, and three title fixtures use one each. At the loopback rate of four creates per two-turn native run, the two baselines plus optional metadata run add 8–12. This leaves 5–9 of the 40 stage attempts for additional client traffic. Both approved slugs map to themselves under the bundled ZDR policy."
+  ],
+  "replay_fixtures": [
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.141.0-exec-gpt-6.2-astra-tool.json",
+      "sha256": "220b30ccd0074724672b23b52e33891b60bd368d9fce20a0a17963865d2d34b4",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.141.0-tui-gemini-4-carbon-tool.json",
+      "sha256": "da92a2226249e73315adb094f8aae1182cd560318acc7230360731758639e3b2",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.149.1-exec-gpt-6.2-astra-tool.json",
+      "sha256": "1e6fd749ff22dfbb0fea89c67f14e204540cead9e1a4b73b14b139edad0ea156",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.149.1-tui-gemini-4-carbon-tool.json",
+      "sha256": "5da62bf9535360c4e4684db76346e07caa1f74de5ab838d4dd2980fb3df23246",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.161.0-exec-gpt-6.2-astra-tool.json",
+      "sha256": "6576ad4707f279fddbcc9c01c19f10592319ff54584a260a0f0a515bd9cc00f2",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.161.0-tui-gemini-4-carbon-tool.json",
+      "sha256": "3df3b1811c96f0647da6422d1f9b6764e49a3e4c87230bdab2cfd67d3c882bb2",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.161.0-tui-gpt-6.2-astra-title.json",
+      "sha256": "b93ad2be080c3aeafbcfee7a7f0bba5762377b3d5bb07c72b0774a6f77655bc5",
+      "purpose": "title"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-exec-gemini-4-carbon-tool.json",
+      "sha256": "2eb60e786a6e00da9a1b5f66cf0bcc70beefbf4a72a7dbd40f4c6b5886f0eff8",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-exec-gpt-6.2-astra-tool.json",
+      "sha256": "c2d47a1788da4983f0691c4c47873385a39989d756070442ca5db69cd394b441",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gemini-4-carbon-tool.json",
+      "sha256": "7eab5fa3ecd4f7dbbfbbfd1462cbcb505174e42478407341b1a2bfc7087f598a",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gemini-4-carbon-title.json",
+      "sha256": "2725c5f153385789d68d31341af2c8c2aa5c51214a57d26ab077f1bd22d163ca",
+      "purpose": "title"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gpt-6.2-astra-tool.json",
+      "sha256": "ad38c262a1c5df39941513a807ee17d41117c075aaf03a854be6a9175bc3aa4d",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gpt-6.2-astra-title.json",
+      "sha256": "e414954c746908ec4ed128b385f471f912e85a800852c556ba3b6bbef9fdf6c2",
+      "purpose": "title"
+    }
+  ],
+  "zdr_control": {
+    "canonical_slug": "qwen/qwen4-max-20261115",
+    "reasoning_effort": "none"
+  }
+}

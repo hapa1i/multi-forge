@@ -1,0 +1,105 @@
+{
+  "attempts": [
+    {
+      "kind": "metadata",
+      "operation": "key",
+      "stage": "cost",
+      "time": 1795141329.11429
+    },
+    {
+      "kind": "generation",
+      "operation": "responses",
+      "stage": "cost",
+      "time": 1795141329.5212648
+    },
+    {
+      "kind": "generation",
+      "operation": "responses",
+      "stage": "cost",
+      "time": 1795141331.40973
+    },
+    {
+      "kind": "generation",
+      "operation": "responses",
+      "stage": "cost",
+      "time": 1795141333.500583
+    },
+    {
+      "kind": "generation",
+      "operation": "responses",
+      "stage": "cost",
+      "time": 1795141335.2211578
+    },
+    {
+      "kind": "generation",
+      "operation": "chat/completions",
+      "stage": "cost",
+      "time": 1795141336.545389
+    },
+    {
+      "kind": "metadata",
+      "operation": "generation",
+      "stage": "cost",
+      "time": 1795141337.8530529
+    },
+    {
+      "kind": "metadata",
+      "operation": "generation",
+      "stage": "cost",
+      "time": 1795141338.45756
+    },
+    {
+      "kind": "metadata",
+      "operation": "generation",
+      "stage": "cost",
+      "time": 1795141339.162046
+    },
+    {
+      "kind": "metadata",
+      "operation": "generation",
+      "stage": "cost",
+      "time": 1795141339.732086
+    },
+    {
+      "kind": "metadata",
+      "operation": "generation",
+      "stage": "cost",
+      "time": 1795141340.231991
+    },
+    {
+      "kind": "metadata",
+      "operation": "generation",
+      "stage": "cost",
+      "time": 1795141344.667278
+    },
+    {
+      "kind": "metadata",
+      "operation": "generation",
+      "stage": "cost",
+      "time": 1795141345.0930822
+    },
+    {
+      "kind": "metadata",
+      "operation": "generation",
+      "stage": "cost",
+      "time": 1795141357.3820128
+    },
+    {
+      "kind": "metadata",
+      "operation": "key",
+      "stage": "codex",
+      "time": 1795141358.0257149
+    },
+    {
+      "kind": "generation",
+      "operation": "responses",
+      "stage": "codex",
+      "time": 1795141358.485055
+    }
+  ],
+  "deadline": 1795142229.1129758,
+  "stages": {
+    "codex": "inconclusive",
+    "cost": "passed"
+  }
+}

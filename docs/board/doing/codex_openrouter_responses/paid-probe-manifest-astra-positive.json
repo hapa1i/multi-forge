@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "status": "Operator accepted the retained Qwen refusal and authorized the remaining Astra control on 2026-11-20.",
+  "scope": "Complete the Astra positive control from manifest 2feeec7f on the same account with ZDR enabled. Reuse the accepted, previously observed Qwen HTTP 404. Independent enforcement of the request flag remains unverified.",
+  "stages": [
+    "zdr"
+  ],
+  "models": {
+    "default": "openai/gpt-6.2-astra",
+    "non_zdr": "qwen/qwen4-max"
+  },
+  "origin": "https://openrouter.ai",
+  "operations": [
+    "GET /api/v1/key",
+    "GET /api/v1/endpoints/zdr",
+    "POST /api/v1/responses"
+  ],
+  "limits": {
+    "usd": 2.0,
+    "seconds": 300,
+    "generation_attempts": 1,
+    "metadata_attempts": 2,
+    "stage_attempts": {
+      "zdr": {
+        "generation": 1,
+        "metadata": 2
+      }
+    }
+  },
+  "ledger_root": "~/.cache/forge-openrouter-probe/response-approvals",
+  "zdr_control": {
+    "criterion": "account_zdr_accepted_refusal",
+    "canonical_slug": "qwen/qwen4-max-20261115",
+    "reasoning_effort": "none",
+    "baseline": {
+      "path": "evidence/paid-3bb021f0/zdr.json",
+      "sha256": "6a04008c3b2921062d4346be4f11e695101bbb737fb8e9dea5f339c9d5b69d7d",
+      "body_sha256": "6ae1793c7b1c43899a5569ce8adf967485e631f164e20024034e64e9a1e623ab"
+    },
+    "accepted_refusal": {
+      "path": "evidence/paid-2feeec7f/zdr.json",
+      "sha256": "9010c657c3f705f3f4944f717fb8c8309190de5c36bb744d0803f6c19d413206",
+      "body_sha256": "1c77a1dda340b6aef7f83c07465f232af64cfaea2f3b4270fd269add4a499eca"
+    }
+  },
+  "key_setup": {
+    "condition": "If a dedicated eligible key from the baseline account is supplied, use it. Otherwise approval includes the following single management request on that account before starting the probe runner.",
+    "operation": "POST /api/v1/keys",
+    "max_attempts": 1,
+    "limit_usd": 2.0,
+    "limit_reset": null,
+    "include_byok_in_limit": true,
+    "expires_in_minutes": 20
+  },
+  "controls": [
+    "Run the remaining positive control once with a fresh ledger and a five-minute deadline. The prior manifest and ledger retain their original verdict. Each HTTP attempt consumes a reservation before dispatch. Do not retry or follow redirects.",
+    "Validate the pinned baseline receipt and the accepted Qwen HTTP 404 for provider.zdr=true. Its diagnostic said 'No endpoints found matching your data policy (Zero data retention).' The operator accepted this exact response as the negative control. Never send Qwen under this continuation.",
+    "A dedicated key on the same account must have available credit, a non-resetting limit at or below USD 2 and BYOK charges included. Use GET /api/v1/key and GET /api/v1/endpoints/zdr to verify the cap and current model membership. Stop on a changed catalog.",
+    "Send exactly the Astra control from the previously reviewed manifest: POST /api/v1/responses with model=openai/gpt-6.2-astra, input='Respond with the single word OK.', max_output_tokens=128, store=false and provider.zdr=true. Stop after this single attempt.",
+    "Require HTTP 200 with status=completed and a nonempty assistant output_text. Record the historical Qwen evidence separately from this live result. This control measures routing with account ZDR enabled.",
+    "Report the stage 60 result before any further paid work. Other generations, policy changes and product implementation are outside this continuation."
+  ],
+  "continues_manifest_sha256": "2feeec7f089df57f2927735a7f36d0e5244bb4afb4844971c0924f641a2e0163"
+}

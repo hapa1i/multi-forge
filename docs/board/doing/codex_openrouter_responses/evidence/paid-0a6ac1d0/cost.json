@@ -1,0 +1,299 @@
+{
+  "completed_control": "chat-control",
+  "cost_coverage": {
+    "stream": [
+      0.000304,
+      0.000304
+    ],
+    "unary": [
+      0.000304,
+      0.000304
+    ]
+  },
+  "credit": {
+    "includes_byok": true,
+    "resets": false,
+    "usd_limit": 2,
+    "usd_remaining": 2
+  },
+  "identity_verdicts": {
+    "chat-control": "verified",
+    "responses-1": "verified",
+    "responses-2": "verified",
+    "responses-3": "verified",
+    "responses-4": "verified"
+  },
+  "lookup_control_indexed": true,
+  "lookups": {
+    "chat-control": [
+      {
+        "http": 404,
+        "present": false,
+        "remote_id": null
+      },
+      {
+        "http": 200,
+        "present": true,
+        "remote_id": "chat-control"
+      }
+    ],
+    "responses-1": [
+      {
+        "http": 200,
+        "present": true,
+        "remote_id": "responses-1"
+      }
+    ],
+    "responses-2": [
+      {
+        "http": 200,
+        "present": true,
+        "remote_id": "responses-2"
+      }
+    ],
+    "responses-3": [
+      {
+        "http": 200,
+        "present": true,
+        "remote_id": "responses-3"
+      }
+    ],
+    "responses-4": [
+      {
+        "http": 404,
+        "present": false,
+        "remote_id": null
+      },
+      {
+        "http": 404,
+        "present": false,
+        "remote_id": null
+      },
+      {
+        "http": 200,
+        "present": true,
+        "remote_id": "responses-4"
+      }
+    ]
+  },
+  "manifest_sha256": "0a6ac1d0ad98fa597a9b3e65027097cb2e71d724d7b4c399d820cf94d464c20d",
+  "prerequisite": {
+    "criterion": "account_zdr_accepted_refusal",
+    "manifest_sha256": "1ee865aae6c817e5b16d72f8ec1fed98db0a49d0aa865b5e4c48674cd4e2a2bc",
+    "path": "evidence/paid-1ee865aa/zdr.json",
+    "sha256": "dd050601a5c88c32f93fd077d81e620ccd7881457e5babee23a0ad8b70ca7dfb",
+    "stage": "zdr"
+  },
+  "requests": [
+    {
+      "model": null,
+      "operation": "key",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "chat/completions",
+      "status": 200
+    },
+    {
+      "error": {
+        "bytes": 91,
+        "code": 404,
+        "format": "json",
+        "message": "Generation chat-control not found",
+        "sha256": "933afe04d331e24e15b31d3481a6eb622adf510656e77e3ae72820dd77d19cda"
+      },
+      "model": null,
+      "operation": "generation",
+      "status": 404
+    },
+    {
+      "model": null,
+      "operation": "generation",
+      "status": 200
+    },
+    {
+      "model": null,
+      "operation": "generation",
+      "status": 200
+    },
+    {
+      "model": null,
+      "operation": "generation",
+      "status": 200
+    },
+    {
+      "error": {
+        "bytes": 91,
+        "code": 404,
+        "format": "json",
+        "message": "Generation responses-4 not found",
+        "sha256": "2d2fead470dba212526b8f5ed682136843807c13bcd7b711b3ead252d717eb86"
+      },
+      "model": null,
+      "operation": "generation",
+      "status": 404
+    },
+    {
+      "model": null,
+      "operation": "generation",
+      "status": 200
+    },
+    {
+      "error": {
+        "bytes": 91,
+        "code": 404,
+        "format": "json",
+        "message": "Generation responses-4 not found",
+        "sha256": "2d2fead470dba212526b8f5ed682136843807c13bcd7b711b3ead252d717eb86"
+      },
+      "model": null,
+      "operation": "generation",
+      "status": 404
+    },
+    {
+      "model": null,
+      "operation": "generation",
+      "status": 200
+    }
+  ],
+  "samples": [
+    {
+      "generation_header": "responses-1",
+      "metadata": false,
+      "output_types": [
+        "message"
+      ],
+      "response_id": "responses-1",
+      "selected": [],
+      "selected_endpoints": [],
+      "status": "completed",
+      "streaming": false,
+      "terminal": null,
+      "usage_cost": 0.000304,
+      "usage_cost_present": true,
+      "usage_keys": [
+        "cost",
+        "cost_details",
+        "input_tokens",
+        "input_tokens_details",
+        "is_byok",
+        "output_tokens",
+        "output_tokens_details",
+        "total_tokens"
+      ]
+    },
+    {
+      "generation_header": "responses-2",
+      "metadata": true,
+      "output_types": [
+        "message"
+      ],
+      "response_id": "responses-2",
+      "selected": [
+        "Azure"
+      ],
+      "selected_endpoints": [
+        {
+          "model": "openai/gpt-6.2-astra-20261117",
+          "provider": "Azure"
+        }
+      ],
+      "status": "completed",
+      "streaming": false,
+      "terminal": null,
+      "usage_cost": 0.000304,
+      "usage_cost_present": true,
+      "usage_keys": [
+        "cost",
+        "cost_details",
+        "input_tokens",
+        "input_tokens_details",
+        "is_byok",
+        "output_tokens",
+        "output_tokens_details",
+        "total_tokens"
+      ]
+    },
+    {
+      "generation_header": "responses-3",
+      "metadata": false,
+      "output_types": [
+        "message"
+      ],
+      "response_id": "responses-3",
+      "selected": [],
+      "selected_endpoints": [],
+      "status": "completed",
+      "streaming": true,
+      "terminal": "response.completed",
+      "usage_cost": 0.000304,
+      "usage_cost_present": true,
+      "usage_keys": [
+        "cost",
+        "cost_details",
+        "input_tokens",
+        "input_tokens_details",
+        "is_byok",
+        "output_tokens",
+        "output_tokens_details",
+        "total_tokens"
+      ]
+    },
+    {
+      "generation_header": "responses-4",
+      "metadata": true,
+      "output_types": [
+        "message"
+      ],
+      "response_id": "responses-4",
+      "selected": [
+        "Azure"
+      ],
+      "selected_endpoints": [
+        {
+          "model": "openai/gpt-6.2-astra-20261117",
+          "provider": "Azure"
+        }
+      ],
+      "status": "completed",
+      "streaming": true,
+      "terminal": "response.completed",
+      "usage_cost": 0.000304,
+      "usage_cost_present": true,
+      "usage_keys": [
+        "cost",
+        "cost_details",
+        "input_tokens",
+        "input_tokens_details",
+        "is_byok",
+        "output_tokens",
+        "output_tokens_details",
+        "total_tokens"
+      ]
+    }
+  ],
+  "stage": "cost",
+  "try_metadata_on_codex": true,
+  "verdict": "passed"
+}

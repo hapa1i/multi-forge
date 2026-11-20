@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "status": "proposed for operator approval",
+  "scope": "Stage 60 on the OpenRouter account that produced the Qwen baseline. Keep its existing ZDR settings enabled. A pass verifies behavior on this account. Independent enforcement of request-level ZDR remains unverified.",
+  "stages": [
+    "zdr"
+  ],
+  "models": {
+    "default": "openai/gpt-6.2-astra",
+    "non_zdr": "qwen/qwen4-max"
+  },
+  "origin": "https://openrouter.ai",
+  "operations": [
+    "GET /api/v1/key",
+    "GET /api/v1/endpoints/zdr",
+    "POST /api/v1/responses"
+  ],
+  "limits": {
+    "usd": 2.0,
+    "seconds": 300,
+    "generation_attempts": 2,
+    "metadata_attempts": 2,
+    "stage_attempts": {
+      "zdr": {
+        "generation": 2,
+        "metadata": 2
+      }
+    }
+  },
+  "ledger_root": "~/.cache/forge-openrouter-probe/response-approvals",
+  "zdr_control": {
+    "criterion": "account_zdr",
+    "canonical_slug": "qwen/qwen4-max-20261115",
+    "reasoning_effort": "none",
+    "baseline": {
+      "path": "evidence/paid-3bb021f0/zdr.json",
+      "sha256": "6a04008c3b2921062d4346be4f11e695101bbb737fb8e9dea5f339c9d5b69d7d",
+      "body_sha256": "6ae1793c7b1c43899a5569ce8adf967485e631f164e20024034e64e9a1e623ab"
+    }
+  },
+  "key_setup": {
+    "condition": "If a dedicated eligible key from the baseline account is supplied, use it. Otherwise approval includes the following single management request on that account before starting the probe runner.",
+    "operation": "POST /api/v1/keys",
+    "max_attempts": 1,
+    "limit_usd": 2.0,
+    "limit_reset": null,
+    "include_byok_in_limit": true,
+    "expires_in_minutes": 20
+  },
+  "controls": [
+    "Run stage 60 once under the approved SHA-256. Persist each attempted request against its budget before dispatch. Stop on an inconclusive result, an exhausted budget or the five-minute deadline. Do not retry or follow redirects.",
+    "Read the pinned local receipt for the original Qwen baseline. Its HTTP 404 excluded one endpoint for account ZDR with provider.zdr omitted. Reuse this result without sending the historical request.",
+    "GET /api/v1/key must confirm a positive available balance, a non-resetting limit at or below USD 2.00 and BYOK charges included. GET /api/v1/endpoints/zdr must list Astra and omit both Qwen slugs.",
+    "Both Responses requests use the synthetic input 'Respond with the single word OK.', max_output_tokens=128, store=false and provider.zdr=true. Only Qwen sets reasoning.effort=none.",
+    "Send Qwen first. Require HTTP 400, 403, 404 or 422 with a complete list of structured reasons, each zdr-violation-by-account or zdr-violation-by-request with a positive endpoint_count. Record the reason codes and counts. Stop on a served request, an unknown reason or an inconclusive refusal.",
+    "Only after a qualifying Qwen refusal, send Astra and require an HTTP 200 completed response containing nonempty assistant output text.",
+    "The scope ends with the stage 60 receipt. Stages 70 and 80, other generations, routing-policy edits and product implementation require separate approval."
+  ]
+}
