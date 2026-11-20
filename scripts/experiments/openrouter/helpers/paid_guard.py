@@ -185,7 +185,8 @@ def validate_manifest(manifest: dict) -> None:
 class Ledger:
     """Persist reservations before dispatch, including attempts with uncertain outcomes."""
 
-    def __init__(self, directory: Path, limits: dict):
+    def __init__(self, directory: Path, limits: dict, *, stage_order: tuple[str, ...] = STAGES):
+        self.stage_order = stage_order
         self.directory = directory
         self.limits = limits
         self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -208,7 +209,7 @@ class Ledger:
             dump(path, state)
 
     def begin(self, stage: str, *, key: str | None = None) -> float:
-        stages = [s for s in STAGES if s in self.limits["stage_attempts"]]
+        stages = [s for s in self.stage_order if s in self.limits["stage_attempts"]]
         if stage not in stages:
             raise ValueError(f"Stage {stage} is outside this approval.")
         with self.locked() as state:

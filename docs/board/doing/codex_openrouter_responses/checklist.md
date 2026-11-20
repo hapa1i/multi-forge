@@ -1,10 +1,10 @@
 # Launch Codex through a direct OpenRouter proxy
 
-**Current focus.** Implement the approved direct route, then verify it on loopback before paid acceptance. Stage 80
-passed with account ZDR enabled. [Probe results](probe-results.md) · [Card](card.md)
+**Current focus.** The direct route and its accounting are implemented. The next paid action requires approval of
+[acceptance manifest `36567394`](paid-acceptance-manifest.json). [Probe results](probe-results.md) · [Card](card.md)
 
-**Proposed probe models.** Use `openai/gpt-6.2-astra` as the template default and `google/gemini-4-carbon` for explicit
-`-m` selection. Astra is the Sonnet-tier default on the shipped local Responses template. The existing
+**Probe models.** Use `openai/gpt-6.2-astra` as the template default and `google/gemini-4-carbon` for explicit `-m`
+selection. Astra is the Sonnet-tier default on the shipped local Responses template. The existing
 `openrouter-openai-codex` Messages template selects a different Sonnet model.
 
 ## 1. Establish the provider and client contracts
@@ -185,29 +185,27 @@ bridge buffered the stream and constructed its own upstream headers.
 
 ## Live acceptance and closeout
 
-- [ ] Obtain a separate live acceptance manifest. Propose a $5 dedicated key with at least $3 available at startup and a
-  $0.50 Forge reject cap. The two native baselines together reported $0.1943697. Allow for TUI title calls, retries and
-  price variation within the approved attempt and credit limits. The first Astra call reported $0.123214. Create a named
-  instance with `--no-start`, set its reject cap and start it. Confirm the live ID, template and loaded cap before
-  sending a prompt. Run `forge codex start --proxy <id>` in the TUI with the default, then with
-  `-- -m google/gemini-4-carbon`. Use the independent request counter and deadline, with at most three prompts per
-  model. If unreported cost requires an override, settle the live cap criterion and verify the independent credit bound
-  before dispatch.
+- [x] Rehearse [live acceptance manifest `36567394`](paid-acceptance-manifest.json) on loopback. Native TUI 0.170.0
+  completed both turns on each model, including the matched local read and edit. Ten creates and seven metadata reads
+  sufficed. Two initial lookup 404s per model exercised the 4- and 12-second waits. The attempt limit and absolute
+  streaming deadline passed separate negative controls.
+  [Acceptance receipt](evidence/forge-tui-acceptance-loopback.json)
+- [ ] Obtain approval for manifest `36567394` and run it once on the stage 60 account with ZDR enabled. The dedicated
+  key has a $5 non-resetting limit including BYOK and requires $3 available. If needed the manifest permits one
+  management POST to create a 20-minute key. Forge rejects at $0.50 and rejects after unreported cost. The run allows 16
+  creates, seven reads, two prompts per model and 15 minutes. This includes titles, retries and reconciliation.
 - [ ] Verify the synthetic read, follow-up and scratch edit. Record binary identity, paths, catalog behavior, request
   count, model slugs and the result of `forge model backend reconcile openrouter --request-id <id>`. Budget up to three
   read-only lookup attempts for a completed generation, with 4- and 12-second waits after an initial or second 404.
   Record each status and stop on a join. Compare local cost totals as sums of per-dispatch integer micros. When
   comparing against raw provider USD, allow half a micro per independently rounded request. Compare
   `forge telemetry trace show`, `forge telemetry trace explain`, `forge telemetry costs show` and `forge proxy metrics`.
-- [ ] As each slice ships, sync the runtime and telemetry designs, installation credential table, bare launcher
-  contract, CLI reference and packaged QA inventory. Correct whole-request byte-fidelity claims in the relay, ingress
-  and local template comments. Document the value guarantee, supported operations, the chosen identifier and BYOK
-  policies, model warning, Astra reasoning limitation, opt-outs and cancellation undercount. Fit or extract the Codex
-  section in the [proxy guide](../../../end-user/proxy.md).
-- [ ] Run `make test-unit`, `make test-regression`, `make pre-commit` and `make build`. Install the resulting wheel in a
-  clean environment and verify template realization, default slug, preflight and loopback smoke. The shared-route
-  checkpoint at `b3929615` passed 11,770 unit tests, 2,627 regressions, nine targeted integration cases, full
-  pre-commit, the build and the clean-wheel LiteLLM start/health/stop smoke.
+- [x] Synchronized the runtime, installation and telemetry designs, CLI reference, packaged QA inventory and
+  [Codex proxy guide](../../../end-user/codex_proxy.md). The guide documents both identifier fields, the OpenRouter
+  credit scope, cross-family fallbacks, missing-cost recovery and the Astra encrypted-replay limitation.
+- [x] Verified the wheel and sdist build, full hooks, shared LiteLLM clean-install start/health/stop, and a separate
+  hash-locked wheel installation. The wheel realized the direct template, selected Astra, passed unary loopback smoke
+  and reported `proxy_supported` with native Codex. Both native TUI launches exercised the wheel on loopback.
 - [x] Rehearse the board move in a temporary `done/` directory. All four approved replay manifests passed their loopback
   selftests there with the pinned Codex binary. The relocation regression verifies the index, the stage 80 receipt, file
   digests and rejection of a changed or escaping fixture.

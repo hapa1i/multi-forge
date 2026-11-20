@@ -52,6 +52,7 @@ from responses_stub import MARKER, assistant_message, capture_shape, read_tool, 
 class FixtureServer(ThreadingHTTPServer):
     hits: list[str]
     get_paths: list[str]
+    native_tui: bool = False
     key_limit: float = 1
     force_error = False
     trickle = False
@@ -87,7 +88,11 @@ class FixtureUpstream(BaseHTTPRequestHandler):
         elif self.path.endswith("/endpoints/zdr"):
             self.send_json({"data": [{"model_id": m} for m in server.zdr_models]})
         elif self.path.startswith("/api/v1/generation?"):
-            self.send_json({"data": {"id": parse_qs(urlsplit(self.path).query)["id"][0]}})
+            remote_id = parse_qs(urlsplit(self.path).query)["id"][0]
+            if server.native_tui and server.get_paths.count(self.path) <= 2:
+                self.send_json({"error": {"message": "Not indexed yet"}}, 404)
+            else:
+                self.send_json({"data": {"id": remote_id, "total_cost": 0.0100004 if server.native_tui else 0}})
         else:
             self.send_json({}, 404)
 
@@ -167,6 +172,7 @@ class FixtureUpstream(BaseHTTPRequestHandler):
                 i.get("role") == "user" and "Give this synthetic task a short title" in text_of(i)
                 for i in body["input"]
             )
+            title = title or (server.native_tui and capture_shape(body)["title_request"])
             if title:
                 item = assistant_message(json.dumps({"title": "Read fixture"}), 1)
             template = None if title else read_tool(body)
@@ -200,7 +206,7 @@ class FixtureUpstream(BaseHTTPRequestHandler):
                 "object": "response",
                 "model": body.get("model"),
                 "usage": {
-                    "cost": 0,
+                    "cost": 0.0100004 if server.native_tui else 0,
                     "input_tokens": 8,
                     "output_tokens": 2,
                     "total_tokens": 10,
@@ -232,6 +238,8 @@ class FixtureUpstream(BaseHTTPRequestHandler):
         )
         raw = b"".join(b"event: " + e["type"].encode() + b"\ndata: " + json.dumps(e).encode() + b"\n\n" for e in events)
         self.send_response(200)
+        if server.native_tui:
+            self.send_header("x-generation-id", f"gen-loopback-{len(server.hits)}")
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()

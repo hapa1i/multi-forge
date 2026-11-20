@@ -9,14 +9,15 @@ stopped before Astra when Qwen's ZDR-specific 404 lacked the required structured
 accepted that exact refusal. The Astra continuation passed with account ZDR enabled. Stage 70 verified cost and
 generation identity for unary and streamed Astra responses. Stage 80 hit the $2 key's credit limit on the first native
 call. The approved $5 retry passed with account ZDR enabled. Native Astra and Gemini read the fixture and wrote its
-contents to a second file on resume. All 13 policy fixtures and the native Astra metadata run passed. The results are
-ready for maintainer review before product implementation. [Probe results](probe-results.md) ·
+contents to a second file on resume. All 13 policy fixtures and the native Astra metadata run passed. The implemented
+route and its accounting passed loopback acceptance. The separate
+[live acceptance manifest](paid-acceptance-manifest.json) awaits approval. [Probe results](probe-results.md) ·
 [Stage 80 manifest](paid-probe-manifest-codex-only.json) · [Stage 80 receipt](evidence/paid-63d4a6f0/codex.json)
 
 ## Operator outcome
 
-Give the sessionless Codex TUI a Forge-owned route to OpenRouter, including non-OpenAI models. The proposed template is
-`codex-responses-openrouter`.
+The `codex-responses-openrouter` template runs the sessionless Codex TUI through OpenRouter, including non-OpenAI
+models.
 
 ```bash
 forge codex start --proxy codex-responses-openrouter
@@ -124,12 +125,12 @@ following criteria governed the probes. [Probe verdicts](probe-results.md#probe-
   local OpenAI-shaped error and makes no upstream call. Nothing unaccounted reaches the paid upstream. The LiteLLM route
   keeps relaying them.
 - **Retries.** The relay does not retry. A Codex retry is a new request and passes the same policy and cap check.
-- **Unreported cost.** On direct OpenRouter Responses, the proposed `costs.on_unreported_cost` defaults to `reject`. A
-  completed or billable incomplete generation with missing cost blocks subsequent Responses creates on that proxy.
-  Failed requests and cancellations before a terminal leave the flag clear. Create and start smoke tests report an
-  unpriced generation on the attempt that incurred it. Restart clears the observed flag. A source-declared gap persists
-  and dollar caps recover their recorded totals. With `allow` through `forge proxy set`, requests can continue and the
-  launcher warns that unreported spend cannot count toward caps. Messages and other sources retain their cost policy.
+- **Unreported cost.** On direct OpenRouter Responses, `costs.on_unreported_cost` defaults to `reject`. A completed or
+  billable incomplete generation with missing cost blocks subsequent Responses creates on that proxy. Failed requests
+  and cancellations before a terminal leave the flag clear. Create and start smoke tests report an unpriced generation
+  on the attempt that incurred it. Restart clears the observed flag. A source-declared gap persists and dollar caps
+  recover their recorded totals. With `allow` through `forge proxy set`, requests can continue and the launcher warns
+  that unreported spend cannot count toward caps. Messages and other sources retain their cost policy.
 - **Endpoint join.** A base whose path ends in `/v1` is the version root and gets `/responses`. Any other base gets
   `/v1/responses`. This keeps a custom gateway's prefix and the LiteLLM route. Apply `decisions_url`'s scheme and
   authority checks to OpenRouter bases. Existing HTTP LAN and Docker LiteLLM bases continue to work.

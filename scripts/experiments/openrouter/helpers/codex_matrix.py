@@ -12,6 +12,7 @@ import os
 import pty
 import re
 import select
+import signal
 import struct
 import subprocess
 import sys
@@ -129,6 +130,8 @@ def run_tui(
     cwd: Path,
     env: dict[str, str],
     seconds: int,
+    *,
+    prompts: tuple[str, str] = (FIRST, FOLLOWUP),
 ) -> dict:
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 55, 190, 0, 0))
@@ -138,7 +141,7 @@ def run_tui(
         "terminal-child",
         *args,
         "--no-alt-screen",
-        FIRST,
+        prompts[0],
     ]
     with subprocess.Popen(
         command,
@@ -163,7 +166,7 @@ def run_tui(
                 now = time.monotonic()
                 if now - started >= seconds:
                     done_reason = "deadline"
-                    proc.terminate()
+                    os.killpg(proc.pid, signal.SIGTERM)
                     break
                 if select.select([master], [], [], 0.1)[0]:
                     try:
@@ -184,7 +187,7 @@ def run_tui(
                     if complete or ("error" in events and ("FORGE_REFUSAL_" + scenario.upper()).encode() in data):
                         exit_at = exit_at or now + 1
                 elif not followup_sent and complete:
-                    os.write(master, b"\x1b[200~" + FOLLOWUP.encode() + b"\x1b[201~")
+                    os.write(master, b"\x1b[200~" + prompts[1].encode() + b"\x1b[201~")
                     time.sleep(0.24)
                     os.write(master, b"\r")
                     followup_sent = True
@@ -206,7 +209,8 @@ def run_tui(
             try:
                 proc.wait(timeout=2)
             except subprocess.TimeoutExpired:
-                proc.kill()
+                os.killpg(proc.pid, signal.SIGKILL)
+                proc.wait()
         path.joinpath("terminal.raw").write_bytes(data)
         rendered = ANSI.sub(b"", bytes(data)).decode(errors="replace")
         path.joinpath("terminal.txt").write_text(rendered)

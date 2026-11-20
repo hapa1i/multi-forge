@@ -235,3 +235,52 @@ def test_standalone_forbids_prior_stages_and_unrelated_operations(codex_only, st
     body = {"model": spec["models"]["default"]} if operation == "chat/completions" else None
     with pytest.raises(ValueError, match="operation outside"):
         api.request(operation, body)
+
+
+def test_tui_acceptance_reserves_before_forwarding_and_refuses_a_spent_approval(manifest, tmp_path):
+    import httpx
+
+    acc = importlib.import_module("forge_acceptance")
+    _, card = manifest
+    spec = json.loads((card / "paid-acceptance-manifest.json").read_bytes())
+    fixture = acc.FixtureServer(("127.0.0.1", 0), acc.FixtureUpstream)
+    fixture.hits, fixture.get_paths = [], []
+    fixture.native_tui = True
+    ledger = acc.Ledger(tmp_path, spec["limits"], stage_order=("tui",))
+    deadline = ledger.begin("tui")
+    api = acc.AcceptanceUpstream(spec, ledger, deadline, "fixture", fixture)
+    api.model = acc.MODELS[0]
+    for _ in range(spec["limits"]["generation_attempts"] - 1):
+        ledger.reserve("tui", "generation", "responses")
+    body = {"model": api.model, "input": "Hi", "store": False, "stream": True, "provider": {"zdr": True}}
+    headers = {"authorization": "Bearer fixture", "x-openrouter-metadata": "enabled"}
+    with acc.serving(fixture), acc.serving(acc.gateway(api)) as base, httpx.Client(trust_env=False) as client:
+        assert client.post(base + "/responses", json=body, headers=headers).status_code == 200
+        assert client.post(base + "/responses", json=body, headers=headers).status_code == 400
+        assert fixture.hits == ["/api/v1/responses"]
+    with pytest.raises(ValueError, match="already started"):
+        ledger.begin("tui")
+
+
+def test_tui_guard_enforces_absolute_stream_deadline(manifest, tmp_path):
+    import time
+
+    import httpx
+
+    acc = importlib.import_module("forge_acceptance")
+    _, card = manifest
+    spec = json.loads((card / "paid-acceptance-manifest.json").read_bytes())
+    fixture = acc.FixtureServer(("127.0.0.1", 0), acc.FixtureUpstream)
+    fixture.hits, fixture.get_paths, fixture.trickle = [], [], True
+    ledger = acc.Ledger(tmp_path, spec["limits"], stage_order=("tui",))
+    ledger.begin("tui")
+    api = acc.AcceptanceUpstream(spec, ledger, time.monotonic() + 0.6, "fixture", fixture)
+    api.model = acc.MODELS[0]
+    with acc.serving(fixture), acc.serving(acc.gateway(api)) as base, httpx.Client(trust_env=False) as client:
+        response = client.post(
+            base + "/responses",
+            headers={"authorization": "Bearer fixture", "x-openrouter-metadata": "enabled"},
+            json={"model": api.model, "store": False, "stream": True, "provider": {"zdr": True}},
+        )
+        assert response.status_code == 200 and 0 < len(response.content) < 35
+        assert api.refusals and len(fixture.hits) == 1

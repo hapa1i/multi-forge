@@ -9,6 +9,17 @@
 | 70 · Cost and identity             | Astra reported cost on unary and streaming requests. The metadata header exposed the selected endpoint. All four generation IDs eventually resolved. | Lookup can lag. The receipts retain the BYOK field names without their values.                                                                |
 | 80 · Native and HTTP compatibility | Native 0.170.0 completed both tasks. All 13 HTTP fixtures and the native Astra metadata run passed.                                                  | Live encrypted reasoning replay was exercised on Gemini. Astra emitted no reasoning item. The bridge buffered SSE and built upstream headers. |
 
+## Direct route acceptance on loopback
+
+The 0.170.0 TUI used the packaged Forge proxy for a local read and a follow-up edit on each slug. Both scratch files
+contained the expected word and the provider received the matching tool results. Astra and Gemini each used five
+creates, including a title. The client made no catalog request. Gemini displayed its fallback model metadata warning.
+
+The fixture supplied $0.0100004 per create. Per-request rounding produced 50,000 micros per model. The individual
+traces, cost summaries and running metrics agreed. Both remote lookups joined on the third read, after the fixture
+returned two 404s. The run used ten creates and seven metadata reads, including the dedicated-key check.
+[Loopback receipt](evidence/forge-tui-acceptance-loopback.json) · [Live scope](paid-acceptance-manifest.json)
+
 ## Follow-up loopback controls
 
 The four pinned Codex binaries ran 72 additional cases against a local stub, with 210 POSTs. Each comparison included
