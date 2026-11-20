@@ -123,12 +123,13 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
   active (lossy)" before launch (§7.x)
 
 - `wire_shape: openai_responses_passthrough` is the **Codex-facing** raw OpenAI **Responses** shape on `/v1/responses*`
-  (create + retrieve/cancel/input_items/delete/compact/input_tokens). It forwards traffic byte-for-byte (signature-safe;
-  `can_inspect.*=false`, like `anthropic_passthrough`). Routing requires that wire shape plus backend
-  `responses_ingress`; `GET /`'s `capabilities.responses_ingress` and Codex preflight's `proxy_supported` expose the
-  conjunction. Reported `x-litellm-response-cost` is USD→micros; an OpenAI-direct upstream is token-telemetry-only. The
-  launcher is `forge codex start --proxy` (§3.4). The shared `proxy.sse_framing` incremental data/JSON framer serves
-  both raw passthrough usage taps; accumulators own protocol event merging and lifecycle semantics.
+  (create + retrieve/cancel/input_items/delete/compact/input_tokens). It preserves request JSON values, including opaque
+  reasoning items, and streams upstream SSE bytes incrementally. `can_inspect.*=false`. Routing requires that wire shape
+  plus backend `responses_ingress`. `GET /`'s `capabilities.responses_ingress` and Codex preflight's `proxy_supported`
+  expose the conjunction. Reported `x-litellm-response-cost` is USD→micros; an OpenAI-direct upstream is
+  token-telemetry-only. The launcher is `forge codex start --proxy` (§3.4). The shared `proxy.sse_framing` incremental
+  data/JSON framer serves both raw passthrough usage taps; accumulators own protocol event merging and lifecycle
+  semantics.
 
   The shape governs the Responses ingress; it does not make the proxy exclusive to Codex. The same
   `codex-responses-local` instance deliberately accepts Claude-backed sessions and workers on `/v1/messages`, where the

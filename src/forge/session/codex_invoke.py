@@ -40,10 +40,8 @@ logger = logging.getLogger(__name__)
 
 _FORGE_SESSION_VAR = "FORGE_SESSION"
 _FORGE_FORGE_ROOT_VAR = "FORGE_FORGE_ROOT"
-# Sessionless proxy-launch env scrub: the session-managed identity AND the native OpenAI
-# account/routing vars, on top of the shared codex child strip set. Because the proxy owns
-# upstream auth, _build_codex_proxy_env (unlike sanitize_codex_child_env) re-establishes NO
-# native codex auth -- codex authenticates only to the loopback proxy via the token below.
+# The sessionless child authenticates to the loopback proxy. Upstream authentication
+# belongs to the proxy process.
 _CODEX_BARE_PROXY_STRIP_VARS: tuple[str, ...] = (
     *_CODEX_CHILD_STRIP_VARS,  # CODEX_*/ANTHROPIC_*/FORGE_SUBPROCESS_* (shared core)
     _FORGE_SESSION_VAR,
@@ -55,11 +53,8 @@ _CODEX_BARE_PROXY_STRIP_VARS: tuple[str, ...] = (
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_PROXY_WIRE_SHAPE_VAR,
     FORGE_AUTHORITY_MARKER_VAR,
-    # No native OpenAI account leakage. OPENAI_API_KEY is load-bearing (a stale inherited key
-    # breaks the first turn); the rest are defense-in-depth -- the custom forge_proxy provider
-    # supplies its own base_url, so OPENAI_BASE_URL can't reroute, but stripping the whole
-    # account/routing set honors the no-leak promise.
     "OPENAI_API_KEY",
+    "OPENROUTER_API_KEY",
     "OPENAI_ORGANIZATION",
     "OPENAI_ORG_ID",
     "OPENAI_PROJECT",
@@ -223,7 +218,7 @@ def invoke_codex_bare_proxy(
 def _build_codex_proxy_env() -> dict[str, str]:
     """Build the scrubbed env for a sessionless proxy-backed codex launch.
 
-    Strips the session/run-tree identity and the OpenAI account/routing vars, advances
+    Strips the session/run-tree identity, upstream credentials and OpenAI routing vars, advances
     FORGE_DEPTH (codex can shell out to ``forge``), and sets the loopback proxy token.
     Establishes NO native codex auth -- that is the session-managed path's job.
     """

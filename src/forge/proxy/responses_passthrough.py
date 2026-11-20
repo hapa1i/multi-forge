@@ -1,10 +1,8 @@
 """OpenAI Responses-shaped passthrough forwarding (Codex-facing ingress).
 
-Forward Codex's raw OpenAI Responses traffic to an upstream that serves the
-Responses API, WITHOUT translation, so reasoning items survive byte-for-byte
-(signature-safe) -- the same rationale as ``passthrough.py`` for Anthropic. The
-whole ``/v1/responses*`` surface is method- and body-agnostic: create (streamed),
-retrieve, cancel, input_items, delete, compact, input_tokens.
+Forward Responses JSON by value, preserving opaque reasoning items and tool calls.
+The relay streams upstream SSE bytes incrementally. The ingress decides which
+operations a source supports.
 
 The subtle streaming teardown is shared with the Anthropic passthrough via
 ``stream_relay.relay_upstream``; this module owns only the Responses-specific
@@ -20,6 +18,7 @@ import logging
 import math
 from collections.abc import Callable, Mapping
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 from fastapi.responses import Response, StreamingResponse
@@ -211,7 +210,10 @@ async def forward(
     ``extra_response_headers`` (e.g. ``X-Spend-Warning`` in warn mode) ride every
     returned response so a warn-mode cap is never silently dropped.
     """
-    url = base_url.rstrip("/") + url_path
+    base = base_url.rstrip("/")
+    if urlsplit(base).path.endswith("/v1") and url_path.startswith("/v1/"):
+        url_path = url_path.removeprefix("/v1")
+    url = base + url_path
     if query_string:
         url = f"{url}?{query_string}"
     headers = build_upstream_headers(inbound_headers, api_key)

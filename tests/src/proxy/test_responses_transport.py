@@ -1,7 +1,7 @@
 """Unit tests for the OpenAI Responses passthrough transport (Codex-facing ingress).
 
 Covers the wire-shape's three honesty constraints from the card:
-- byte-faithful forwarding (method/body/query preserved, no `.json()` on bodyless);
+- preservation of method, JSON values and query (bodyless requests skip JSON decoding);
 - token telemetry always, dollar cost ONLY when the upstream reports it (USD->micros);
 - the capability gate mirrored across the route, GET / advertisement, and preflight.
 """
@@ -187,7 +187,7 @@ async def test_forward_non_streaming_post_relays_and_accounts(responses_transpor
     captured = responses_transport.captured
     assert captured.method == "POST"
     assert captured.url == "https://upstream.test/v1/responses"
-    assert captured.json == body  # byte-faithful, unknown field intact
+    assert captured.json == body  # includes the unknown field
     assert resp.status_code == 200
     # Token telemetry from the body; real dollar cost from the upstream header (USD->micros).
     assert seen == {
@@ -550,10 +550,7 @@ def test_intercept_section_responses_passthrough_is_signature_safe_uninspectable
     section = ri.build_intercept_capability_section(
         "openai_responses_passthrough", intercept_mode="inspect", audit_full_body=True
     )
-    # Reasoning preserved byte-for-byte...
     assert section["thinking_blocks_preserved"] is True
-    # ...but a byte-faithful passthrough can inspect/override/audit nothing, even
-    # with intercept.mode=inspect and audit_full_body=True.
     assert section["can_inspect"] == {
         "system_prompt": False,
         "drift_detection": False,

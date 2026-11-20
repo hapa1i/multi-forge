@@ -477,14 +477,14 @@ Forge proxy but creates no Forge session, manifest, artifacts, or `.forge/` requ
 from `forge session start --runtime codex`, which records a managed Codex thread.
 
 The proxy must advertise `wire_shape: openai_responses_passthrough` and `capabilities.responses_ingress: true` from
-`GET /`. The built-in `codex-responses-local` template provides that shape by forwarding Codex's raw `/v1/responses*`
-traffic to a local LiteLLM backend, preserving reasoning items byte-for-byte. It uses the `openai-api` credential
-(`OPENAI_API_KEY`) for the upstream LiteLLM/OpenAI leg; the Codex child itself does not need native OpenAI or Codex
-login for this proxy-backed launch.
+`GET /`. The built-in `codex-responses-local` template forwards `/v1/responses*` to LiteLLM with the `openai-api`
+credential. It preserves JSON values, including encrypted reasoning, and streams responses as they arrive. A saved
+upstream URL may include a path prefix and the final `/v1`.
 
-Forge passes Codex temporary argv `-c` provider overrides, never writes Codex's `config.toml`, and scrubs inherited
-Codex/OpenAI auth, session, proxy, and run-tree env vars before starting the child. Extra Codex args go after `--`; a
-user-supplied `-m`/`--model` overrides the proxy default model.
+Forge supplies temporary `-c` provider settings and a loopback token. It removes inherited Codex, OpenAI and OpenRouter
+credentials and Forge session, proxy and run-tree variables from the child environment. A nested Forge command can still
+load the active credential profile or the project's `.env`. Set `PYTHON_DOTENV_DISABLED=1` to disable dotenv loading.
+Pass extra Codex arguments after `--`. Use `-m` or `--model` to override the proxy default.
 
 ### Delete a proxy
 

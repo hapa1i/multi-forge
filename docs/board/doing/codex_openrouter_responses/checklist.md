@@ -96,11 +96,13 @@ choices cover native identifiers, BYOK cost and cross-family fallback. Stage 80 
   `openai_responses_passthrough`. Require only the OpenRouter credential. Preserve the live identity, wire-shape and
   source-capability checks, translated Messages ingress and user-owned proxy snapshots. Keep model-first session routing
   and managed Codex sessions outside this change. [Source catalog](../../../../src/forge/backend/sources.py)
-- [ ] Join versioned and unversioned bases exactly once, preserving custom prefixes. Validate the OpenRouter base before
-  attaching its bearer. Require HTTPS except for `localhost`, `127.0.0.1` and `::1`, and reject userinfo, query strings
-  and fragments. Test a saved LiteLLM base using HTTP on a LAN or `host.docker.internal`, including its subresource
-  paths. Relay only the create operation to OpenRouter. Use the captured local refusal contract for subresources and
-  keep a single upstream attempt per incoming request. [Ingress](../../../../src/forge/proxy/responses_ingress.py)
+- [x] Join versioned and unversioned bases exactly once, preserving custom prefixes. Verified create and subresource
+  URLs, bearer replacement and encoded query parameters for HTTP LiteLLM and HTTPS gateways.
+  [Regression](../../../../tests/regression/test_bug_responses_versioned_base.py)
+- [ ] Validate the OpenRouter base before attaching its bearer. Require HTTPS except for `localhost`, `127.0.0.1` and
+  `::1`, and reject userinfo, query strings and fragments. Relay only the create operation to OpenRouter. Use the
+  captured local refusal contract for subresources and keep a single upstream attempt per incoming request.
+  [Ingress](../../../../src/forge/proxy/responses_ingress.py)
 - [ ] On required-ZDR requests force `provider.zdr=true`, apply `model_for_zdr_policy`, and accept only the
   client-executed tool types established by the captures. Check top-level `tools`, namespaces and `additional_tools`
   input items. Preserve sibling provider options and other caller fields by value. With `allow_non_zdr`, preserve the
@@ -109,11 +111,13 @@ choices cover native identifiers, BYOK cost and cross-family fallback. Stage 80 
   suggest a ZDR-eligible model. Explain that `allow_non_zdr=true` can relax Forge's requirement only where account and
   guardrail policies permit it. Preserve unrelated provider 404s.
   [Qwen evidence](probe-results.md#qwen-paid-run-on-2026-11-19)
-- [ ] Keep ephemeral provider overrides and the loopback credential. Scrub `OPENROUTER_API_KEY` from sessionless
-  children for both OpenRouter and LiteLLM. Under required ZDR, supply `-c web_search="disabled"` before operator
-  arguments. Use the verified live proxy to report the requested and dispatched launch model when they differ, including
-  an explicit off-tier `-m`. Verify credential-store fallback for nested Forge commands with dotenv disabled. Account
-  for a project's `.env` when documenting what a nested Forge command can resolve.
+- [x] Scrub `OPENROUTER_API_KEY` in the shared sessionless launcher. An actual child received its loopback token. With
+  dotenv disabled, nested `forge auth status` resolved only the stored test key. Both credential cases and all four
+  LiteLLM streaming-cost integration cases passed via `./scripts/test-integration.sh`.
+  [Integration](../../../../tests/integration/proxy/test_codex_openrouter_responses_e2e.py) ·
+  [Proxy guide](../../../end-user/proxy.md#start-codex-with-a-responses-capable-proxy)
+- [ ] Under required ZDR, supply `-c web_search="disabled"` before operator arguments. Use the verified live proxy to
+  report the requested and dispatched launch model when they differ, including an explicit off-tier `-m`.
   [Launcher](../../../../src/forge/cli/codex.py)
 - [ ] Run the route and launcher cases in the new Docker integration suite via `./scripts/test-integration.sh` in this
   slice. Exercise both documented template-name launches, a saved Messages-only proxy, and the translated Messages

@@ -34,10 +34,8 @@ logger = logging.getLogger(__name__)
 def build_intercept_capability_section(wire_shape: str, intercept_mode: str, audit_full_body: bool) -> dict[str, Any]:
     """Compute GET /'s intercept truth table for one wire shape.
 
-    Both passthrough shapes preserve signed reasoning byte-for-byte (Anthropic
-    thinking blocks / Responses reasoning items). A byte-faithful Responses
-    passthrough cannot inspect or override bodies, so its can_inspect is uniformly
-    false even when intercept.mode is inspect/override.
+    Both passthrough shapes preserve signed reasoning. Responses preserves JSON
+    values across serialization. Its intercept capability stays false in every mode.
     """
     is_responses_pt = wire_shape == OPENAI_RESPONSES_PASSTHROUGH
     return {
@@ -76,8 +74,8 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
     Codex-facing ingress for ``forge codex start --proxy``. Gated on
     ``wire_shape == openai_responses_passthrough`` AND the source's
     ``responses_ingress`` capability -- the same conjunction the codex preflight
-    mirrors, so a green preflight cannot 501 here. Reasoning items survive
-    byte-for-byte (passthrough); body audit is structurally unavailable. The body
+    mirrors, so a green preflight cannot 501 here. Reasoning items survive by
+    value. Body audit is structurally unavailable. The body
     is read only for POST -- bodyless GET/DELETE never call ``.json()``.
     """
     import forge.proxy.server as server
