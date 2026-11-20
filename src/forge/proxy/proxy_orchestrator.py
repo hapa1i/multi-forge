@@ -1116,6 +1116,8 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
         runtime = root.get("runtime")
         policy = runtime.get("responses_policy") if isinstance(runtime, dict) else None
         identity = root.get("proxy")
+        if isinstance(policy, dict) and policy.get("requested_default_model"):
+            model = policy["requested_default_model"]
         return _smoke_test_responses(
             base_url=base_url,
             timeout_s=timeout_s,

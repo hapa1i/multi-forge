@@ -160,10 +160,12 @@ selection. Astra is the Sonnet-tier default on the shipped local Responses templ
   Repeat with only the environment key and only the Forge credential store. Inspect the child's environment in both
   runs.
 - [x] Run the accounting cases in the new integration suite, relevant CLI smoke cases and
-  `tests/integration/proxy/test_litellm_streaming_cost_e2e.py` via `./scripts/test-integration.sh` in this slice. All 33
+  `tests/integration/proxy/test_litellm_streaming_cost_e2e.py` via `./scripts/test-integration.sh` in this slice. All 34
   selected cases passed with dotenv disabled via the integration wrapper, including
   `TestProxyCreateAndStart::test_create_json_failed_smoke_is_one_result_and_preserves_proxy`. Both credential sources
-  passed create/start smoke, the account-credit total matched telemetry, and a duplicate stream terminal charged once.
+  passed create/start smoke, the account-credit total matched telemetry, and a duplicate stream terminal charged once. A
+  restart retained $0.125 of spend under the new cost policy. Two unpriced LiteLLM Responses creates succeeded. The
+  OpenRouter smoke sends the originally requested default so a chained fallback maps it once.
 
 ## Acceptance fixtures
 
@@ -203,9 +205,13 @@ bridge buffered the stream and constructed its own upstream headers.
 - [x] Synchronized the runtime, installation and telemetry designs, CLI reference, packaged QA inventory and
   [Codex proxy guide](../../../end-user/codex_proxy.md). The guide documents both identifier fields, the OpenRouter
   credit scope, cross-family fallbacks, missing-cost recovery and the Astra encrypted-replay limitation.
+- [x] `make test-unit` passed 11,809 tests. `make test-regression` passed 2,632 on rerun. On the preceding run,
+  `test_claude_ignores_codex_format_preference` compared independently measured 0.0s and 0.1s in its output. Its 16-test
+  file also passed in isolation.
 - [x] Verified the wheel and sdist build, full hooks, shared LiteLLM clean-install start/health/stop, and a separate
   hash-locked wheel installation. The wheel realized the direct template, selected Astra, passed unary loopback smoke
-  and reported `proxy_supported` with native Codex. Both native TUI launches exercised the wheel on loopback.
+  and reported `proxy_supported` with native Codex. Both native TUI launches exercised the wheel on loopback. The
+  installed wheel SHA-256 was `cf550c277a77e4402232d5ac4c4bd3628675c0eeb7143d539384d19dd280d862`.
 - [x] Rehearse the board move in a temporary `done/` directory. All four approved replay manifests passed their loopback
   selftests there with the pinned Codex binary. The relocation regression verifies the index, the stage 80 receipt, file
   digests and rejection of a changed or escaping fixture.

@@ -72,6 +72,7 @@ class ResponsesUpstream:
     requests: list = field(default_factory=list)
     release_terminal: threading.Event = field(default_factory=threading.Event)
     status: int = 200
+    gateway_cost_header: str | None = "0.125"
     generation_id: str | None = "gen-test"
     drop_connection: bool = False
     reply: dict[str, Any] = field(
@@ -103,7 +104,8 @@ def responses_upstream():
                 self.close_connection = True
                 return
             self.send_response(upstream.status)
-            self.send_header("x-litellm-response-cost", "0.125")
+            if upstream.gateway_cost_header is not None:
+                self.send_header("x-litellm-response-cost", upstream.gateway_cost_header)
             if upstream.generation_id:
                 self.send_header("x-generation-id", upstream.generation_id)
             self.send_header("X-Request-Cost", "9.999999")
@@ -545,8 +547,9 @@ def test_create_start_smoke_and_missing_cost_recovery(responses_upstream, monkey
         again = runner.invoke(main, ["proxy", "start", proxy_id, "--smoke-test"])
         assert again.exit_code == 1 and "costs.on_unreported_cost=allow" in again.output
         assert len(provider.requests) == 1
+        _forge("proxy", "set", proxy_id, "costs.caps.per_day=0.25")
         _forge("proxy", "stop", proxy_id)
-        provider.reply["usage"]["cost"] = 0
+        provider.reply["usage"]["cost"] = 0.125
         assert "Smoke test passed" in _forge("proxy", "start", proxy_id, "--smoke-test")
         assert len(provider.requests) == 2
         assert not httpx.get(base).json()["runtime"]["responses_policy"]["unreported_cost_observed"]
@@ -557,8 +560,22 @@ def test_create_start_smoke_and_missing_cost_recovery(responses_upstream, monkey
         _forge("proxy", "stop", proxy_id)
         provider.reply["usage"].pop("cost")
         assert "Smoke test passed" in _forge("proxy", "start", proxy_id, "--smoke-test")
-        assert httpx.get(base).json()["runtime"]["responses_policy"]["on_unreported_cost"] == "allow"
+        restarted = httpx.get(base).json()
+        assert restarted["runtime"]["responses_policy"]["on_unreported_cost"] == "allow"
+        assert restarted["metrics"]["costs"]["caps"]["daily"]["current_usd"] == 0.125
         assert "Unreported OpenRouter" in _forge("codex", "start", "--proxy", proxy_id)
         assert len(provider.requests) == 3
     finally:
         runner.invoke(main, ["proxy", "stop", proxy_id])
+
+
+def test_unpriced_litellm_responses_still_serves(local_responses_proxy, responses_upstream):
+    base, calls, _ = local_responses_proxy
+    responses_upstream.gateway_cost_header = None
+    responses_upstream.reply["usage"].pop("cost")
+    with httpx.Client(base_url=base) as client:
+        for _ in range(2):
+            response = client.post("/v1/responses", json={"model": "local/model", "input": "hi"})
+            assert response.status_code == 200 and "x-request-cost" not in response.headers
+        assert client.get("/").json()["metrics"]["costs"]["total_micros"] == 0
+    assert len(calls) == 2
