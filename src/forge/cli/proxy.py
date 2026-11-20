@@ -53,7 +53,12 @@ from forge.config.loader import (
     template_exists,
     validate_template_name,
 )
-from forge.core.metric_formatting import TokenDisplayPolicy, format_token_count
+from forge.core.metric_formatting import (
+    TokenDisplayPolicy,
+    UsdDisplayPolicy,
+    format_token_count,
+    format_usd,
+)
 from forge.core.paths import display_path, get_forge_home
 from forge.core.process import find_pid_by_port
 from forge.core.state import (
@@ -1537,6 +1542,22 @@ def _display_metrics(
         console.print(f"  Failures     {failures:>10,}{fail_pct}")
     else:
         console.print(f"  Failures     {failures:>10,}")
+
+    costs = metrics.get("costs") or {}
+    caps = costs.get("caps") or {}
+    for window, key in (("daily", "per_day"), ("monthly", "per_month")):
+        cap = caps.get(window)
+        if not isinstance(cap, dict):
+            continue
+        current, limit = cap.get("current_usd"), cap.get("limit_usd")
+        if not isinstance(current, (int, float)) or not isinstance(limit, (int, float)):
+            continue
+        spent_usd = format_usd(current, policy=UsdDisplayPolicy.SPEND_CAP_DETAIL)
+        limit_usd = format_usd(limit, policy=UsdDisplayPolicy.SPEND_CAP_DETAIL)
+        console.print(f"  {window.capitalize()} spend cap  {spent_usd} / {limit_usd}")
+        if current >= limit and costs.get("on_cap_hit") == "reject":
+            console.print("    Cap reached. New generations are blocked.")
+            console.print(f"    forge proxy set {proxy_id} costs.caps.{key}=<amount>", markup=False)
 
     console.print("\n  [bold]Tokens[/bold]")
     console.print(

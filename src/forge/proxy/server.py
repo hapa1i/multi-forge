@@ -43,6 +43,7 @@ from forge.core.logging import (
     configure_debug_logging,
     get_effective_log_level,
 )
+from forge.core.metric_formatting import UsdDisplayPolicy, format_usd_micros
 from forge.core.models.model_reference import strip_transport_model_suffix
 from forge.core.models.model_routes import resolve_model_alternative
 from forge.core.models.types import REQUIRED_TIERS
@@ -78,7 +79,7 @@ from forge.proxy.converters import (
     convert_openai_to_anthropic_sse,
 )
 from forge.proxy.cost_logger import build_request_cost_record
-from forge.proxy.cost_tracker import CostTracker
+from forge.proxy.cost_tracker import CapResult, CostTracker
 from forge.proxy.data_models import (
     MessagesRequest,
     TokenCountRequest,
@@ -245,6 +246,7 @@ def _attach_cap_summary(metrics: dict[str, Any], tracker: CostTracker | None) ->
     costs = metrics.get("costs")
     if caps and isinstance(costs, dict):
         costs["caps"] = caps
+        costs["on_cap_hit"] = tracker.on_cap_hit
 
 
 _downstream_pruned = False
@@ -601,15 +603,15 @@ def _cumulative_cost_header() -> dict[str, str]:
 _CAP_CONFIG_KEY = {"daily": "per_day", "monthly": "per_month"}
 
 
-def _cap_result_message(cap_result) -> str:
+def _cap_result_message(cap_result: CapResult) -> str:
     """Format a spend cap result for HTTP headers and errors."""
     cap_type = cap_result.cap_type or "configured"
     config_key = _CAP_CONFIG_KEY.get(cap_type, f"per_{cap_type}")
     return (
         f"{cap_type} spend cap reached: "
-        f"${cap_result.current_micros / 1_000_000:.2f} / "
-        f"${cap_result.limit_micros / 1_000_000:.2f}. "
-        f"Adjust with: forge proxy set <id> costs.caps.{config_key}=<amount>"
+        f"{format_usd_micros(cap_result.current_micros, policy=UsdDisplayPolicy.SPEND_CAP_DETAIL)} / "
+        f"{format_usd_micros(cap_result.limit_micros, policy=UsdDisplayPolicy.SPEND_CAP_DETAIL)}. "
+        f"Adjust with: forge proxy set {PROXY_ID or '<id>'} costs.caps.{config_key}=<amount>"
     )
 
 

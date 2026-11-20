@@ -29,9 +29,10 @@ choices cover native identifiers, BYOK cost and cross-family fallback. Stage 80 
   diagnostic, request count and retry timing per binary. Distinguish injected errors from paths the client calls itself.
   Select statuses and envelopes that surface the recovery action and let Codex stop on its own. Record any cutoff by the
   harness as a retry-limit failure. Reopen compatibility if a supported client hides the refusal or loops.
-- [ ] Resolve the spend-cap diagnostic before live acceptance. Preserve the shared 429 contract while testing an
-  operator-visible recovery path. Verify both the foreground turn and forced compaction. Any proposed status change
-  needs explicit route scope and coverage for the existing LiteLLM Responses template.
+- [x] Preserve HTTP 429. On the shared LiteLLM Responses path, one admitted generation reached the cap. A foreground
+  retry and all six replayed compaction attempts stopped before dispatch. `forge proxy metrics <id>` showed the running
+  amount, limit and setting for that instance. Repeat on the new template in the dispatch-boundary acceptance case.
+  [Integration](../../../../tests/integration/proxy/test_codex_openrouter_responses_e2e.py)
 - [x] Cross the cap status with both error bodies, refuse forced compaction, replay the sanitized credit error, and send
   routing metadata to every pinned binary. The 72 free cases showed that cap text visibility depended on status. All
   four versions tolerated the metadata on both model layouts. [Results](probe-results.md#follow-up-loopback-controls)
@@ -85,10 +86,12 @@ choices cover native identifiers, BYOK cost and cross-family fallback. Stage 80 
   cross-family fallback, whether it forwards both `client_metadata` and `prompt_cache_key`, and whether Forge caps cover
   only OpenRouter credit or also a BYOK provider's bill. The Messages opt-in covers Forge's own hashed grouping ID. It
   does not govern either native Codex field. [Probe verdicts](probe-results.md#probe-verdicts)
-- [ ] The route implementer owns the opaque-reasoning fidelity test. Insert a synthetic `reasoning` item with an ID,
-  empty `summary` and a nonempty `encrypted_content` into a copy of each model's tool continuation. Assert the whole
-  item, its position, the tool call and matching result survive the real proxy by value. At closeout, document live
-  encrypted replay as verified on Gemini and unverified on Astra unless a separately approved run observes it.
+- [x] The shared Responses relay preserved a synthetic `reasoning` item, its position, the tool call and the matching
+  result in both captured tool continuations. A loopback upstream released the terminal only after the client received
+  its first delta. It received the supplied `openai-beta` and Forge's upstream bearer.
+  [Integration](../../../../tests/integration/proxy/test_codex_openrouter_responses_e2e.py)
+- [ ] Repeat both opaque-item tests through the new OpenRouter policy. At closeout, label live encrypted replay verified
+  on Gemini and unverified on Astra unless a separately approved run observes it.
 
 ## 2. Wire the sessionless route
 

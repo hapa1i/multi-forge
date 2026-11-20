@@ -24,9 +24,11 @@ metadata placement, per-client counts and visible diagnostics. [Loopback receipt
 | Selected endpoint in the SSE response                                          | With `openrouter_metadata` in the `response.created` and `response.completed` response objects, all 16 version/mode/model combinations completed the tool read and follow-up.                               |
 
 Changing only the cap envelope cannot expose the recovery setting on these pins. Forge's Responses ingress shares the
-429 with the LiteLLM route. The operator-visible cap diagnostic remains an implementation item. The first live 402
-bridge stopped forwarding after one refusal. The six-attempt result above measures a client that keeps receiving 402
-from the stub. [Ingress](../../../../src/forge/proxy/responses_ingress.py) ·
+429 with the LiteLLM route. On a running LiteLLM Responses proxy, `forge proxy metrics <id>` displayed the reached cap,
+the exact amount and the instance-specific setting. One foreground retry and six replayed compaction attempts all
+stopped locally. The first live 402 bridge stopped forwarding after one refusal. The six-attempt result above measures a
+client that keeps receiving 402 from the stub.
+[Integration](../../../../tests/integration/proxy/test_codex_openrouter_responses_e2e.py) ·
 [Live 402 receipt](evidence/paid-0a6ac1d0/codex.json)
 
 The 402 put the Astra admission estimate at $2.62144 for the reported 65,536-token allowance. A dedicated $5 key
@@ -292,8 +294,8 @@ interactive session. Newer TUIs generated their own title requests, which receiv
 
 Use the measured HTTP 400 and nested `error.message` for the proposed deterministic local refusals. Missing-cost 403
 retries were 0.187–3.462 seconds apart and took 5.977–6.588 seconds from first to last foreground attempt. The existing
-spend-cap diagnostic **remains open**. Both 429 controls ended the turn but lost the cap-specific message. Product work
-needs a verified way for the operator to see the cap and recovery before claiming that acceptance item.
+429 controls ended the turn but hid the cap-specific message. The operator can inspect the running proxy with
+`forge proxy metrics <id>`. [Follow-up controls](#follow-up-loopback-controls) ·
 [Stub envelopes](../../../../scripts/experiments/openrouter/helpers/responses_stub.py) ·
 [Forge's existing 429](../../../../src/forge/proxy/responses_ingress.py)
 

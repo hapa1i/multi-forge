@@ -197,8 +197,9 @@ with:
 }
 ```
 
-`warn` mode forwards the request and returns the same message in `X-Spend-Warning`. Cost tracking is best effort:
-cost-capture or log write failures must not break successful LLM responses.
+`warn` mode forwards the request with `X-Spend-Warning`. When caps are configured, `GET /` exposes the running policy in
+`metrics.costs.on_cap_hit` and window totals in `metrics.costs.caps`. `forge proxy metrics <id>` shows the amounts and
+the setting for each reached reject cap. Cost capture and log writes are best effort.
 
 #### Per-session usage read surface
 

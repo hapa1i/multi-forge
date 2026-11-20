@@ -344,7 +344,8 @@ shape is unchanged. `--no-start` remains config-only and does not run verificati
 Bare `forge proxy metrics --json` always returns a mapping from every registered proxy ID to its metrics object, using
 `null` for an unreachable proxy; this shape is the same for zero, one, or many registrations. Selecting an ID returns
 that proxy's raw metrics object instead. JSON uses a non-rendering stdout path, so whitespace and bracket-rich metric
-values are not wrapped or interpreted as terminal markup.
+values are not wrapped or interpreted as terminal markup. The human view shows configured spend caps and the setting to
+change when a reject cap blocks new generations.
 
 ### Telemetry
 

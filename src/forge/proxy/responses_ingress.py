@@ -166,13 +166,13 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
         cap_result = tracker.check_cap()
         if cap_result.exceeded:
             spend_warning = server._cap_result_message(cap_result)
+            logger.warning("[%s] %s", request_id, spend_warning)
             if tracker.on_cap_hit == "reject":
                 return JSONResponse(
                     status_code=429,
                     content={"type": "error", "error": {"type": "spend_cap_exceeded", "message": spend_warning}},
                     headers=server._with_spend_warning({"X-Request-ID": request_id}, spend_warning),
                 )
-            logger.warning("[%s] %s", request_id, spend_warning)
 
     def _on_complete(
         usage: dict[str, int], reported_cost_micros: int | None, failed: bool, error_type: str | None

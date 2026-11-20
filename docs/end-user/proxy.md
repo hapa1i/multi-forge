@@ -484,7 +484,8 @@ upstream URL may include a path prefix and the final `/v1`.
 Forge supplies temporary `-c` provider settings and a loopback token. It removes inherited Codex, OpenAI and OpenRouter
 credentials and Forge session, proxy and run-tree variables from the child environment. A nested Forge command can still
 load the active credential profile or the project's `.env`. Set `PYTHON_DOTENV_DISABLED=1` to disable dotenv loading.
-Pass extra Codex arguments after `--`. Use `-m` or `--model` to override the proxy default.
+Pass extra Codex arguments after `--`. Use `-m` or `--model` to override the proxy default. If Codex shows HTTP 429,
+inspect the running [spend caps](#cost-tracking-and-spend-caps) with `forge proxy metrics <id>`.
 
 ### Delete a proxy
 
@@ -881,10 +882,10 @@ forge proxy set openrouter-anthropic costs.caps.per_month=100.00
 forge proxy set openrouter-anthropic costs.on_cap_hit=warn
 ```
 
-Caps are enforced after each completed request: a request may cross a cap and complete, then the next request is blocked
-once logged spend reaches the cap. `on_cap_hit=reject` returns HTTP 429 with `spend_cap_exceeded`; `on_cap_hit=warn`
-lets the request continue and returns `X-Spend-Warning`. LiteLLM cost received in final streamed usage contributes once
-when the stream completes, under the same cap rules.
+A request can finish at or above a cap. After that, `on_cap_hit=reject` returns HTTP 429 and `on_cap_hit=warn` forwards
+the request with `X-Spend-Warning`. LiteLLM cost in final streamed usage counts once. If Codex shows a generic 429
+during a turn or compaction, run `forge proxy metrics <id>`. It shows the running daily and monthly limits and the
+setting for any reached reject cap. Wait for spend to fall below the limit, or change the cap and restart the proxy.
 
 > Earlier versions had a `costs.cap_mode` setting (`post`/`strict`); it was removed and caps are now always post-event.
 > A leftover `cap_mode:` line — or any unrecognized key under `costs`/`costs.caps` — is now rejected with a config error
