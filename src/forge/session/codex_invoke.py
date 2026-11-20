@@ -261,12 +261,21 @@ def _build_codex_proxy_argv(
         "-c",
         f'model_providers.forge_proxy.env_key="{_FORGE_CODEX_PROXY_TOKEN_VAR}"',
     ]
-    if model and not _passthrough_has_model(passthrough):
+    if model and passthrough_model(passthrough) is None:
         argv += ["-m", model]
     argv += list(passthrough)
     return argv
 
 
-def _passthrough_has_model(passthrough: Sequence[str]) -> bool:
-    """Whether the user already supplied a model flag, so the auto-default ``-m`` is suppressed."""
-    return any(arg in ("-m", "--model") or arg.startswith("--model=") for arg in passthrough)
+def passthrough_model(passthrough: Sequence[str]) -> str | None:
+    """Read the operator's model selection as Codex will receive it."""
+    for index, arg in enumerate(passthrough):
+        if arg == "--":
+            break
+        if arg in ("-m", "--model"):
+            return passthrough[index + 1] if index + 1 < len(passthrough) else ""
+        if arg.startswith("--model="):
+            return arg.removeprefix("--model=")
+        if arg.startswith("-m") and len(arg) > 2:
+            return arg[2:].removeprefix("=")
+    return None

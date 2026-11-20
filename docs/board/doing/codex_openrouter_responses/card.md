@@ -111,7 +111,8 @@ following criteria governed the probes. [Probe verdicts](probe-results.md#probe-
 - **Request guarantee.** The route preserves caller fields by value. Its routing changes are `provider.zdr=true` when
   ZDR is required and `model` when a configured fallback applies. Sibling `provider` keys pass through. With
   `allow_non_zdr`, Forge leaves both routing fields as supplied. Fallbacks come from `model_for_zdr_policy`, as on the
-  Messages path. The policy for native identifiers is open below.
+  Messages path, including operator-configured cross-family replacements. Forge omits `client_metadata` and
+  `prompt_cache_key` on the direct route, including when `allow_non_zdr` is enabled.
 - **Requested and effective model.** For OpenRouter Responses the downstream record carries the requested slug in
   `model` and the dispatched slug in `mapped_model`. The launcher prints both for a launch-time fallback.
   `forge telemetry trace show` exposes the pair for each dispatch, including an in-TUI model change. Metrics and cost
@@ -206,12 +207,12 @@ following criteria governed the probes. [Probe verdicts](probe-results.md#probe-
 
 - **Client identifiers.** All 18 retained fixtures carry `client_metadata`. Their `prompt_cache_key` also equals the
   session and thread IDs. Passing through both fields discloses native identifiers by default. The Messages route's
-  Forge-generated, hashed grouping ID is opt-in. Decide the policy for both native fields, document the cache effect of
-  any rewrite, and test the resulting body.
+  Forge-generated, hashed grouping ID is opt-in. The direct Responses route drops both native fields. OpenRouter
+  receives no Codex cache grouping key from this route.
 - **BYOK cost.** OpenRouter documents `usage.cost` as its account charge and reports the provider charge separately in
   `cost_details`. A Forge cap based on the former can undercount provider-billed inference. The paid key included BYOK
-  in its limit. The receipts did not measure a BYOK billing case. Define the scope of the Forge cap in the guide.
-  [OpenRouter usage accounting](https://openrouter.ai/docs/cookbook/administration/usage-accounting)
+  in its limit. Forge measures OpenRouter account credit using `usage.cost`. A separate BYOK provider bill falls outside
+  that cap. [OpenRouter usage accounting](https://openrouter.ai/docs/cookbook/administration/usage-accounting)
 - **Astra encrypted reasoning.** Stage 80 verified encrypted tool continuation on Gemini. Astra emitted no reasoning
   item during this task. The implementer owns the synthetic fidelity check in the checklist and retains this limit on
   the live claim.

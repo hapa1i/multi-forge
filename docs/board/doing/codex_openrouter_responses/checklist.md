@@ -1,8 +1,7 @@
 # Launch Codex through a direct OpenRouter proxy
 
-**Current focus.** The maintainer reviewed the probe results and approved continuing on 2026-11-20. The remaining policy
-choices cover native identifiers, BYOK cost and cross-family fallback. Stage 80 passed with account ZDR enabled.
-[Probe results](probe-results.md) · [Card](card.md)
+**Current focus.** Implement the approved direct route, then verify it on loopback before paid acceptance. Stage 80
+passed with account ZDR enabled. [Probe results](probe-results.md) · [Card](card.md)
 
 **Proposed probe models.** Use `openai/gpt-6.2-astra` as the template default and `google/gemini-4-carbon` for explicit
 `-m` selection. Astra is the Sonnet-tier default on the shipped local Responses template. The existing
@@ -83,31 +82,30 @@ choices cover native identifiers, BYOK cost and cross-family fallback. Stage 80 
   fixtures replayed encrypted reasoning. The five Astra tool fixtures emitted none. The native Astra run also completed
   both turns with explicit ZDR and the routing-metadata header. Azure and Google were identified on every
   metadata-enabled request to their respective models. [Probe results](probe-results.md)
-- [ ] Review the probe verdicts and settle three policy choices before product changes. Decide how the route handles a
-  cross-family fallback, whether it forwards both `client_metadata` and `prompt_cache_key`, and whether Forge caps cover
-  only OpenRouter credit or also a BYOK provider's bill. The Messages opt-in covers Forge's own hashed grouping ID. It
-  does not govern either native Codex field. [Probe verdicts](probe-results.md#probe-verdicts)
+- [x] The maintainer chose to omit `client_metadata` and `prompt_cache_key` by default, count OpenRouter account credit
+  for BYOK, and forward configured cross-family ZDR fallbacks. Codex builds the request for the requested slug.
+  [Probe verdicts](probe-results.md#probe-verdicts)
 - [x] The shared Responses relay preserved a synthetic `reasoning` item, its position, the tool call and the matching
   result in both captured tool continuations. A loopback upstream released the terminal only after the client received
   its first delta. It received the supplied `openai-beta` and Forge's upstream bearer.
   [Integration](../../../../tests/integration/proxy/test_codex_openrouter_responses_e2e.py)
-- [ ] Repeat both opaque-item tests through the new OpenRouter policy. At closeout, label live encrypted replay verified
-  on Gemini and unverified on Astra unless a separately approved run observes it.
+- [x] Both synthetic opaque-item continuations passed through the direct OpenRouter route. Live encrypted replay is
+  verified on Gemini and unverified on Astra.
 
 ## 2. Wire the sessionless route
 
-- [ ] Register `codex-responses-openrouter` on the canonical `openrouter` source and package a template with
+- [x] Register `codex-responses-openrouter` on the canonical `openrouter` source and package a template with
   `openai_responses_passthrough`. Require only the OpenRouter credential. Preserve the live identity, wire-shape and
   source-capability checks, translated Messages ingress and user-owned proxy snapshots. Keep model-first session routing
   and managed Codex sessions outside this change. [Source catalog](../../../../src/forge/backend/sources.py)
 - [x] Join versioned and unversioned bases exactly once, preserving custom prefixes. Verified create and subresource
   URLs, bearer replacement and encoded query parameters for HTTP LiteLLM and HTTPS gateways.
   [Regression](../../../../tests/regression/test_bug_responses_versioned_base.py)
-- [ ] Validate the OpenRouter base before attaching its bearer. Require HTTPS except for `localhost`, `127.0.0.1` and
+- [x] Validate the OpenRouter base before attaching its bearer. Require HTTPS except for `localhost`, `127.0.0.1` and
   `::1`, and reject userinfo, query strings and fragments. Relay only the create operation to OpenRouter. Use the
   captured local refusal contract for subresources and keep a single upstream attempt per incoming request.
   [Ingress](../../../../src/forge/proxy/responses_ingress.py)
-- [ ] On required-ZDR requests force `provider.zdr=true`, apply `model_for_zdr_policy`, and accept only the
+- [x] On required-ZDR requests force `provider.zdr=true`, apply `model_for_zdr_policy`, and accept only the
   client-executed tool types established by the captures. Check top-level `tools`, namespaces and `additional_tools`
   input items. Preserve sibling provider options and other caller fields by value. With `allow_non_zdr`, preserve the
   caller's model and provider settings. Test both Qwen 404s. For `zdr-violation-by-account`, name the model and point to
@@ -120,12 +118,13 @@ choices cover native identifiers, BYOK cost and cross-family fallback. Stage 80 
   LiteLLM streaming-cost integration cases passed via `./scripts/test-integration.sh`.
   [Integration](../../../../tests/integration/proxy/test_codex_openrouter_responses_e2e.py) ·
   [Proxy guide](../../../end-user/proxy.md#start-codex-with-a-responses-capable-proxy)
-- [ ] Under required ZDR, supply `-c web_search="disabled"` before operator arguments. Use the verified live proxy to
+- [x] Under required ZDR, supply `-c web_search="disabled"` before operator arguments. Use the verified live proxy to
   report the requested and dispatched launch model when they differ, including an explicit off-tier `-m`.
   [Launcher](../../../../src/forge/cli/codex.py)
-- [ ] Run the route and launcher cases in the new Docker integration suite via `./scripts/test-integration.sh` in this
+- [x] Run the route and launcher cases in the new Docker integration suite via `./scripts/test-integration.sh` in this
   slice. Exercise both documented template-name launches, a saved Messages-only proxy, and the translated Messages
-  ingress on the new template. Record the test selections and results before starting accounting work.
+  ingress on the new template. All 12 cases passed via
+  `PYTHON_DOTENV_DISABLED=1 ./scripts/test-integration.sh tests/integration/proxy/test_codex_openrouter_responses_e2e.py`.
 
 ## 3. Account for each dispatched generation
 

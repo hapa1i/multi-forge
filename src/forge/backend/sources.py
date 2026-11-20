@@ -386,6 +386,7 @@ def template_env_vars_by_template() -> dict[str, list[str]]:
 
 
 OPENROUTER_TEMPLATE_NAMES: tuple[str, ...] = (
+    "codex-responses-openrouter",
     "openrouter-anthropic",
     "openrouter-deepseek",
     "openrouter-gemini",
@@ -415,7 +416,7 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
             default_url="https://openrouter.ai/api/v1",
         ),
         credential_ids=("openrouter",),
-        capabilities=ModelSourceCapabilities(provider_trace=True, provider_user_grouping=True),
+        capabilities=ModelSourceCapabilities(provider_trace=True, provider_user_grouping=True, responses_ingress=True),
         template_names=OPENROUTER_TEMPLATE_NAMES,
     ),
     ModelSource(

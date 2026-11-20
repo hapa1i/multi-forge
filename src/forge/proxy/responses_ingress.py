@@ -117,8 +117,21 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
         )
 
     base_url = config.proxy.get_provider().base_url
+    from forge.proxy import openrouter_responses
+
+    direct = source.id == "openrouter"
+    is_generation = method == "POST" and url_path == "/v1/responses"
+    if direct and not is_generation:
+        return openrouter_responses.refusal(
+            "unsupported_operation", "This source supports only POST /v1/responses. Send the full history.", request_id
+        )
     if not base_url:
         return _error(500, "configuration_error", "responses passthrough upstream base_url is not configured")
+    if direct:
+        try:
+            openrouter_responses.validate_base(base_url)
+        except ValueError as exc:
+            return openrouter_responses.refusal("configuration_error", str(exc), request_id)
 
     try:
         bearer_env = source_bearer_auth_env_var(source)
@@ -144,7 +157,13 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
                 return _error(400, "invalid_request_error", "Request body must be a JSON object")
             body = parsed
 
-    model = str(body.get("model")) if body and body.get("model") else "unknown"
+    requested_model = str(body.get("model")) if body and body.get("model") else "unknown"
+    if direct:
+        try:
+            body = openrouter_responses.prepare_request(body or {}, config.proxy.get_provider())
+        except ValueError as exc:
+            return openrouter_responses.refusal("invalid_request", str(exc), request_id)
+    model = str(body["model"]) if direct and body else requested_model
     resolved_tier = getattr(config.proxy, "default_tier", None) or "sonnet"
     streaming = body is not None and bool(body.get("stream"))
     forge_run_id, forge_root_run_id = server._forge_run_ids(raw_request)
@@ -156,8 +175,6 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
     # (so accounting double-counts tokens) or carry none (logging zero-token attempts);
     # the spend cap likewise governs new generations, not management of an existing run
     # (you must be able to cancel a run to STOP spending even while over cap).
-    is_generation = method == "POST" and url_path == "/v1/responses"
-
     # Spend-cap check — same cross-request accumulation as the other accounted
     # paths, so caps configured on a Responses proxy reject rather than silently pass.
     tracker = server.cost_tracker
@@ -241,6 +258,7 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
         request_id=request_id,
         on_complete=_on_complete if is_generation else None,
         provider_trace_ctx=provider_trace_ctx,
+        direct_openrouter=direct,
         extra_response_headers=server._with_spend_warning({}, spend_warning) or None,
     )
 

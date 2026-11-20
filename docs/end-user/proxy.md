@@ -55,31 +55,32 @@ hyperparameter defaults apply only when a proxy route is selected.
 
 Forge provides ready-to-use built-in proxy templates:
 
-| Template                     | Use case                                        |
-| ---------------------------- | ----------------------------------------------- |
-| `openrouter-anthropic`       | Claude models via OpenRouter (direct)           |
-| `openrouter-deepseek`        | DeepSeek models via OpenRouter (direct)         |
-| `openrouter-glm`             | GLM / Z.ai models via OpenRouter (direct)       |
-| `openrouter-kimi`            | Kimi models via OpenRouter (direct)             |
-| `openrouter-minimax`         | MiniMax models via OpenRouter (direct)          |
-| `openrouter-openai`          | GPT models via OpenRouter (direct)              |
-| `openrouter-qwen`            | Qwen models via OpenRouter (direct)             |
-| `openrouter-gemini`          | Gemini models via OpenRouter (direct)           |
-| `openrouter-openai-codex`    | OpenAI Codex models via OpenRouter (direct)     |
-| `openrouter-gemini-flash`    | Gemini Flash via OpenRouter (cheap, direct)     |
-| `litellm-anthropic`          | Anthropic models via remote/shared LiteLLM      |
-| `litellm-anthropic-local`    | Local LiteLLM + Anthropic API key               |
-| `litellm-openai`             | OpenAI models via remote/shared LiteLLM         |
-| `litellm-gemini`             | Gemini models via remote/shared LiteLLM         |
-| `litellm-openai-local`       | Local LiteLLM + OpenAI API key                  |
-| `litellm-openai-codex-local` | Local LiteLLM + OpenAI Codex models             |
-| `anthropic-passthrough`      | Raw Anthropic passthrough; inspect enabled      |
-| `codex-responses-local`      | Sessionless Codex TUI via Responses passthrough |
-| `litellm-gemini-local`       | Local LiteLLM + Gemini API key                  |
-| `litellm-gemini-flash-local` | Local LiteLLM + Gemini Flash (fast/cheap)       |
+| Template                     | Use case                                              |
+| ---------------------------- | ----------------------------------------------------- |
+| `openrouter-anthropic`       | Claude models via OpenRouter (direct)                 |
+| `openrouter-deepseek`        | DeepSeek models via OpenRouter (direct)               |
+| `openrouter-glm`             | GLM / Z.ai models via OpenRouter (direct)             |
+| `openrouter-kimi`            | Kimi models via OpenRouter (direct)                   |
+| `openrouter-minimax`         | MiniMax models via OpenRouter (direct)                |
+| `openrouter-openai`          | GPT models via OpenRouter (direct)                    |
+| `openrouter-qwen`            | Qwen models via OpenRouter (direct)                   |
+| `openrouter-gemini`          | Gemini models via OpenRouter (direct)                 |
+| `openrouter-openai-codex`    | OpenAI Codex models via OpenRouter (direct)           |
+| `openrouter-gemini-flash`    | Gemini Flash via OpenRouter (cheap, direct)           |
+| `litellm-anthropic`          | Anthropic models via remote/shared LiteLLM            |
+| `litellm-anthropic-local`    | Local LiteLLM + Anthropic API key                     |
+| `litellm-openai`             | OpenAI models via remote/shared LiteLLM               |
+| `litellm-gemini`             | Gemini models via remote/shared LiteLLM               |
+| `litellm-openai-local`       | Local LiteLLM + OpenAI API key                        |
+| `litellm-openai-codex-local` | Local LiteLLM + OpenAI Codex models                   |
+| `anthropic-passthrough`      | Raw Anthropic passthrough; inspect enabled            |
+| `codex-responses-local`      | Sessionless Codex TUI via Responses passthrough       |
+| `codex-responses-openrouter` | Sessionless Codex TUI via direct OpenRouter Responses |
+| `litellm-gemini-local`       | Local LiteLLM + Gemini API key                        |
+| `litellm-gemini-flash-local` | Local LiteLLM + Gemini Flash (fast/cheap)             |
 
-The table lists all twenty user-facing templates. `litellm-gemini-test` also exists internally, but it is hidden from
-normal end-user template lists.
+The table lists all twenty-one user-facing templates. `litellm-gemini-test` also exists internally, but it is hidden
+from normal end-user template lists.
 
 Built-in templates declare `proxy.backend`, the config field that names the backend owning endpoint and credential
 requirements. If you customize a template under `~/.forge/templates/<name>.yaml`, keep `proxy.backend` set to an
@@ -466,26 +467,8 @@ the requested model.
 
 ### Start Codex with a Responses-capable proxy
 
-```bash
-forge codex status
-forge codex start --proxy codex-responses-local
-forge codex start --proxy <proxy_id> --sandbox read-only -- -m gpt-5.5
-```
-
-`forge codex start --proxy` is the Codex equivalent of a bare proxy launch: it opens the foreground Codex TUI through a
-Forge proxy but creates no Forge session, manifest, artifacts, or `.forge/` requirement. It is intentionally different
-from `forge session start --runtime codex`, which records a managed Codex thread.
-
-The proxy must advertise `wire_shape: openai_responses_passthrough` and `capabilities.responses_ingress: true` from
-`GET /`. The built-in `codex-responses-local` template forwards `/v1/responses*` to LiteLLM with the `openai-api`
-credential. It preserves JSON values, including encrypted reasoning, and streams responses as they arrive. A saved
-upstream URL may include a path prefix and the final `/v1`.
-
-Forge supplies temporary `-c` provider settings and a loopback token. It removes inherited Codex, OpenAI and OpenRouter
-credentials and Forge session, proxy and run-tree variables from the child environment. A nested Forge command can still
-load the active credential profile or the project's `.env`. Set `PYTHON_DOTENV_DISABLED=1` to disable dotenv loading.
-Pass extra Codex arguments after `--`. Use `-m` or `--model` to override the proxy default. If Codex shows HTTP 429,
-inspect the running [spend caps](#cost-tracking-and-spend-caps) with `forge proxy metrics <id>`.
+Run `forge codex start --proxy codex-responses-openrouter` for direct OpenRouter access or use `codex-responses-local`
+for LiteLLM. Both open a sessionless Codex TUI. [Credentials, model selection and spend caps](codex_proxy.md)
 
 ### Delete a proxy
 

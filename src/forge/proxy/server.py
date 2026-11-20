@@ -1900,7 +1900,7 @@ async def root(request: Request):
             "Proxy is missing config.proxy.default_tier; ambiguous requests will fail until configured."
         )
 
-    runtime_section = {
+    runtime_section: dict[str, Any] = {
         "template": active_template,
         "provider": preferred_provider,
         "backend_id": _backend_instance_id(),
@@ -1947,6 +1947,12 @@ async def root(request: Request):
     )
     # Advertised Responses-ingress capability for the Phase 4 launcher health-check.
     _responses_ingress = advertise_responses_ingress(_wire_shape, getattr(config.proxy, "backend", "") or "")
+    if _responses_ingress and _backend_instance_id() == "openrouter":
+        runtime_section["responses_policy"] = {
+            "requested_default_model": configured_tier_models.get(default_tier) if default_tier else None,
+            "required_zdr": not provider_config.allow_non_zdr,
+            "zdr_fallbacks": _openrouter_zdr_fallbacks(provider_config) if not provider_config.allow_non_zdr else {},
+        }
 
     # Per-proxy metrics (request counts, token usage, latency); spend-cap
     # proximity is attached under metrics.costs.caps when caps are configured.

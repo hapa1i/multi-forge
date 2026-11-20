@@ -24,6 +24,7 @@ import httpx
 from fastapi.responses import Response, StreamingResponse
 
 from forge.core.telemetry.downstream import RequestMode
+from forge.proxy.openrouter_responses import zdr_refusal
 from forge.proxy.provider_trace_logger import record_provider_trace
 from forge.proxy.response_headers import merge_response_headers, relay_response_headers
 from forge.proxy.sse_framing import SseJsonDataFramer
@@ -199,6 +200,7 @@ async def forward(
     on_complete: OnComplete | None = None,
     provider_trace_ctx: Mapping[str, Any] | None = None,
     extra_response_headers: Mapping[str, str] | None = None,
+    direct_openrouter: bool = False,
 ) -> Response:
     """Forward a raw Responses-API request to ``{base_url}{url_path}``.
 
@@ -217,6 +219,8 @@ async def forward(
     if query_string:
         url = f"{url}?{query_string}"
     headers = build_upstream_headers(inbound_headers, api_key)
+    if direct_openrouter:
+        headers["x-openrouter-metadata"] = "enabled"
     is_stream = body is not None and bool(body.get("stream"))
 
     if is_stream:
@@ -228,6 +232,7 @@ async def forward(
             on_complete=on_complete,
             provider_trace_ctx=provider_trace_ctx,
             extra_response_headers=extra_response_headers,
+            direct_openrouter=direct_openrouter,
         )
 
     provider_attempt_started = False
@@ -289,6 +294,10 @@ async def forward(
             reported_cost_micros=reported_cost,
         )
 
+    if direct_openrouter and (
+        translated := zdr_refusal(resp.status_code, resp.content, str((body or {}).get("model")), request_id)
+    ):
+        return translated
     return Response(
         status_code=resp.status_code,
         content=resp.content,
@@ -306,6 +315,7 @@ async def _forward_streaming(
     on_complete: OnComplete | None,
     provider_trace_ctx: Mapping[str, Any] | None,
     extra_response_headers: Mapping[str, str] | None,
+    direct_openrouter: bool = False,
 ) -> Response:
     client_cm = httpx.AsyncClient(timeout=_RESPONSES_TIMEOUT)
     stream_cm = None
@@ -367,6 +377,10 @@ async def _forward_streaming(
             )
 
         logger.warning("[%s] responses passthrough upstream %s", request_id, resp.status_code)
+        if direct_openrouter and (
+            translated := zdr_refusal(resp.status_code, upstream_body, str((body or {}).get("model")), request_id)
+        ):
+            return translated
         return Response(
             status_code=resp.status_code,
             content=upstream_body,

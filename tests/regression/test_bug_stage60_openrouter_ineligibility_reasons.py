@@ -26,6 +26,15 @@ REQUEST_REASON = "zdr-violation-by-request"
 PRIVACY_URL = "https://openrouter.ai/settings/privacy"
 
 
+def test_responses_route_translates_exact_account_refusal():
+    from forge.proxy.openrouter_responses import zdr_refusal
+
+    response = zdr_refusal(404, QWEN_404, "qwen/qwen4-max", "req-account")
+    assert response.status_code == 400
+    message = json.loads(response.body)["error"]["message"]
+    assert "account ZDR" in message and "qwen/qwen4-max" in message and PRIVACY_URL in message
+
+
 @pytest.fixture(autouse=True)
 def probe_path(monkeypatch):
     monkeypatch.syspath_prepend(Path(__file__).resolve().parents[2] / "scripts/experiments/openrouter/helpers")

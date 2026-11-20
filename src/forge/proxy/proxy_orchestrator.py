@@ -1031,7 +1031,21 @@ def assert_proxy_responses_capable(
     expected_template: str | None = None,
     timeout_s: float = 5.0,
 ) -> tuple[str | None, str]:
-    """Assert a proxy advertises the Codex Responses ingress; return ``(default_model, wire_shape)``.
+    """Return the effective default model and wire shape of the verified proxy."""
+    model, _ = read_responses_launch(
+        base_url, expected_proxy_id=expected_proxy_id, expected_template=expected_template, timeout_s=timeout_s
+    )
+    return model, OPENAI_RESPONSES_PASSTHROUGH
+
+
+def read_responses_launch(
+    base_url: str,
+    *,
+    expected_proxy_id: str | None = None,
+    expected_template: str | None = None,
+    timeout_s: float = 5.0,
+) -> tuple[str | None, dict[str, Any]]:
+    """Read the effective default model and launch policy from a verified live proxy.
 
     Reads ``GET {base_url}/`` and enforces the *same conjunction* the runtime route gate
     enforces: top-level ``wire_shape == "openai_responses_passthrough"`` **and**
@@ -1084,7 +1098,9 @@ def assert_proxy_responses_capable(
     if wire_shape_str != OPENAI_RESPONSES_PASSTHROUGH or responses_ingress is not True:
         raise ProxyNotResponsesCapableError(wire_shape_str)
 
-    return _default_model_from_root(data), wire_shape_str
+    runtime = data.get("runtime")
+    policy = runtime.get("responses_policy") if isinstance(runtime, dict) else None
+    return _default_model_from_root(data), policy if isinstance(policy, dict) else {}
 
 
 def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, str]:

@@ -645,9 +645,9 @@ codex manifests as a backstop. The CLI accepts `--runtime claude|codex` but mani
 - Routes Codex through the loopback proxy via list-mode
   `-c model_providers.forge_proxy.{base_url,wire_api=responses,env_key}` overrides (never `--strict-config`); a custom
   provider means Codex needs no OpenAI login.
-- **Scrubbed child env**: drops native codex/OpenAI auth and OpenAI account/routing vars (the proxy owns upstream auth
-  -- no native-account leakage) plus session/run-tree identity, and advances `FORGE_DEPTH`. Unlike session-managed
-  `invoke_codex_interactive`, it re-establishes **no** native auth (`invoke_codex_bare_proxy`).
+- The child receives a loopback token. Forge strips Codex, OpenAI and OpenRouter credentials and session/run-tree
+  identity, and advances `FORGE_DEPTH`. Direct OpenRouter launches use the verified proxy's ZDR policy and report the
+  requested and dispatched model for a fallback. [Sessionless Codex](end-user/codex_proxy.md)
 - Hard-blocks a codex older than the proxy-contract-validated version (`0.141.0`) *before* starting a proxy.
 
 **Subprocess proxy launch variant** (`forge session start --subprocess-proxy <proxy_id>`):
