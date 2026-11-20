@@ -46,6 +46,22 @@ zero account charge on BYOK counts as zero. A separate bill from the BYOK provid
 ends before its terminal usage can also leave spend uncounted. Codex can omit `max_output_tokens`, so OpenRouter can
 require more available credit to admit a request than it ultimately charges.
 
+A completed or incomplete generation without a reported cost blocks the next direct Responses create until restart. The
+default applies even with no dollar cap. Create/start smoke tests check the price on their own unary request. The first
+unpriced success fails the smoke and leaves the proxy available for inspection. To accept uncounted charges, run:
+
+```bash
+forge proxy set <id> costs.on_unreported_cost=allow
+forge proxy stop <id>
+forge proxy start <id> --smoke-test
+```
+
+Forge warns at each Codex launch with this setting. Restart clears an observed reporting gap and reloads persisted
+dollar-cap totals. A source that declares its cost unavailable requires the override before its first direct create.
+
+`forge runtime preflight codex --proxy <id>` reports `proxy_supported` for this route. That command also reports native
+headless login readiness. The sessionless proxy launch uses its loopback credential.
+
 If Codex shows HTTP 429, run `forge proxy metrics <id>` to see the active caps and their settings. For an individual
 request, use `forge telemetry trace show <request-id>` and
 `forge model backend reconcile openrouter --request-id <request-id>`. A fresh generation may take several seconds to

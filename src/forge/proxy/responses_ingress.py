@@ -179,6 +179,11 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
     # paths, so caps configured on a Responses proxy reject rather than silently pass.
     tracker = server.cost_tracker
     spend_warning: str | None = None
+    if direct and (config.proxy.costs.on_unreported_cost or "reject") == "reject":
+        if source.capabilities.responses_reports_cost is False or (tracker and tracker.responses_cost_unreported):
+            return openrouter_responses.refusal(
+                "unreported_cost", openrouter_responses.unreported_cost_message(server.PROXY_ID or "<id>"), request_id
+            )
     if is_generation and tracker is not None and tracker.has_caps:
         cap_result = tracker.check_cap()
         if cap_result.exceeded:
@@ -202,6 +207,7 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
         )
         cost = server._calc_and_log_cost(
             model=model,
+            requested_model=requested_model if direct else None,
             tier=resolved_tier,
             input_tokens=in_tok,
             output_tokens=out_tok,
@@ -232,6 +238,7 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
             "backend_id": server._backend_instance_id(),
             "proxy_id": server.PROXY_ID or "unknown",
             "mapped_model": model,
+            "requested_model": requested_model if direct else None,
             "request_id": request_id,
             "forge_run_id": forge_run_id,
             "forge_root_run_id": forge_root_run_id,
@@ -258,7 +265,11 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
         request_id=request_id,
         on_complete=_on_complete if is_generation else None,
         provider_trace_ctx=provider_trace_ctx,
-        direct_openrouter=direct,
+        openrouter=(
+            openrouter_responses.OpenRouterResponseEvidence(tracker.mark_responses_cost_unreported if tracker else None)
+            if direct
+            else None
+        ),
         extra_response_headers=server._with_spend_warning({}, spend_warning) or None,
     )
 

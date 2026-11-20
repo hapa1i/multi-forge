@@ -510,6 +510,8 @@ def write_proxy_instance_config(
     path.parent.mkdir(parents=True, exist_ok=True)
 
     data = asdict(config)
+    if config.costs.on_unreported_cost is None:
+        data["costs"].pop("on_unreported_cost", None)
 
     # These controls describe OpenRouter's first-party routing contract. Do not
     # imply ZDR support for arbitrary LiteLLM backends by serializing inert keys.

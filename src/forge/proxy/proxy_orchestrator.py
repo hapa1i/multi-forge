@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -1107,11 +1108,21 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
     """Send a minimal completion request through the proxy to verify the upstream LLM.
 
     Returns (success, detail) where detail is the model response text on
-    success or the error message on failure. Retries once on failure.
+    success or the error message on failure. Direct OpenRouter sends one create.
     """
-    # Responses passthrough proxies serve /v1/responses, not /v1/messages.
-    if _proxy_wire_shape(base_url=base_url, timeout_s=timeout_s) == OPENAI_RESPONSES_PASSTHROUGH:
-        return _smoke_test_responses(base_url=base_url, timeout_s=timeout_s)
+    root = _proxy_smoke_root(base_url=base_url, timeout_s=timeout_s)
+    model = _smoke_test_model(root)
+    if root.get("wire_shape") == OPENAI_RESPONSES_PASSTHROUGH:
+        runtime = root.get("runtime")
+        policy = runtime.get("responses_policy") if isinstance(runtime, dict) else None
+        identity = root.get("proxy")
+        return _smoke_test_responses(
+            base_url=base_url,
+            timeout_s=timeout_s,
+            model=model,
+            proxy_id=(identity.get("proxy_id") or "<id>") if isinstance(identity, dict) else "<id>",
+            cost_policy=policy.get("on_unreported_cost", "reject") if isinstance(policy, dict) else None,
+        )
 
     url = f"{base_url.rstrip('/')}/v1/messages"
     last_error = ""
@@ -1124,7 +1135,7 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
                 # max_tokens must be large enough for thinking models (e.g., Gemini 2.5 Pro)
                 # which consume tokens for internal reasoning before producing visible output.
                 payload = {
-                    "model": _resolve_smoke_test_model(client=client, base_url=base_url),
+                    "model": model,
                     "max_tokens": 256,
                     "messages": [{"role": "user", "content": "Say hi"}],
                 }
@@ -1142,10 +1153,10 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
                     return True, text.strip()
                 # Valid structure but empty text — thinking models may consume
                 # all tokens for reasoning. Report model + usage for diagnosis.
-                model = data.get("model", "unknown")
+                response_model = data.get("model", "unknown")
                 usage = data.get("usage", {})
                 last_error = (
-                    f"Empty response from {model} "
+                    f"Empty response from {response_model} "
                     f"(input={usage.get('input_tokens', '?')}, "
                     f"output={usage.get('output_tokens', '?')} tokens)"
                 )
@@ -1160,24 +1171,10 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
     return False, last_error
 
 
-def _resolve_smoke_test_model(*, client: httpx.Client, base_url: str) -> str:
-    """Pick the smoke-test model for the proxy's wire shape.
-
-    Translated proxies accept the local ``sonnet`` tier alias. Passthrough
-    proxies (Anthropic or Responses) forward the client model unchanged, so the
-    smoke test must use the resolved upstream model reported by ``GET /``.
-    """
+def _smoke_test_model(data: dict[str, Any]) -> str:
+    """Translated routes accept a tier name. Passthrough routes require an upstream slug."""
     fallback = "sonnet"
-    try:
-        resp = client.get(f"{base_url.rstrip('/')}/")
-        if resp.status_code != 200:
-            return fallback
-        data = resp.json()
-    except Exception as e:
-        logger.debug("Could not resolve proxy smoke-test model from GET /: %s", e)
-        return fallback
-
-    if not isinstance(data, dict) or data.get("wire_shape") not in PASSTHROUGH_WIRE_SHAPES:
+    if data.get("wire_shape") not in PASSTHROUGH_WIRE_SHAPES:
         return fallback
 
     routing = data.get("routing")
@@ -1208,32 +1205,34 @@ def _resolve_smoke_test_model(*, client: httpx.Client, base_url: str) -> str:
     return fallback
 
 
-def _proxy_wire_shape(*, base_url: str, timeout_s: float) -> str | None:
-    """Read the proxy's wire shape from ``GET /`` (None if unreachable)."""
+def _proxy_smoke_root(*, base_url: str, timeout_s: float) -> dict[str, Any]:
+    """Read routing and cost policy from the same proxy snapshot."""
     try:
         with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
             resp = client.get(f"{base_url.rstrip('/')}/")
         if resp.status_code != 200:
-            return None
+            return {}
         data = resp.json()
     except Exception as e:
         logger.debug("Could not resolve proxy wire shape from GET /: %s", e)
-        return None
-    return data.get("wire_shape") if isinstance(data, dict) else None
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
-def _smoke_test_responses(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, str]:
+def _smoke_test_responses(
+    *, base_url: str, timeout_s: float, model: str, proxy_id: str, cost_policy: str | None
+) -> tuple[bool, str]:
     """Smoke-test a Responses passthrough proxy via ``POST /v1/responses``."""
     url = f"{base_url.rstrip('/')}/v1/responses"
     last_error = ""
 
-    for attempt in range(2):
+    for attempt in range(1 if cost_policy is not None else 2):
         if attempt > 0:
             time.sleep(2)
         try:
             with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
                 payload = {
-                    "model": _resolve_smoke_test_model(client=client, base_url=base_url),
+                    "model": model,
                     "input": "Say hi",
                     "max_output_tokens": 256,
                     "stream": False,
@@ -1241,18 +1240,35 @@ def _smoke_test_responses(*, base_url: str, timeout_s: float = 30.0) -> tuple[bo
                 resp = client.post(url, json=payload)
 
             if resp.status_code != 200:
-                last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                detail = resp.text[:200]
+                if cost_policy is not None:
+                    try:
+                        error_body = resp.json()
+                    except ValueError:
+                        error_body = None
+                    error = error_body.get("error") if isinstance(error_body, dict) else None
+                    if isinstance(error, dict) and isinstance(error.get("message"), str):
+                        detail = error["message"][:1000]
+                last_error = f"HTTP {resp.status_code}: {detail}"
                 continue
 
             data = resp.json()
             text = _extract_responses_text(data)
+            if (
+                text
+                and cost_policy == "reject"
+                and not re.fullmatch(r"[0-9]+\.[0-9]{6}", resp.headers.get("X-Request-Cost", ""))
+            ):
+                from forge.proxy.openrouter_responses import unreported_cost_message
+
+                return False, unreported_cost_message(proxy_id)
             if text:
                 return True, text.strip()
 
-            model = data.get("model", "unknown") if isinstance(data, dict) else "unknown"
+            response_model = data.get("model", "unknown") if isinstance(data, dict) else "unknown"
             usage = data.get("usage", {}) if isinstance(data, dict) else {}
             last_error = (
-                f"Empty response from {model} "
+                f"Empty response from {response_model} "
                 f"(input={usage.get('input_tokens', '?')}, "
                 f"output={usage.get('output_tokens', '?')} tokens)"
             )

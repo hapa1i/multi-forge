@@ -127,6 +127,7 @@ class ModelSourceCapabilities:
     # ingress (forge codex start --proxy). Gates the proxy `/v1/responses` route and
     # the codex preflight `proxy_supported` posture.
     responses_ingress: bool = False
+    responses_reports_cost: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -416,7 +417,9 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
             default_url="https://openrouter.ai/api/v1",
         ),
         credential_ids=("openrouter",),
-        capabilities=ModelSourceCapabilities(provider_trace=True, provider_user_grouping=True, responses_ingress=True),
+        capabilities=ModelSourceCapabilities(
+            provider_trace=True, provider_user_grouping=True, responses_ingress=True, responses_reports_cost=True
+        ),
         template_names=OPENROUTER_TEMPLATE_NAMES,
     ),
     ModelSource(

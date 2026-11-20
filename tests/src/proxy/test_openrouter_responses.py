@@ -71,3 +71,29 @@ def test_text_only_qwen_404_names_the_restriction():
     assert translated.status_code == 400
     message = json.loads(translated.body)["error"]["message"]
     assert "ZDR-eligible" in message and "qwen/qwen4-max" in message and "account" not in message
+
+
+@pytest.mark.parametrize(
+    "amount,expected",
+    [
+        (0, 0),
+        (0.0000005, 1),
+        (0.123214, 123214),
+        (False, None),
+        (-1, None),
+        ("0.00", None),
+        (float("inf"), None),
+        (float("nan"), None),
+    ],
+)
+def test_only_reported_terminal_account_credit_counts(amount, expected):
+    observed = []
+    attempt = route.OpenRouterResponseEvidence(lambda: observed.append(1))
+    attempt.observe({"id": "resp_only", "usage": {"cost": 42}}, "in_progress")
+    assert attempt.cost_micros is None and not observed
+    attempt.observe(
+        {"usage": {"cost": amount, "is_byok": True, "cost_details": {"upstream_inference_cost": 123}}}, "incomplete"
+    )
+    attempt.observe({"usage": {"cost": 999}}, "completed")
+    assert attempt.cost_micros == expected and len(observed) == int(expected is None)
+    assert attempt.response_id == "resp_only" and attempt.generation_id is None

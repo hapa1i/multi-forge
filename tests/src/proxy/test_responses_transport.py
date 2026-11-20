@@ -1143,3 +1143,40 @@ async def test_responses_catalog_error_does_not_leak_exception_text(monkeypatch,
     assert b"FOO_KEY" not in leaked and b"BAR_KEY" not in leaked  # ...nor any env var name
     assert b"misconfigured" in leaked  # a generic, non-leaking message is returned instead
     assert secret in caplog.text  # ...while the full detail stays available in the server log
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reason,status", [("base", 400), ("missing_key", 401), ("declared_cost_gap", 400)])
+async def test_direct_openrouter_refuses_before_dispatch(monkeypatch, proxy_runtime_ready, reason, status):
+    from dataclasses import replace
+
+    import forge.backend.sources as catalog
+    from forge.config import load_config
+
+    server = proxy_runtime_ready
+    config = load_config(template="codex-responses-openrouter")
+    monkeypatch.setattr(server, "config", config)
+    if reason == "base":
+        config.proxy.get_provider().base_url = "http://router.invalid"
+    if reason == "declared_cost_gap":
+        source = catalog.get_model_source("openrouter")
+        monkeypatch.setattr(
+            catalog,
+            "get_model_source",
+            lambda _: replace(source, capabilities=replace(source.capabilities, responses_reports_cost=False)),
+        )
+    monkeypatch.setattr(
+        "forge.core.auth.template_secrets.resolve_env_or_credential",
+        lambda _: None if reason == "missing_key" else "fixture-key",
+    )
+
+    async def unexpected(**kwargs):
+        pytest.fail("A local refusal reached dispatch")
+
+    monkeypatch.setattr(rp, "forward", unexpected)
+    resp = await ri.handle_responses_passthrough(
+        _RawReq(body=b'{"model":"fixture"}'), method="POST", url_path="/v1/responses"
+    )
+    assert resp.status_code == status
+    if reason == "declared_cost_gap":
+        assert b"costs.on_unreported_cost=allow" in resp.body

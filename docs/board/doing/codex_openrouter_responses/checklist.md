@@ -128,40 +128,42 @@ passed with account ZDR enabled. [Probe results](probe-results.md) · [Card](car
 
 ## 3. Account for each dispatched generation
 
-- [ ] Write one downstream attempt per dispatch, joining cost and trace on `downstream_event_id`. On this route store
+- [x] Write one downstream attempt per dispatch, joining cost and trace on `downstream_event_id`. On this route store
   the requested slug in `model` and the dispatched slug in `mapped_model`. Group metrics and `costs show --by-model` by
   the dispatched slug. Extend the trace projection so `trace show` displays a fallback's two slugs in both human and
   JSON output. Test older records and Messages callers without inferring a historical requested slug. Preserve the
   downstream schema.
-- [ ] Exercise the chosen BYOK accounting policy with `is_byok=true`, zero `usage.cost` and a positive
+- [x] Exercise the chosen BYOK accounting policy with `is_byok=true`, zero `usage.cost` and a positive
   `cost_details.upstream_inference_cost`. Assert the documented amount in the per-request record, cap and metrics.
-- [ ] Parse observed unary and SSE evidence once per attempt. Preserve explicit zero, unavailable cost, upstream
+- [x] Parse observed unary and SSE evidence once per attempt. Preserve explicit zero, unavailable cost, upstream
   failures, disconnects and an ID received before cancellation. Send `X-OpenRouter-Metadata: enabled` on direct
   OpenRouter Responses and extract the endpoint marked selected. Use `provider_response_id` for the response identity
   and `provider_generation_id` only for a verified generation identity. Missing provider or generation evidence stays
   empty. [Relay](../../../../src/forge/proxy/responses_passthrough.py) ·
   [Trace projection](../../../../src/forge/proxy/provider_trace_logger.py)
-- [ ] Wire `costs.on_unreported_cost=reject|allow` through saved config, both loader steps, `forge proxy set` and live
+- [x] Wire `costs.on_unreported_cost=reject|allow` through saved config, both loader steps, `forge proxy set` and live
   policy. In shared config, leave an omitted key unset. Resolve and advertise the default `reject` only for direct
   OpenRouter Responses creates. A source-declared cost gap rejects the first such call. The same proxy's Messages
   ingress and other sources retain their current accounting behavior.
-- [ ] Under `reject`, an observed `completed` or `incomplete` terminal with missing cost blocks subsequent Responses
+- [x] Under `reject`, an observed `completed` or `incomplete` terminal with missing cost blocks subsequent Responses
   creates on that proxy. Forge already treats `incomplete` as a partial billable success. Explicit zero, a local
   refusal, an HTTP or transport error, `response.failed`, and disconnect/EOF before a terminal leave the flag unchanged.
   A restart clears an observed gap and reloads the source declaration and dollar-cap totals. Test the next request after
   each outcome, including with no configured dollar cap.
-- [ ] Make the unary create/start smoke evaluate its own response using the effective policy and Forge's existing
+- [x] Make the unary create/start smoke evaluate its own response using the effective policy and Forge's existing
   `X-Request-Cost` convention. Emit the header for reported cost including zero. A text-bearing success without cost
   under `reject` fails that smoke and reports the override. Preserve the first diagnostic and issue no second generation
   for an unpriced success or deterministic refusal. Under `allow`, that smoke can pass. Print the uncounted-spend
   warning on each launch. Test recovery with `forge proxy set <id> costs.on_unreported_cost=allow` followed by restart.
-- [ ] With `PYTHON_DOTENV_DISABLED=1`, exercise `forge proxy create codex-responses-openrouter --json --smoke-test`,
+- [x] With `PYTHON_DOTENV_DISABLED=1`, exercise `forge proxy create codex-responses-openrouter --json --smoke-test`,
   `forge proxy start <id> --smoke-test` and `forge runtime preflight codex --proxy <id>` against a local upstream.
   Repeat with only the environment key and only the Forge credential store. Inspect the child's environment in both
   runs.
-- [ ] Run the accounting cases in the new integration suite, relevant CLI smoke cases and
-  `tests/integration/proxy/test_litellm_streaming_cost_e2e.py` via `./scripts/test-integration.sh` in this slice.
-  Reconcile the running proxy's metrics with the persisted cost and trace reads. Record commands and results here.
+- [x] Run the accounting cases in the new integration suite, relevant CLI smoke cases and
+  `tests/integration/proxy/test_litellm_streaming_cost_e2e.py` via `./scripts/test-integration.sh` in this slice. All 33
+  selected cases passed with dotenv disabled via the integration wrapper, including
+  `TestProxyCreateAndStart::test_create_json_failed_smoke_is_one_result_and_preserves_proxy`. Both credential sources
+  passed create/start smoke, the account-credit total matched telemetry, and a duplicate stream terminal charged once.
 
 ## Acceptance fixtures
 

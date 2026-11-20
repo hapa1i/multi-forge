@@ -73,6 +73,7 @@ class CostTracker:
         self.daily_cap_micros = int(daily_cap_usd * _MICROS_PER_DOLLAR) if daily_cap_usd is not None else None
         self.monthly_cap_micros = int(monthly_cap_usd * _MICROS_PER_DOLLAR) if monthly_cap_usd is not None else None
         self.on_cap_hit = on_cap_hit
+        self.responses_cost_unreported = False
 
         self._daily_window: deque[tuple[float, int]] = deque()
         self._monthly_total: int = 0
@@ -88,6 +89,10 @@ class CostTracker:
     @property
     def has_caps(self) -> bool:
         return self.daily_cap_micros is not None or self.monthly_cap_micros is not None
+
+    def mark_responses_cost_unreported(self) -> None:
+        """Latch a billable direct Responses terminal without cost until restart."""
+        self.responses_cost_unreported = True
 
     def set_cap_state_persister(self, persister: Callable[[CapState], Future[bool] | None] | None) -> None:
         """Set the snapshot sink; ``None`` restores direct synchronous persistence."""

@@ -227,3 +227,10 @@ class TestPlaneRobustness:
         traces = _downstream_dir()
         for d in (traces, traces.parent):  # downstream/, telemetry/
             assert oct(d.stat().st_mode)[-3:] == "700"
+
+
+@pytest.mark.parametrize("recorded", [None, "openai/gpt-5.5"])
+def test_trace_without_a_distinct_requested_slug_preserves_historical_evidence(recorded):
+    _record(requested_model=recorded)
+    (rec,) = ptl.read_provider_traces()
+    assert rec.mapped_model == "openai/gpt-5.5" and rec.requested_model is None

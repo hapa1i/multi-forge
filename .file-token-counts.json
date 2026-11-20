@@ -81,10 +81,10 @@
       "tokens": 21842
     },
     "docs/design_telemetry.md": {
-      "sha256": "da7f86cc1c0f052d6358ea5479fdcd4ba5c29d68b75387a2927850a015d6e791",
+      "sha256": "2d0fed3a1a6e13ae5531ba09472225f842e7a92473ea16bb7e1b6c3c12d81cb4",
       "method": "claude-opus-5",
       "family": "anthropic",
-      "tokens": 24000
+      "tokens": 24285
     },
     "docs/design_workflows.md": {
       "sha256": "7b0b90e58d9b6f3e391e7e014c49aedb409bc5e1066ff0bdac4c5fc553602606",

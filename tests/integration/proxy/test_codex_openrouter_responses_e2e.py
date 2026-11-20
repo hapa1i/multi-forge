@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import threading
+import time
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -17,6 +18,7 @@ from click.testing import CliRunner
 from forge.cli.main import main
 from forge.core.auth.credentials_file import save_profile
 from forge.core.paths import get_forge_home
+from forge.core.telemetry.downstream import read_downstream_records
 from forge.proxy.proxies import ProxyRegistryStore
 from forge.session.codex_invoke import invoke_codex_bare_proxy
 from tests.fixtures.proxy import allocate_ephemeral_port, kill_process
@@ -70,6 +72,8 @@ class ResponsesUpstream:
     requests: list = field(default_factory=list)
     release_terminal: threading.Event = field(default_factory=threading.Event)
     status: int = 200
+    generation_id: str | None = "gen-test"
+    drop_connection: bool = False
     reply: dict[str, Any] = field(
         default_factory=lambda: {
             "id": "gen-test",
@@ -95,9 +99,14 @@ def responses_upstream():
         def do_POST(self) -> None:
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             upstream.requests.append((self.path, self.headers, body))
+            if upstream.drop_connection:
+                self.close_connection = True
+                return
             self.send_response(upstream.status)
             self.send_header("x-litellm-response-cost", "0.125")
-            self.send_header("x-generation-id", "gen-test")
+            if upstream.generation_id:
+                self.send_header("x-generation-id", upstream.generation_id)
+            self.send_header("X-Request-Cost", "9.999999")
             if self.path.endswith("/chat/completions"):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
@@ -233,7 +242,8 @@ def test_incremental_relay_preserves_opaque_reasoning_and_tool_results(local_res
     assert sent["input"][-3:] == [opaque, call, result]
 
 
-def test_cap_blocks_foreground_and_compaction_retries_and_reports_recovery(local_responses_proxy):
+@pytest.mark.parametrize("proxy_template", ["codex-responses-local", "codex-responses-openrouter"])
+def test_cap_blocks_foreground_and_compaction_retries_and_reports_recovery(local_responses_proxy, proxy_template):
     base, requests, _ = local_responses_proxy
     foreground = _codex_request("0.170.0-tui-gpt-6.2-astra-tool")
     compaction = _codex_request("0.170.0-tui-gpt-6.2-astra-compaction-prompt")
@@ -340,3 +350,215 @@ def test_template_name_launch_uses_verified_proxy(
         assert argv[argv.index("-m") + 1] == ("qwen/qwen4-max" if args else "openai/gpt-6.2-astra")
         if proxy_template == "codex-responses-openrouter":
             assert "dispatching google/gemini-4-carbon" in " ".join(result.output.split())
+
+
+def _attempt(request_id):
+    end = time.monotonic() + 5
+    while time.monotonic() < end:
+        rows = read_downstream_records(proxy_id="codex-fixture", request_id=request_id)
+        if rows and rows[0].request_mode is not None:
+            assert len(rows) == 1
+            return rows[0]
+        time.sleep(0.025)
+    pytest.fail(f"Missing completed trace for {request_id}")
+
+
+def _forge(*args):
+    result = CliRunner().invoke(main, list(args))
+    assert result.exit_code == 0, (result.output, result.exception)
+    return result.output
+
+
+@pytest.mark.parametrize("proxy_template", ["codex-responses-openrouter"])
+@pytest.mark.parametrize(
+    "proxy_settings",
+    [{"zdr_fallbacks": {"openai/gpt-6.2-astra": "google/gemini-4-carbon"}, "costs": {"caps": {"per_day": 0.1}}}],
+)
+def test_byok_fallback_cost_and_duplicate_terminal(
+    local_responses_proxy, responses_upstream, proxy_template, proxy_settings
+):
+    base, calls, release = local_responses_proxy
+    requested, dispatched = "openai/gpt-6.2-astra", "google/gemini-4-carbon"
+    provider = responses_upstream
+    usage = provider.reply["usage"]
+    usage.update(cost=0, is_byok=True, cost_details={"upstream_inference_cost": 9.25})
+    provider.reply["id"] = "resp-local"
+    body = {"model": requested, "input": "hi"}
+    with httpx.Client(base_url=base) as client:
+        reply = client.post("/v1/responses", json=body)
+        assert reply.headers["x-request-cost"] == "0.000000"
+        first = _attempt(reply.headers["x-request-id"])
+        assert (first.model, first.mapped_model, first.cost_micros) == (requested, dispatched, 0)
+        assert (first.provider_response_id, first.provider_generation_id, first.selected_provider) == (
+            "resp-local",
+            "gen-test",
+            "Azure",
+        )
+        assert client.get("/").json()["metrics"]["costs"]["caps"]["daily"]["current_usd"] == 0
+        usage["cost"] = 0.1000005
+        release.set()
+        provider.repeat_terminal = True
+        reply = client.post("/v1/responses", json={**body, "stream": True})
+        assert reply.text.count('"type": "response.completed"') == 2
+        row = _attempt(reply.headers["x-request-id"])
+        assert row.cost_micros == row.reported_cost_micros == 100001
+        assert (row.reporter, row.confidence, row.selected_provider) == ("openrouter", "reported", "Azure")
+        metrics = client.get("/").json()["metrics"]
+        assert metrics["costs"]["total_micros"] == 100001
+        assert metrics["costs"]["caps"]["daily"]["current_usd"] == pytest.approx(0.100001)
+        assert metrics["by_model"][dispatched]["requests"] == 2 and requested not in metrics["by_model"]
+        assert client.post("/v1/responses", json=body).status_code == 429
+    assert len(calls) == 2
+    shown = _forge("telemetry", "trace", "show", row.request_id)
+    assert "Requested model" in shown and requested in shown and dispatched in shown
+    trace = json.loads(_forge("telemetry", "trace", "show", row.request_id, "--json"))
+    assert (trace["requested_model"], trace["mapped_model"]) == (requested, dispatched)
+    assert "gen-test" in _forge("telemetry", "trace", "explain", row.request_id, "--json")
+    costs = json.loads(_forge("telemetry", "costs", "show", "codex-fixture", "--by-model", "--json"))
+    assert costs["by_model"][dispatched]["cost_micros"] == 100001 and requested not in costs["by_model"]
+    assert "OpenRouter account credit" in _forge("proxy", "metrics", "codex-fixture")
+
+
+@pytest.mark.parametrize("proxy_template", ["codex-responses-openrouter"])
+@pytest.mark.parametrize("proxy_settings", [{}])
+@pytest.mark.parametrize(
+    "case,stream",
+    [
+        ("completed", False),
+        ("incomplete", True),
+        ("failed", False),
+        ("failed", True),
+        ("http", True),
+        ("http", False),
+        ("transport", True),
+        ("transport", False),
+        ("eof", True),
+        ("disconnect", True),
+        ("account", False),
+        ("request", True),
+    ],
+)
+def test_next_create_after_missing_cost(
+    local_responses_proxy, responses_upstream, proxy_template, proxy_settings, case, stream
+):
+    base, calls, release = local_responses_proxy
+    provider = responses_upstream
+    provider.generation_id = None
+    provider.reply["id"] = "resp-only"
+    del provider.reply["usage"]["cost"], provider.reply["openrouter_metadata"]
+    provider.reply["status"] = case
+    if case in ("http", "account", "request"):
+        provider.status = 404
+        error: dict[str, Any] = {"message": "fixture missing"}
+        if case == "account":
+            error["metadata"] = {"ineligibility_reasons": [{"reason": "zdr-violation-by-account"}]}
+        elif case == "request":
+            error["message"] = (
+                "No endpoints found matching your data policy (Zero data retention). Configure: https://openrouter.ai/settings/privacy"
+            )
+        provider.reply = {"error": error}
+    provider.drop_connection = case == "transport"
+    provider.omit_terminal = case in ("eof", "disconnect")
+    if case != "disconnect":
+        release.set()
+    body = {"model": "fixture/model", "input": "hi"}
+    with httpx.Client(base_url=base, timeout=10) as client:
+        with client.stream("POST", "/v1/responses", json={**body, "stream": stream}) as response:
+            expected = {"http": 404, "account": 400, "request": 400, "transport": 502}.get(case, 200)
+            assert response.status_code == expected
+            assert "x-request-cost" not in response.headers
+            if case == "disconnect":
+                lines = response.iter_lines()
+                assert "response.created" in next(lines)
+                assert any("first" in line for line in lines)
+            else:
+                raw = response.read()
+                if case in ("account", "request"):
+                    assert b"ZDR" in raw and (b"settings/privacy" in raw) == (case == "account")
+        row = _attempt(response.headers["x-request-id"])
+        assert row.cost_micros is None and row.provider_generation_id is None and row.selected_provider is None
+        if case == "disconnect":
+            assert row.client_disconnected and row.provider_response_id == "gen-test"
+        missing = case in ("completed", "incomplete")
+        assert client.get("/").json()["runtime"]["responses_policy"]["unreported_cost_observed"] is missing
+        release.set()
+        provider.status, provider.drop_connection = 200, False
+        provider.reply = {"id": "resp-next", "status": "completed", "usage": {"cost": 0}}
+        result = client.post("/v1/responses", json=body)
+        assert result.status_code == (400 if missing else 200)
+        if missing:
+            assert "costs.on_unreported_cost=allow" in result.json()["error"]["message"]
+            msg = client.post(
+                "/v1/messages",
+                json={"model": "sonnet", "max_tokens": 16, "messages": [{"role": "user", "content": "hi"}]},
+            )
+            assert msg.status_code == 200
+        assert len([c for c in calls if c[0].endswith("/responses")]) == (1 if missing else 2)
+
+
+@pytest.mark.parametrize("stored", [False, True], ids=["env-only", "credential-store"])
+def test_create_start_smoke_and_missing_cost_recovery(responses_upstream, monkeypatch, stored, tmp_path):
+    provider = responses_upstream
+    proxy_id = "smoke-acceptance"
+    port = allocate_ephemeral_port()
+    base = f"http://127.0.0.1:{port}"
+    monkeypatch.setenv("PYTHON_DOTENV_DISABLED", "1")
+    monkeypatch.setenv("OPENROUTER_BASE_URL", provider.base_url)
+    monkeypatch.setenv("FORGE_PROFILE", "default")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    key = "store-fixture" if stored else "env-fixture"
+    if stored:
+        save_profile("default", {"OPENROUTER_API_KEY": key})
+    else:
+        monkeypatch.setenv("OPENROUTER_API_KEY", key)
+    child = tmp_path / "codex"
+    child.write_text(
+        f"#!{sys.executable}\nimport os,sys\nif '--version' in sys.argv: print('codex-cli 0.170.0')\nelif 'features' in sys.argv: print('hooks stable true')\nelif 'doctor' in sys.argv: print('{{}}')\nelse: assert 'OPENROUTER_API_KEY' not in os.environ and os.environ['FORGE_CODEX_PROXY_TOKEN'] == 'forge-loopback'\n"
+    )
+    child.chmod(0o700)
+    monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ["PATH"])
+    runner = CliRunner()
+    provider.reply["usage"].pop("cost")
+    try:
+        create = runner.invoke(
+            main,
+            [
+                "proxy",
+                "create",
+                "codex-responses-openrouter",
+                "--name",
+                proxy_id,
+                "--port",
+                str(port),
+                "--base-url",
+                provider.base_url,
+                "--json",
+                "--smoke-test",
+            ],
+        )
+        assert create.exit_code == 1, (create.output, create.exception)
+        payload = json.loads(create.stdout)
+        assert payload["status"] == "healthy" and not payload["smoke_test"]["passed"]
+        assert f"forge proxy set {proxy_id} costs.on_unreported_cost=allow" in payload["smoke_test"]["detail"]
+        assert len(provider.requests) == 1
+        assert provider.requests[0][1]["authorization"] == "Bearer " + key
+        again = runner.invoke(main, ["proxy", "start", proxy_id, "--smoke-test"])
+        assert again.exit_code == 1 and "costs.on_unreported_cost=allow" in again.output
+        assert len(provider.requests) == 1
+        _forge("proxy", "stop", proxy_id)
+        provider.reply["usage"]["cost"] = 0
+        assert "Smoke test passed" in _forge("proxy", "start", proxy_id, "--smoke-test")
+        assert len(provider.requests) == 2
+        assert not httpx.get(base).json()["runtime"]["responses_policy"]["unreported_cost_observed"]
+        preflight = runner.invoke(main, ["runtime", "preflight", "codex", "--proxy", proxy_id, "--json"])
+        assert json.loads(preflight.stdout)["proxy_responses"] == "proxy_supported"
+        _forge("codex", "start", "--proxy", proxy_id)
+        _forge("proxy", "set", proxy_id, "costs.on_unreported_cost=allow")
+        _forge("proxy", "stop", proxy_id)
+        provider.reply["usage"].pop("cost")
+        assert "Smoke test passed" in _forge("proxy", "start", proxy_id, "--smoke-test")
+        assert httpx.get(base).json()["runtime"]["responses_policy"]["on_unreported_cost"] == "allow"
+        assert "Unreported OpenRouter" in _forge("codex", "start", "--proxy", proxy_id)
+        assert len(provider.requests) == 3
+    finally:
+        runner.invoke(main, ["proxy", "stop", proxy_id])

@@ -104,6 +104,7 @@ from forge.proxy.ports import (
 from forge.proxy.provider_trace_logger import record_provider_trace
 from forge.proxy.reasoning import resolve_reasoning_effort_record
 from forge.proxy.request_id import is_valid_request_id
+from forge.proxy.response_headers import request_cost_header as _request_cost_header
 from forge.proxy.responses_ingress import (
     advertise_responses_ingress,
     build_intercept_capability_section,
@@ -519,6 +520,7 @@ def _calc_and_log_cost(
     forge_run_id: str | None = None,
     forge_root_run_id: str | None = None,
     downstream_event_id: str | None = None,
+    requested_model: str | None = None,
     cache_write_tokens: int = 0,
 ) -> int | None:
     """Log a request's cost (microdollars) and return it, or ``None`` if unavailable.
@@ -542,6 +544,7 @@ def _calc_and_log_cost(
                 proxy_id=PROXY_ID or "unknown",
                 backend_id=_backend_instance_id(),
                 model=model,
+                requested_model=requested_model,
                 tier=tier,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
@@ -575,17 +578,6 @@ def _persist_proxy_downstream_record(record: DownstreamRecord) -> None:
         write_downstream_record(record)
     else:
         _accounting_persistence.submit_downstream_record(record)
-
-
-def _request_cost_header(cost_micros: int | None) -> dict[str, str]:
-    """``X-Request-Cost`` only when this request reported a cost.
-
-    A ``None`` cost is "unavailable" — omit the header rather than emit a
-    misleading ``0.000000`` (and ``None / 1_000_000`` would raise).
-    """
-    if cost_micros is None:
-        return {}
-    return {"X-Request-Cost": f"{cost_micros / 1_000_000:.6f}"}
 
 
 def _cumulative_cost_header() -> dict[str, str]:
@@ -1949,6 +1941,9 @@ async def root(request: Request):
     _responses_ingress = advertise_responses_ingress(_wire_shape, getattr(config.proxy, "backend", "") or "")
     if _responses_ingress and _backend_instance_id() == "openrouter":
         runtime_section["responses_policy"] = {
+            "on_unreported_cost": config.proxy.costs.on_unreported_cost or "reject",
+            "cost_scope": "openrouter_credit",
+            "unreported_cost_observed": bool(cost_tracker and cost_tracker.responses_cost_unreported),
             "requested_default_model": configured_tier_models.get(default_tier) if default_tier else None,
             "required_zdr": not provider_config.allow_non_zdr,
             "zdr_fallbacks": _openrouter_zdr_fallbacks(provider_config) if not provider_config.allow_non_zdr else {},
@@ -1958,6 +1953,8 @@ async def root(request: Request):
     # proximity is attached under metrics.costs.caps when caps are configured.
     metrics_snapshot = proxy_metrics.snapshot()
     _attach_cap_summary(metrics_snapshot, cost_tracker)
+    if "responses_policy" in runtime_section:
+        metrics_snapshot["costs"]["responses_scope"] = "openrouter_credit"
 
     retention_section, retention_degraded = _downstream_retention_status_section()
 

@@ -395,8 +395,12 @@ class CostConfig:
     caps: CostCaps = field(default_factory=CostCaps)
     on_cap_hit: str = "reject"  # "reject" (HTTP 429) or "warn" (header only)
 
+    on_unreported_cost: str | None = None
+
     def __post_init__(self) -> None:
         self.caps = _coerce_cost_caps(self.caps)
+        if self.on_unreported_cost not in (None, "reject", "allow"):
+            raise ValueError("costs.on_unreported_cost must be reject or allow")
 
         valid_actions = {"reject", "warn"}
         if self.on_cap_hit not in valid_actions:
@@ -413,10 +417,11 @@ def _coerce_cost_config(value: Any) -> CostConfig:
         return value
     if not isinstance(value, dict):
         raise ValueError("Invalid costs: must be a mapping")
-    _reject_unknown_cost_keys("costs", value, {"caps", "on_cap_hit"})
+    _reject_unknown_cost_keys("costs", value, {"caps", "on_cap_hit", "on_unreported_cost"})
     return CostConfig(
         caps=_coerce_cost_caps(value.get("caps", {}) or {}),
         on_cap_hit=value.get("on_cap_hit", "reject"),
+        on_unreported_cost=value.get("on_unreported_cost"),
     )
 
 

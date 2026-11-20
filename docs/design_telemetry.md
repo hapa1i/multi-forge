@@ -690,8 +690,15 @@ Semantics and invariants:
   record joined to cost by `downstream_event_id`. Before any provider response, lifecycle flags stay false; a received
   response sets `stream_started=true`, while content/usage and header cost reflect only observed evidence. Validation,
   conversion, routing, client construction, and non-generation relays write none.
-- **`selected_provider`** = the upstream OpenRouter routed to, read from the response body or, when streaming, the first
-  chunk (OpenRouter names it on every chunk).
+- **`selected_provider`** comes from the OpenRouter Chat Completions body or first streaming chunk. Direct Responses
+  requests enable routing metadata and use the endpoint marked `selected: true` in a Responses object. The body ID
+  supplies `provider_response_id`. The `x-generation-id` header supplies the remote lookup identity even if the client
+  disconnects before a terminal event.
+- Direct Responses records keep the requested slug in `model` and the dispatched slug in `mapped_model`. Trace show
+  displays both on a fallback. Metrics and cost summaries use the dispatched slug. A completed or incomplete terminal
+  supplies OpenRouter account credit in `usage.cost`, including explicit zero on BYOK. The upstream BYOK provider's
+  invoice falls outside that scope. Forge rounds once per create to integer micros and joins lifecycle and cost by
+  attempt ID. Missing terminal cost can block subsequent creates. A pre-terminal disconnect can leave cost unavailable.
 - **`first_chunk_seen`** = first user-visible content chunk. The first-event `_provider_meta` carrier does not count, so
   a pre-content cancellation can retain its generation id with `first_chunk_seen=false`.
 - **`local_usage_status`** = `available` after final usage or reported cost, else `unavailable`. Probe 2

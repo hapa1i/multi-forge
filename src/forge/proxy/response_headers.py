@@ -76,3 +76,14 @@ def merge_response_headers(
     merged = {name: value for name, value in headers.items() if name.lower() not in replaced}
     merged.update(overlay)
     return merged
+
+
+def request_cost_header(cost_micros: int | None) -> dict[str, str]:
+    """``X-Request-Cost`` only when this request reported a cost.
+
+    A ``None`` cost is "unavailable" — omit the header rather than emit a
+    misleading ``0.000000`` (and ``None / 1_000_000`` would raise).
+    """
+    if cost_micros is None:
+        return {}
+    return {"X-Request-Cost": f"{cost_micros / 1_000_000:.6f}"}

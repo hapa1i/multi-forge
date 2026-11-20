@@ -3,13 +3,73 @@
 from __future__ import annotations
 
 import json
+import math
+from collections.abc import Callable
+from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
 from fastapi.responses import JSONResponse
 
+from forge.core.llm.clients.openai_compat import extract_reported_cost_usd
 from forge.proxy.model_routes import model_for_zdr_policy
+
+
+def unreported_cost_message(proxy_id: str) -> str:
+    return (
+        "OpenRouter Responses cost is unavailable. To allow uncounted spend, run "
+        f"forge proxy set {proxy_id} costs.on_unreported_cost=allow and restart the proxy."
+    )
+
+
+@dataclass
+class OpenRouterResponseEvidence:
+    """Correlate one physical create and retain only its first terminal charge."""
+
+    on_missing_cost: Callable[[], None] | None = None
+    response_id: str | None = None
+    generation_id: str | None = None
+    selected_provider: str | None = None
+    cost_micros: int | None = None
+    terminal_seen: bool = False
+
+    def observe(self, response: object, status: object) -> None:
+        data = response if isinstance(response, dict) else {}
+        if isinstance(response_id := data.get("id"), str) and response_id:
+            self.response_id = response_id
+        metadata = data.get("openrouter_metadata")
+        endpoints = metadata.get("endpoints") if isinstance(metadata, dict) else None
+        available = endpoints.get("available") if isinstance(endpoints, dict) else None
+        if isinstance(available, list):
+            for route in available:
+                if isinstance(route, dict) and route.get("selected") is True:
+                    provider = route.get("provider")
+                    if isinstance(provider, str) and provider:
+                        self.selected_provider = provider
+                        break
+        if self.terminal_seen or status not in ("completed", "incomplete", "failed"):
+            return
+        self.terminal_seen = True
+        if status == "failed":
+            return
+        try:
+            cost = extract_reported_cost_usd(data.get("usage"))
+        except OverflowError:
+            cost = None
+        if cost is not None and cost >= 0 and math.isfinite(cost * 1_000_000):
+            self.cost_micros = int((Decimal(str(cost)) * 1_000_000).to_integral_value(rounding=ROUND_HALF_UP))
+        elif self.on_missing_cost:
+            self.on_missing_cost()
+
+    def provider_meta(self) -> dict[str, Any]:
+        return {
+            "provider": "openrouter",
+            "provider_response_id": self.response_id,
+            "provider_generation_id": self.generation_id,
+            "selected_provider": self.selected_provider,
+        }
 
 
 def validate_base(base: str) -> None:

@@ -410,6 +410,8 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
         )
         sys.exit(1)
 
+    if policy.get("on_unreported_cost") == "allow":
+        err_console.print("Unreported OpenRouter account charges cannot count toward this proxy's spend caps.")
     launch_default = policy.get("requested_default_model") or default_model
     requested = passthrough_model(codex_args) or launch_default
     dispatched = requested

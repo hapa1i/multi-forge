@@ -27,6 +27,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Literal
@@ -357,7 +358,7 @@ def show_cmd(proxy_id: str, raw: bool, as_json: bool) -> None:
     "--base-url",
     "upstream_url",
     type=str,
-    help="Upstream LiteLLM base URL (overrides env var)",
+    help="Upstream provider base URL (overrides env var)",
 )
 # Per-tier reasoning effort overrides
 @click.option("--haiku-reasoning", type=str, help="Override reasoning_effort for haiku tier")
@@ -841,6 +842,17 @@ def stop_cmd(proxy_id: str, force: bool, kill_adopted: bool) -> None:
     outcome = _stop_proxy_process(console, entry, kill_adopted=kill_adopted)
 
     if outcome == "stopped":
+        # A fast subsequent start would otherwise adopt the signaled server with its old config.
+        deadline = time.monotonic() + 5
+        while entry.pid is not None and check_proxy_health(
+            base_url=entry.base_url, expected_proxy_id=entry.proxy_id, expected_template=entry.template, timeout_s=0.3
+        ):
+            if time.monotonic() >= deadline:
+                print_error(
+                    "Proxy is still serving after SIGTERM. Check its status before restarting.", console=err_console
+                )
+                sys.exit(1)
+            time.sleep(0.05)
         console.print(f"[green]Stopped[/green] server for [cyan]{proxy_id}[/cyan]")
     elif outcome == "already_stopped":
         console.print(f"[green]Cleared[/green] stale running state for [cyan]{proxy_id}[/cyan]")
@@ -1544,6 +1556,8 @@ def _display_metrics(
         console.print(f"  Failures     {failures:>10,}")
 
     costs = metrics.get("costs") or {}
+    if costs.get("responses_scope") == "openrouter_credit":
+        console.print("  Responses spend counts OpenRouter account credit, including the OpenRouter charge on BYOK.")
     caps = costs.get("caps") or {}
     for window, key in (("daily", "per_day"), ("monthly", "per_month")):
         cap = caps.get(window)

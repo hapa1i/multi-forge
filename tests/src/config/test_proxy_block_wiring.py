@@ -45,7 +45,7 @@ _VALID_PROXY: dict[str, Any] = {
 # a block is added to PROXY_BLOCK_FIELDS without a marker here, so the live-read
 # proof grows with the registry instead of silently narrowing.
 _BLOCK_MARKERS: dict[str, object] = {
-    "costs": {"caps": {"per_day": 12.5}, "on_cap_hit": "warn"},
+    "costs": {"caps": {"per_day": 12.5}, "on_cap_hit": "warn", "on_unreported_cost": "allow"},
     "wire_shape": "anthropic_passthrough",
     "intercept": {"mode": "inspect"},
     "audit": {"audit_full_body": True, "retention_days": 3},
@@ -72,6 +72,7 @@ _PROVIDER_DIRECT_MARKERS: dict[str, object] = {
 def _assert_markers(proxy_cfg) -> None:
     assert proxy_cfg.costs.caps.per_day == 12.5
     assert proxy_cfg.costs.on_cap_hit == "warn"
+    assert proxy_cfg.costs.on_unreported_cost == "allow"
     assert proxy_cfg.wire_shape == "anthropic_passthrough"
     assert proxy_cfg.intercept.mode == "inspect"
     assert proxy_cfg.audit.audit_full_body is True
@@ -195,3 +196,16 @@ def test_invalid_wire_shape_message_unchanged() -> None:
     """The registry-driven coercer keeps the pre-existing error contract."""
     with pytest.raises(ValueError, match=r"Invalid wire_shape: 'bogus' \(must be one of:"):
         load_proxy_instance_config_from_dict({**_VALID_PROXY, "wire_shape": "bogus"})
+
+
+def test_unreported_cost_policy_is_optional_in_saved_config():
+    import yaml
+
+    from forge.config.loader import write_proxy_instance_config
+
+    config = load_proxy_instance_config_from_dict(_VALID_PROXY)
+    assert config.costs.on_unreported_cost is None
+    path = write_proxy_instance_config("test", config)
+    assert "on_unreported_cost" not in yaml.safe_load(path.read_text())["costs"]
+    with pytest.raises(ValueError, match="on_unreported_cost"):
+        load_proxy_instance_config_from_dict({**_VALID_PROXY, "costs": {"on_unreported_cost": "warn"}})
