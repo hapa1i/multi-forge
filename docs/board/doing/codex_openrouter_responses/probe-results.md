@@ -43,6 +43,24 @@ nearest microdollar yields 454,718 micros. Rounding the total once yields 454,71
 per-request units Forge stores. [Lookup ledger](evidence/paid-0a6ac1d0/state.json) ·
 [Per-request costs](evidence/paid-63d4a6f0/codex.json)
 
+### Native Codex spend caps through Forge
+
+With `codex-responses-local` at `b3929615`, each TUI and `exec` run admitted one foreground request. The loopback
+provider reported $0.125 and 200,000 input tokens for that request, reaching the daily reject cap and triggering Codex's
+1,000-token compaction threshold. A fresh launch then sent a foreground turn to the same capped proxy.
+
+| Codex   | Mode | Compaction POSTs refused | Fresh foreground POSTs refused | Title POSTs refused across both launches | Upstream POSTs |
+| ------- | ---- | ------------------------ | ------------------------------ | ---------------------------------------- | -------------- |
+| 0.161.0 | exec | 6                        | 1                              | 0                                        | 1              |
+| 0.161.0 | TUI  | 6                        | 1                              | 3                                        | 1              |
+| 0.170.0 | exec | 1                        | 1                              | 0                                        | 1              |
+| 0.170.0 | TUI  | 1                        | 1                              | 2                                        | 1              |
+
+All 23 refused requests stopped at Forge. Both clients showed generic 429s. In every case `forge proxy metrics <id>`
+identified the reached cap and the recovery setting. The TUI turns ended and the exec processes exited within the
+harness deadline. The direct OpenRouter template still needs this check.
+[Loopback receipt](evidence/forge-cap-loopback.json)
+
 ## Stage 80 passed on 2026-11-20
 
 With account ZDR enabled, Codex 0.170.0 read `fixture.txt` through a local tool, resumed the same thread, and wrote

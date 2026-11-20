@@ -29,9 +29,10 @@ choices cover native identifiers, BYOK cost and cross-family fallback. Stage 80 
   diagnostic, request count and retry timing per binary. Distinguish injected errors from paths the client calls itself.
   Select statuses and envelopes that surface the recovery action and let Codex stop on its own. Record any cutoff by the
   harness as a retry-limit failure. Reopen compatibility if a supported client hides the refusal or loops.
-- [x] Preserve HTTP 429. On the shared LiteLLM Responses path, one admitted generation reached the cap. A foreground
-  retry and all six replayed compaction attempts stopped before dispatch. `forge proxy metrics <id>` showed the running
-  amount, limit and setting for that instance. Repeat on the new template in the dispatch-boundary acceptance case.
+- [x] Preserve HTTP 429. Native 0.161.0 and 0.170.0, in both TUI and exec, reached a $0.125 cap through the LiteLLM
+  Responses proxy. All 23 subsequent compaction, foreground and title requests stopped before dispatch. Each run exposed
+  the cap and recovery setting in `forge proxy metrics <id>`. Repeat on the new template in the dispatch-boundary
+  acceptance case. [Native cap receipt](evidence/forge-cap-loopback.json) ·
   [Integration](../../../../tests/integration/proxy/test_codex_openrouter_responses_e2e.py)
 - [x] Cross the cap status with both error bodies, refuse forced compaction, replay the sanitized credit error, and send
   routing metadata to every pinned binary. The 72 free cases showed that cap text visibility depended on status. All
@@ -203,7 +204,9 @@ bridge buffered the stream and constructed its own upstream headers.
   policies, model warning, Astra reasoning limitation, opt-outs and cancellation undercount. Fit or extract the Codex
   section in the [proxy guide](../../../end-user/proxy.md).
 - [ ] Run `make test-unit`, `make test-regression`, `make pre-commit` and `make build`. Install the resulting wheel in a
-  clean environment and verify template realization, default slug, preflight and loopback smoke.
+  clean environment and verify template realization, default slug, preflight and loopback smoke. The shared-route
+  checkpoint at `b3929615` passed 11,770 unit tests, 2,627 regressions, nine targeted integration cases, full
+  pre-commit, the build and the clean-wheel LiteLLM start/health/stop smoke.
 - [x] Rehearse the board move in a temporary `done/` directory. All four approved replay manifests passed their loopback
   selftests there with the pinned Codex binary. The relocation regression verifies the index, the stage 80 receipt, file
   digests and rejection of a changed or escaping fixture.

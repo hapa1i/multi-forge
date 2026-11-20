@@ -1,0 +1,111 @@
+{
+  "cases": [
+    {
+      "cap_visible_in_metrics": true,
+      "compaction_run": {
+        "requests": {
+          "compaction_429": 6,
+          "foreground_200": 1
+        },
+        "stop": "client_exit",
+        "visible_generic_429": true
+      },
+      "foreground_run": {
+        "requests": {
+          "foreground_429": 1
+        },
+        "stop": "client_exit",
+        "visible_generic_429": true
+      },
+      "mode": "exec",
+      "upstream_dispatches": [
+        "foreground"
+      ],
+      "version": "0.161.0"
+    },
+    {
+      "cap_visible_in_metrics": true,
+      "compaction_run": {
+        "requests": {
+          "compaction_429": 6,
+          "foreground_200": 1,
+          "title_429": 2
+        },
+        "stop": "turn_ended",
+        "visible_generic_429": true
+      },
+      "foreground_run": {
+        "requests": {
+          "foreground_429": 1,
+          "title_429": 1
+        },
+        "stop": "turn_ended",
+        "visible_generic_429": true
+      },
+      "mode": "tui",
+      "upstream_dispatches": [
+        "foreground"
+      ],
+      "version": "0.161.0"
+    },
+    {
+      "cap_visible_in_metrics": true,
+      "compaction_run": {
+        "requests": {
+          "compaction_429": 1,
+          "foreground_200": 1
+        },
+        "stop": "client_exit",
+        "visible_generic_429": true
+      },
+      "foreground_run": {
+        "requests": {
+          "foreground_429": 1
+        },
+        "stop": "client_exit",
+        "visible_generic_429": true
+      },
+      "mode": "exec",
+      "upstream_dispatches": [
+        "foreground"
+      ],
+      "version": "0.170.0"
+    },
+    {
+      "cap_visible_in_metrics": true,
+      "compaction_run": {
+        "requests": {
+          "compaction_429": 1,
+          "foreground_200": 1,
+          "title_429": 1
+        },
+        "stop": "turn_ended",
+        "visible_generic_429": true
+      },
+      "foreground_run": {
+        "requests": {
+          "foreground_429": 1,
+          "title_429": 1
+        },
+        "stop": "turn_ended",
+        "visible_generic_429": true
+      },
+      "mode": "tui",
+      "upstream_dispatches": [
+        "foreground"
+      ],
+      "version": "0.170.0"
+    }
+  ],
+  "codex_binary_sha256": {
+    "0.161.0": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+    "0.170.0": "9248cfeebec9b4cc3034d5114caab10fbf426cbfa79dba410c5fa1b72762abd6"
+  },
+  "forge_commit": "b3929615",
+  "protocol": {
+    "accounting": "The local provider reported $0.125 for the first foreground response. Each proxy had a $0.125 rolling daily reject cap.",
+    "client": "Each CLI ran with a fresh Codex home, dummy credentials, web search disabled and a 1000-token compaction threshold. The first reply reported 200000 input tokens. A second fresh launch sent an ordinary foreground turn through the same proxy.",
+    "observation": "A loopback listener classified requests sent by Codex and recorded the live Forge status. A separate loopback provider counted dispatches. The operator check used forge proxy metrics on the running instance.",
+    "scope": "codex-responses-local, openai/gpt-6.2-astra, TUI and exec, no external generation endpoint."
+  }
+}
