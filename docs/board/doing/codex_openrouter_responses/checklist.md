@@ -1,8 +1,8 @@
 # Launch Codex through a direct OpenRouter proxy
 
-**Current focus.** The probe results are ready for maintainer review before product implementation. Stage 80 passed with
-the original native Codex requests, account ZDR enabled and a $5 dedicated key. All 13 policy fixtures and the native
-Astra run with routing metadata passed. [Probe results](probe-results.md) · [Card](card.md)
+**Current focus.** The maintainer reviewed the probe results and approved continuing on 2026-11-20. The remaining policy
+choices cover native identifiers, BYOK cost and cross-family fallback. Stage 80 passed with account ZDR enabled.
+[Probe results](probe-results.md) · [Card](card.md)
 
 **Proposed probe models.** Use `openai/gpt-6.2-astra` as the template default and `google/gemini-4-carbon` for explicit
 `-m` selection. Astra is the Sonnet-tier default on the shipped local Responses template. The existing
@@ -197,10 +197,12 @@ bridge buffered the stream and constructed its own upstream headers.
   section in the [proxy guide](../../../end-user/proxy.md).
 - [ ] Run `make test-unit`, `make test-regression`, `make pre-commit` and `make build`. Install the resulting wheel in a
   clean environment and verify template realization, default slug, preflight and loopback smoke.
+- [x] Rehearse the board move in a temporary `done/` directory. All four approved replay manifests passed their loopback
+  selftests there with the pinned Codex binary. The relocation regression verifies the index, the stage 80 receipt, file
+  digests and rejection of a changed or escaping fixture.
+  [Regression](../../../../tests/regression/test_bug_openrouter_paid_stage_continuation.py)
 - [ ] Record evidence and accepted limitations. The change log had 53 tokens of headroom against its 25,000-token target
   at pickup. Rotate whole oldest date blocks verbatim as needed for the shipped entry. Submit a correction to the
   existing runtime/telemetry implementation note for human review before promotion. Move the shipped card and checklist
-  to `done/`, repoint inbound links, and run the Markdown, board and size checks. Before moving, teach the probe harness
-  to resolve this card's legacy fixture references against the manifest's current directory with the pinned digest.
-  Verify all four replay manifests, the fixture index and the stage 80 receipt from the destination in an offline
-  relocation test. Preserve the approved manifest bytes and historical receipts.
+  to `done/`, repoint inbound links, and run the Markdown, board and size checks. Preserve the approved manifest bytes
+  and historical receipts.

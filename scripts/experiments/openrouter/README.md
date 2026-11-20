@@ -28,7 +28,8 @@ manifest's attempt budget and deadline, with a persistent receipt under
 within the approval and count BYOK charges. Local controls can be checked with
 `python3 helpers/paid_probe.py selftest --selftest-codex /path/to/pinned/codex`. Pass
 `--selftest-manifest /path/to/paid-probe-manifest.json` to include all pinned replay fixtures. This exercises the bridge
-and scratch edit against a canned upstream.
+and scratch edit against a canned upstream. Keep the card's `evidence/` directory beside its manifests when moving or
+copying the card. The runner resolves historical fixture paths there and replays the bytes verified during preflight.
 [Original Qwen replay manifest](../../../docs/board/doing/codex_openrouter_responses/paid-probe-manifest-qwen.json)
 
 The

@@ -411,8 +411,7 @@ def run_stage(stage: str) -> dict:
         raise ValueError("Dedicated probe key is malformed.")
     from paid_codex import check_inputs, stage_codex
 
-    if stage == "codex":
-        check_inputs(manifest)
+    fixtures = check_inputs(manifest, manifest_dir) if stage == "codex" else []
     ledger = Ledger(Path(LEDGER_ROOT).expanduser() / digest, manifest["limits"])
     deadline = ledger.begin(stage, key=key)
     api = Upstream(manifest, ledger, stage, deadline, key)
@@ -432,7 +431,7 @@ def run_stage(stage: str) -> dict:
         elif stage == "cost":
             stage_cost(api, evidence)
         else:
-            stage_codex(api, evidence, cost_receipt=cost_receipt)
+            stage_codex(api, evidence, fixtures, cost_receipt=cost_receipt)
         evidence["verdict"] = "passed"
     except (
         ValueError,

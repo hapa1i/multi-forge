@@ -390,7 +390,7 @@ def check_cost_codex(
     manifest = json.loads(manifest_bytes)
     validate_manifest(manifest)
     prerequisite = verify_prerequisite(manifest, manifest_path.parent)
-    check_inputs(manifest, binary)
+    fixtures = check_inputs(manifest, manifest_path.parent, binary)
     ledger = Ledger(directory, manifest["limits"])
     cost = transport(manifest, ledger, "cost", ledger.begin("cost", key="dummy"), "dummy")
     cost.validate_credit_limit()
@@ -414,7 +414,7 @@ def check_cost_codex(
     server.zdr_requests = []
     try:
         with patch.dict(os.environ, {"OPENROUTER_RESPONSES_CODEX": str(binary)}):
-            stage_codex(codex, codex_result)
+            stage_codex(codex, codex_result, fixtures)
         bodies = server.zdr_requests
     finally:
         server.zdr_requests = None
@@ -667,7 +667,6 @@ def selftest(binary: Path | None = None, manifest_path: Path | None = None) -> d
             if any(v != 0 for sample in evidence["cost_coverage"].values() for v in sample):
                 raise ValueError("Reported zero lost in fixture cost records.")
             api = Local(manifest, ledger, "codex", ledger.begin("codex"), "dummy")
-            sample = root / "sample.json"
             summary = []
             for schema in (
                 {"type": "function", "name": "exec_command"},
@@ -677,18 +676,14 @@ def selftest(binary: Path | None = None, manifest_path: Path | None = None) -> d
                     "tools": [{"type": "custom", "name": "exec"}],
                 },
             ):
-                sample.write_text(
-                    json.dumps(
-                        {
-                            "model": models["default"],
-                            "stream": True,
-                            "store": False,
-                            "tools": [schema],
-                            "input": [{"role": "user", "content": "task"}],
-                        }
-                    )
-                )
-                result = replay(api, {"path": str(sample)}, True)
+                body = {
+                    "model": models["default"],
+                    "stream": True,
+                    "store": False,
+                    "tools": [schema],
+                    "input": [{"role": "user", "content": "task"}],
+                }
+                result = replay(api, {"purpose": "tool"}, body, True)
                 summary.append(result["tool_replay_verified"])
             native = {}
             verified_fixtures = 0
@@ -710,16 +705,16 @@ def selftest(binary: Path | None = None, manifest_path: Path | None = None) -> d
             elif manifest_path:
                 if not binary:
                     raise ValueError("Provide --selftest-codex to validate the manifest's executable identity.")
-                check_inputs(planned, binary)
+                fixtures = check_inputs(planned, manifest_path.parent, binary)
                 fixture_ledger = Ledger(root / "fixtures", planned["limits"])
                 fixture_ledger.begin("zdr")
                 fixture_ledger.finish("zdr", "passed")
                 fixture_ledger.begin("cost")
                 fixture_ledger.finish("cost", "passed")
                 fixture_api = Local(planned, fixture_ledger, "codex", fixture_ledger.begin("codex"), "dummy")
-                for spec in planned["replay_fixtures"]:
+                for spec, body in fixtures:
                     before = len(server.hits)
-                    result = replay(fixture_api, spec, True)
+                    result = replay(fixture_api, spec, body, True)
                     paths = server.hits[before:]
                     key, expected = ("title_control", 1) if spec["purpose"] == "title" else ("tool_replay_verified", 2)
                     if not result.get(key) or paths != ["/api/v1/responses"] * expected:

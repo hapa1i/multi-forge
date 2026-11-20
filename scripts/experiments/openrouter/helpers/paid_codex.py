@@ -35,19 +35,40 @@ PROMPTS = (
 )
 
 
-def check_inputs(manifest: dict, binary: Path | None = None) -> None:
+_LEGACY_CARD = Path("docs/board/doing/codex_openrouter_responses")
+_FIXTURES = Path("evidence/fixtures")
+
+
+def read_fixture(spec: dict, manifest_dir: Path) -> dict:
+    """Resolve historical paths beside their manifest and verify the bytes that will be replayed."""
+    recorded = Path(spec["path"])
+    root = REPO
+    if recorded.parent == _FIXTURES or (
+        recorded.parent == _LEGACY_CARD / _FIXTURES
+        and (manifest_dir.name == _LEGACY_CARD.name or (manifest_dir / _FIXTURES).is_dir())
+    ):
+        root = manifest_dir.resolve()
+        recorded = _FIXTURES / recorded.name
+    path = (root / recorded).resolve(strict=True)
+    if not path.is_relative_to(root):
+        raise ValueError("Replay fixture path escapes its root.")
+    raw = path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != spec["sha256"]:
+        raise ValueError("Replay fixture checksum differs from approval.")
+    return envelope(raw)
+
+
+def check_inputs(manifest: dict, manifest_dir: Path, binary: Path | None = None) -> list[tuple[dict, dict]]:
     binary = (binary or Path(os.environ["OPENROUTER_RESPONSES_CODEX"])).resolve(strict=True)
     if hashlib.sha256(binary.read_bytes()).hexdigest() != manifest["binary"]["sha256"]:
         raise ValueError("Codex executable hash differs from approved manifest.")
     if not manifest["replay_fixtures"]:
         raise ValueError("No approved capture fixtures.")
+    fixtures = []
     for spec in manifest["replay_fixtures"]:
         if spec.get("purpose", "tool") not in {"tool", "title"}:
             raise ValueError("Unknown fixture purpose.")
-        path = (REPO / spec["path"]).resolve(strict=True)
-        if not path.is_relative_to(REPO) or hashlib.sha256(path.read_bytes()).hexdigest() != spec["sha256"]:
-            raise ValueError("Replay fixture path or checksum differs from approval.")
-        body = envelope(path.read_bytes())
+        body = read_fixture(spec, manifest_dir)
         if body.get("model") not in {
             manifest["models"]["default"],
             manifest["models"]["alternate"],
@@ -60,6 +81,8 @@ def check_inputs(manifest: dict, binary: Path | None = None) -> None:
             or body.get("store") is True
         ):
             raise ValueError("Paid replay requires a sanitized, stateless first-turn fixture.")
+        fixtures.append((spec, body))
+    return fixtures
 
 
 def verify_tool(item: dict, command: str) -> bool:
@@ -175,8 +198,7 @@ def verify_title(items: list[dict], text_format: dict) -> int:
     return len(title)
 
 
-def replay(api: Upstream, spec: dict, metadata: bool) -> dict:
-    body = envelope((REPO / spec["path"]).read_bytes())
+def replay(api: Upstream, spec: dict, body: dict, metadata: bool) -> dict:
     require_local_tools(body)
     body["provider"] = dict(body.get("provider") or {}, zdr=True)
     # Begin with the approved capture's structure; replace only synthetic user prose
@@ -412,7 +434,9 @@ def client_run(
         raise ValueError(errors[0])
 
 
-def stage_codex(api: Upstream, evidence: dict, *, cost_receipt: dict | None = None) -> None:
+def stage_codex(
+    api: Upstream, evidence: dict, fixtures: list[tuple[dict, dict]], *, cost_receipt: dict | None = None
+) -> None:
     if cost_receipt is None:
         cost_receipt = json.loads((api.ledger.directory / "cost.json").read_bytes())
     use_metadata = cost_receipt["try_metadata_on_codex"]
@@ -424,7 +448,7 @@ def stage_codex(api: Upstream, evidence: dict, *, cost_receipt: dict | None = No
     ):
         client_run(api, model, False, False, evidence, binary)
     evidence["replays"] = []
-    for spec in api.manifest["replay_fixtures"]:
-        evidence["replays"].append(replay(api, spec, use_metadata))
+    for spec, body in fixtures:
+        evidence["replays"].append(replay(api, spec, body, use_metadata))
     if use_metadata:
         client_run(api, api.manifest["models"]["default"], True, True, evidence, binary)

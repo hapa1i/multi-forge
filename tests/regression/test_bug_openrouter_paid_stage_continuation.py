@@ -3,6 +3,7 @@
 import hashlib
 import importlib
 import json
+import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,6 +18,46 @@ def manifest(monkeypatch):
     monkeypatch.syspath_prepend(repo / "scripts/experiments/openrouter/helpers")
     manifest_path = next((repo / "docs/board").glob("*/codex_openrouter_responses/paid-probe-manifest-cost-codex.json"))
     return json.loads(manifest_path.read_bytes()), manifest_path.parent
+
+
+def test_move_to_done_preserves_pinned_replays_and_receipt_paths(manifest, tmp_path, monkeypatch):
+    _, origin = manifest
+    codex = importlib.import_module("paid_codex")
+    monkeypatch.setattr(codex, "REPO", tmp_path)
+    card = tmp_path / "docs/board/doing" / origin.name
+    shutil.copytree(origin, card)
+    archived = tmp_path / "docs/board/done" / origin.name
+    archived.parent.mkdir()
+    card.rename(archived)
+    binary = tmp_path / "dummy-codex"
+    binary.write_bytes(b"offline binary identity fixture")
+    manifests = []
+    for source in archived.glob("paid-probe-manifest*.json"):
+        assert source.read_bytes() == (origin / source.name).read_bytes()
+        parsed = json.loads(source.read_bytes())
+        if not parsed.get("replay_fixtures"):
+            continue
+        manifests.append(source.name)
+        parsed["binary"]["sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
+        checked = codex.check_inputs(parsed, archived, binary)
+        assert [spec for spec, _ in checked] == parsed["replay_fixtures"]
+    assert len(manifests) == 4
+
+    index = json.loads((archived / "evidence/fixture-index.json").read_bytes())
+    receipt = json.loads((archived / "evidence/paid-63d4a6f0/codex.json").read_bytes())
+    for spec in [*index["replay_fixtures"], *index["offline_fixtures"], *(r["fixture"] for r in receipt["replays"])]:
+        original = origin / "evidence/fixtures" / Path(spec["path"]).name
+        assert codex.read_fixture(spec, archived) == json.loads(original.read_bytes())
+
+    pin = index["replay_fixtures"][0]
+    moved_fixture = archived / "evidence/fixtures" / Path(pin["path"]).name
+    moved_fixture.write_bytes(moved_fixture.read_bytes() + b"\n")
+    with pytest.raises(ValueError, match="checksum"):
+        codex.read_fixture(pin, archived)
+    moved_fixture.unlink()
+    moved_fixture.symlink_to(origin / "evidence/fixtures" / moved_fixture.name)
+    with pytest.raises(ValueError, match="escapes"):
+        codex.read_fixture(pin, archived)
 
 
 @pytest.mark.parametrize("stage", ["cost", "codex"])
