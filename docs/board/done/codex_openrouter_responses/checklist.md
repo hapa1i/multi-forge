@@ -1,7 +1,8 @@
 # Launch Codex through a direct OpenRouter proxy
 
-**Current focus.** The direct route and its accounting are implemented. The next paid action requires approval of
-[acceptance manifest `36567394`](paid-acceptance-manifest.json). [Probe results](probe-results.md) · [Card](card.md)
+**Completed 2026-11-21.** Both native sessions passed on the packaged Forge proxy with account ZDR enabled. OpenRouter
+reported $0.2890382 across ten creates. [Paid acceptance receipt](evidence/paid-36567394/acceptance.json) ·
+[Probe results](probe-results.md) · [Card](card.md)
 
 **Probe models.** Use `openai/gpt-6.2-astra` as the template default and `google/gemini-4-carbon` for explicit `-m`
 selection. Astra is the Sonnet-tier default on the shipped local Responses template. The existing
@@ -192,16 +193,18 @@ bridge buffered the stream and constructed its own upstream headers.
   sufficed. Two initial lookup 404s per model exercised the 4- and 12-second waits. The attempt limit and absolute
   streaming deadline passed separate negative controls.
   [Acceptance receipt](evidence/forge-tui-acceptance-loopback.json)
-- [ ] Obtain approval for manifest `36567394` and run it once on the stage 60 account with ZDR enabled. The dedicated
-  key has a $5 non-resetting limit including BYOK and requires $3 available. If needed the manifest permits one
-  management POST to create a 20-minute key. Forge rejects at $0.50 and rejects after unreported cost. The run allows 16
-  creates, seven reads, two prompts per model and 15 minutes. This includes titles, retries and reconciliation.
-- [ ] Verify the synthetic read, follow-up and scratch edit. Record binary identity, paths, catalog behavior, request
-  count, model slugs and the result of `forge model backend reconcile openrouter --request-id <id>`. Budget up to three
-  read-only lookup attempts for a completed generation, with 4- and 12-second waits after an initial or second 404.
-  Record each status and stop on a join. Compare local cost totals as sums of per-dispatch integer micros. When
-  comparing against raw provider USD, allow half a micro per independently rounded request. Compare
-  `forge telemetry trace show`, `forge telemetry trace explain`, `forge telemetry costs show` and `forge proxy metrics`.
+- [x] The maintainer approved [manifest `36567394`](paid-acceptance-manifest.json). It ran once on the stage 60 account
+  with ZDR enabled. One management POST created the dedicated 20-minute, non-resetting, BYOK-inclusive $5 key. Forge
+  enforced its $0.50 daily reject cap and unreported-cost policy. Two prompts per model used ten of 16 creates and three
+  of seven reads. [Key setup](evidence/paid-36567394/key-setup.json) ·
+  [Paid acceptance receipt](evidence/paid-36567394/acceptance.json)
+- [x] Both native 0.170.0 sessions read the fixture and wrote its word on the follow-up. The proxy received ten
+  Responses creates and four identity reads. No catalog request was observed. The first lookup joined Astra on Azure
+  (`req_abf301664fec`) and Gemini on Google (`req_ca761be0dff8`). The traces, cost summaries and proxy metrics agreed on
+  239,035 and 50,003 micros respectively. Each request was within half a micro of its reported charge. Gemini replayed
+  encrypted reasoning on three requests. Astra replay remains unverified.
+  [Downstream records](evidence/paid-36567394/downstream.json) ·
+  [Paid acceptance receipt](evidence/paid-36567394/acceptance.json)
 - [x] Synchronized the runtime, installation and telemetry designs, CLI reference, packaged QA inventory and
   [Codex proxy guide](../../../end-user/codex_proxy.md). The guide documents both identifier fields, the OpenRouter
   credit scope, cross-family fallbacks, missing-cost recovery and the Astra encrypted-replay limitation.
@@ -214,10 +217,22 @@ bridge buffered the stream and constructed its own upstream headers.
   installed wheel SHA-256 was `cf550c277a77e4402232d5ac4c4bd3628675c0eeb7143d539384d19dd280d862`.
 - [x] Rehearse the board move in a temporary `done/` directory. All four approved replay manifests passed their loopback
   selftests there with the pinned Codex binary. The relocation regression verifies the index, the stage 80 receipt, file
-  digests and rejection of a changed or escaping fixture.
+  digests and rejection of a changed or escaping fixture. From the final lane, the stage 80 selftest passed all 35
+  creates. The 71 probe regressions and six fixture-dependent integration cases also passed.
   [Regression](../../../../tests/regression/test_bug_openrouter_paid_stage_continuation.py)
-- [ ] Record evidence and accepted limitations. The change log had 53 tokens of headroom against its 25,000-token target
-  at pickup. Rotate whole oldest date blocks verbatim as needed for the shipped entry. Submit a correction to the
-  existing runtime/telemetry implementation note for human review before promotion. Move the shipped card and checklist
-  to `done/`, repoint inbound links, and run the Markdown, board and size checks. Preserve the approved manifest bytes
-  and historical receipts.
+- [x] Closed the card in `done/`, updated inbound links and recorded acceptance in the
+  [change log](../../change_log.md). The [2026-08-22 archive](../../archive/change_log_2026-08-22.md) keeps the oldest
+  date block verbatim. The original manifests and historical receipts are among 54 relocated files verified
+  byte-for-byte. The current change log uses 23,699 of its 25,000 target tokens. The implementation-note correction
+  below was submitted to the local shadow notes for human review.
+
+### Proposed correction to the June 23 launcher note
+
+The [runtime and telemetry implementation note](../../impl_notes/runtime_telemetry.md) describes byte-for-byte relay.
+Forge parses and serializes the Responses request while preserving JSON values, including tool continuations and opaque
+reasoning items. With required ZDR, the direct OpenRouter route sets `provider.zdr` and applies any configured model
+fallback. It strips `client_metadata` and `prompt_cache_key` on every create. LiteLLM also relays Responses
+subresources. The direct route accepts creates only. Before launch, `read_responses_launch` checks the live proxy
+identity, template, wire shape and Responses ingress capability together.
+[Request preparation](../../../../src/forge/proxy/openrouter_responses.py) ·
+[Launch check](../../../../src/forge/proxy/proxy_orchestrator.py)

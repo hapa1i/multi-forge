@@ -9,6 +9,31 @@
 | 70 · Cost and identity             | Astra reported cost on unary and streaming requests. The metadata header exposed the selected endpoint. All four generation IDs eventually resolved. | Lookup can lag. The receipts retain the BYOK field names without their values.                                                                |
 | 80 · Native and HTTP compatibility | Native 0.170.0 completed both tasks. All 13 HTTP fixtures and the native Astra metadata run passed.                                                  | Live encrypted reasoning replay was exercised on Gemini. Astra emitted no reasoning item. The bridge buffered SSE and built upstream headers. |
 
+## Paid acceptance through Forge on 2026-11-21
+
+Native Codex 0.170.0 launched through the installed Forge wheel. With account ZDR enabled, each model read `fixture.txt`
+using a local tool, then wrote the word it had read to `proof.txt` on the follow-up turn. Both files contained
+`FORGE_FIXTURE_173`. Gemini displayed Codex's fallback model metadata warning and completed both turns.
+[Approved manifest](paid-acceptance-manifest.json) · [Acceptance receipt](evidence/paid-36567394/acceptance.json)
+
+| Model                    | Selected provider | Responses creates | OpenRouter credit (USD) | Forge (micros) | Encrypted reasoning replay |
+| ------------------------ | ----------------- | ----------------: | ----------------------: | -------------: | -------------------------- |
+| `openai/gpt-6.2-astra`   | Azure             |                 5 |               0.2390352 |        239,035 | Unverified on Astra        |
+| `google/gemini-4-carbon` | Google            |                 5 |               0.0500030 |         50,003 | Observed on three requests |
+
+All ten creates streamed, returned HTTP 200 and reported terminal usage. Two were title requests. Five downstream
+records also flagged a client disconnect after recording final usage. Per-request rounding produced 289,038 micros from
+$0.2890382 of reported OpenRouter credit. The traces, per-model cost summaries and proxy metrics agreed. Forge's daily
+reject cap was $0.50. Each model's first generation lookup returned HTTP 200 and joined its local trace.
+[Downstream records](evidence/paid-36567394/downstream.json) ·
+[Reconciliation results](evidence/paid-36567394/acceptance.json)
+
+The run used ten of 16 creates and three of seven metadata reads, including the dedicated-key check. The $5 key had a
+20-minute expiry and included BYOK in its non-resetting limit. Every create carried `provider.zdr=true` and omitted
+`client_metadata` and `prompt_cache_key`. Codex made four local identity reads and no catalog requests. The upstream
+received no `openai-beta` header on these ten requests. [Key setup](evidence/paid-36567394/key-setup.json) ·
+[Acceptance receipt](evidence/paid-36567394/acceptance.json)
+
 ## Direct route acceptance on loopback
 
 The 0.170.0 TUI used the packaged Forge proxy for a local read and a follow-up edit on each slug. Both scratch files

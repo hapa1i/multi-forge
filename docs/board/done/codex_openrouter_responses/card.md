@@ -1,18 +1,10 @@
 # Launch Codex through a direct OpenRouter proxy
 
-Picked up on 2026-11-19. The maintainer approved the [execution checklist](checklist.md). The
-[free loopback results](probe-results.md) are recorded. The [first paid manifest](paid-probe-manifest.json) stopped at
-the unrestricted Fable baseline. The approved [Qwen manifest](paid-probe-manifest-qwen.json) also stopped when
-OpenRouter reported that account-level ZDR excluded the sole Qwen endpoint. The maintainer selected the narrower stage
-60 criterion below for this account. The [revised stage 60 manifest](paid-probe-manifest-qwen-account-zdr.json) ran and
-stopped before Astra when Qwen's ZDR-specific 404 lacked the required structured reasons. On 2026-11-20 the maintainer
-accepted that exact refusal. The Astra continuation passed with account ZDR enabled. Stage 70 verified cost and
-generation identity for unary and streamed Astra responses. Stage 80 hit the $2 key's credit limit on the first native
-call. The approved $5 retry passed with account ZDR enabled. Native Astra and Gemini read the fixture and wrote its
-contents to a second file on resume. All 13 policy fixtures and the native Astra metadata run passed. The implemented
-route and its accounting passed loopback acceptance. The separate
-[live acceptance manifest](paid-acceptance-manifest.json) awaits approval. [Probe results](probe-results.md) ·
-[Stage 80 manifest](paid-probe-manifest-codex-only.json) · [Stage 80 receipt](evidence/paid-63d4a6f0/codex.json)
+Completed on 2026-11-21. Native Codex 0.170.0 read a local fixture and wrote its contents to a second file on both Astra
+and Gemini through the packaged Forge proxy. Account ZDR stayed enabled. Ten streamed creates reported $0.2890382 of
+OpenRouter credit across both models, and one generation per model reconciled on its first lookup.
+[Execution checklist](checklist.md) · [Probe results and limitations](probe-results.md) ·
+[Paid acceptance receipt](evidence/paid-36567394/acceptance.json)
 
 ## Operator outcome
 
@@ -24,12 +16,10 @@ forge codex start --proxy codex-responses-openrouter
 forge codex start --proxy codex-responses-openrouter -- -m google/gemini-4-carbon
 ```
 
-The first command should use the template's default model. The second should select the explicit OpenRouter slug,
-subject to the proxy's configured zero data retention (ZDR) policy. Both should work with the OpenRouter credential
-alone. The operator gets Forge's proxy traces and spend caps while Codex runs its usual local tools.
-
-Today `codex-responses-local` is the only template the launcher accepts. It needs an OpenAI API key and a local LiteLLM
-backend, and it serves OpenAI models only.
+The first command selects Astra by default. The second selects the explicit OpenRouter slug, subject to the proxy's
+configured zero data retention (ZDR) policy. Both use the OpenRouter credential. The operator gets Forge's proxy traces
+and spend caps while Codex runs its usual local tools. The existing `codex-responses-local` template uses an OpenAI API
+key and a local LiteLLM backend.
 
 Forge can trace a local attempt even when the upstream supplies no identity. Stage 70 found reported cost on both unary
 and streaming Astra requests. The route's missing-cost policy covers endpoints that omit the field.
@@ -214,9 +204,9 @@ following criteria governed the probes. [Probe verdicts](probe-results.md#probe-
   `cost_details`. A Forge cap based on the former can undercount provider-billed inference. The paid key included BYOK
   in its limit. Forge measures OpenRouter account credit using `usage.cost`. A separate BYOK provider bill falls outside
   that cap. [OpenRouter usage accounting](https://openrouter.ai/docs/cookbook/administration/usage-accounting)
-- **Astra encrypted reasoning.** Stage 80 verified encrypted tool continuation on Gemini. Astra emitted no reasoning
-  item during this task. The implementer owns the synthetic fidelity check in the checklist and retains this limit on
-  the live claim.
+- **Astra encrypted reasoning.** Gemini replayed encrypted reasoning in stage 80 and through the packaged Forge proxy.
+  Astra emitted no reasoning item during the stage 80 task, and its live acceptance still showed no replay. Integration
+  fixtures verify that Forge preserves synthetic encrypted reasoning for either model.
 - **Client coupling.** The request shape changed with model metadata inside one binary. The tool allow-list and fixtures
   follow captured shapes, so required ZDR refuses a new Codex tool type until Forge admits it. Retain 0.141.0 as the
   launcher floor for the tested task. Its evidence is from loopback and HTTP fixture replay. The native paid run used
