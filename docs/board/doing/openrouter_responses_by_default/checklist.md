@@ -54,11 +54,15 @@ stubbed the Codex child after argument construction and sent no inference traffi
   edit preserved the saved bytes. New Messages audit records use the same `messages` value as smoke JSON.
 - Promoted the reviewed source and identity rules and the JSON-value preservation contract to the
   [launcher implementation note](../../impl_notes/runtime_telemetry.md#sessionless-codex-proxy-launcher).
+- With `priority` saved in a disposable Codex home, Codex 0.171.0 completed two turns on the translated Gemini proxy
+  without either the service-tier or shared-server warning. The loopback upstream saw the saved Neon slug and no
+  `service_tier` on all four requests. An explicit `-c 'service_tier="flex"'` sent `flex` on all four. Codex 0.141.0
+  completed the same default launch. The pinned 0.170.0 TUI self-test also passed both models' read and follow-up edit.
 
 ## Closeout
 
 - [x] Sync design, CLI, end-user and verification docs and record the reviewed launcher invariant.
-- [x] `make test-unit` passed 12,049 tests and `make test-regression` passed 2,708. All 47 targeted integration cases,
+- [x] `make test-unit` passed 12,055 tests and `make test-regression` passed 2,708. All 47 targeted integration cases,
   `make pre-commit`, repository file limits and the 810-file Markdown link audit passed.
 - [x] Record the verified feature in the [change log](../../change_log.md).
 - [ ] Move the card to `done/` and update inbound links when the implementation lands on `main`.

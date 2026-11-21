@@ -424,7 +424,8 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
         err_console.print("Unreported OpenRouter account charges cannot count toward this proxy's spend caps.")
     launch_default = policy.get("requested_default_model") or default_model
     requested = passthrough_model(codex_args) or launch_default
-    if "required_zdr" in policy and not requested:
+    direct_openrouter = "required_zdr" in policy
+    if direct_openrouter and not requested:
         print_error_with_tip(
             "The OpenRouter proxy has no model configured for its default tier.",
             "Pass an upstream slug after -- with -m, or configure a model for the proxy's default tier.",
@@ -449,5 +450,6 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
             sandbox=cast(CodexSandbox, sandbox),
             model=launch_default,
             passthrough=client_args,
+            direct_openrouter=direct_openrouter,
         )
     )

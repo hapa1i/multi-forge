@@ -148,7 +148,9 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
 - `capabilities.responses_ingress` advertises live availability and `endpoints.responses` describes the available route.
   Responses preserves opaque reasoning and bypasses body audit. Direct OpenRouter strips native identifiers, enforces
   model and tool policy, and refuses background creates. The explicit Responses profile keeps its historical bare smoke
-  target. [Operator contract](end-user/codex_proxy.md)
+  target. For a verified direct OpenRouter route the launcher defaults Codex to the standard service tier and selects
+  the embedded server when the CLI supports `--no-daemon`. Explicit launch options take precedence.
+  [Operator contract](end-user/codex_proxy.md)
 
 **Marking-practice separation.** Runtime truth identifies effective routes; it does not classify provider practices. The
 package-owned `core/data/model_practices.yaml` separately records dated, source-linked provider declarations under

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import struct
+import subprocess
 import sys
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -361,6 +362,7 @@ class TestBareProxyInvoke:
             base_url=_PROXY_BASE, sandbox="workspace-write", model="gpt-5.5", passthrough=["--search"], cwd="/work"
         )
         assert rc == 7
+        mock_run.assert_called_once()
         argv = mock_run.call_args.args[0]
         assert argv[:3] == ["codex", "--sandbox", "workspace-write"]
         assert argv[-3:] == ["-m", "gpt-5.5", "--search"]
@@ -376,3 +378,34 @@ class TestBareProxyInvoke:
         mock_run.return_value = MagicMock(returncode=0)
         invoke_codex_bare_proxy(base_url=_PROXY_BASE, model=None)
         assert mock_run.call_args.kwargs["cwd"]  # non-empty: os.getcwd()
+
+    @pytest.mark.parametrize(
+        ("help_result", "server_flags"),
+        [
+            (subprocess.CompletedProcess(["codex", "--help"], 0, b"  --no-daemon  Run embedded"), ["--no-daemon"]),
+            (subprocess.CompletedProcess(["codex", "--help"], 0, b"Options:"), []),
+            (subprocess.TimeoutExpired(["codex", "--help"], 5), []),
+        ],
+        ids=["current-cli", "older-cli", "help-unavailable"],
+    )
+    def test_openrouter_defaults_precede_user_overrides(
+        self,
+        mock_run: MagicMock,
+        help_result: subprocess.CompletedProcess[bytes] | subprocess.TimeoutExpired,
+        server_flags: list[str],
+    ) -> None:
+        mock_run.side_effect = [help_result, MagicMock(returncode=0)]
+        explicit = ['--config=service_tier="flex"', "--", "--no-daemon"]
+        invoke_codex_bare_proxy(base_url=_PROXY_BASE, direct_openrouter=True, passthrough=explicit, cwd="/work")
+
+        probe, launch = mock_run.call_args_list
+        assert probe.args[0] == ["codex", "--help"]
+        assert probe.kwargs["env"] == launch.kwargs["env"] and probe.kwargs["cwd"] == "/work"
+        assert launch.args[0] == [*_PROXY_BASE_ARGV, "-c", 'service_tier="default"', *server_flags, *explicit]
+
+    @pytest.mark.parametrize("selection", [["--no-daemon"], ["--remote", "unix://"], ["--remote=unix://"]])
+    def test_openrouter_honors_explicit_server_selection(self, mock_run: MagicMock, selection: list[str]) -> None:
+        mock_run.return_value = MagicMock(returncode=0)
+        invoke_codex_bare_proxy(base_url=_PROXY_BASE, direct_openrouter=True, passthrough=selection)
+        mock_run.assert_called_once()
+        assert mock_run.call_args.args[0] == [*_PROXY_BASE_ARGV, "-c", 'service_tier="default"', *selection]

@@ -196,6 +196,7 @@ def invoke_codex_bare_proxy(
     sandbox: CodexSandbox = "workspace-write",
     model: str | None = None,
     passthrough: Sequence[str] = (),
+    direct_openrouter: bool = False,
     cwd: str | None = None,
 ) -> int:
     """Run the codex TUI foreground through a Forge proxy; return its exit code.
@@ -204,16 +205,46 @@ def invoke_codex_bare_proxy(
     proxy owns upstream auth; codex authenticates only to the loopback proxy). The
     terminal is inherited -- the TUI owns stdin/stdout/stderr.
     """
-    argv = _build_codex_proxy_argv(base_url=base_url, sandbox=sandbox, model=model, passthrough=passthrough)
+    cwd = cwd or os.getcwd()
     env = _build_codex_proxy_env()
+    if direct_openrouter:
+        passthrough = [*_openrouter_launch_defaults(passthrough, env=env, cwd=cwd), *passthrough]
+    argv = _build_codex_proxy_argv(base_url=base_url, sandbox=sandbox, model=model, passthrough=passthrough)
     logger.debug(
         "Launching proxy-backed codex (base_url=%s, sandbox=%s, model=%s)",
         base_url,
         sandbox,
         model,
     )
-    result = subprocess.run(argv, env=env, cwd=cwd or os.getcwd(), stdin=None, stdout=None, stderr=None)
+    result = subprocess.run(argv, env=env, cwd=cwd, stdin=None, stdout=None, stderr=None)
     return result.returncode
+
+
+def _openrouter_launch_defaults(passthrough: Sequence[str], *, env: Mapping[str, str], cwd: str) -> list[str]:
+    """Set standard service for this launch and opt into embedded mode on CLIs that support it."""
+    defaults = ["-c", 'service_tier="default"']
+    for arg in passthrough:
+        if arg == "--":
+            break
+        if arg in ("--no-daemon", "--remote") or arg.startswith("--remote="):
+            return defaults
+
+    # Older supported Codex binaries already run embedded and reject --no-daemon.
+    try:
+        help_result = subprocess.run(
+            ["codex", "--help"],
+            env=env,
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return defaults
+    if help_result.returncode == 0 and b"--no-daemon" in help_result.stdout.split():
+        defaults.append("--no-daemon")
+    return defaults
 
 
 def _build_codex_proxy_env() -> dict[str, str]:

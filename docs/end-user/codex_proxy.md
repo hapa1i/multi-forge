@@ -6,6 +6,7 @@ running proxy's identity and Responses capability before launching.
 
 ```bash
 forge codex start --proxy codex-responses-openrouter
+forge codex start --proxy <id>
 forge codex start --proxy <id> -- -m google/gemini-4-neon
 forge codex start --proxy codex-responses-local --sandbox read-only
 ```
@@ -16,6 +17,11 @@ example, the Gemini template selects `google/gemini-4-neon`, and `codex-response
 `openai/gpt-6.2-astra`. After `--`, use the full OpenRouter slug with `-m` or a top-level `-c model=...` override. An
 explicit `-m` takes precedence. Codex can warn about missing built-in model metadata for an unfamiliar slug. The proxy
 uses `OPENROUTER_API_KEY` from the environment or active Forge credential profile.
+
+On direct OpenRouter launches, Forge sets `service_tier="default"` for this run. Codex omits the tier from upstream
+requests even if your personal config selects `priority`. To request another tier, pass it after `--`, for example
+`-- -c 'service_tier="flex"'`. Forge also passes `--no-daemon` when the installed Codex CLI supports it, which
+explicitly selects the embedded server for the proxy settings.
 
 After upgrading Forge, restart an existing listener with `forge proxy stop <id>` then `forge proxy start <id>`. Its
 saved configuration stays in place. An older snapshot with a missing or blank `backend` uses its saved

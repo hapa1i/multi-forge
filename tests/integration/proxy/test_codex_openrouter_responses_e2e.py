@@ -362,6 +362,7 @@ def test_template_name_launch_uses_verified_proxy(
     child.write_text(
         f"#!{sys.executable}\nimport json, sys, os\nfrom pathlib import Path\n"
         "if '--version' in sys.argv: print('codex-cli 0.170.0'); sys.exit()\n"
+        "if sys.argv[1:] == ['--help']: print('--no-daemon'); sys.exit()\n"
         "assert 'OPENROUTER_API_KEY' not in os.environ\n"
         f"Path({str(captured)!r}).write_text(json.dumps(sys.argv[1:]))\n"
     )
@@ -376,6 +377,8 @@ def test_template_name_launch_uses_verified_proxy(
         assert result.exit_code == 0, result.output
         argv = json.loads(captured.read_bytes())
         direct = proxy_template != "codex-responses-local"
+        assert ('service_tier="default"' in argv) == direct
+        assert ("--no-daemon" in argv) == direct
         assert ('web_search="disabled"' in argv) == (direct and not proxy_settings.get("allow_non_zdr"))
         if proxy_settings.get("costs", {}).get("on_unreported_cost") == "allow":
             assert "Unreported OpenRouter account charges" in result.output

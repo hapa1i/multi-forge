@@ -62,7 +62,8 @@ live Google AI cases in `test_session_routing_e2e.py`. Follow the Neon and Hydro
 
 The loopback fixtures exercise translated and explicit Responses profiles, the legacy OpenRouter backend fallback, both
 clients on one port, endpoint-specific audit and smoke output, unreported cost and a shared two-cent cap. They also
-retain coverage for local LiteLLM subresources and accounting. Use synthetic credentials for this suite.
+check the OpenRouter-only Codex launch flags and retain coverage for local LiteLLM subresources and accounting. Use
+synthetic credentials for this suite.
 
 ```bash
 PYTHON_DOTENV_DISABLED=1 GEMINI_API_KEY= OPENROUTER_API_KEY= ./scripts/test-integration.sh \
@@ -75,6 +76,11 @@ For native TUI acceptance, run `forge_acceptance.py --selftest` with the manifes
 receipt path. Verify the read and follow-up edit on both model slugs, the cap and the generation lookups. A live rerun
 requires a separately approved manifest and a dedicated credit-limited key.
 [Harness and commands](../../scripts/experiments/openrouter/README.md#codex-responses)
+
+For launch-default changes, set `service_tier="priority"` in a disposable Codex home and use a loopback OpenRouter
+fixture. On a CLI that supports `--no-daemon`, verify that the tier and shared-server warnings are absent. The default
+Responses request should omit `service_tier`, and an explicit `-- -c 'service_tier="flex"'` should send `flex`. Also
+launch with the minimum supported Codex CLI to catch unsupported flags.
 
 ## Backends, telemetry and costs
 

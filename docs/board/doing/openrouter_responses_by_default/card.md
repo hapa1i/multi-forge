@@ -26,6 +26,8 @@ the original saved configuration. [Original Responses card](../../done/codex_ope
   OpenRouter slug, subject to the saved routing policy. At Codex launch, disclose when Messages inspection is enabled
   and Responses has no body audit. On a saved `allow_non_zdr=true` profile, disclose that Forge permits hosted tools and
   caller-supplied routing. Account restrictions still apply. [Codex proxy contract](../../../end-user/codex_proxy.md)
+- On a direct OpenRouter launch, default Codex to `service_tier="default"` and pass `--no-daemon` when supported. Honor
+  explicit per-launch settings and keep older supported Codex versions usable.
 - Both endpoints charge one proxy spend cap. Use Responses eligibility when validating, loading and enforcing
   `costs.on_unreported_cost`. An absent policy means `reject`. Honor an explicit saved `allow`, including one 1.1.8
   ignored on a translated proxy, and surface the uncounted-spend notice at launch. Recovery from a missing-cost block
