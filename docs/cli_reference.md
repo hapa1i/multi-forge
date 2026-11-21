@@ -337,9 +337,10 @@ claim. Default adopted detach, `delete --no-kill`, and deletion of one live shar
 process running and succeed. Multi-delete continues other IDs, reports deleted/failed totals, and exits non-zero if any
 required stop fails.
 
-`proxy create --json --smoke-test` emits one object with the normal creation fields plus `smoke_test: {passed, detail}`.
-Failed verification exits non-zero while retaining the created/reused/adopted proxy; without `--smoke-test`, the JSON
-shape is unchanged. `--no-start` remains config-only and does not run verification.
+`proxy create` and `proxy start` accept `--smoke-test --smoke-endpoint messages|responses`. A bare check targets
+Messages except on an explicit Responses profile. The human result identifies the endpoint, and create JSON includes
+`smoke_test` with `passed`, `detail` and `endpoint`. If live discovery fails before selecting an endpoint, its value is
+`null`. Failed verification exits nonzero and retains the proxy. `--no-start` creates configuration only.
 
 Bare `forge proxy metrics --json` always returns a mapping from every registered proxy ID to its metrics object, using
 `null` for an unreachable proxy; this shape is the same for zero, one, or many registrations. Selecting an ID returns
@@ -398,12 +399,12 @@ selects the alternate slug. `forge proxy metrics <id>` shows the credit cap, and
 the detected Forge install scope (else user); `--scope user|project|local` and `--all` widen it. Prove enrollment
 empirically with `forge runtime preflight codex --verify-enrollment`.
 
-`start --proxy <id-or-template>` launches the Codex TUI routed through a Responses-capable proxy
-(`wire_shape: openai_responses_passthrough` + a `responses_ingress` source). It is **sessionless and scrubbed** — the
-proxy owns upstream auth, so no native codex/OpenAI login is required or leaked. It hard-blocks a codex older than the
-proxy-contract-validated version (≥0.141.0) before starting a proxy, auto-defaults `-m` from the proxy's default tier
-(override with `-- -m <model>`), and accepts `--sandbox read-only|workspace-write|danger-full-access` (default
-`workspace-write`). For direct use without a proxy, run native `codex`.
+`start --proxy <id-or-template>` launches the Codex TUI routed through any direct OpenRouter proxy or the local
+Responses passthrough profile. It is **sessionless and scrubbed** — the proxy owns upstream auth, so no native
+codex/OpenAI login is required or leaked. It hard-blocks a codex older than the proxy-contract-validated version
+(≥0.141.0) before starting a proxy, auto-defaults `-m` from the proxy's default tier (override with `-- -m <model>`),
+and accepts `--sandbox read-only|workspace-write|danger-full-access` (default `workspace-write`). For direct use without
+a proxy, run native `codex`.
 
 ### Runtime management
 
