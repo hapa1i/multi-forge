@@ -46,6 +46,7 @@ def build_request_cost_record(
     forge_root_run_id: str | None = None,
     downstream_event_id: str | None = None,
     backend_id: str | None = None,
+    requested_model: str | None = None,
     cache_write_tokens: int = 0,
 ) -> DownstreamRecord:
     """Build detached request-cost evidence for direct or queued persistence.
@@ -67,7 +68,7 @@ def build_request_cost_record(
         source_id=proxy_id,
         source_kind="proxy",
         backend_id=backend_id,
-        model=model,
+        model=requested_model or model,
         mapped_model=model,
         tier=tier,
         input_tokens=input_tokens,

@@ -123,12 +123,18 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
   active (lossy)" before launch (§7.x)
 
 - `wire_shape: openai_responses_passthrough` is the **Codex-facing** raw OpenAI **Responses** shape on `/v1/responses*`
-  (create + retrieve/cancel/input_items/delete/compact/input_tokens). It forwards traffic byte-for-byte (signature-safe;
-  `can_inspect.*=false`, like `anthropic_passthrough`). Routing requires that wire shape plus backend
-  `responses_ingress`; `GET /`'s `capabilities.responses_ingress` and Codex preflight's `proxy_supported` expose the
-  conjunction. Reported `x-litellm-response-cost` is USD→micros; an OpenAI-direct upstream is token-telemetry-only. The
-  launcher is `forge codex start --proxy` (§3.4). The shared `proxy.sse_framing` incremental data/JSON framer serves
-  both raw passthrough usage taps; accumulators own protocol event merging and lifecycle semantics.
+  (create + retrieve/cancel/input_items/delete/compact/input_tokens). It preserves request JSON values, including opaque
+  reasoning items, and streams upstream SSE bytes incrementally. `can_inspect.*=false`. Routing requires that wire shape
+  plus backend `responses_ingress`. `GET /`'s `capabilities.responses_ingress` and Codex preflight's `proxy_supported`
+  expose the conjunction. Reported `x-litellm-response-cost` is USD→micros; an OpenAI-direct upstream is
+  token-telemetry-only. The launcher is `forge codex start --proxy` (§3.4). The shared `proxy.sse_framing` incremental
+  data/JSON framer serves both raw passthrough usage taps; accumulators own protocol event merging and lifecycle
+  semantics.
+
+  On the canonical OpenRouter source, only create is relayed. The ingress drops native identifiers and applies the live
+  ZDR model and tool policy, including plugin controls on the outgoing request. The direct route rejects background
+  creates because it cannot retrieve their final usage. The LiteLLM template also relays subresources.
+  [Operator contract](end-user/codex_proxy.md)
 
   The shape governs the Responses ingress; it does not make the proxy exclusive to Codex. The same
   `codex-responses-local` instance deliberately accepts Claude-backed sessions and workers on `/v1/messages`, where the
@@ -448,9 +454,10 @@ unchanged `starting` row, preserving concurrent replacements.
 | `litellm-openai-codex-local` | OpenAI Codex models via local LiteLLM + OpenAI API key         |
 | `anthropic-passthrough`      | Raw Anthropic passthrough; signature-safe; inspect enabled     |
 | `codex-responses-local`      | Raw Codex Responses plus translated Claude Messages ingress    |
+| `codex-responses-openrouter` | Direct OpenRouter Responses plus translated Messages ingress   |
 | `litellm-gemini-test`        | Internal integration-test dependency; hidden from normal lists |
 
-Twenty-one templates ship; `litellm-gemini-test` is test infrastructure, so twenty are user-facing.
+Twenty-two templates ship, including twenty-one user-facing templates and the internal `litellm-gemini-test`.
 
 A proxy template is an operational profile:
 
@@ -532,7 +539,7 @@ The shipped v1 catalog includes:
 
 | Backend instance id       | Kind   | Provider         | Endpoint shape                       | Credentials      | Notes                                                                                           |
 | ------------------------- | ------ | ---------------- | ------------------------------------ | ---------------- | ----------------------------------------------------------------------------------------------- |
-| `openrouter`              | remote | `openrouter`     | `OPENROUTER_BASE_URL` + default URL  | `openrouter`     | Provider-trace and user-group capable                                                           |
+| `openrouter`              | remote | `openrouter`     | `OPENROUTER_BASE_URL` + default URL  | `openrouter`     | Provider trace, Messages user grouping, direct Responses                                        |
 | `litellm-remote`          | remote | `litellm_remote` | `LITELLM_BASE_URL`                   | `litellm-remote` | Aliases remote LiteLLM templates                                                                |
 | `anthropic-passthrough`   | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Proxy-template backend, no lifecycle                                                            |
 | `anthropic-direct`        | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Direct-runtime attribution backend                                                              |

@@ -1,0 +1,136 @@
+{
+  "client_runs": [
+    {
+      "client_diagnostics": [
+        {
+          "fallback_metadata_warning": false,
+          "returncode": 1,
+          "turn": 1
+        }
+      ],
+      "metadata_header": false,
+      "model": "openai/gpt-6.2-astra",
+      "requests": [
+        {
+          "http": 402,
+          "path": "/v1/responses",
+          "shape": {
+            "additional_tools": true,
+            "compacted_history": false,
+            "compaction_prompt": false,
+            "custom_names": [
+              "functions.exec"
+            ],
+            "fixture_call": false,
+            "fixture_output_received": false,
+            "fixture_result": false,
+            "followup": false,
+            "function_names": [
+              "functions.wait",
+              "functions.request_user_input",
+              "functions.request_user_input_async",
+              "functions.send_message_to_user_async",
+              "clock.sleep",
+              "collaboration.followup_task",
+              "collaboration.interrupt_agent",
+              "collaboration.list_agents",
+              "collaboration.send_message",
+              "collaboration.spawn_agent",
+              "collaboration.wait_agent"
+            ],
+            "hosted_web_search": false,
+            "item_types": [
+              "additional_tools",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message"
+            ],
+            "keys": [
+              "client_metadata",
+              "include",
+              "input",
+              "model",
+              "parallel_tool_calls",
+              "prompt_cache_key",
+              "reasoning",
+              "store",
+              "stream",
+              "text",
+              "tool_choice"
+            ],
+            "metadata_keys": [
+              "root_turn_id",
+              "session_id",
+              "thread_id",
+              "turn_id",
+              "x-codex-installation-id",
+              "x-codex-turn-metadata",
+              "x-codex-window-id"
+            ],
+            "model": "openai/gpt-6.2-astra",
+            "previous_response_id_present": false,
+            "reasoning_keys": [
+              "context",
+              "effort"
+            ],
+            "store": false,
+            "stream": true,
+            "text_keys": [
+              "verbosity"
+            ],
+            "title_request": false,
+            "tool_types": [
+              "custom",
+              "function",
+              "namespace"
+            ],
+            "top_tool_types": [],
+            "user_messages": 2
+          },
+          "turn": 1
+        }
+      ],
+      "required_zdr": false,
+      "turns": []
+    }
+  ],
+  "credit": {
+    "includes_byok": true,
+    "resets": false,
+    "usd_limit": 2,
+    "usd_remaining": 1.99848
+  },
+  "manifest_sha256": "0a6ac1d0ad98fa597a9b3e65027097cb2e71d724d7b4c399d820cf94d464c20d",
+  "prerequisite": {
+    "criterion": "account_zdr_accepted_refusal",
+    "manifest_sha256": "1ee865aae6c817e5b16d72f8ec1fed98db0a49d0aa865b5e4c48674cd4e2a2bc",
+    "path": "evidence/paid-1ee865aa/zdr.json",
+    "sha256": "dd050601a5c88c32f93fd077d81e620ccd7881457e5babee23a0ad8b70ca7dfb",
+    "stage": "zdr"
+  },
+  "reason": "Provider returned HTTP 402. This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 49962. To increase, visit <key-settings-url> and adjust the key's total limit",
+  "requests": [
+    {
+      "model": null,
+      "operation": "key",
+      "status": 200
+    },
+    {
+      "error": {
+        "bytes": 561,
+        "code": 402,
+        "format": "json",
+        "message": "This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 49962. To increase, visit <key-settings-url> and adjust the key's total limit",
+        "sha256": "54228229d68cb9e765ffd906c686ef699099978012a346e95feae02a40445019"
+      },
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 402
+    }
+  ],
+  "stage": "codex",
+  "verdict": "inconclusive"
+}

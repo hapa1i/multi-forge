@@ -34,10 +34,8 @@ logger = logging.getLogger(__name__)
 def build_intercept_capability_section(wire_shape: str, intercept_mode: str, audit_full_body: bool) -> dict[str, Any]:
     """Compute GET /'s intercept truth table for one wire shape.
 
-    Both passthrough shapes preserve signed reasoning byte-for-byte (Anthropic
-    thinking blocks / Responses reasoning items). A byte-faithful Responses
-    passthrough cannot inspect or override bodies, so its can_inspect is uniformly
-    false even when intercept.mode is inspect/override.
+    Both passthrough shapes preserve signed reasoning. Responses preserves JSON
+    values across serialization. Its intercept capability stays false in every mode.
     """
     is_responses_pt = wire_shape == OPENAI_RESPONSES_PASSTHROUGH
     return {
@@ -76,8 +74,8 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
     Codex-facing ingress for ``forge codex start --proxy``. Gated on
     ``wire_shape == openai_responses_passthrough`` AND the source's
     ``responses_ingress`` capability -- the same conjunction the codex preflight
-    mirrors, so a green preflight cannot 501 here. Reasoning items survive
-    byte-for-byte (passthrough); body audit is structurally unavailable. The body
+    mirrors, so a green preflight cannot 501 here. Reasoning items survive by
+    value. Body audit is structurally unavailable. The body
     is read only for POST -- bodyless GET/DELETE never call ``.json()``.
     """
     import forge.proxy.server as server
@@ -119,8 +117,21 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
         )
 
     base_url = config.proxy.get_provider().base_url
+    from forge.proxy import openrouter_responses
+
+    direct = source.id == "openrouter"
+    is_generation = method == "POST" and url_path == "/v1/responses"
+    if direct and not is_generation:
+        return openrouter_responses.refusal(
+            "unsupported_operation", "This source supports only POST /v1/responses. Send the full history.", request_id
+        )
     if not base_url:
         return _error(500, "configuration_error", "responses passthrough upstream base_url is not configured")
+    if direct:
+        try:
+            openrouter_responses.validate_base(base_url)
+        except ValueError as exc:
+            return openrouter_responses.refusal("configuration_error", str(exc), request_id)
 
     try:
         bearer_env = source_bearer_auth_env_var(source)
@@ -146,7 +157,13 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
                 return _error(400, "invalid_request_error", "Request body must be a JSON object")
             body = parsed
 
-    model = str(body.get("model")) if body and body.get("model") else "unknown"
+    requested_model = str(body.get("model")) if body and body.get("model") else "unknown"
+    if direct:
+        try:
+            body = openrouter_responses.prepare_request(body or {}, config.proxy.get_provider())
+        except ValueError as exc:
+            return openrouter_responses.refusal("invalid_request", str(exc), request_id)
+    model = str(body["model"]) if direct and body else requested_model
     resolved_tier = getattr(config.proxy, "default_tier", None) or "sonnet"
     streaming = body is not None and bool(body.get("stream"))
     forge_run_id, forge_root_run_id = server._forge_run_ids(raw_request)
@@ -158,23 +175,26 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
     # (so accounting double-counts tokens) or carry none (logging zero-token attempts);
     # the spend cap likewise governs new generations, not management of an existing run
     # (you must be able to cancel a run to STOP spending even while over cap).
-    is_generation = method == "POST" and url_path == "/v1/responses"
-
     # Spend-cap check — same cross-request accumulation as the other accounted
     # paths, so caps configured on a Responses proxy reject rather than silently pass.
     tracker = server.cost_tracker
     spend_warning: str | None = None
+    if direct and (config.proxy.costs.on_unreported_cost or "reject") == "reject":
+        if source.capabilities.responses_reports_cost is False or (tracker and tracker.responses_cost_unreported):
+            return openrouter_responses.refusal(
+                "unreported_cost", openrouter_responses.unreported_cost_message(server.PROXY_ID or "<id>"), request_id
+            )
     if is_generation and tracker is not None and tracker.has_caps:
         cap_result = tracker.check_cap()
         if cap_result.exceeded:
             spend_warning = server._cap_result_message(cap_result)
+            logger.warning("[%s] %s", request_id, spend_warning)
             if tracker.on_cap_hit == "reject":
                 return JSONResponse(
                     status_code=429,
                     content={"type": "error", "error": {"type": "spend_cap_exceeded", "message": spend_warning}},
                     headers=server._with_spend_warning({"X-Request-ID": request_id}, spend_warning),
                 )
-            logger.warning("[%s] %s", request_id, spend_warning)
 
     def _on_complete(
         usage: dict[str, int], reported_cost_micros: int | None, failed: bool, error_type: str | None
@@ -187,6 +207,7 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
         )
         cost = server._calc_and_log_cost(
             model=model,
+            requested_model=requested_model if direct else None,
             tier=resolved_tier,
             input_tokens=in_tok,
             output_tokens=out_tok,
@@ -217,6 +238,7 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
             "backend_id": server._backend_instance_id(),
             "proxy_id": server.PROXY_ID or "unknown",
             "mapped_model": model,
+            "requested_model": requested_model if direct else None,
             "request_id": request_id,
             "forge_run_id": forge_run_id,
             "forge_root_run_id": forge_root_run_id,
@@ -243,6 +265,11 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
         request_id=request_id,
         on_complete=_on_complete if is_generation else None,
         provider_trace_ctx=provider_trace_ctx,
+        openrouter=(
+            openrouter_responses.OpenRouterResponseEvidence(tracker.mark_responses_cost_unreported if tracker else None)
+            if direct
+            else None
+        ),
         extra_response_headers=server._with_spend_warning({}, spend_warning) or None,
     )
 

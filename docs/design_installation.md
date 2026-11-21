@@ -220,7 +220,7 @@ Six atomic credentials (defined in `forge.core.auth.capabilities`):
 
 | Credential       | Env var(s)                                              | Capabilities                                                                    |
 | ---------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `openrouter`     | `OPENROUTER_API_KEY` (+ optional `OPENROUTER_BASE_URL`) | All `openrouter-*` proxies, OSS workflow models                                 |
+| `openrouter`     | `OPENROUTER_API_KEY` (+ optional `OPENROUTER_BASE_URL`) | `openrouter-*`, `codex-responses-openrouter`, OSS workflow models               |
 | `anthropic-api`  | `ANTHROPIC_API_KEY`                                     | Forge subprocesses, `litellm-anthropic-local` + `anthropic-passthrough` proxies |
 | `openai-api`     | `OPENAI_API_KEY`                                        | `litellm-openai-local` proxy                                                    |
 | `gemini-api`     | `GEMINI_API_KEY`                                        | `litellm-gemini-local` proxy                                                    |

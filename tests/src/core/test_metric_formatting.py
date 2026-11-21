@@ -126,3 +126,11 @@ def test_status_fractional_cents_usd_policy(amount: float, expected: str) -> Non
 )
 def test_spend_cap_usd_policy(amount: float, expected: str) -> None:
     assert format_usd(amount, policy=UsdDisplayPolicy.SPEND_CAP) == expected
+
+
+@pytest.mark.parametrize(
+    ("micros", "expected"),
+    [(0, "$0.00"), (1, "$0.000001"), (125_000, "$0.125"), (500_000, "$0.50"), (3_000_001, "$3.000001")],
+)
+def test_spend_cap_detail_preserves_integer_micros(micros: int, expected: str) -> None:
+    assert format_usd_micros(micros, policy=UsdDisplayPolicy.SPEND_CAP_DETAIL) == expected

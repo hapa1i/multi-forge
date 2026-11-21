@@ -34,6 +34,7 @@ from forge.core.models.model_routes import (
 from forge.core.wire_shapes import (
     ANTHROPIC_PASSTHROUGH,
     DEFAULT_WIRE_SHAPE,
+    OPENAI_RESPONSES_PASSTHROUGH,
     VALID_WIRE_SHAPES,
 )
 
@@ -395,8 +396,12 @@ class CostConfig:
     caps: CostCaps = field(default_factory=CostCaps)
     on_cap_hit: str = "reject"  # "reject" (HTTP 429) or "warn" (header only)
 
+    on_unreported_cost: str | None = None
+
     def __post_init__(self) -> None:
         self.caps = _coerce_cost_caps(self.caps)
+        if self.on_unreported_cost not in (None, "reject", "allow"):
+            raise ValueError("costs.on_unreported_cost must be reject or allow")
 
         valid_actions = {"reject", "warn"}
         if self.on_cap_hit not in valid_actions:
@@ -413,10 +418,11 @@ def _coerce_cost_config(value: Any) -> CostConfig:
         return value
     if not isinstance(value, dict):
         raise ValueError("Invalid costs: must be a mapping")
-    _reject_unknown_cost_keys("costs", value, {"caps", "on_cap_hit"})
+    _reject_unknown_cost_keys("costs", value, {"caps", "on_cap_hit", "on_unreported_cost"})
     return CostConfig(
         caps=_coerce_cost_caps(value.get("caps", {}) or {}),
         on_cap_hit=value.get("on_cap_hit", "reject"),
+        on_unreported_cost=value.get("on_unreported_cost"),
     )
 
 
@@ -828,15 +834,19 @@ PROXY_PROVIDER_DIRECT_FIELDS: tuple[str, ...] = (
 PROXY_PROVIDER_TRANSFORMED_FIELDS: frozenset[str] = frozenset({"tier_overrides", "tiers"})
 
 
-def _coerce_proxy_blocks(cfg: Any) -> None:
-    """Coerce the shared per-proxy blocks in place, then cross-validate.
+def supports_unreported_cost_policy(backend: str, wire_shape: str) -> bool:
+    return backend == "openrouter" and wire_shape == OPENAI_RESPONSES_PASSTHROUGH
 
-    The cross-field check needs the validated wire_shape and the coerced
-    intercept, so it runs after the loop.
-    """
+
+def _coerce_proxy_blocks(cfg: Any) -> None:
+    """Coerce the shared per-proxy blocks before checking route-specific settings."""
     for name, coercer in PROXY_BLOCK_COERCERS.items():
         setattr(cfg, name, coercer(getattr(cfg, name)))
     _validate_wire_shape_intercept(cfg.wire_shape, cfg.intercept)
+    if cfg.costs.on_unreported_cost is not None and not supports_unreported_cost_policy(cfg.backend, cfg.wire_shape):
+        raise ValueError(
+            "costs.on_unreported_cost applies only to direct OpenRouter Responses. Remove it on this proxy."
+        )
 
 
 _VALID_DEFAULT_TIERS = frozenset({"haiku", "sonnet", "opus"})

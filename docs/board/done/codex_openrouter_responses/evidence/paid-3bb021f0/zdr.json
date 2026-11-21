@@ -1,0 +1,58 @@
+{
+  "baseline": {
+    "error": {
+      "bytes": 625,
+      "code": 404,
+      "format": "json",
+      "message": "0 endpoints out of 1 requested are available matching your guardrail restrictions and data policy. We removed them for the following reasons (an endpoint may have matched multiple reasons):",
+      "sha256": "6ae1793c7b1c43899a5569ce8adf967485e631f164e20024034e64e9a1e623ab"
+    },
+    "http": 404
+  },
+  "catalog": {
+    "entries": 1047,
+    "epoch": 1795108888.346354,
+    "excluded": true,
+    "included": true,
+    "negative_model_ids": [
+      "qwen/qwen4-max",
+      "qwen/qwen4-max-20261115"
+    ],
+    "positive_model": "openai/gpt-6.2-astra",
+    "sha256": "d6d722c045f2a04313172817f9a7f3be9fdef0de6f9c8b773ed0c6ae7a38fee3"
+  },
+  "credit": {
+    "includes_byok": true,
+    "resets": false,
+    "usd_limit": 2,
+    "usd_remaining": 2
+  },
+  "manifest_sha256": "3bb021f0744eaf594e0ee3eb8ead7ccc6838c84fe09a88fcd25ed549a0c6bc1a",
+  "reason": "Responses request returned HTTP 404. 0 endpoints out of 1 requested are available matching your guardrail restrictions and data policy. We removed them for the following reasons (an endpoint may have matched multiple reasons):",
+  "requests": [
+    {
+      "model": null,
+      "operation": "key",
+      "status": 200
+    },
+    {
+      "model": null,
+      "operation": "endpoints/zdr",
+      "status": 200
+    },
+    {
+      "error": {
+        "bytes": 625,
+        "code": 404,
+        "format": "json",
+        "message": "0 endpoints out of 1 requested are available matching your guardrail restrictions and data policy. We removed them for the following reasons (an endpoint may have matched multiple reasons):",
+        "sha256": "6ae1793c7b1c43899a5569ce8adf967485e631f164e20024034e64e9a1e623ab"
+      },
+      "model": "qwen/qwen4-max",
+      "operation": "responses",
+      "status": 404
+    }
+  ],
+  "stage": "zdr",
+  "verdict": "inconclusive"
+}

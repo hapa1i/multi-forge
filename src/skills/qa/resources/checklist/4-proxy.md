@@ -23,11 +23,11 @@ forge proxy template list
 
 - [ ] `forge proxy list` shows "No proxies found." when none exist
 - [ ] `forge proxy list` shows tip to run `forge proxy template list`
-- [ ] `forge proxy template list` shows available templates (20 user-facing: anthropic-passthrough,
-  codex-responses-local, litellm-anthropic, litellm-anthropic-local, litellm-gemini, litellm-gemini-flash-local,
-  litellm-gemini-local, litellm-openai, litellm-openai-codex-local, litellm-openai-local, openrouter-anthropic,
-  openrouter-deepseek, openrouter-gemini, openrouter-gemini-flash, openrouter-glm, openrouter-kimi, openrouter-minimax,
-  openrouter-openai, openrouter-openai-codex, openrouter-qwen)
+- [ ] `forge proxy template list` shows available templates (21 user-facing: anthropic-passthrough,
+  codex-responses-local, codex-responses-openrouter, litellm-anthropic, litellm-anthropic-local, litellm-gemini,
+  litellm-gemini-flash-local, litellm-gemini-local, litellm-openai, litellm-openai-codex-local, litellm-openai-local,
+  openrouter-anthropic, openrouter-deepseek, openrouter-gemini, openrouter-gemini-flash, openrouter-glm,
+  openrouter-kimi, openrouter-minimax, openrouter-openai, openrouter-openai-codex, openrouter-qwen)
 - [ ] Internal test-only templates (e.g., litellm-gemini-test) are hidden from the default list
 
 ### 4.2 Create a Proxy
@@ -443,6 +443,7 @@ forge model backend show litellm-4000 --raw
 forge proxy template list
 
 # Show each OpenRouter template
+forge proxy template show codex-responses-openrouter
 forge proxy template show openrouter-anthropic
 forge proxy template show openrouter-openai
 forge proxy template show openrouter-openai-codex
@@ -455,7 +456,7 @@ forge proxy template show openrouter-minimax
 forge proxy template show openrouter-qwen
 ```
 
-- [ ] `forge proxy template list` shows 20 user-facing templates total (8 LiteLLM + 10 OpenRouter +
+- [ ] `forge proxy template list` shows 21 user-facing templates total (8 LiteLLM + 11 OpenRouter +
   `anthropic-passthrough` + `codex-responses-local`)
 - [ ] `openrouter-anthropic` maps tiers to Claude models (haiku=claude-haiku-4.5, sonnet=claude-sonnet-5.5,
   opus=claude-opus-5.5)

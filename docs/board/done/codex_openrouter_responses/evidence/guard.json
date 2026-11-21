@@ -1,0 +1,36 @@
+{
+  "accepted": 2,
+  "attempted": 6,
+  "canned_function_and_custom_tool_replay": true,
+  "canned_unary_stream_metadata_cost": "passed",
+  "canned_zdr_controls": "passed",
+  "deadline_seconds": 1.5,
+  "detached_survivors_swept": 1,
+  "elapsed_seconds": 1.6529486660001567,
+  "kind": "loopback-only",
+  "native": {
+    "google/gemini-4-carbon": {
+      "metadata_header": true,
+      "requests": 4,
+      "scratch_edit_verified": true,
+      "verified_turns": 2
+    },
+    "openai/gpt-6.2-astra": {
+      "metadata_header": true,
+      "requests": 4,
+      "scratch_edit_verified": true,
+      "verified_turns": 2
+    }
+  },
+  "published_fixture_posts": {
+    "title": 3,
+    "tool": 20
+  },
+  "published_fixture_replays": 13,
+  "received": 2,
+  "remaining_processes": 0,
+  "separately_opened_ledgers": 6,
+  "tested_manifest_sha256": "53895a110f3639b5423a48f7861d7e3ed5936621b7b76fb3f7e3508141e4fbb9",
+  "trickling_close_delimited_cutoff_seconds": 0.352,
+  "unexpected_upstream_error_stops": true
+}

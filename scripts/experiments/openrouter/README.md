@@ -1,4 +1,98 @@
-# OpenRouter provider-trace probe harness (Phase 0, evaluation only)
+# OpenRouter probe harness
+
+## Codex Responses
+
+Stages 50–80 exercise the sessionless Codex Responses route. Select each stage by name or number. Stage 50 uses a
+private loopback server, a dummy provider token and disposable Codex homes. Supply a JSON object mapping each pinned
+version (`0.141.0`, `0.149.1`, `0.161.0`, `0.170.0`) to its retained native executable's absolute path. Keep the
+complete distribution next to each executable. Point `OPENROUTER_CAPTURE_DIR` at a fresh private directory.
+
+```bash
+export OPENROUTER_RESPONSES_BINARIES=/path/to/binaries.json
+export OPENROUTER_CAPTURE_DIR=/path/to/private/capture-round
+./reproduce.sh 50-responses-loopback
+./sanitize.sh
+```
+
+The matrix records a local tool read, a follow-up turn, compaction, and client rendering and retries for seven error
+controls across five refusal classes. Keep raw transcripts, native IDs and executable paths private. After the scan,
+`python3 helpers/export_matrix.py "$OPENROUTER_CAPTURE_DIR/sanitized/50-loopback"` writes the per-request CSV to
+standard output. [Recorded results](../../../docs/board/done/codex_openrouter_responses/probe-results.md)
+
+The final acceptance runner launches both native TUIs through a saved Forge proxy with a verified $0.50 reject cap. It
+reserves requests before forwarding and relays SSE incrementally. Supply an unused path in a private directory. The
+receipt contains identifiers used for reconciliation. For publication, replace generation, request and downstream event
+IDs with stable labels across the receipt, downstream records and checklist. Keep the original locally for lookups. The
+selftest uses loopback, synthetic credentials and a scratch workspace.
+
+```bash
+uv run --locked python scripts/experiments/openrouter/helpers/forge_acceptance.py --selftest \
+  --manifest docs/board/done/codex_openrouter_responses/paid-acceptance-manifest.json \
+  --binary /path/to/pinned/codex --output /path/to/new-receipt.json
+```
+
+After separate operator approval, replace `--selftest` with `--approved-sha256 <full-approved-digest>` and supply the
+dedicated key via `OPENROUTER_PROBE_API_KEY`. The live ledger permits one run per digest. The approved `36567394` run
+completed on 2026-11-21.
+[Paid receipt](../../../docs/board/done/codex_openrouter_responses/evidence/paid-36567394/acceptance.json) ·
+[Acceptance limits and optional key creation](../../../docs/board/done/codex_openrouter_responses/paid-acceptance-manifest.json)
+
+Stages 60 (ZDR), 70 (cost and identity) and 80 (Codex and HTTP replay) spend OpenRouter credit. They require a reviewed
+manifest and a dedicated, credit-limited probe key. Supply the manifest path in `OPENROUTER_RESPONSES_MANIFEST` and the
+**approved digest** in `OPENROUTER_RESPONSES_APPROVED_SHA256`. Supply the key through `OPENROUTER_PROBE_API_KEY`. For
+native Codex probes, supply the retained binary path through `OPENROUTER_RESPONSES_CODEX`. Each stage consumes its
+manifest's attempt budget and deadline, with a persistent receipt under
+`~/.cache/forge-openrouter-probe/response-approvals/<manifest-sha256>/`. The key must have a non-resetting USD limit
+within the approval and count BYOK charges. Local controls can be checked with
+`python3 helpers/paid_probe.py selftest --selftest-codex /path/to/pinned/codex`. Pass
+`--selftest-manifest /path/to/paid-probe-manifest.json` to include all pinned replay fixtures. This exercises the bridge
+and scratch edit against a canned upstream. Keep the card's `evidence/` directory beside its manifests when moving or
+copying the card. The runner resolves historical fixture paths there and replays the bytes verified during preflight.
+[Original Qwen replay manifest](../../../docs/board/done/codex_openrouter_responses/paid-probe-manifest-qwen.json)
+
+The
+[account ZDR manifest](../../../docs/board/done/codex_openrouter_responses/paid-probe-manifest-qwen-account-zdr.json)
+covers only stage 60. After approval, select `./reproduce.sh 60-responses-zdr`. The harness verifies the recorded Qwen
+baseline locally, checks the key and current ZDR catalog, and sends both live requests with `provider.zdr=true`. A pass
+requires a ZDR-specific Qwen refusal and completed text from Astra under the account policy. The independent effect of
+the request flag remains unverified.
+
+The [Astra continuation](../../../docs/board/done/codex_openrouter_responses/paid-probe-manifest-astra-positive.json)
+accepts the exact Qwen refusal the maintainer reviewed. The harness verifies both historical Qwen receipts, reads the
+key and catalog, and sends one Astra request. To reproduce that sequence locally, pass the continuation file to
+`--selftest-manifest`.
+[Live result](../../../docs/board/done/codex_openrouter_responses/evidence/paid-1ee865aa/zdr.json)
+
+The [stages 70 and 80 manifest](../../../docs/board/done/codex_openrouter_responses/paid-probe-manifest-cost-codex.json)
+pins the passing stage 60 receipt. Rehearse it with `selftest --selftest-manifest <manifest> --selftest-codex <binary>`.
+After approval, run `./reproduce.sh 70-responses-cost` followed by `./reproduce.sh 80-responses-codex` with the same
+dedicated key. The ledger verifies that key with a fresh salt per approval and enforces stage order, the shared deadline
+and the attempt limits. If an unfinished ledger predates salted key verification, keep its reservations. Stage 80 then
+requires a separately approved continuation.
+
+The [stage 80-only manifest](../../../docs/board/done/codex_openrouter_responses/paid-probe-manifest-codex-only.json)
+reuses the stage 70 metadata decision and pins the prior credit refusal. Pass it to the same loopback command to run
+only the native and HTTP replay probes. After approval, select `./reproduce.sh 80-responses-codex`. The standalone stage
+checks the dedicated key's credit once before forwarding the first native request.
+
+Run the original account ZDR manifest on loopback from the repository root.
+
+```bash
+python3 scripts/experiments/openrouter/helpers/paid_probe.py selftest \
+  --selftest-manifest docs/board/done/codex_openrouter_responses/paid-probe-manifest-qwen-account-zdr.json
+```
+
+For a failed request, inspect `requests[].error` in the stage receipt. The diagnostic projects OpenRouter's
+`error.metadata.ineligibility_reasons` into `ineligibility_reasons`, retaining recognized routing codes, valid endpoint
+counts and the public privacy settings URL when present. `ineligibility_reasons_omitted` counts entries withheld by the
+sanitizer. The separate `routing_reasons` field contains recognized policy lines from the message. Stage 60 also records
+the diagnostic on the failed control, for example `baseline.error`. The diagnostic includes the sanitized message and
+available error code, provider name, upstream error fields and request ID. For an unreadable error body, use the
+recorded byte count and SHA-256 to identify it. The original three-stage manifests use a paired test for independent
+request-level enforcement. That test requires a completed unrestricted baseline before the same model and reasoning
+setting can demonstrate a refusal with the flag set.
+
+## Provider trace (Chat Completions)
 
 **Question:** which OpenRouter externals does the `openrouter_observability` card rest on, and are they true? Phase 0
 pins them with reproducible, operator-gated probes **before** any later phase populates a provider-id field.
@@ -83,5 +177,5 @@ ${OPENROUTER_CAPTURE_DIR:-~/.cache/forge-openrouter-probe}/<stage>/
 └── streams/   # raw payloads -- ONLY when --debug-raw (uncommitted)
 ```
 
-Promote the sanitized findings into `docs/board/doing/openrouter_observability/phase0-results.md` (metadata-only) and
-tick the Phase 0 boxes in that card's `checklist.md`. Raw captures stay in the cache, never committed.
+The [provider-trace results](../../../docs/board/done/openrouter_observability/phase0-results.md) record the completed
+Chat Completions investigation. Raw captures stay in the private cache.

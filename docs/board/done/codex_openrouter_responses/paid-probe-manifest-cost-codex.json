@@ -1,0 +1,143 @@
+{
+  "schema": 1,
+  "status": "proposed for operator approval",
+  "scope": "Stages 70 and 80 on the OpenRouter account used for stage 60. Keep account ZDR enabled. This approval ends with the probe receipts, before product implementation and live acceptance.",
+  "stages": [
+    "cost",
+    "codex"
+  ],
+  "models": {
+    "default": "openai/gpt-6.2-astra",
+    "alternate": "google/gemini-4-carbon"
+  },
+  "binary": {
+    "version": "0.170.0",
+    "platform": "aarch64-apple-darwin",
+    "sha256": "9248cfeebec9b4cc3034d5114caab10fbf426cbfa79dba410c5fa1b72762abd6"
+  },
+  "origin": "https://openrouter.ai",
+  "operations": [
+    "GET /api/v1/key",
+    "POST /api/v1/responses",
+    "POST /api/v1/chat/completions",
+    "GET /api/v1/generation?id=<observed ID>"
+  ],
+  "limits": {
+    "usd": 2.0,
+    "seconds": 900,
+    "generation_attempts": 45,
+    "metadata_attempts": 17,
+    "stage_attempts": {
+      "cost": {
+        "generation": 5,
+        "metadata": 16
+      },
+      "codex": {
+        "generation": 40,
+        "metadata": 1
+      }
+    }
+  },
+  "ledger_root": "~/.cache/forge-openrouter-probe/response-approvals",
+  "prerequisite": {
+    "stage": "zdr",
+    "criterion": "account_zdr_accepted_refusal",
+    "path": "evidence/paid-1ee865aa/zdr.json",
+    "sha256": "dd050601a5c88c32f93fd077d81e620ccd7881457e5babee23a0ad8b70ca7dfb",
+    "manifest_sha256": "1ee865aae6c817e5b16d72f8ec1fed98db0a49d0aa865b5e4c48674cd4e2a2bc"
+  },
+  "key_setup": {
+    "condition": "Use an eligible dedicated key from the stage 60 account. If one is unavailable, this approval includes one management request on that account before starting the shared runner.",
+    "operation": "POST /api/v1/keys",
+    "max_attempts": 1,
+    "limit_usd": 2.0,
+    "limit_reset": null,
+    "include_byok_in_limit": true,
+    "expires_in_minutes": 20
+  },
+  "controls": [
+    "Verify the pinned stage 60 pass locally. Its account-scoped result leaves independent enforcement of the request flag unverified.",
+    "Run stage 70 and then stage 80 using the same dedicated key and ledger. Run each stage once. Start stage 80 only after stage 70 passes. Stop on an inconclusive result, exhausted budget or the shared 15-minute deadline.",
+    "Verify the dedicated key through GET /api/v1/key before each stage. Require positive available credit, a non-resetting limit at or below USD 2.00 and BYOK charges included.",
+    "Reserve each attempt before sending, including client retries and tool continuations. Use the listed operations, models and synthetic tasks. All redirects stay unfollowed."
+  ],
+  "cost": [
+    "Use the synthetic input 'Respond with the single word OK.' on openai/gpt-6.2-astra with provider.zdr=true and at most 128 output tokens. Send four Responses requests with store=false spanning unary and streaming, each with the X-OpenRouter-Metadata header omitted and enabled.",
+    "Send one Chat Completions create with the same synthetic task and ZDR flag as an indexing control. Allow up to 15 generation lookups in total and at most three lookups per observed ID. A completed Chat Completions control must be indexed for stage 70 to pass. Record missing, explicit zero and numeric cost separately, along with response identity and selected-provider evidence."
+  ],
+  "codex": [
+    "Run native Codex exec and exec resume on both slugs with the client's default tool declarations and no policy mutation. A fresh isolated home, workspace, thread and loopback credential belong to each run. Only the test bridge holds the OpenRouter key. Account ZDR applies to both unmodified native baselines. The bridge rejects store=true. All 13 pinned Responses fixtures have store=false.",
+    "The scratch project has a single input file, fixture.txt, containing FORGE_FIXTURE_173. The first prompt requests exactly 'cat fixture.txt'. The resumed prompt asks the client to write the word from turn one to proof.txt with 'echo WORD > proof.txt'. Verify the resulting file. These are the only local commands the bridge accepts.",
+    "Replay each checksum-pinned synthetic fixture with provider.zdr=true. For each tool request, append the freshly returned output items, including any opaque reasoning and matching call ID, followed by the synthetic read result. Record whether encrypted replay was exercised. Title fixtures require a strict JSON object with a 1–36 character title and no additional fields.",
+    "If streaming metadata identifies one selected provider, apply the candidate metadata header to the policy replays and an additional real Codex read/edit run on the default model with required ZDR and web search disabled.",
+    "Native calls may send bundled client instructions, tool schemas, scratch paths and newly generated client IDs. Synthetic HTTP fixtures replace local paths, client-generated IDs and prose. Native default-tool declarations can include web search on Gemini. The task requires only the two local scratch commands.",
+    "The 10 tool fixtures use two creates each, and three title fixtures use one each. At the loopback rate of four creates per two-turn native run, the two baselines plus optional metadata run add 8–12. This leaves 5–9 of the 40 stage attempts for additional client traffic. Both approved slugs map to themselves under the bundled ZDR policy."
+  ],
+  "replay_fixtures": [
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.141.0-exec-gpt-6.2-astra-tool.json",
+      "sha256": "220b30ccd0074724672b23b52e33891b60bd368d9fce20a0a17963865d2d34b4",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.141.0-tui-gemini-4-carbon-tool.json",
+      "sha256": "da92a2226249e73315adb094f8aae1182cd560318acc7230360731758639e3b2",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.149.1-exec-gpt-6.2-astra-tool.json",
+      "sha256": "1e6fd749ff22dfbb0fea89c67f14e204540cead9e1a4b73b14b139edad0ea156",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.149.1-tui-gemini-4-carbon-tool.json",
+      "sha256": "5da62bf9535360c4e4684db76346e07caa1f74de5ab838d4dd2980fb3df23246",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.161.0-exec-gpt-6.2-astra-tool.json",
+      "sha256": "6576ad4707f279fddbcc9c01c19f10592319ff54584a260a0f0a515bd9cc00f2",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.161.0-tui-gemini-4-carbon-tool.json",
+      "sha256": "3df3b1811c96f0647da6422d1f9b6764e49a3e4c87230bdab2cfd67d3c882bb2",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.161.0-tui-gpt-6.2-astra-title.json",
+      "sha256": "b93ad2be080c3aeafbcfee7a7f0bba5762377b3d5bb07c72b0774a6f77655bc5",
+      "purpose": "title"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-exec-gemini-4-carbon-tool.json",
+      "sha256": "2eb60e786a6e00da9a1b5f66cf0bcc70beefbf4a72a7dbd40f4c6b5886f0eff8",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-exec-gpt-6.2-astra-tool.json",
+      "sha256": "c2d47a1788da4983f0691c4c47873385a39989d756070442ca5db69cd394b441",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gemini-4-carbon-tool.json",
+      "sha256": "7eab5fa3ecd4f7dbbfbbfd1462cbcb505174e42478407341b1a2bfc7087f598a",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gemini-4-carbon-title.json",
+      "sha256": "2725c5f153385789d68d31341af2c8c2aa5c51214a57d26ab077f1bd22d163ca",
+      "purpose": "title"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gpt-6.2-astra-tool.json",
+      "sha256": "ad38c262a1c5df39941513a807ee17d41117c075aaf03a854be6a9175bc3aa4d",
+      "purpose": "tool"
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gpt-6.2-astra-title.json",
+      "sha256": "e414954c746908ec4ed128b385f471f912e85a800852c556ba3b6bbef9fdf6c2",
+      "purpose": "title"
+    }
+  ]
+}

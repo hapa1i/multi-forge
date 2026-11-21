@@ -344,7 +344,8 @@ shape is unchanged. `--no-start` remains config-only and does not run verificati
 Bare `forge proxy metrics --json` always returns a mapping from every registered proxy ID to its metrics object, using
 `null` for an unreachable proxy; this shape is the same for zero, one, or many registrations. Selecting an ID returns
 that proxy's raw metrics object instead. JSON uses a non-rendering stdout path, so whitespace and bracket-rich metric
-values are not wrapped or interpreted as terminal markup.
+values are not wrapped or interpreted as terminal markup. The human view shows configured spend caps and the setting to
+change when a reject cap blocks new generations.
 
 ### Telemetry
 
@@ -387,6 +388,11 @@ session *label*; use `--root-run-id` for an exact match.
 | -------------------------------- | -------------------------------------------------------------------------------------------- |
 | `forge codex status`             | Inspect Codex binary, config, and Forge hook registration (`--scope`, `--all`, `--json`)     |
 | `forge codex start --proxy <id>` | Launch the Codex TUI routed through a Responses-capable proxy (`--sandbox`, `-- codex-args`) |
+
+For OpenRouter, use `forge codex start --proxy codex-responses-openrouter`. An explicit `-- -m google/gemini-4-carbon`
+selects the alternate slug. `forge proxy metrics <id>` shows the credit cap, and
+`forge telemetry trace show <request-id>` shows both slugs on a configured ZDR fallback.
+[Codex proxy settings and missing-cost recovery](end-user/codex_proxy.md)
 
 `status` is read-only and reports registration from a static config read; it never claims enrollment. Default scope is
 the detected Forge install scope (else user); `--scope user|project|local` and `--all` widen it. Prove enrollment

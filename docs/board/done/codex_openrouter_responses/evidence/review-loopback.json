@@ -1,0 +1,857 @@
+{
+  "cases": [
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "exec",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-anthropic",
+      "tasks_ended": 1,
+      "version": "0.141.0"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "tui",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-anthropic",
+      "tasks_ended": 1,
+      "version": "0.141.0"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "exec",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-anthropic",
+      "tasks_ended": 1,
+      "version": "0.149.1"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "tui",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-anthropic",
+      "tasks_ended": 1,
+      "version": "0.149.1"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "exec",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-anthropic",
+      "tasks_ended": 1,
+      "version": "0.161.0"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "tui",
+      "requests": {
+        "foreground_400": 1,
+        "title_400": 1
+      },
+      "scenario": "400-anthropic",
+      "tasks_ended": 1,
+      "version": "0.161.0"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "exec",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-anthropic",
+      "tasks_ended": 1,
+      "version": "0.170.0"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "tui",
+      "requests": {
+        "foreground_400": 1,
+        "title_400": 1
+      },
+      "scenario": "400-anthropic",
+      "tasks_ended": 1,
+      "version": "0.170.0"
+    },
+    {
+      "ingress_diagnostic_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-ingress",
+      "tasks_ended": 1,
+      "version": "0.141.0"
+    },
+    {
+      "ingress_diagnostic_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-ingress",
+      "tasks_ended": 1,
+      "version": "0.141.0"
+    },
+    {
+      "ingress_diagnostic_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-ingress",
+      "tasks_ended": 1,
+      "version": "0.149.1"
+    },
+    {
+      "ingress_diagnostic_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-ingress",
+      "tasks_ended": 1,
+      "version": "0.149.1"
+    },
+    {
+      "ingress_diagnostic_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-ingress",
+      "tasks_ended": 1,
+      "version": "0.161.0"
+    },
+    {
+      "ingress_diagnostic_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_400": 1,
+        "title_400": 1
+      },
+      "scenario": "400-ingress",
+      "tasks_ended": 1,
+      "version": "0.161.0"
+    },
+    {
+      "ingress_diagnostic_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-ingress",
+      "tasks_ended": 1,
+      "version": "0.170.0"
+    },
+    {
+      "ingress_diagnostic_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_400": 1,
+        "title_400": 1
+      },
+      "scenario": "400-ingress",
+      "tasks_ended": 1,
+      "version": "0.170.0"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "exec",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-openai",
+      "tasks_ended": 1,
+      "version": "0.141.0"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "tui",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-openai",
+      "tasks_ended": 1,
+      "version": "0.141.0"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "exec",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-openai",
+      "tasks_ended": 1,
+      "version": "0.149.1"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "tui",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-openai",
+      "tasks_ended": 1,
+      "version": "0.149.1"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "exec",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-openai",
+      "tasks_ended": 1,
+      "version": "0.161.0"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "tui",
+      "requests": {
+        "foreground_400": 1,
+        "title_400": 1
+      },
+      "scenario": "400-openai",
+      "tasks_ended": 1,
+      "version": "0.161.0"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "exec",
+      "requests": {
+        "foreground_400": 1
+      },
+      "scenario": "400-openai",
+      "tasks_ended": 1,
+      "version": "0.170.0"
+    },
+    {
+      "cap_setting_visible": true,
+      "generic_429_visible": false,
+      "mode": "tui",
+      "requests": {
+        "foreground_400": 1,
+        "title_400": 1
+      },
+      "scenario": "400-openai",
+      "tasks_ended": 1,
+      "version": "0.170.0"
+    },
+    {
+      "credit_message_and_both_token_counts_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_402": 6
+      },
+      "scenario": "402-credit",
+      "tasks_ended": 1,
+      "version": "0.141.0"
+    },
+    {
+      "credit_message_and_both_token_counts_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_402": 6
+      },
+      "scenario": "402-credit",
+      "tasks_ended": 1,
+      "version": "0.141.0"
+    },
+    {
+      "credit_message_and_both_token_counts_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_402": 6
+      },
+      "scenario": "402-credit",
+      "tasks_ended": 1,
+      "version": "0.149.1"
+    },
+    {
+      "credit_message_and_both_token_counts_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_402": 6
+      },
+      "scenario": "402-credit",
+      "tasks_ended": 1,
+      "version": "0.149.1"
+    },
+    {
+      "credit_message_and_both_token_counts_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_402": 6
+      },
+      "scenario": "402-credit",
+      "tasks_ended": 1,
+      "version": "0.161.0"
+    },
+    {
+      "credit_message_and_both_token_counts_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_402": 6,
+        "title_402": 6
+      },
+      "scenario": "402-credit",
+      "tasks_ended": 1,
+      "version": "0.161.0"
+    },
+    {
+      "credit_message_and_both_token_counts_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_402": 6
+      },
+      "scenario": "402-credit",
+      "tasks_ended": 1,
+      "version": "0.170.0"
+    },
+    {
+      "credit_message_and_both_token_counts_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_402": 6,
+        "title_402": 6
+      },
+      "scenario": "402-credit",
+      "tasks_ended": 1,
+      "version": "0.170.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_429": 1
+      },
+      "scenario": "429-anthropic",
+      "tasks_ended": 1,
+      "version": "0.141.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_429": 1
+      },
+      "scenario": "429-anthropic",
+      "tasks_ended": 1,
+      "version": "0.141.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_429": 1
+      },
+      "scenario": "429-anthropic",
+      "tasks_ended": 1,
+      "version": "0.149.1"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_429": 1
+      },
+      "scenario": "429-anthropic",
+      "tasks_ended": 1,
+      "version": "0.149.1"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_429": 1
+      },
+      "scenario": "429-anthropic",
+      "tasks_ended": 1,
+      "version": "0.161.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_429": 1,
+        "title_429": 1
+      },
+      "scenario": "429-anthropic",
+      "tasks_ended": 1,
+      "version": "0.161.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_429": 1
+      },
+      "scenario": "429-anthropic",
+      "tasks_ended": 1,
+      "version": "0.170.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_429": 1,
+        "title_429": 1
+      },
+      "scenario": "429-anthropic",
+      "tasks_ended": 1,
+      "version": "0.170.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_429": 1
+      },
+      "scenario": "429-openai",
+      "tasks_ended": 1,
+      "version": "0.141.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_429": 1
+      },
+      "scenario": "429-openai",
+      "tasks_ended": 1,
+      "version": "0.141.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_429": 1
+      },
+      "scenario": "429-openai",
+      "tasks_ended": 1,
+      "version": "0.149.1"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_429": 1
+      },
+      "scenario": "429-openai",
+      "tasks_ended": 1,
+      "version": "0.149.1"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_429": 1
+      },
+      "scenario": "429-openai",
+      "tasks_ended": 1,
+      "version": "0.161.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_429": 1,
+        "title_429": 1
+      },
+      "scenario": "429-openai",
+      "tasks_ended": 1,
+      "version": "0.161.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "exec",
+      "requests": {
+        "foreground_429": 1
+      },
+      "scenario": "429-openai",
+      "tasks_ended": 1,
+      "version": "0.170.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "tui",
+      "requests": {
+        "foreground_429": 1,
+        "title_429": 1
+      },
+      "scenario": "429-openai",
+      "tasks_ended": 1,
+      "version": "0.170.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "exec",
+      "requests": {
+        "compaction_429": 6,
+        "foreground_200": 1
+      },
+      "scenario": "compaction-429",
+      "tasks_ended": 2,
+      "version": "0.141.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "tui",
+      "requests": {
+        "compaction_429": 6,
+        "foreground_200": 1
+      },
+      "scenario": "compaction-429",
+      "tasks_ended": 2,
+      "version": "0.141.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "exec",
+      "requests": {
+        "compaction_429": 6,
+        "foreground_200": 1
+      },
+      "scenario": "compaction-429",
+      "tasks_ended": 2,
+      "version": "0.149.1"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "tui",
+      "requests": {
+        "compaction_429": 6,
+        "foreground_200": 1
+      },
+      "scenario": "compaction-429",
+      "tasks_ended": 2,
+      "version": "0.149.1"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "exec",
+      "requests": {
+        "compaction_429": 6,
+        "foreground_200": 1
+      },
+      "scenario": "compaction-429",
+      "tasks_ended": 2,
+      "version": "0.161.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "tui",
+      "requests": {
+        "compaction_429": 6,
+        "foreground_200": 1,
+        "title_200": 1
+      },
+      "scenario": "compaction-429",
+      "tasks_ended": 2,
+      "version": "0.161.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "exec",
+      "requests": {
+        "compaction_429": 1,
+        "foreground_200": 1
+      },
+      "scenario": "compaction-429",
+      "tasks_ended": 2,
+      "version": "0.170.0"
+    },
+    {
+      "cap_setting_visible": false,
+      "generic_429_visible": true,
+      "mode": "tui",
+      "requests": {
+        "compaction_429": 1,
+        "foreground_200": 1,
+        "title_200": 1
+      },
+      "scenario": "compaction-429",
+      "tasks_ended": 2,
+      "version": "0.170.0"
+    },
+    {
+      "mode": "exec",
+      "requests": {
+        "foreground_200": 3
+      },
+      "scenario": "metadata-astra",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.141.0"
+    },
+    {
+      "mode": "tui",
+      "requests": {
+        "foreground_200": 3
+      },
+      "scenario": "metadata-astra",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.141.0"
+    },
+    {
+      "mode": "exec",
+      "requests": {
+        "foreground_200": 3
+      },
+      "scenario": "metadata-astra",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.149.1"
+    },
+    {
+      "mode": "tui",
+      "requests": {
+        "foreground_200": 3
+      },
+      "scenario": "metadata-astra",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.149.1"
+    },
+    {
+      "mode": "exec",
+      "requests": {
+        "foreground_200": 3
+      },
+      "scenario": "metadata-astra",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.161.0"
+    },
+    {
+      "mode": "tui",
+      "requests": {
+        "foreground_200": 3,
+        "title_200": 1
+      },
+      "scenario": "metadata-astra",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.161.0"
+    },
+    {
+      "mode": "exec",
+      "requests": {
+        "foreground_200": 3
+      },
+      "scenario": "metadata-astra",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.170.0"
+    },
+    {
+      "mode": "tui",
+      "requests": {
+        "foreground_200": 3,
+        "title_200": 1
+      },
+      "scenario": "metadata-astra",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.170.0"
+    },
+    {
+      "mode": "exec",
+      "requests": {
+        "foreground_200": 3
+      },
+      "scenario": "metadata-gemini",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.141.0"
+    },
+    {
+      "mode": "tui",
+      "requests": {
+        "foreground_200": 3
+      },
+      "scenario": "metadata-gemini",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.141.0"
+    },
+    {
+      "mode": "exec",
+      "requests": {
+        "foreground_200": 3
+      },
+      "scenario": "metadata-gemini",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.149.1"
+    },
+    {
+      "mode": "tui",
+      "requests": {
+        "foreground_200": 3
+      },
+      "scenario": "metadata-gemini",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.149.1"
+    },
+    {
+      "mode": "exec",
+      "requests": {
+        "foreground_200": 3
+      },
+      "scenario": "metadata-gemini",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.161.0"
+    },
+    {
+      "mode": "tui",
+      "requests": {
+        "foreground_200": 3,
+        "title_200": 1
+      },
+      "scenario": "metadata-gemini",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.161.0"
+    },
+    {
+      "mode": "exec",
+      "requests": {
+        "foreground_200": 3
+      },
+      "scenario": "metadata-gemini",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.170.0"
+    },
+    {
+      "mode": "tui",
+      "requests": {
+        "foreground_200": 3,
+        "title_200": 1
+      },
+      "scenario": "metadata-gemini",
+      "tasks_ended": 2,
+      "verified_tool_and_followup": true,
+      "version": "0.170.0"
+    }
+  ],
+  "codex_binary_sha256": {
+    "0.141.0": "51f848c212ee24e8da923a7175813a74c113d47e01f0d40f1fea46b12644c363",
+    "0.149.1": "f0d8762236594359b60cfbe17f4c7e945a3ce8d1c91e74778838c968d250fb6c",
+    "0.161.0": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+    "0.170.0": "9248cfeebec9b4cc3034d5114caab10fbf426cbfa79dba410c5fa1b72762abd6"
+  },
+  "kind": "supplemental native Codex loopback review",
+  "protocol": {
+    "400-ingress": {
+      "body": {
+        "error": {
+          "message": "Request body must be a JSON object",
+          "type": "invalid_request_error"
+        },
+        "type": "error"
+      },
+      "headers": {
+        "X-Request-ID": "fixture-capped-request"
+      },
+      "status": 400
+    },
+    "402-credit": {
+      "body": {
+        "error": {
+          "code": 402,
+          "message": "This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 49962. To increase, visit <key-settings-url> and adjust the key's total limit"
+        }
+      },
+      "note": "Sanitized provider message in a synthetic envelope. The stub returned the same 402 on each retry.",
+      "status": 402
+    },
+    "cap_comparison": {
+      "anthropic": {
+        "error": {
+          "message": "<cap message>",
+          "type": "spend_cap_exceeded"
+        },
+        "type": "error"
+      },
+      "headers": {
+        "X-Request-ID": "fixture-capped-request",
+        "X-Spend-Warning": "same cap message for all four combinations"
+      },
+      "message": "daily spend cap reached: $1.00 / $1.00. Adjust with: forge proxy set <id> costs.caps.per_day=<amount>",
+      "openai": {
+        "error": {
+          "code": "spend_cap_exceeded",
+          "message": "<cap message>",
+          "type": "spend_cap_exceeded"
+        }
+      },
+      "status": [
+        400,
+        429
+      ]
+    },
+    "compaction-429": "First foreground completion reports 200000 input tokens with a 1000-token compaction limit. The first compaction request and subsequent creates receive Forge's cap 429 and headers. Title controls before compaction succeed.",
+    "measurement": "Visibility checks inspected ANSI-stripped terminal output or exec JSON and stderr. Tool continuations required the fixture result on the wire and an acknowledged follow-up. Request counts come from the recording stub.",
+    "metadata": "Normal local tool read and follow-up, one run per model layout. response.created.response and response.completed.response each carry openrouter_metadata.endpoints.available with selected=true and the model/provider pair measured on the live route. Titles use the same event shape.",
+    "scope": "Local stub, dummy credential, isolated native Codex home and scratch project, web search disabled. Each row is one client run. No OpenRouter generation, key operation or lookup."
+  },
+  "totals": {
+    "cases": 72,
+    "deadline_or_request_cutoffs": 0,
+    "local_posts": 210,
+    "surviving_processes": 0
+  }
+}

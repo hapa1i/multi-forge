@@ -80,6 +80,7 @@ class ProviderTraceRecord:
     timeout_seen: bool = False
     reported_cost_micros: int | None = None
     latency_ms: float | None = None
+    requested_model: str | None = None
 
 
 # --- Write path (best-effort; never raises into the request path) ------------
@@ -103,6 +104,7 @@ def write_provider_trace(
     local_usage_status: LocalUsageStatus,
     reported_cost_micros: int | None,
     latency_ms: float | None,
+    requested_model: str | None = None,
     downstream_event_id: str | None = None,
     backend_id: str | None = None,
     record_sink: Callable[[DownstreamRecord], None] | None = None,
@@ -128,6 +130,7 @@ def write_provider_trace(
             source_id=proxy_id,
             source_kind="proxy",
             backend_id=backend_id,
+            model=requested_model,
             mapped_model=mapped_model,
             forge_run_id=forge_run_id,
             forge_root_run_id=forge_root_run_id,
@@ -169,6 +172,7 @@ def record_provider_trace(
     client_disconnected: bool,
     reported_cost_micros: int | None,
     latency_ms: float | None,
+    requested_model: str | None = None,
     downstream_event_id: str | None = None,
     backend_id: str | None = None,
     record_sink: Callable[[DownstreamRecord], None] | None = None,
@@ -195,6 +199,7 @@ def record_provider_trace(
             request_id=request_id,
             proxy_id=proxy_id,
             mapped_model=mapped_model,
+            requested_model=requested_model,
             forge_run_id=forge_run_id,
             forge_root_run_id=forge_root_run_id,
             provider_session_id=provider_session_id,
@@ -277,6 +282,7 @@ def read_provider_traces(
                 request_id=rec.request_id or "",
                 proxy_id=rec.proxy_id or "",
                 mapped_model=rec.mapped_model or rec.model or "",
+                requested_model=rec.model if rec.mapped_model and rec.model != rec.mapped_model else None,
                 forge_run_id=rec.forge_run_id,
                 forge_root_run_id=rec.forge_root_run_id,
                 provider_session_id=rec.provider_session_id,

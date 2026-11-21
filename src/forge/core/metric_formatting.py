@@ -21,6 +21,7 @@ class UsdDisplayPolicy(StrEnum):
     STATUS_WHOLE_CENTS = "status_whole_cents"
     STATUS_FRACTIONAL_CENTS = "status_fractional_cents"
     SPEND_CAP = "spend_cap"
+    SPEND_CAP_DETAIL = "spend_cap_detail"
 
 
 def format_token_count(count: int, *, policy: TokenDisplayPolicy) -> str:
@@ -85,6 +86,10 @@ def format_usd(amount_usd: float, *, policy: UsdDisplayPolicy) -> str:
         if amount_usd <= 0:
             return "$0.00"
         return f"${amount_usd:.4f}"
+
+    if policy is UsdDisplayPolicy.SPEND_CAP_DETAIL:
+        dollars, fraction = f"{amount_usd:.6f}".split(".")
+        return f"${dollars}.{fraction[:2]}{fraction[2:].rstrip('0')}"
 
     raise ValueError(f"Unsupported USD display policy: {policy}")
 

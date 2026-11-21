@@ -1,0 +1,2498 @@
+{
+  "client_runs": [
+    {
+      "client_diagnostics": [
+        {
+          "fallback_metadata_warning": false,
+          "returncode": 0,
+          "turn": 1
+        },
+        {
+          "fallback_metadata_warning": false,
+          "returncode": 0,
+          "turn": 2
+        }
+      ],
+      "metadata_header": false,
+      "model": "openai/gpt-6.2-astra",
+      "requests": [
+        {
+          "hosted_tool_output": [],
+          "http": 200,
+          "local_fixture_calls": [
+            {
+              "name": "exec",
+              "operation": "read",
+              "type": "custom_tool_call"
+            }
+          ],
+          "path": "/v1/responses",
+          "response": {
+            "generation_header": "responses-1",
+            "output_types": [
+              "message",
+              "custom_tool_call"
+            ],
+            "response_id": "responses-1",
+            "selected": [],
+            "selected_endpoints": [],
+            "status": "completed",
+            "terminal": "response.completed",
+            "usage_cost": 0.123214,
+            "usage_cost_present": true,
+            "usage_keys": [
+              "cost",
+              "cost_details",
+              "input_tokens",
+              "input_tokens_details",
+              "is_byok",
+              "output_tokens",
+              "output_tokens_details",
+              "total_tokens"
+            ]
+          },
+          "shape": {
+            "additional_tools": true,
+            "compacted_history": false,
+            "compaction_prompt": false,
+            "custom_names": [
+              "functions.exec"
+            ],
+            "fixture_call": false,
+            "fixture_output_received": false,
+            "fixture_result": false,
+            "followup": false,
+            "function_names": [
+              "functions.wait",
+              "functions.request_user_input",
+              "functions.request_user_input_async",
+              "functions.send_message_to_user_async",
+              "clock.sleep",
+              "collaboration.followup_task",
+              "collaboration.interrupt_agent",
+              "collaboration.list_agents",
+              "collaboration.send_message",
+              "collaboration.spawn_agent",
+              "collaboration.wait_agent"
+            ],
+            "hosted_web_search": false,
+            "item_types": [
+              "additional_tools",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message"
+            ],
+            "keys": [
+              "client_metadata",
+              "include",
+              "input",
+              "model",
+              "parallel_tool_calls",
+              "prompt_cache_key",
+              "reasoning",
+              "store",
+              "stream",
+              "text",
+              "tool_choice"
+            ],
+            "metadata_keys": [
+              "root_turn_id",
+              "session_id",
+              "thread_id",
+              "turn_id",
+              "x-codex-installation-id",
+              "x-codex-turn-metadata",
+              "x-codex-window-id"
+            ],
+            "model": "openai/gpt-6.2-astra",
+            "previous_response_id_present": false,
+            "reasoning_keys": [
+              "context",
+              "effort"
+            ],
+            "store": false,
+            "stream": true,
+            "text_keys": [
+              "verbosity"
+            ],
+            "title_request": false,
+            "tool_types": [
+              "custom",
+              "function",
+              "namespace"
+            ],
+            "top_tool_types": [],
+            "user_messages": 2
+          },
+          "turn": 1
+        },
+        {
+          "hosted_tool_output": [],
+          "http": 200,
+          "local_fixture_calls": [],
+          "path": "/v1/responses",
+          "response": {
+            "generation_header": "responses-2",
+            "output_types": [
+              "message"
+            ],
+            "response_id": "responses-2",
+            "selected": [],
+            "selected_endpoints": [],
+            "status": "completed",
+            "terminal": "response.completed",
+            "usage_cost": 0.0063344,
+            "usage_cost_present": true,
+            "usage_keys": [
+              "cost",
+              "cost_details",
+              "input_tokens",
+              "input_tokens_details",
+              "is_byok",
+              "output_tokens",
+              "output_tokens_details",
+              "total_tokens"
+            ]
+          },
+          "shape": {
+            "additional_tools": true,
+            "compacted_history": false,
+            "compaction_prompt": false,
+            "custom_names": [
+              "functions.exec"
+            ],
+            "fixture_call": false,
+            "fixture_output_received": false,
+            "fixture_result": false,
+            "followup": false,
+            "function_names": [
+              "functions.wait",
+              "functions.request_user_input",
+              "functions.request_user_input_async",
+              "functions.send_message_to_user_async",
+              "clock.sleep",
+              "collaboration.followup_task",
+              "collaboration.interrupt_agent",
+              "collaboration.list_agents",
+              "collaboration.send_message",
+              "collaboration.spawn_agent",
+              "collaboration.wait_agent"
+            ],
+            "hosted_web_search": false,
+            "item_types": [
+              "additional_tools",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "custom_tool_call",
+              "custom_tool_call_output"
+            ],
+            "keys": [
+              "client_metadata",
+              "include",
+              "input",
+              "model",
+              "parallel_tool_calls",
+              "prompt_cache_key",
+              "reasoning",
+              "store",
+              "stream",
+              "text",
+              "tool_choice"
+            ],
+            "metadata_keys": [
+              "root_turn_id",
+              "session_id",
+              "thread_id",
+              "turn_id",
+              "x-codex-installation-id",
+              "x-codex-turn-metadata",
+              "x-codex-window-id"
+            ],
+            "model": "openai/gpt-6.2-astra",
+            "previous_response_id_present": false,
+            "reasoning_keys": [
+              "context",
+              "effort"
+            ],
+            "store": false,
+            "stream": true,
+            "text_keys": [
+              "verbosity"
+            ],
+            "title_request": false,
+            "tool_types": [
+              "custom",
+              "function",
+              "namespace"
+            ],
+            "top_tool_types": [],
+            "user_messages": 2
+          },
+          "turn": 1
+        },
+        {
+          "hosted_tool_output": [],
+          "http": 200,
+          "local_fixture_calls": [
+            {
+              "name": "exec",
+              "operation": "write",
+              "type": "custom_tool_call"
+            }
+          ],
+          "path": "/v1/responses",
+          "response": {
+            "generation_header": "responses-3",
+            "output_types": [
+              "message",
+              "custom_tool_call"
+            ],
+            "response_id": "responses-3",
+            "selected": [],
+            "selected_endpoints": [],
+            "status": "completed",
+            "terminal": "response.completed",
+            "usage_cost": 0.0078164,
+            "usage_cost_present": true,
+            "usage_keys": [
+              "cost",
+              "cost_details",
+              "input_tokens",
+              "input_tokens_details",
+              "is_byok",
+              "output_tokens",
+              "output_tokens_details",
+              "total_tokens"
+            ]
+          },
+          "shape": {
+            "additional_tools": true,
+            "compacted_history": false,
+            "compaction_prompt": false,
+            "custom_names": [
+              "functions.exec"
+            ],
+            "fixture_call": false,
+            "fixture_output_received": false,
+            "fixture_result": false,
+            "followup": false,
+            "function_names": [
+              "functions.wait",
+              "functions.request_user_input",
+              "functions.request_user_input_async",
+              "functions.send_message_to_user_async",
+              "clock.sleep",
+              "collaboration.followup_task",
+              "collaboration.interrupt_agent",
+              "collaboration.list_agents",
+              "collaboration.send_message",
+              "collaboration.spawn_agent",
+              "collaboration.wait_agent"
+            ],
+            "hosted_web_search": false,
+            "item_types": [
+              "additional_tools",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "custom_tool_call",
+              "custom_tool_call_output",
+              "message",
+              "message"
+            ],
+            "keys": [
+              "client_metadata",
+              "include",
+              "input",
+              "model",
+              "parallel_tool_calls",
+              "prompt_cache_key",
+              "reasoning",
+              "store",
+              "stream",
+              "text",
+              "tool_choice"
+            ],
+            "metadata_keys": [
+              "root_turn_id",
+              "session_id",
+              "thread_id",
+              "turn_id",
+              "x-codex-installation-id",
+              "x-codex-turn-metadata",
+              "x-codex-window-id"
+            ],
+            "model": "openai/gpt-6.2-astra",
+            "previous_response_id_present": false,
+            "reasoning_keys": [
+              "context",
+              "effort"
+            ],
+            "store": false,
+            "stream": true,
+            "text_keys": [
+              "verbosity"
+            ],
+            "title_request": false,
+            "tool_types": [
+              "custom",
+              "function",
+              "namespace"
+            ],
+            "top_tool_types": [],
+            "user_messages": 3
+          },
+          "turn": 2
+        },
+        {
+          "hosted_tool_output": [],
+          "http": 200,
+          "local_fixture_calls": [],
+          "path": "/v1/responses",
+          "response": {
+            "generation_header": "responses-4",
+            "output_types": [
+              "message"
+            ],
+            "response_id": "responses-4",
+            "selected": [],
+            "selected_endpoints": [],
+            "status": "completed",
+            "terminal": "response.completed",
+            "usage_cost": 0.0067736,
+            "usage_cost_present": true,
+            "usage_keys": [
+              "cost",
+              "cost_details",
+              "input_tokens",
+              "input_tokens_details",
+              "is_byok",
+              "output_tokens",
+              "output_tokens_details",
+              "total_tokens"
+            ]
+          },
+          "shape": {
+            "additional_tools": true,
+            "compacted_history": false,
+            "compaction_prompt": false,
+            "custom_names": [
+              "functions.exec"
+            ],
+            "fixture_call": false,
+            "fixture_output_received": false,
+            "fixture_result": false,
+            "followup": false,
+            "function_names": [
+              "functions.wait",
+              "functions.request_user_input",
+              "functions.request_user_input_async",
+              "functions.send_message_to_user_async",
+              "clock.sleep",
+              "collaboration.followup_task",
+              "collaboration.interrupt_agent",
+              "collaboration.list_agents",
+              "collaboration.send_message",
+              "collaboration.spawn_agent",
+              "collaboration.wait_agent"
+            ],
+            "hosted_web_search": false,
+            "item_types": [
+              "additional_tools",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "custom_tool_call",
+              "custom_tool_call_output",
+              "message",
+              "message",
+              "message",
+              "custom_tool_call",
+              "custom_tool_call_output"
+            ],
+            "keys": [
+              "client_metadata",
+              "include",
+              "input",
+              "model",
+              "parallel_tool_calls",
+              "prompt_cache_key",
+              "reasoning",
+              "store",
+              "stream",
+              "text",
+              "tool_choice"
+            ],
+            "metadata_keys": [
+              "root_turn_id",
+              "session_id",
+              "thread_id",
+              "turn_id",
+              "x-codex-installation-id",
+              "x-codex-turn-metadata",
+              "x-codex-window-id"
+            ],
+            "model": "openai/gpt-6.2-astra",
+            "previous_response_id_present": false,
+            "reasoning_keys": [
+              "context",
+              "effort"
+            ],
+            "store": false,
+            "stream": true,
+            "text_keys": [
+              "verbosity"
+            ],
+            "title_request": false,
+            "tool_types": [
+              "custom",
+              "function",
+              "namespace"
+            ],
+            "top_tool_types": [],
+            "user_messages": 3
+          },
+          "turn": 2
+        }
+      ],
+      "required_zdr": false,
+      "turns": [
+        {
+          "turn": 1,
+          "verified": true
+        },
+        {
+          "turn": 2,
+          "verified": true
+        }
+      ]
+    },
+    {
+      "client_diagnostics": [
+        {
+          "fallback_metadata_warning": true,
+          "returncode": 0,
+          "turn": 1
+        },
+        {
+          "fallback_metadata_warning": true,
+          "returncode": 0,
+          "turn": 2
+        }
+      ],
+      "metadata_header": false,
+      "model": "google/gemini-4-carbon",
+      "requests": [
+        {
+          "hosted_tool_output": [],
+          "http": 200,
+          "local_fixture_calls": [
+            {
+              "name": "exec_command",
+              "operation": "read",
+              "type": "function_call"
+            }
+          ],
+          "path": "/v1/responses",
+          "response": {
+            "generation_header": "responses-5",
+            "output_types": [
+              "reasoning",
+              "function_call"
+            ],
+            "response_id": "responses-5",
+            "selected": [],
+            "selected_endpoints": [],
+            "status": "completed",
+            "terminal": "response.completed",
+            "usage_cost": 0.01941,
+            "usage_cost_present": true,
+            "usage_keys": [
+              "cost",
+              "cost_details",
+              "input_tokens",
+              "input_tokens_details",
+              "is_byok",
+              "output_tokens",
+              "output_tokens_details",
+              "total_tokens"
+            ]
+          },
+          "shape": {
+            "additional_tools": false,
+            "compacted_history": false,
+            "compaction_prompt": false,
+            "custom_names": [],
+            "fixture_call": false,
+            "fixture_output_received": false,
+            "fixture_result": false,
+            "followup": false,
+            "function_names": [
+              "exec_command",
+              "write_stdin",
+              "request_user_input",
+              "view_image",
+              "multi_agent_v1.close_agent",
+              "multi_agent_v1.resume_agent",
+              "multi_agent_v1.send_input",
+              "multi_agent_v1.spawn_agent",
+              "multi_agent_v1.wait_agent",
+              "get_goal",
+              "create_goal",
+              "update_goal"
+            ],
+            "hosted_web_search": true,
+            "item_types": [
+              "message",
+              "message",
+              "message",
+              "message"
+            ],
+            "keys": [
+              "client_metadata",
+              "include",
+              "input",
+              "model",
+              "parallel_tool_calls",
+              "prompt_cache_key",
+              "reasoning",
+              "store",
+              "stream",
+              "tool_choice",
+              "tools"
+            ],
+            "metadata_keys": [
+              "root_turn_id",
+              "session_id",
+              "thread_id",
+              "turn_id",
+              "x-codex-installation-id",
+              "x-codex-turn-metadata",
+              "x-codex-window-id"
+            ],
+            "model": "google/gemini-4-carbon",
+            "previous_response_id_present": false,
+            "reasoning_keys": [
+              "summary"
+            ],
+            "store": false,
+            "stream": true,
+            "text_keys": [],
+            "title_request": false,
+            "tool_types": [
+              "function",
+              "namespace",
+              "web_search"
+            ],
+            "top_tool_types": [
+              "function",
+              "namespace",
+              "web_search"
+            ],
+            "user_messages": 2
+          },
+          "turn": 1
+        },
+        {
+          "hosted_tool_output": [],
+          "http": 200,
+          "local_fixture_calls": [],
+          "path": "/v1/responses",
+          "response": {
+            "generation_header": "responses-6",
+            "output_types": [
+              "message",
+              "reasoning"
+            ],
+            "response_id": "responses-6",
+            "selected": [],
+            "selected_endpoints": [],
+            "status": "completed",
+            "terminal": "response.completed",
+            "usage_cost": 0.0054821,
+            "usage_cost_present": true,
+            "usage_keys": [
+              "cost",
+              "cost_details",
+              "input_tokens",
+              "input_tokens_details",
+              "is_byok",
+              "output_tokens",
+              "output_tokens_details",
+              "total_tokens"
+            ]
+          },
+          "shape": {
+            "additional_tools": false,
+            "compacted_history": false,
+            "compaction_prompt": false,
+            "custom_names": [],
+            "fixture_call": false,
+            "fixture_output_received": false,
+            "fixture_result": false,
+            "followup": false,
+            "function_names": [
+              "exec_command",
+              "write_stdin",
+              "request_user_input",
+              "view_image",
+              "multi_agent_v1.close_agent",
+              "multi_agent_v1.resume_agent",
+              "multi_agent_v1.send_input",
+              "multi_agent_v1.spawn_agent",
+              "multi_agent_v1.wait_agent",
+              "get_goal",
+              "create_goal",
+              "update_goal"
+            ],
+            "hosted_web_search": true,
+            "item_types": [
+              "message",
+              "message",
+              "message",
+              "message",
+              "reasoning",
+              "function_call",
+              "function_call_output"
+            ],
+            "keys": [
+              "client_metadata",
+              "include",
+              "input",
+              "model",
+              "parallel_tool_calls",
+              "prompt_cache_key",
+              "reasoning",
+              "store",
+              "stream",
+              "tool_choice",
+              "tools"
+            ],
+            "metadata_keys": [
+              "root_turn_id",
+              "session_id",
+              "thread_id",
+              "turn_id",
+              "x-codex-installation-id",
+              "x-codex-turn-metadata",
+              "x-codex-window-id"
+            ],
+            "model": "google/gemini-4-carbon",
+            "previous_response_id_present": false,
+            "reasoning_keys": [
+              "summary"
+            ],
+            "store": false,
+            "stream": true,
+            "text_keys": [],
+            "title_request": false,
+            "tool_types": [
+              "function",
+              "namespace",
+              "web_search"
+            ],
+            "top_tool_types": [
+              "function",
+              "namespace",
+              "web_search"
+            ],
+            "user_messages": 2
+          },
+          "turn": 1
+        },
+        {
+          "hosted_tool_output": [],
+          "http": 200,
+          "local_fixture_calls": [
+            {
+              "name": "exec_command",
+              "operation": "write",
+              "type": "function_call"
+            }
+          ],
+          "path": "/v1/responses",
+          "response": {
+            "generation_header": "responses-7",
+            "output_types": [
+              "message",
+              "reasoning",
+              "function_call"
+            ],
+            "response_id": "responses-7",
+            "selected": [],
+            "selected_endpoints": [],
+            "status": "completed",
+            "terminal": "response.completed",
+            "usage_cost": 0.019902,
+            "usage_cost_present": true,
+            "usage_keys": [
+              "cost",
+              "cost_details",
+              "input_tokens",
+              "input_tokens_details",
+              "is_byok",
+              "output_tokens",
+              "output_tokens_details",
+              "total_tokens"
+            ]
+          },
+          "shape": {
+            "additional_tools": false,
+            "compacted_history": false,
+            "compaction_prompt": false,
+            "custom_names": [],
+            "fixture_call": false,
+            "fixture_output_received": false,
+            "fixture_result": false,
+            "followup": false,
+            "function_names": [
+              "exec_command",
+              "write_stdin",
+              "request_user_input",
+              "view_image",
+              "multi_agent_v1.close_agent",
+              "multi_agent_v1.resume_agent",
+              "multi_agent_v1.send_input",
+              "multi_agent_v1.spawn_agent",
+              "multi_agent_v1.wait_agent",
+              "get_goal",
+              "create_goal",
+              "update_goal"
+            ],
+            "hosted_web_search": true,
+            "item_types": [
+              "message",
+              "message",
+              "message",
+              "message",
+              "reasoning",
+              "function_call",
+              "function_call_output",
+              "message",
+              "reasoning",
+              "message"
+            ],
+            "keys": [
+              "client_metadata",
+              "include",
+              "input",
+              "model",
+              "parallel_tool_calls",
+              "prompt_cache_key",
+              "reasoning",
+              "store",
+              "stream",
+              "tool_choice",
+              "tools"
+            ],
+            "metadata_keys": [
+              "root_turn_id",
+              "session_id",
+              "thread_id",
+              "turn_id",
+              "x-codex-installation-id",
+              "x-codex-turn-metadata",
+              "x-codex-window-id"
+            ],
+            "model": "google/gemini-4-carbon",
+            "previous_response_id_present": false,
+            "reasoning_keys": [
+              "summary"
+            ],
+            "store": false,
+            "stream": true,
+            "text_keys": [],
+            "title_request": false,
+            "tool_types": [
+              "function",
+              "namespace",
+              "web_search"
+            ],
+            "top_tool_types": [
+              "function",
+              "namespace",
+              "web_search"
+            ],
+            "user_messages": 3
+          },
+          "turn": 2
+        },
+        {
+          "hosted_tool_output": [],
+          "http": 200,
+          "local_fixture_calls": [],
+          "path": "/v1/responses",
+          "response": {
+            "generation_header": "responses-8",
+            "output_types": [
+              "message",
+              "reasoning"
+            ],
+            "response_id": "responses-8",
+            "selected": [],
+            "selected_endpoints": [],
+            "status": "completed",
+            "terminal": "response.completed",
+            "usage_cost": 0.0054372,
+            "usage_cost_present": true,
+            "usage_keys": [
+              "cost",
+              "cost_details",
+              "input_tokens",
+              "input_tokens_details",
+              "is_byok",
+              "output_tokens",
+              "output_tokens_details",
+              "total_tokens"
+            ]
+          },
+          "shape": {
+            "additional_tools": false,
+            "compacted_history": false,
+            "compaction_prompt": false,
+            "custom_names": [],
+            "fixture_call": false,
+            "fixture_output_received": false,
+            "fixture_result": false,
+            "followup": false,
+            "function_names": [
+              "exec_command",
+              "write_stdin",
+              "request_user_input",
+              "view_image",
+              "multi_agent_v1.close_agent",
+              "multi_agent_v1.resume_agent",
+              "multi_agent_v1.send_input",
+              "multi_agent_v1.spawn_agent",
+              "multi_agent_v1.wait_agent",
+              "get_goal",
+              "create_goal",
+              "update_goal"
+            ],
+            "hosted_web_search": true,
+            "item_types": [
+              "message",
+              "message",
+              "message",
+              "message",
+              "reasoning",
+              "function_call",
+              "function_call_output",
+              "message",
+              "reasoning",
+              "message",
+              "message",
+              "reasoning",
+              "function_call",
+              "function_call_output"
+            ],
+            "keys": [
+              "client_metadata",
+              "include",
+              "input",
+              "model",
+              "parallel_tool_calls",
+              "prompt_cache_key",
+              "reasoning",
+              "store",
+              "stream",
+              "tool_choice",
+              "tools"
+            ],
+            "metadata_keys": [
+              "root_turn_id",
+              "session_id",
+              "thread_id",
+              "turn_id",
+              "x-codex-installation-id",
+              "x-codex-turn-metadata",
+              "x-codex-window-id"
+            ],
+            "model": "google/gemini-4-carbon",
+            "previous_response_id_present": false,
+            "reasoning_keys": [
+              "summary"
+            ],
+            "store": false,
+            "stream": true,
+            "text_keys": [],
+            "title_request": false,
+            "tool_types": [
+              "function",
+              "namespace",
+              "web_search"
+            ],
+            "top_tool_types": [
+              "function",
+              "namespace",
+              "web_search"
+            ],
+            "user_messages": 3
+          },
+          "turn": 2
+        }
+      ],
+      "required_zdr": false,
+      "turns": [
+        {
+          "turn": 1,
+          "verified": true
+        },
+        {
+          "turn": 2,
+          "verified": true
+        }
+      ]
+    },
+    {
+      "client_diagnostics": [
+        {
+          "fallback_metadata_warning": false,
+          "returncode": 0,
+          "turn": 1
+        },
+        {
+          "fallback_metadata_warning": false,
+          "returncode": 0,
+          "turn": 2
+        }
+      ],
+      "metadata_header": true,
+      "model": "openai/gpt-6.2-astra",
+      "requests": [
+        {
+          "hosted_tool_output": [],
+          "http": 200,
+          "local_fixture_calls": [
+            {
+              "name": "exec",
+              "operation": "read",
+              "type": "custom_tool_call"
+            }
+          ],
+          "path": "/v1/responses",
+          "response": {
+            "generation_header": "responses-32",
+            "output_types": [
+              "message",
+              "custom_tool_call"
+            ],
+            "response_id": "responses-32",
+            "selected": [
+              "Azure"
+            ],
+            "selected_endpoints": [
+              {
+                "model": "openai/gpt-6.2-astra-20261117",
+                "provider": "Azure"
+              }
+            ],
+            "status": "completed",
+            "terminal": "response.completed",
+            "usage_cost": 0.123114,
+            "usage_cost_present": true,
+            "usage_keys": [
+              "cost",
+              "cost_details",
+              "input_tokens",
+              "input_tokens_details",
+              "is_byok",
+              "output_tokens",
+              "output_tokens_details",
+              "total_tokens"
+            ]
+          },
+          "shape": {
+            "additional_tools": true,
+            "compacted_history": false,
+            "compaction_prompt": false,
+            "custom_names": [
+              "functions.exec"
+            ],
+            "fixture_call": false,
+            "fixture_output_received": false,
+            "fixture_result": false,
+            "followup": false,
+            "function_names": [
+              "functions.wait",
+              "functions.request_user_input",
+              "functions.request_user_input_async",
+              "functions.send_message_to_user_async",
+              "clock.sleep",
+              "collaboration.followup_task",
+              "collaboration.interrupt_agent",
+              "collaboration.list_agents",
+              "collaboration.send_message",
+              "collaboration.spawn_agent",
+              "collaboration.wait_agent"
+            ],
+            "hosted_web_search": false,
+            "item_types": [
+              "additional_tools",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message"
+            ],
+            "keys": [
+              "client_metadata",
+              "include",
+              "input",
+              "model",
+              "parallel_tool_calls",
+              "prompt_cache_key",
+              "reasoning",
+              "store",
+              "stream",
+              "text",
+              "tool_choice"
+            ],
+            "metadata_keys": [
+              "root_turn_id",
+              "session_id",
+              "thread_id",
+              "turn_id",
+              "x-codex-installation-id",
+              "x-codex-turn-metadata",
+              "x-codex-window-id"
+            ],
+            "model": "openai/gpt-6.2-astra",
+            "previous_response_id_present": false,
+            "reasoning_keys": [
+              "context",
+              "effort"
+            ],
+            "store": false,
+            "stream": true,
+            "text_keys": [
+              "verbosity"
+            ],
+            "title_request": false,
+            "tool_types": [
+              "custom",
+              "function",
+              "namespace"
+            ],
+            "top_tool_types": [],
+            "user_messages": 2
+          },
+          "turn": 1
+        },
+        {
+          "hosted_tool_output": [],
+          "http": 200,
+          "local_fixture_calls": [],
+          "path": "/v1/responses",
+          "response": {
+            "generation_header": "responses-33",
+            "output_types": [
+              "message"
+            ],
+            "response_id": "responses-33",
+            "selected": [
+              "Azure"
+            ],
+            "selected_endpoints": [
+              {
+                "model": "openai/gpt-6.2-astra-20261117",
+                "provider": "Azure"
+              }
+            ],
+            "status": "completed",
+            "terminal": "response.completed",
+            "usage_cost": 0.0063204,
+            "usage_cost_present": true,
+            "usage_keys": [
+              "cost",
+              "cost_details",
+              "input_tokens",
+              "input_tokens_details",
+              "is_byok",
+              "output_tokens",
+              "output_tokens_details",
+              "total_tokens"
+            ]
+          },
+          "shape": {
+            "additional_tools": true,
+            "compacted_history": false,
+            "compaction_prompt": false,
+            "custom_names": [
+              "functions.exec"
+            ],
+            "fixture_call": false,
+            "fixture_output_received": false,
+            "fixture_result": false,
+            "followup": false,
+            "function_names": [
+              "functions.wait",
+              "functions.request_user_input",
+              "functions.request_user_input_async",
+              "functions.send_message_to_user_async",
+              "clock.sleep",
+              "collaboration.followup_task",
+              "collaboration.interrupt_agent",
+              "collaboration.list_agents",
+              "collaboration.send_message",
+              "collaboration.spawn_agent",
+              "collaboration.wait_agent"
+            ],
+            "hosted_web_search": false,
+            "item_types": [
+              "additional_tools",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "custom_tool_call",
+              "custom_tool_call_output"
+            ],
+            "keys": [
+              "client_metadata",
+              "include",
+              "input",
+              "model",
+              "parallel_tool_calls",
+              "prompt_cache_key",
+              "reasoning",
+              "store",
+              "stream",
+              "text",
+              "tool_choice"
+            ],
+            "metadata_keys": [
+              "root_turn_id",
+              "session_id",
+              "thread_id",
+              "turn_id",
+              "x-codex-installation-id",
+              "x-codex-turn-metadata",
+              "x-codex-window-id"
+            ],
+            "model": "openai/gpt-6.2-astra",
+            "previous_response_id_present": false,
+            "reasoning_keys": [
+              "context",
+              "effort"
+            ],
+            "store": false,
+            "stream": true,
+            "text_keys": [
+              "verbosity"
+            ],
+            "title_request": false,
+            "tool_types": [
+              "custom",
+              "function",
+              "namespace"
+            ],
+            "top_tool_types": [],
+            "user_messages": 2
+          },
+          "turn": 1
+        },
+        {
+          "hosted_tool_output": [],
+          "http": 200,
+          "local_fixture_calls": [
+            {
+              "name": "exec",
+              "operation": "write",
+              "type": "custom_tool_call"
+            }
+          ],
+          "path": "/v1/responses",
+          "response": {
+            "generation_header": "responses-34",
+            "output_types": [
+              "message",
+              "custom_tool_call"
+            ],
+            "response_id": "responses-34",
+            "selected": [
+              "Azure"
+            ],
+            "selected_endpoints": [
+              {
+                "model": "openai/gpt-6.2-astra-20261117",
+                "provider": "Azure"
+              }
+            ],
+            "status": "completed",
+            "terminal": "response.completed",
+            "usage_cost": 0.007732,
+            "usage_cost_present": true,
+            "usage_keys": [
+              "cost",
+              "cost_details",
+              "input_tokens",
+              "input_tokens_details",
+              "is_byok",
+              "output_tokens",
+              "output_tokens_details",
+              "total_tokens"
+            ]
+          },
+          "shape": {
+            "additional_tools": true,
+            "compacted_history": false,
+            "compaction_prompt": false,
+            "custom_names": [
+              "functions.exec"
+            ],
+            "fixture_call": false,
+            "fixture_output_received": false,
+            "fixture_result": false,
+            "followup": false,
+            "function_names": [
+              "functions.wait",
+              "functions.request_user_input",
+              "functions.request_user_input_async",
+              "functions.send_message_to_user_async",
+              "clock.sleep",
+              "collaboration.followup_task",
+              "collaboration.interrupt_agent",
+              "collaboration.list_agents",
+              "collaboration.send_message",
+              "collaboration.spawn_agent",
+              "collaboration.wait_agent"
+            ],
+            "hosted_web_search": false,
+            "item_types": [
+              "additional_tools",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "custom_tool_call",
+              "custom_tool_call_output",
+              "message",
+              "message"
+            ],
+            "keys": [
+              "client_metadata",
+              "include",
+              "input",
+              "model",
+              "parallel_tool_calls",
+              "prompt_cache_key",
+              "reasoning",
+              "store",
+              "stream",
+              "text",
+              "tool_choice"
+            ],
+            "metadata_keys": [
+              "root_turn_id",
+              "session_id",
+              "thread_id",
+              "turn_id",
+              "x-codex-installation-id",
+              "x-codex-turn-metadata",
+              "x-codex-window-id"
+            ],
+            "model": "openai/gpt-6.2-astra",
+            "previous_response_id_present": false,
+            "reasoning_keys": [
+              "context",
+              "effort"
+            ],
+            "store": false,
+            "stream": true,
+            "text_keys": [
+              "verbosity"
+            ],
+            "title_request": false,
+            "tool_types": [
+              "custom",
+              "function",
+              "namespace"
+            ],
+            "top_tool_types": [],
+            "user_messages": 3
+          },
+          "turn": 2
+        },
+        {
+          "hosted_tool_output": [],
+          "http": 200,
+          "local_fixture_calls": [],
+          "path": "/v1/responses",
+          "response": {
+            "generation_header": "responses-35",
+            "output_types": [
+              "message"
+            ],
+            "response_id": "responses-35",
+            "selected": [
+              "Azure"
+            ],
+            "selected_endpoints": [
+              {
+                "model": "openai/gpt-6.2-astra-20261117",
+                "provider": "Azure"
+              }
+            ],
+            "status": "completed",
+            "terminal": "response.completed",
+            "usage_cost": 0.0067692,
+            "usage_cost_present": true,
+            "usage_keys": [
+              "cost",
+              "cost_details",
+              "input_tokens",
+              "input_tokens_details",
+              "is_byok",
+              "output_tokens",
+              "output_tokens_details",
+              "total_tokens"
+            ]
+          },
+          "shape": {
+            "additional_tools": true,
+            "compacted_history": false,
+            "compaction_prompt": false,
+            "custom_names": [
+              "functions.exec"
+            ],
+            "fixture_call": false,
+            "fixture_output_received": false,
+            "fixture_result": false,
+            "followup": false,
+            "function_names": [
+              "functions.wait",
+              "functions.request_user_input",
+              "functions.request_user_input_async",
+              "functions.send_message_to_user_async",
+              "clock.sleep",
+              "collaboration.followup_task",
+              "collaboration.interrupt_agent",
+              "collaboration.list_agents",
+              "collaboration.send_message",
+              "collaboration.spawn_agent",
+              "collaboration.wait_agent"
+            ],
+            "hosted_web_search": false,
+            "item_types": [
+              "additional_tools",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "message",
+              "custom_tool_call",
+              "custom_tool_call_output",
+              "message",
+              "message",
+              "message",
+              "custom_tool_call",
+              "custom_tool_call_output"
+            ],
+            "keys": [
+              "client_metadata",
+              "include",
+              "input",
+              "model",
+              "parallel_tool_calls",
+              "prompt_cache_key",
+              "reasoning",
+              "store",
+              "stream",
+              "text",
+              "tool_choice"
+            ],
+            "metadata_keys": [
+              "root_turn_id",
+              "session_id",
+              "thread_id",
+              "turn_id",
+              "x-codex-installation-id",
+              "x-codex-turn-metadata",
+              "x-codex-window-id"
+            ],
+            "model": "openai/gpt-6.2-astra",
+            "previous_response_id_present": false,
+            "reasoning_keys": [
+              "context",
+              "effort"
+            ],
+            "store": false,
+            "stream": true,
+            "text_keys": [
+              "verbosity"
+            ],
+            "title_request": false,
+            "tool_types": [
+              "custom",
+              "function",
+              "namespace"
+            ],
+            "top_tool_types": [],
+            "user_messages": 3
+          },
+          "turn": 2
+        }
+      ],
+      "required_zdr": true,
+      "turns": [
+        {
+          "turn": 1,
+          "verified": true
+        },
+        {
+          "turn": 2,
+          "verified": true
+        }
+      ]
+    }
+  ],
+  "credit": {
+    "includes_byok": true,
+    "resets": false,
+    "usd_limit": 5,
+    "usd_remaining": 5
+  },
+  "manifest_sha256": "63d4a6f0de64ec9f0bb30ba783d2dc6f414c651c67854f021e63269d21aa4f28",
+  "prerequisite": {
+    "manifest_sha256": "0a6ac1d0ad98fa597a9b3e65027097cb2e71d724d7b4c399d820cf94d464c20d",
+    "path": "evidence/paid-0a6ac1d0/cost.json",
+    "sha256": "be8a91623f06bc10ea312c631dc84867c4846c02f9296db7f96a0cb809ca671a",
+    "stage": "cost"
+  },
+  "previous_attempt": {
+    "manifest_sha256": "0a6ac1d0ad98fa597a9b3e65027097cb2e71d724d7b4c399d820cf94d464c20d",
+    "path": "evidence/paid-0a6ac1d0/codex.json",
+    "sha256": "7517c4d6100bcfeaf792562ae0c3c71673286d9817581271a0dc07587fcc0dc9",
+    "stage": "codex"
+  },
+  "replays": [
+    {
+      "encrypted_reasoning_replayed": false,
+      "first": {
+        "generation_header": "responses-9",
+        "output_types": [
+          "function_call"
+        ],
+        "response_id": "responses-9",
+        "selected": [
+          "Azure"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "openai/gpt-6.2-astra-20261117",
+            "provider": "Azure"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.007512,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "fixture": {
+        "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.141.0-exec-gpt-6.2-astra-tool.json",
+        "purpose": "tool",
+        "sha256": "220b30ccd0074724672b23b52e33891b60bd368d9fce20a0a17963865d2d34b4"
+      },
+      "followup": {
+        "generation_header": "responses-10",
+        "output_types": [
+          "message"
+        ],
+        "response_id": "responses-10",
+        "selected": [
+          "Azure"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "openai/gpt-6.2-astra-20261117",
+            "provider": "Azure"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.007416,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "tool_replay_verified": true
+    },
+    {
+      "encrypted_reasoning_replayed": true,
+      "first": {
+        "generation_header": "responses-11",
+        "output_types": [
+          "reasoning",
+          "function_call"
+        ],
+        "response_id": "responses-11",
+        "selected": [
+          "Google"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "google/gemini-4-carbon-20261110",
+            "provider": "Google"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.00364,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "fixture": {
+        "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.141.0-tui-gemini-4-carbon-tool.json",
+        "purpose": "tool",
+        "sha256": "da92a2226249e73315adb094f8aae1182cd560318acc7230360731758639e3b2"
+      },
+      "followup": {
+        "generation_header": "responses-12",
+        "output_types": [
+          "message",
+          "reasoning"
+        ],
+        "response_id": "responses-12",
+        "selected": [
+          "Google"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "google/gemini-4-carbon-20261110",
+            "provider": "Google"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.003752,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "tool_replay_verified": true
+    },
+    {
+      "encrypted_reasoning_replayed": false,
+      "first": {
+        "generation_header": "responses-13",
+        "output_types": [
+          "function_call"
+        ],
+        "response_id": "responses-13",
+        "selected": [
+          "Azure"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "openai/gpt-6.2-astra-20261117",
+            "provider": "Azure"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.00688,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "fixture": {
+        "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.149.1-exec-gpt-6.2-astra-tool.json",
+        "purpose": "tool",
+        "sha256": "1e6fd749ff22dfbb0fea89c67f14e204540cead9e1a4b73b14b139edad0ea156"
+      },
+      "followup": {
+        "generation_header": "responses-14",
+        "output_types": [
+          "message"
+        ],
+        "response_id": "responses-14",
+        "selected": [
+          "Azure"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "openai/gpt-6.2-astra-20261117",
+            "provider": "Azure"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.006784,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "tool_replay_verified": true
+    },
+    {
+      "encrypted_reasoning_replayed": true,
+      "first": {
+        "generation_header": "responses-15",
+        "output_types": [
+          "reasoning",
+          "function_call"
+        ],
+        "response_id": "responses-15",
+        "selected": [
+          "Google"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "google/gemini-4-carbon-20261110",
+            "provider": "Google"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.00399,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "fixture": {
+        "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.149.1-tui-gemini-4-carbon-tool.json",
+        "purpose": "tool",
+        "sha256": "5da62bf9535360c4e4684db76346e07caa1f74de5ab838d4dd2980fb3df23246"
+      },
+      "followup": {
+        "generation_header": "responses-16",
+        "output_types": [
+          "message",
+          "reasoning"
+        ],
+        "response_id": "responses-16",
+        "selected": [
+          "Google"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "google/gemini-4-carbon-20261110",
+            "provider": "Google"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.003872,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "tool_replay_verified": true
+    },
+    {
+      "encrypted_reasoning_replayed": false,
+      "first": {
+        "generation_header": "responses-17",
+        "output_types": [
+          "function_call"
+        ],
+        "response_id": "responses-17",
+        "selected": [
+          "Azure"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "openai/gpt-6.2-astra-20261117",
+            "provider": "Azure"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.006392,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "fixture": {
+        "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.161.0-exec-gpt-6.2-astra-tool.json",
+        "purpose": "tool",
+        "sha256": "6576ad4707f279fddbcc9c01c19f10592319ff54584a260a0f0a515bd9cc00f2"
+      },
+      "followup": {
+        "generation_header": "responses-18",
+        "output_types": [
+          "message"
+        ],
+        "response_id": "responses-18",
+        "selected": [
+          "Azure"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "openai/gpt-6.2-astra-20261117",
+            "provider": "Azure"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.006296,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "tool_replay_verified": true
+    },
+    {
+      "encrypted_reasoning_replayed": true,
+      "first": {
+        "generation_header": "responses-19",
+        "output_types": [
+          "reasoning",
+          "function_call"
+        ],
+        "response_id": "responses-19",
+        "selected": [
+          "Google"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "google/gemini-4-carbon-20261110",
+            "provider": "Google"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.003328,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "fixture": {
+        "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.161.0-tui-gemini-4-carbon-tool.json",
+        "purpose": "tool",
+        "sha256": "3df3b1811c96f0647da6422d1f9b6764e49a3e4c87230bdab2cfd67d3c882bb2"
+      },
+      "followup": {
+        "generation_header": "responses-20",
+        "output_types": [
+          "message",
+          "reasoning"
+        ],
+        "response_id": "responses-20",
+        "selected": [
+          "Google"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "google/gemini-4-carbon-20261110",
+            "provider": "Google"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.00331,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "tool_replay_verified": true
+    },
+    {
+      "fixture": {
+        "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.161.0-tui-gpt-6.2-astra-title.json",
+        "purpose": "title",
+        "sha256": "b93ad2be080c3aeafbcfee7a7f0bba5762377b3d5bb07c72b0774a6f77655bc5"
+      },
+      "response": {
+        "generation_header": "responses-21",
+        "output_types": [
+          "message"
+        ],
+        "response_id": "responses-21",
+        "selected": [
+          "Azure"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "openai/gpt-6.2-astra-20261117",
+            "provider": "Azure"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.001296,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "title_control": true,
+      "title_length": 32
+    },
+    {
+      "encrypted_reasoning_replayed": true,
+      "first": {
+        "generation_header": "responses-22",
+        "output_types": [
+          "reasoning",
+          "function_call"
+        ],
+        "response_id": "responses-22",
+        "selected": [
+          "Google"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "google/gemini-4-carbon-20261110",
+            "provider": "Google"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.00362,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "fixture": {
+        "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-exec-gemini-4-carbon-tool.json",
+        "purpose": "tool",
+        "sha256": "2eb60e786a6e00da9a1b5f66cf0bcc70beefbf4a72a7dbd40f4c6b5886f0eff8"
+      },
+      "followup": {
+        "generation_header": "responses-23",
+        "output_types": [
+          "message",
+          "reasoning"
+        ],
+        "response_id": "responses-23",
+        "selected": [
+          "Google"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "google/gemini-4-carbon-20261110",
+            "provider": "Google"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.003492,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "tool_replay_verified": true
+    },
+    {
+      "encrypted_reasoning_replayed": false,
+      "first": {
+        "generation_header": "responses-24",
+        "output_types": [
+          "custom_tool_call"
+        ],
+        "response_id": "responses-24",
+        "selected": [
+          "Azure"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "openai/gpt-6.2-astra-20261117",
+            "provider": "Azure"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.00704,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "fixture": {
+        "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-exec-gpt-6.2-astra-tool.json",
+        "purpose": "tool",
+        "sha256": "c2d47a1788da4983f0691c4c47873385a39989d756070442ca5db69cd394b441"
+      },
+      "followup": {
+        "generation_header": "responses-25",
+        "output_types": [
+          "message"
+        ],
+        "response_id": "responses-25",
+        "selected": [
+          "Azure"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "openai/gpt-6.2-astra-20261117",
+            "provider": "Azure"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.00684,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "tool_replay_verified": true
+    },
+    {
+      "encrypted_reasoning_replayed": true,
+      "first": {
+        "generation_header": "responses-26",
+        "output_types": [
+          "reasoning",
+          "function_call"
+        ],
+        "response_id": "responses-26",
+        "selected": [
+          "Google"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "google/gemini-4-carbon-20261110",
+            "provider": "Google"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.00531,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "fixture": {
+        "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gemini-4-carbon-tool.json",
+        "purpose": "tool",
+        "sha256": "7eab5fa3ecd4f7dbbfbbfd1462cbcb505174e42478407341b1a2bfc7087f598a"
+      },
+      "followup": {
+        "generation_header": "responses-27",
+        "output_types": [
+          "message",
+          "reasoning"
+        ],
+        "response_id": "responses-27",
+        "selected": [
+          "Google"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "google/gemini-4-carbon-20261110",
+            "provider": "Google"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.005292,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "tool_replay_verified": true
+    },
+    {
+      "fixture": {
+        "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gemini-4-carbon-title.json",
+        "purpose": "title",
+        "sha256": "2725c5f153385789d68d31341af2c8c2aa5c51214a57d26ab077f1bd22d163ca"
+      },
+      "response": {
+        "generation_header": "responses-28",
+        "output_types": [
+          "message",
+          "reasoning"
+        ],
+        "response_id": "responses-28",
+        "selected": [
+          "Google"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "google/gemini-4-carbon-20261110",
+            "provider": "Google"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.00072,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "title_control": true,
+      "title_length": 32
+    },
+    {
+      "encrypted_reasoning_replayed": false,
+      "first": {
+        "generation_header": "responses-29",
+        "output_types": [
+          "custom_tool_call"
+        ],
+        "response_id": "responses-29",
+        "selected": [
+          "Azure"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "openai/gpt-6.2-astra-20261117",
+            "provider": "Azure"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.007064,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "fixture": {
+        "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gpt-6.2-astra-tool.json",
+        "purpose": "tool",
+        "sha256": "ad38c262a1c5df39941513a807ee17d41117c075aaf03a854be6a9175bc3aa4d"
+      },
+      "followup": {
+        "generation_header": "responses-30",
+        "output_types": [
+          "message"
+        ],
+        "response_id": "responses-30",
+        "selected": [
+          "Azure"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "openai/gpt-6.2-astra-20261117",
+            "provider": "Azure"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.006864,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "tool_replay_verified": true
+    },
+    {
+      "fixture": {
+        "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gpt-6.2-astra-title.json",
+        "purpose": "title",
+        "sha256": "e414954c746908ec4ed128b385f471f912e85a800852c556ba3b6bbef9fdf6c2"
+      },
+      "response": {
+        "generation_header": "responses-31",
+        "output_types": [
+          "message"
+        ],
+        "response_id": "responses-31",
+        "selected": [
+          "Azure"
+        ],
+        "selected_endpoints": [
+          {
+            "model": "openai/gpt-6.2-astra-20261117",
+            "provider": "Azure"
+          }
+        ],
+        "status": "completed",
+        "terminal": "response.completed",
+        "usage_cost": 0.005704,
+        "usage_cost_present": true,
+        "usage_keys": [
+          "cost",
+          "cost_details",
+          "input_tokens",
+          "input_tokens_details",
+          "is_byok",
+          "output_tokens",
+          "output_tokens_details",
+          "total_tokens"
+        ]
+      },
+      "title_control": true,
+      "title_length": 32
+    }
+  ],
+  "requests": [
+    {
+      "model": null,
+      "operation": "key",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "google/gemini-4-carbon",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    }
+  ],
+  "stage": "codex",
+  "verdict": "passed"
+}

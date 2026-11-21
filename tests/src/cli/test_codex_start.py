@@ -2,7 +2,7 @@
 
 The orchestration is exercised end-to-end through the CLI with the proxy/runtime/invoke
 seams patched: `get_runtime` (installed + version), `ensure_proxy` (resolve/start),
-`assert_proxy_responses_capable` (capability gate), and `invoke_codex_bare_proxy` (exec).
+`read_responses_launch` (capability gate), and `invoke_codex_bare_proxy` (exec).
 Errors land on stderr (Rich `Console(stderr=True)`); status lands on stdout. Click 8.4's
 default `CliRunner()` exposes `result.stdout`/`result.stderr` separately.
 """
@@ -54,12 +54,12 @@ def _invoke_start(
 ) -> tuple[Any, MagicMock, MagicMock, MagicMock]:
     runtime = runtime or _runtime()
     ensure = ensure if ensure is not None else MagicMock(return_value=(_entry(), False))
-    capable = capable if capable is not None else MagicMock(return_value=("gpt-5.5", "openai_responses_passthrough"))
+    capable = capable if capable is not None else MagicMock(return_value=("gpt-5.5", {}))
     invoke = invoke if invoke is not None else MagicMock(return_value=0)
     with (
         patch("forge.cli.codex.get_runtime", return_value=runtime),
         patch("forge.proxy.proxy_orchestrator.ensure_proxy", ensure),
-        patch("forge.proxy.proxy_orchestrator.assert_proxy_responses_capable", capable),
+        patch("forge.proxy.proxy_orchestrator.read_responses_launch", capable),
         patch("forge.session.codex_invoke.invoke_codex_bare_proxy", invoke),
     ):
         result = CliRunner().invoke(main, ["codex", "start", *args])

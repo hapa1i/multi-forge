@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "scope": "Sessionless interactive Codex through the packaged Forge direct OpenRouter Responses route. Keep account ZDR enabled.",
+  "template": "codex-responses-openrouter",
+  "models": {
+    "default": "openai/gpt-6.2-astra",
+    "alternate": "google/gemini-4-carbon"
+  },
+  "binary": {
+    "version": "0.170.0",
+    "platform": "aarch64-apple-darwin",
+    "sha256": "9248cfeebec9b4cc3034d5114caab10fbf426cbfa79dba410c5fa1b72762abd6"
+  },
+  "origin": "https://openrouter.ai",
+  "operations": [
+    "GET /api/v1/key",
+    "POST /api/v1/responses",
+    "GET /api/v1/generation?id=<observed-id>"
+  ],
+  "limits": {
+    "usd": 5,
+    "seconds": 900,
+    "generation_attempts": 16,
+    "metadata_attempts": 7,
+    "stage_attempts": {
+      "tui": {
+        "generation": 16,
+        "metadata": 7
+      }
+    }
+  },
+  "key_setup": {
+    "condition": "Use a dedicated key on the stage 60 account with at least USD 3.00 available and a non-resetting limit at or below USD 5.00 including BYOK. If none is supplied, approval includes one management POST to create the specified key before the run.",
+    "operation": "POST /api/v1/keys",
+    "max_attempts": 1,
+    "limit_usd": 5.0,
+    "limit_reset": null,
+    "include_byok_in_limit": true,
+    "expires_in_minutes": 20,
+    "minimum_remaining_usd": 3.0
+  },
+  "forge_cap": {
+    "per_day_usd": 0.5,
+    "on_cap_hit": "reject",
+    "on_unreported_cost": "reject"
+  },
+  "prerequisite": {
+    "path": "evidence/paid-63d4a6f0/codex.json",
+    "sha256": "24f11ce4a6f02652dbddb0b13d0b1535e1c1ed79a0da0985ab80a0531df96194"
+  },
+  "prompts": [
+    "Read fixture.txt using exactly the local command cat fixture.txt. Report its contents.",
+    "Using the single word you read in the first turn, write proof.txt using exactly the command echo WORD > proof.txt, replacing WORD with the actual word. Then finish."
+  ],
+  "tool_instruction": "For a shell function use its command parameter. If the tool is functions.exec, use exactly text(await tools.exec_command({cmd:\"COMMAND\"})) replacing COMMAND with the specified command. Use no other tools or commands.",
+  "fixture_value": "FORGE_FIXTURE_173",
+  "controls": [
+    "Two prompts per model in separate scratch workspaces. Start the default TUI, then explicitly select the alternate model. Both run with the workspace-write sandbox and approval policy never.",
+    "Verify the loaded instance identity, template, both cost policies, daily cap and required ZDR before the first prompt. Admit only stateless creates on the two named models with provider.zdr=true, no client identifiers, and routing metadata enabled.",
+    "Reserve all creates and reads before dispatch, including retries and auxiliary calls. The independent key limits OpenRouter credit. The 15-minute run is single-use. Stop on a failed criterion. No model substitutions, account policy edits, or cap increases during this run. OpenRouter selects the eligible provider.",
+    "Read the key once. For each model reconcile one observed generation through Forge, up to three reads per ID, waiting 4 and then 12 seconds only after a 404. Compare per-request rounded micros, model totals and raw reported cost within half a micro per request.",
+    "Keep local receipts for the cap, model selection, observed paths, request counts, terminal usage, trace show/explain, reconciliation and scratch edits. Retain no credentials or raw conversation. Astra live encrypted reasoning remains unverified unless observed."
+  ],
+  "ledger_root": "~/.cache/forge-openrouter-probe/response-approvals"
+}

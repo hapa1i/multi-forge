@@ -1,0 +1,232 @@
+{
+  "source_stage": "50-loopback",
+  "grouping": "One representative for each complete synthetic foreground or title request body, ignoring the model slug and client UUIDs. Source cases list equivalent bodies. Hosted web, linked tool outputs and local compaction examples are for offline inspection only.",
+  "replay_creations": 23,
+  "replay_fixtures": [
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.141.0-exec-gpt-6.2-astra-tool.json",
+      "sha256": "220b30ccd0074724672b23b52e33891b60bd368d9fce20a0a17963865d2d34b4",
+      "purpose": "tool",
+      "model": "openai/gpt-6.2-astra",
+      "codex_version": "0.141.0",
+      "case": "0.141.0__exec__gpt-6.2-astra__disabled__normal",
+      "source_request": "request-01.json",
+      "source_cases": [
+        "0.141.0__exec__gemini-4-carbon__disabled__normal",
+        "0.141.0__exec__gpt-6.2-astra__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.141.0-tui-gemini-4-carbon-tool.json",
+      "sha256": "da92a2226249e73315adb094f8aae1182cd560318acc7230360731758639e3b2",
+      "purpose": "tool",
+      "model": "google/gemini-4-carbon",
+      "codex_version": "0.141.0",
+      "case": "0.141.0__tui__gemini-4-carbon__disabled__normal",
+      "source_request": "request-01.json",
+      "source_cases": [
+        "0.141.0__tui__gemini-4-carbon__disabled__normal",
+        "0.141.0__tui__gpt-6.2-astra__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.149.1-exec-gpt-6.2-astra-tool.json",
+      "sha256": "1e6fd749ff22dfbb0fea89c67f14e204540cead9e1a4b73b14b139edad0ea156",
+      "purpose": "tool",
+      "model": "openai/gpt-6.2-astra",
+      "codex_version": "0.149.1",
+      "case": "0.149.1__exec__gpt-6.2-astra__disabled__normal",
+      "source_request": "request-01.json",
+      "source_cases": [
+        "0.149.1__exec__gemini-4-carbon__disabled__normal",
+        "0.149.1__exec__gpt-6.2-astra__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.149.1-tui-gemini-4-carbon-tool.json",
+      "sha256": "5da62bf9535360c4e4684db76346e07caa1f74de5ab838d4dd2980fb3df23246",
+      "purpose": "tool",
+      "model": "google/gemini-4-carbon",
+      "codex_version": "0.149.1",
+      "case": "0.149.1__tui__gemini-4-carbon__disabled__normal",
+      "source_request": "request-01.json",
+      "source_cases": [
+        "0.149.1__tui__gemini-4-carbon__disabled__normal",
+        "0.149.1__tui__gpt-6.2-astra__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.161.0-exec-gpt-6.2-astra-tool.json",
+      "sha256": "6576ad4707f279fddbcc9c01c19f10592319ff54584a260a0f0a515bd9cc00f2",
+      "purpose": "tool",
+      "model": "openai/gpt-6.2-astra",
+      "codex_version": "0.161.0",
+      "case": "0.161.0__exec__gpt-6.2-astra__disabled__normal",
+      "source_request": "request-01.json",
+      "source_cases": [
+        "0.161.0__exec__gemini-4-carbon__disabled__normal",
+        "0.161.0__exec__gpt-6.2-astra__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.161.0-tui-gemini-4-carbon-tool.json",
+      "sha256": "3df3b1811c96f0647da6422d1f9b6764e49a3e4c87230bdab2cfd67d3c882bb2",
+      "purpose": "tool",
+      "model": "google/gemini-4-carbon",
+      "codex_version": "0.161.0",
+      "case": "0.161.0__tui__gemini-4-carbon__disabled__normal",
+      "source_request": "request-01.json",
+      "source_cases": [
+        "0.161.0__tui__gemini-4-carbon__disabled__normal",
+        "0.161.0__tui__gpt-6.2-astra__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.161.0-tui-gpt-6.2-astra-title.json",
+      "sha256": "b93ad2be080c3aeafbcfee7a7f0bba5762377b3d5bb07c72b0774a6f77655bc5",
+      "purpose": "title",
+      "model": "openai/gpt-6.2-astra",
+      "codex_version": "0.161.0",
+      "case": "0.161.0__tui__gpt-6.2-astra__disabled__normal",
+      "source_request": "request-02.json",
+      "source_cases": [
+        "0.161.0__tui__gemini-4-carbon__disabled__normal",
+        "0.161.0__tui__gpt-6.2-astra__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-exec-gemini-4-carbon-tool.json",
+      "sha256": "2eb60e786a6e00da9a1b5f66cf0bcc70beefbf4a72a7dbd40f4c6b5886f0eff8",
+      "purpose": "tool",
+      "model": "google/gemini-4-carbon",
+      "codex_version": "0.170.0",
+      "case": "0.170.0__exec__gemini-4-carbon__disabled__normal",
+      "source_request": "request-01.json",
+      "source_cases": [
+        "0.170.0__exec__gemini-4-carbon__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-exec-gpt-6.2-astra-tool.json",
+      "sha256": "c2d47a1788da4983f0691c4c47873385a39989d756070442ca5db69cd394b441",
+      "purpose": "tool",
+      "model": "openai/gpt-6.2-astra",
+      "codex_version": "0.170.0",
+      "case": "0.170.0__exec__gpt-6.2-astra__disabled__normal",
+      "source_request": "request-01.json",
+      "source_cases": [
+        "0.170.0__exec__gpt-6.2-astra__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gemini-4-carbon-tool.json",
+      "sha256": "7eab5fa3ecd4f7dbbfbbfd1462cbcb505174e42478407341b1a2bfc7087f598a",
+      "purpose": "tool",
+      "model": "google/gemini-4-carbon",
+      "codex_version": "0.170.0",
+      "case": "0.170.0__tui__gemini-4-carbon__disabled__normal",
+      "source_request": "request-01.json",
+      "source_cases": [
+        "0.170.0__tui__gemini-4-carbon__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gemini-4-carbon-title.json",
+      "sha256": "2725c5f153385789d68d31341af2c8c2aa5c51214a57d26ab077f1bd22d163ca",
+      "purpose": "title",
+      "model": "google/gemini-4-carbon",
+      "codex_version": "0.170.0",
+      "case": "0.170.0__tui__gemini-4-carbon__disabled__normal",
+      "source_request": "request-02.json",
+      "source_cases": [
+        "0.170.0__tui__gemini-4-carbon__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gpt-6.2-astra-tool.json",
+      "sha256": "ad38c262a1c5df39941513a807ee17d41117c075aaf03a854be6a9175bc3aa4d",
+      "purpose": "tool",
+      "model": "openai/gpt-6.2-astra",
+      "codex_version": "0.170.0",
+      "case": "0.170.0__tui__gpt-6.2-astra__disabled__normal",
+      "source_request": "request-01.json",
+      "source_cases": [
+        "0.170.0__tui__gpt-6.2-astra__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gpt-6.2-astra-title.json",
+      "sha256": "e414954c746908ec4ed128b385f471f912e85a800852c556ba3b6bbef9fdf6c2",
+      "purpose": "title",
+      "model": "openai/gpt-6.2-astra",
+      "codex_version": "0.170.0",
+      "case": "0.170.0__tui__gpt-6.2-astra__disabled__normal",
+      "source_request": "request-02.json",
+      "source_cases": [
+        "0.170.0__tui__gpt-6.2-astra__disabled__normal"
+      ]
+    }
+  ],
+  "offline_fixtures": [
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gemini-4-carbon-hosted-control.json",
+      "sha256": "b57ffbdde3ada5bc0d4f6732f1d9ba0ea74c598dee1780f052789e5b2ec9b29e",
+      "purpose": "hosted-control",
+      "model": "google/gemini-4-carbon",
+      "codex_version": "0.170.0",
+      "case": "0.170.0__tui__gemini-4-carbon__default__normal",
+      "source_request": "request-01.json",
+      "source_cases": [
+        "0.170.0__tui__gemini-4-carbon__default__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.161.0-exec-gemini-4-carbon-function-output.json",
+      "sha256": "dfde78719ef846c5cfd4957b3f243df5fcf11f8b44ce150874185bd4f22e18c6",
+      "purpose": "function-output",
+      "model": "google/gemini-4-carbon",
+      "codex_version": "0.161.0",
+      "case": "0.161.0__exec__gemini-4-carbon__disabled__normal",
+      "source_request": "request-02.json",
+      "source_cases": [
+        "0.161.0__exec__gemini-4-carbon__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-exec-gpt-6.2-astra-custom-output.json",
+      "sha256": "e2cc24fc74be22c277f20b482d5a89c250146e7971e4dd24d2c21badd211992b",
+      "purpose": "custom-output",
+      "model": "openai/gpt-6.2-astra",
+      "codex_version": "0.170.0",
+      "case": "0.170.0__exec__gpt-6.2-astra__disabled__normal",
+      "source_request": "request-02.json",
+      "source_cases": [
+        "0.170.0__exec__gpt-6.2-astra__disabled__normal"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gpt-6.2-astra-compaction-prompt.json",
+      "sha256": "4727acaa69cdc71d35d39c59281c47f68b06dee0dcb59834b3875102f6f90214",
+      "purpose": "compaction-prompt",
+      "model": "openai/gpt-6.2-astra",
+      "codex_version": "0.170.0",
+      "case": "0.170.0__tui__gpt-6.2-astra__disabled__compaction",
+      "source_request": "request-03.json",
+      "source_cases": [
+        "0.170.0__tui__gpt-6.2-astra__disabled__compaction"
+      ]
+    },
+    {
+      "path": "docs/board/doing/codex_openrouter_responses/evidence/fixtures/0.170.0-tui-gpt-6.2-astra-compacted-followup.json",
+      "sha256": "ddc6899308ea6e3994b5805585ceda0f8601a544793f06da8f9f9fda9896e1a5",
+      "purpose": "compacted-followup",
+      "model": "openai/gpt-6.2-astra",
+      "codex_version": "0.170.0",
+      "case": "0.170.0__tui__gpt-6.2-astra__disabled__compaction",
+      "source_request": "request-04.json",
+      "source_cases": [
+        "0.170.0__tui__gpt-6.2-astra__disabled__compaction"
+      ]
+    }
+  ]
+}

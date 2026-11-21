@@ -1,0 +1,52 @@
+{
+  "checked_utc": "2026-11-19T17:03:13+00:00",
+  "models": {
+    "url": "https://openrouter.ai/api/v1/models",
+    "sha256": "bfd1981894095ed5fc14d1971c38b6b9b67df6417f965c3997489f7ad02c5385",
+    "entries": 479,
+    "model": {
+      "id": "qwen/qwen4-max",
+      "canonical_slug": "qwen/qwen4-max-20261115",
+      "endpoints": [
+        "/api/v1/chat/completions",
+        "/api/v1/completions",
+        "/api/v1/messages",
+        "/api/v1/responses"
+      ],
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": [
+          "xhigh",
+          "high",
+          "low",
+          "none"
+        ],
+        "default_effort": "high"
+      }
+    }
+  },
+  "model_endpoints": {
+    "url": "https://openrouter.ai/api/v1/models/qwen/qwen4-max/endpoints",
+    "sha256": "c06c9da630c522b33eadf3a5aca35b871b1fcd2309ebbcc2e9746b646b7ac44e",
+    "endpoints": [
+      {
+        "model_id": "qwen/qwen4-max",
+        "provider_name": "Alibaba",
+        "status": 0,
+        "uptime_last_30m": 100
+      }
+    ]
+  },
+  "zdr": {
+    "url": "https://openrouter.ai/api/v1/endpoints/zdr",
+    "sha256": "3e7167b4e4060a83049621ba81884c76f88aa4420a4db91f8bde32d0eab29744",
+    "entries": 1052,
+    "matching_model_id_counts": {
+      "qwen/qwen4-max": 0,
+      "qwen/qwen4-max-20261115": 0,
+      "openai/gpt-6.2-astra": 1
+    }
+  },
+  "provider_responses_reference": "https://www.alibabacloud.com/help/en/model-studio/qwen-api-via-openai-responses"
+}

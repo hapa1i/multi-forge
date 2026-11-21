@@ -1,0 +1,458 @@
+{
+  "client_metadata": {
+    "root_turn_id": "018bcfe5-6800-7000-8000-000000000077",
+    "session_id": "018bcfe5-6800-7000-8000-000000000076",
+    "thread_id": "018bcfe5-6800-7000-8000-000000000076",
+    "turn_id": "018bcfe5-6800-7000-8000-000000000077",
+    "x-codex-installation-id": "00000000-0000-4000-8000-000000000078",
+    "x-codex-turn-metadata": "{\"installation_id\":\"00000000-0000-4000-8000-000000000078\",\"session_id\":\"018bcfe5-6800-7000-8000-000000000076\",\"thread_id\":\"018bcfe5-6800-7000-8000-000000000076\",\"agent_name\":\"/synthetic/bin/codex\",\"turn_id\":\"018bcfe5-6800-7000-8000-000000000077\",\"window_id\":\"018bcfe5-6800-7000-8000-000000000076:0\",\"window_number\":0,\"context_window_id\":\"018bcfe5-6800-7000-8000-000000000079\",\"request_kind\":\"turn\",\"history_initialization\":\"new\",\"root_turn_id\":\"018bcfe5-6800-7000-8000-000000000077\",\"thread_source\":\"user\",\"turn_trigger\":\"user\",\"sandbox\":\"seatbelt\",\"sandbox_mode\":\"workspace-write\",\"auto_review_enabled\":false,\"node_repl_auto_review_required\":true,\"node_repl_disabled\":false,\"turn_started_at_unix_ms\":1700000000000,\"analytics_enabled\":false,\"model\":\"openai/gpt-6.2-astra\",\"reasoning_effort\":\"low\"}",
+    "x-codex-window-id": "018bcfe5-6800-7000-8000-000000000076:0"
+  },
+  "include": [
+    "reasoning.encrypted_content"
+  ],
+  "input": [
+    {
+      "id": "at_018bcfe5-6800-7000-8000-00000000006f",
+      "role": "developer",
+      "tools": [
+        {
+          "description": "Synthetic fixture.",
+          "name": "functions",
+          "tools": [
+            {
+              "description": "Synthetic fixture.",
+              "format": {
+                "definition": "\nstart: pragma_source | plain_source\npragma_source: PRAGMA_LINE NEWLINE SOURCE\nplain_source: SOURCE\n\nPRAGMA_LINE: /[ \\t]*\\/\\/ @exec:[^\\r\\n]*/\nNEWLINE: /\\r?\\n/\nSOURCE: /[\\s\\S]+/\n",
+                "syntax": "lark",
+                "type": "grammar"
+              },
+              "name": "exec",
+              "type": "custom"
+            },
+            {
+              "description": "Synthetic fixture.",
+              "name": "wait",
+              "parameters": {
+                "additionalProperties": false,
+                "properties": {
+                  "cell_id": {
+                    "description": "Synthetic fixture.",
+                    "type": "string"
+                  },
+                  "max_tokens": {
+                    "description": "Synthetic fixture.",
+                    "type": "number"
+                  },
+                  "terminate": {
+                    "description": "Synthetic fixture.",
+                    "type": "boolean"
+                  },
+                  "yield_time_ms": {
+                    "description": "Synthetic fixture.",
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "cell_id"
+                ],
+                "type": "object"
+              },
+              "strict": false,
+              "type": "function"
+            },
+            {
+              "description": "Synthetic fixture.",
+              "name": "request_user_input",
+              "parameters": {
+                "additionalProperties": false,
+                "properties": {
+                  "questions": {
+                    "description": "Synthetic fixture.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "header": {
+                          "description": "Synthetic fixture.",
+                          "type": "string"
+                        },
+                        "id": {
+                          "description": "Synthetic fixture.",
+                          "type": "string"
+                        },
+                        "options": {
+                          "description": "Synthetic fixture.",
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "description": {
+                                "description": "Synthetic fixture.",
+                                "type": "string"
+                              },
+                              "label": {
+                                "description": "Synthetic fixture.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "label",
+                              "description"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "question": {
+                          "description": "Synthetic fixture.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "header",
+                        "question",
+                        "options"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "questions"
+                ],
+                "type": "object"
+              },
+              "strict": false,
+              "type": "function"
+            },
+            {
+              "description": "Synthetic fixture.",
+              "name": "request_user_input_async",
+              "parameters": {
+                "additionalProperties": false,
+                "properties": {
+                  "questions": {
+                    "description": "Synthetic fixture.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "options": {
+                          "description": "Synthetic fixture.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 1,
+                          "type": "array"
+                        },
+                        "title": {
+                          "description": "Synthetic fixture.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "title"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "questions"
+                ],
+                "type": "object"
+              },
+              "strict": false,
+              "type": "function"
+            },
+            {
+              "description": "Synthetic fixture.",
+              "name": "send_message_to_user_async",
+              "parameters": {
+                "additionalProperties": false,
+                "properties": {
+                  "message": {
+                    "description": "Synthetic fixture.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "type": "object"
+              },
+              "strict": false,
+              "type": "function"
+            }
+          ],
+          "type": "namespace"
+        },
+        {
+          "description": "Synthetic fixture.",
+          "name": "clock",
+          "tools": [
+            {
+              "description": "Synthetic fixture.",
+              "name": "sleep",
+              "parameters": {
+                "additionalProperties": false,
+                "properties": {
+                  "duration_ms": {
+                    "description": "Synthetic fixture.",
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "duration_ms"
+                ],
+                "type": "object"
+              },
+              "strict": false,
+              "type": "function"
+            }
+          ],
+          "type": "namespace"
+        },
+        {
+          "description": "Synthetic fixture.",
+          "name": "collaboration",
+          "tools": [
+            {
+              "description": "Synthetic fixture.",
+              "name": "followup_task",
+              "parameters": {
+                "additionalProperties": false,
+                "properties": {
+                  "message": {
+                    "description": "Synthetic fixture.",
+                    "encrypted": true,
+                    "type": "string"
+                  },
+                  "target": {
+                    "description": "Synthetic fixture.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "target",
+                  "message"
+                ],
+                "type": "object"
+              },
+              "strict": false,
+              "type": "function"
+            },
+            {
+              "description": "Synthetic fixture.",
+              "name": "interrupt_agent",
+              "parameters": {
+                "additionalProperties": false,
+                "properties": {
+                  "target": {
+                    "description": "Synthetic fixture.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "target"
+                ],
+                "type": "object"
+              },
+              "strict": false,
+              "type": "function"
+            },
+            {
+              "description": "Synthetic fixture.",
+              "name": "list_agents",
+              "parameters": {
+                "additionalProperties": false,
+                "properties": {
+                  "path_prefix": {
+                    "description": "Synthetic fixture.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "strict": false,
+              "type": "function"
+            },
+            {
+              "description": "Synthetic fixture.",
+              "name": "send_message",
+              "parameters": {
+                "additionalProperties": false,
+                "properties": {
+                  "message": {
+                    "description": "Synthetic fixture.",
+                    "encrypted": true,
+                    "type": "string"
+                  },
+                  "target": {
+                    "description": "Synthetic fixture.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "target",
+                  "message"
+                ],
+                "type": "object"
+              },
+              "strict": false,
+              "type": "function"
+            },
+            {
+              "description": "Synthetic fixture.",
+              "name": "spawn_agent",
+              "parameters": {
+                "additionalProperties": false,
+                "properties": {
+                  "fork_turns": {
+                    "description": "Synthetic fixture.",
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "Synthetic fixture.",
+                    "encrypted": true,
+                    "type": "string"
+                  },
+                  "model": {
+                    "description": "Synthetic fixture.",
+                    "type": "string"
+                  },
+                  "reasoning_effort": {
+                    "description": "Synthetic fixture.",
+                    "type": "string"
+                  },
+                  "task_name": {
+                    "description": "Synthetic fixture.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "task_name",
+                  "message"
+                ],
+                "type": "object"
+              },
+              "strict": false,
+              "type": "function"
+            },
+            {
+              "description": "Synthetic fixture.",
+              "name": "wait_agent",
+              "parameters": {
+                "additionalProperties": false,
+                "properties": {
+                  "timeout_ms": {
+                    "description": "Synthetic fixture.",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "strict": false,
+              "type": "function"
+            }
+          ],
+          "type": "namespace"
+        }
+      ],
+      "type": "additional_tools"
+    },
+    {
+      "content": [
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        }
+      ],
+      "id": "msg_018bcfe5-6800-7000-8000-000000000070",
+      "role": "developer",
+      "type": "message"
+    },
+    {
+      "content": [
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        },
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        },
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        },
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        }
+      ],
+      "id": "msg_018bcfe5-6800-7000-8000-000000000071",
+      "role": "developer",
+      "type": "message"
+    },
+    {
+      "content": [
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        }
+      ],
+      "id": "msg_018bcfe5-6800-7000-8000-000000000072",
+      "role": "developer",
+      "type": "message"
+    },
+    {
+      "content": [
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        }
+      ],
+      "id": "msg_018bcfe5-6800-7000-8000-000000000073",
+      "role": "developer",
+      "type": "message"
+    },
+    {
+      "content": [
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        }
+      ],
+      "id": "msg_018bcfe5-6800-7000-8000-000000000074",
+      "role": "user",
+      "type": "message"
+    },
+    {
+      "content": [
+        {
+          "text": "Synthetic fixture.",
+          "type": "input_text"
+        }
+      ],
+      "id": "msg_018bcfe5-6800-7000-8000-000000000075",
+      "role": "user",
+      "type": "message"
+    }
+  ],
+  "model": "openai/gpt-6.2-astra",
+  "parallel_tool_calls": false,
+  "prompt_cache_key": "018bcfe5-6800-7000-8000-000000000076",
+  "reasoning": {
+    "context": "all_turns",
+    "effort": "low"
+  },
+  "store": false,
+  "stream": true,
+  "text": {
+    "verbosity": "low"
+  },
+  "tool_choice": "auto"
+}

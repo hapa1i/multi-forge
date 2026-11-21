@@ -1,0 +1,58 @@
+{
+  "codex": {
+    "generation": 35,
+    "metadata": 1
+  },
+  "explicit_zdr_posts": 27,
+  "kind": "loopback-only",
+  "manifest_sha256": "63d4a6f0de64ec9f0bb30ba783d2dc6f414c651c67854f021e63269d21aa4f28",
+  "native_baseline_posts_with_max_output_tokens": 0,
+  "native_runs": [
+    {
+      "creates": 4,
+      "metadata_header": false,
+      "model": "openai/gpt-6.2-astra",
+      "required_zdr": false
+    },
+    {
+      "creates": 4,
+      "metadata_header": false,
+      "model": "google/gemini-4-carbon",
+      "required_zdr": false
+    },
+    {
+      "creates": 4,
+      "metadata_header": true,
+      "model": "openai/gpt-6.2-astra",
+      "required_zdr": true
+    }
+  ],
+  "prerequisite": {
+    "manifest_sha256": "0a6ac1d0ad98fa597a9b3e65027097cb2e71d724d7b4c399d820cf94d464c20d",
+    "path": "evidence/paid-0a6ac1d0/cost.json",
+    "sha256": "be8a91623f06bc10ea312c631dc84867c4846c02f9296db7f96a0cb809ca671a",
+    "stage": "cost"
+  },
+  "previous_attempt": {
+    "manifest_sha256": "0a6ac1d0ad98fa597a9b3e65027097cb2e71d724d7b4c399d820cf94d464c20d",
+    "path": "evidence/paid-0a6ac1d0/codex.json",
+    "sha256": "7517c4d6100bcfeaf792562ae0c3c71673286d9817581271a0dc07587fcc0dc9",
+    "stage": "codex"
+  },
+  "published_fixture_posts": {
+    "title": 3,
+    "tool": 20
+  },
+  "published_fixture_replays": 13,
+  "simulated_credit": {
+    "includes_byok": true,
+    "resets": false,
+    "usd_limit": 5.0,
+    "usd_remaining": 5.0
+  },
+  "stages": [
+    "codex"
+  ],
+  "unmodified_native_baseline_posts": 8,
+  "verdict": "passed"
+}

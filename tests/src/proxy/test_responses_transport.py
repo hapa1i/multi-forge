@@ -1,13 +1,14 @@
 """Unit tests for the OpenAI Responses passthrough transport (Codex-facing ingress).
 
 Covers the wire-shape's three honesty constraints from the card:
-- byte-faithful forwarding (method/body/query preserved, no `.json()` on bodyless);
+- preservation of method, JSON values and query (bodyless requests skip JSON decoding);
 - token telemetry always, dollar cost ONLY when the upstream reports it (USD->micros);
 - the capability gate mirrored across the route, GET / advertisement, and preflight.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from types import SimpleNamespace
 
@@ -16,6 +17,7 @@ import pytest
 import forge.proxy.responses_ingress as ri
 import forge.proxy.responses_passthrough as rp
 from forge.core.credential_registry import Credential, EnvVar
+from forge.proxy.openrouter_responses import OpenRouterResponseEvidence
 from tests.fixtures.proxy_transport import FakeResponse, FakeStream, ProxyTransportFake
 
 
@@ -187,7 +189,7 @@ async def test_forward_non_streaming_post_relays_and_accounts(responses_transpor
     captured = responses_transport.captured
     assert captured.method == "POST"
     assert captured.url == "https://upstream.test/v1/responses"
-    assert captured.json == body  # byte-faithful, unknown field intact
+    assert captured.json == body  # includes the unknown field
     assert resp.status_code == 200
     # Token telemetry from the body; real dollar cost from the upstream header (USD->micros).
     assert seen == {
@@ -550,10 +552,7 @@ def test_intercept_section_responses_passthrough_is_signature_safe_uninspectable
     section = ri.build_intercept_capability_section(
         "openai_responses_passthrough", intercept_mode="inspect", audit_full_body=True
     )
-    # Reasoning preserved byte-for-byte...
     assert section["thinking_blocks_preserved"] is True
-    # ...but a byte-faithful passthrough can inspect/override/audit nothing, even
-    # with intercept.mode=inspect and audit_full_body=True.
     assert section["can_inspect"] == {
         "system_prompt": False,
         "drift_detection": False,
@@ -688,6 +687,134 @@ def test_accumulator_tracks_terminal_status():
     acc.feed(b'data: {"type":"response.failed","response":{"usage":{"input_tokens":5,"output_tokens":0}}}\n\n')
     assert acc.terminal_status == "failed"
     assert acc.usage == {"input_tokens": 5, "output_tokens": 0}  # usage still captured
+
+
+@pytest.mark.parametrize(
+    "wire",
+    [
+        b'data: {"type":"error","message":"failed"}\n\n',
+        b'event: error\r\ndata: {"message":"failed"}\r\n\r\n',
+        b'data: {"message":"failed"}\nevent: error\n\n',
+    ],
+)
+def test_explicit_sse_error_sets_application_failure_without_charging(wire):
+    missing = []
+    evidence = OpenRouterResponseEvidence(lambda: missing.append(True))
+    acc = rp._ResponsesUsageAccumulator(evidence)
+    for i in range(0, len(wire), 5):
+        acc.feed(wire[i : i + 5])
+    assert rp._failure_from_terminal_status(acc.terminal_status) == (
+        True,
+        "response_failed",
+    )
+    assert evidence.terminal_seen and evidence.cost_micros is None and not missing
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "wire,media,status,charge,latch,reason",
+    [
+        (
+            b'{"usage":{"cost":0.4}}',
+            "application/json",
+            502,
+            400_000,
+            False,
+            "invalid_upstream_response",
+        ),
+        (
+            b'{"status":"unknown"}',
+            "application/json",
+            502,
+            None,
+            True,
+            "invalid_upstream_response",
+        ),
+        (
+            b'{"status":"queued","usage":{"cost":0}}',
+            "application/json",
+            502,
+            None,
+            True,
+            "invalid_upstream_response",
+        ),
+        (
+            b'{"status":"in_progress"}',
+            "application/json",
+            502,
+            None,
+            True,
+            "invalid_upstream_response",
+        ),
+        (
+            b'{"status":"failed"}',
+            "application/json",
+            200,
+            None,
+            False,
+            "response_failed",
+        ),
+        (
+            b'{"status":"cancelled"}',
+            "application/json",
+            200,
+            None,
+            False,
+            "response_cancelled",
+        ),
+        (
+            b"malformed",
+            "application/json",
+            502,
+            None,
+            True,
+            "invalid_upstream_response",
+        ),
+        (b"OK", "text/plain", 502, None, True, "invalid_upstream_response"),
+    ],
+)
+async def test_direct_unary_classifies_entire_reply(responses_transport, wire, media, status, charge, latch, reason):
+    responses_transport.response = FakeResponse(content=wire, headers={"content-type": media})
+    missing, completed = [], []
+    resp = await rp.forward(
+        method="POST",
+        url_path="/v1/responses",
+        body={"model": "m"},
+        query_string="",
+        inbound_headers={},
+        base_url="https://u.test",
+        api_key="K",
+        request_id="req_unary",
+        openrouter=OpenRouterResponseEvidence(lambda: missing.append(True)),
+        on_complete=lambda usage, cost, failed, error: completed.append((cost, failed, error)),
+        extra_response_headers={"X-Spend-Warning": "over cap"},
+    )
+    assert resp.status_code == status and resp.headers["X-Spend-Warning"] == "over cap"
+    assert completed == [(charge, True, reason)] and bool(missing) == latch
+    if charge is not None:
+        assert resp.headers["X-Request-Cost"] == "0.400000"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream", [False, True])
+async def test_translated_zdr_refusal_keeps_warning(responses_transport, stream):
+    wire = b'{"error":{"message":"No endpoints found matching your data policy (Zero data retention)."}}'
+    responses_transport.response = FakeResponse(status_code=404, content=wire)
+    responses_transport.stream_response = FakeStream(status_code=404, chunks=(wire,))
+    resp = await rp.forward(
+        method="POST",
+        url_path="/v1/responses",
+        body={"model": "m", "stream": stream},
+        query_string="",
+        inbound_headers={},
+        base_url="https://u.test",
+        api_key="K",
+        request_id="req_warn",
+        openrouter=OpenRouterResponseEvidence(),
+        extra_response_headers={"X-Spend-Warning": "over cap"},
+    )
+    assert resp.status_code == 400 and json.loads(resp.body)["error"]["code"] == "zdr_unavailable"
+    assert resp.headers["X-Spend-Warning"] == "over cap" and resp.headers["X-Request-ID"] == "req_warn"
 
 
 async def _drain(resp):
@@ -1146,3 +1273,40 @@ async def test_responses_catalog_error_does_not_leak_exception_text(monkeypatch,
     assert b"FOO_KEY" not in leaked and b"BAR_KEY" not in leaked  # ...nor any env var name
     assert b"misconfigured" in leaked  # a generic, non-leaking message is returned instead
     assert secret in caplog.text  # ...while the full detail stays available in the server log
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reason,status", [("base", 400), ("missing_key", 401), ("declared_cost_gap", 400)])
+async def test_direct_openrouter_refuses_before_dispatch(monkeypatch, proxy_runtime_ready, reason, status):
+    from dataclasses import replace
+
+    import forge.backend.sources as catalog
+    from forge.config import load_config
+
+    server = proxy_runtime_ready
+    config = load_config(template="codex-responses-openrouter")
+    monkeypatch.setattr(server, "config", config)
+    if reason == "base":
+        config.proxy.get_provider().base_url = "http://router.invalid"
+    if reason == "declared_cost_gap":
+        source = catalog.get_model_source("openrouter")
+        monkeypatch.setattr(
+            catalog,
+            "get_model_source",
+            lambda _: replace(source, capabilities=replace(source.capabilities, responses_reports_cost=False)),
+        )
+    monkeypatch.setattr(
+        "forge.core.auth.template_secrets.resolve_env_or_credential",
+        lambda _: None if reason == "missing_key" else "fixture-key",
+    )
+
+    async def unexpected(**kwargs):
+        pytest.fail("A local refusal reached dispatch")
+
+    monkeypatch.setattr(rp, "forward", unexpected)
+    resp = await ri.handle_responses_passthrough(
+        _RawReq(body=b'{"model":"fixture"}'), method="POST", url_path="/v1/responses"
+    )
+    assert resp.status_code == status
+    if reason == "declared_cost_gap":
+        assert b"costs.on_unreported_cost=allow" in resp.body

@@ -91,8 +91,8 @@ You  ->  forge session  ->  Claude Code  |  Codex
 **Claude direct mode** (the default for Claude sessions) skips the proxy and talks to Anthropic directly; you still get
 sessions, hooks, consumer lanes, and the status line. Add `--proxy` for routing. **OpenRouter** templates call the
 OpenRouter API directly -- one API key covers Anthropic, OpenAI, Google, and more. **LiteLLM** templates route through a
-[LiteLLM](https://github.com/BerriAI/litellm) proxy, remote or a local subprocess. Twenty user-facing templates ship;
-see [docs/end-user/proxy.md](docs/end-user/proxy.md).
+[LiteLLM](https://github.com/BerriAI/litellm) proxy, remote or a local subprocess. The
+[proxy guide](docs/end-user/proxy.md) lists all 21 user-facing templates.
 
 ## Requirements
 

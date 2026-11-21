@@ -2182,6 +2182,23 @@ class TestProxyMetrics:
         assert data["total_requests"] == 42
         assert data["tokens"]["cached"] == 60000
 
+    @pytest.mark.parametrize(
+        ("mode", "current", "blocked"),
+        [("reject", 0.49, False), ("reject", 0.50, True), ("warn", 0.51, False), (None, 0.51, False)],
+    )
+    def test_metrics_spend_cap_recovery(self, runner, temp_env, monkeypatch, mode, current, blocked):
+        self._setup_registry_with_proxy()
+        costs = {"caps": {"monthly": {"current_usd": current, "limit_usd": 0.5}}}
+        if mode:
+            costs["on_cap_hit"] = mode
+        info = _ProxyInfo(metrics={"costs": costs})
+        monkeypatch.setattr("forge.cli.proxy._fetch_proxy_info", lambda _: info)
+        result = runner.invoke(main, ["proxy", "metrics", "test-proxy"])
+        assert result.exit_code == 0, result.output
+        assert f"Monthly spend cap  ${current:.2f} / $0.50" in result.output
+        assert ("New generations are blocked" in result.output) is blocked
+        assert ("forge proxy set test-proxy costs.caps.per_month=<amount>" in result.output) is blocked
+
     def test_metrics_multiple_json_marks_unreachable_null(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -2852,7 +2869,8 @@ class TestStopForceUpdatesSiblings:
             }
         )
         monkeypatch.setattr("forge.cli.proxy.find_pid_by_port", lambda port: 42)
-        monkeypatch.setattr("forge.cli.proxy.check_proxy_health", lambda **_: True)
+        health_checks = iter([True, False])  # Verify identity before SIGTERM, then observe shutdown.
+        monkeypatch.setattr("forge.cli.proxy.check_proxy_health", lambda **_: next(health_checks))
         monkeypatch.setattr("forge.cli.proxy.os.kill", lambda pid, sig: None)
 
         result = runner.invoke(main, ["proxy", "stop", "alias-a", "--force", "--kill-adopted"])

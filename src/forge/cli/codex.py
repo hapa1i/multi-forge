@@ -344,6 +344,7 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
         sys.exit(1)
 
     # Heavy proxy/invoke imports are deferred so `forge codex status` stays light.
+    from forge.core.models.model_reference import strip_transport_model_suffix
     from forge.proxy.proxies import (
         ProxyNotFoundError,
         ProxyResolutionError,
@@ -353,10 +354,10 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
         ProxyNotResponsesCapableError,
         ProxyStartError,
         ProxyUnreachableError,
-        assert_proxy_responses_capable,
         ensure_proxy,
+        read_responses_launch,
     )
-    from forge.session.codex_invoke import invoke_codex_bare_proxy
+    from forge.session.codex_invoke import invoke_codex_bare_proxy, passthrough_model
 
     # 3. Resolve + start/adopt the proxy.
     try:
@@ -380,9 +381,7 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
     #    capability/identity failure we leave the proxy running -- it's a static property of
     #    the proxy, so killing it would be user-hostile.
     try:
-        # wire_shape is "openai_responses_passthrough" on success (uninformative); the
-        # failure path names the actual shape via the exception instead.
-        default_model, _ = assert_proxy_responses_capable(
+        default_model, policy = read_responses_launch(
             entry.base_url,
             expected_proxy_id=entry.proxy_id,
             expected_template=entry.template,
@@ -411,15 +410,27 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
         )
         sys.exit(1)
 
+    if policy.get("on_unreported_cost") == "allow":
+        err_console.print("Unreported OpenRouter account charges cannot count toward this proxy's spend caps.")
+    launch_default = policy.get("requested_default_model") or default_model
+    requested = passthrough_model(codex_args) or launch_default
+    dispatched = requested
+    client_args = list(codex_args)
+    if policy.get("required_zdr") is True:
+        client_args[:0] = ["-c", 'web_search="disabled"']
+        if requested:
+            dispatched = policy["zdr_fallbacks"].get(strip_transport_model_suffix(requested), requested)
+    if requested != dispatched:
+        console.print(f"OpenRouter ZDR fallback: requested {requested}, dispatching {dispatched}.", markup=False)
     console.print(
         f"Starting Codex through proxy [green]{entry.proxy_id}[/green] "
-        f"({entry.template}, model={default_model or 'proxy default'})"
+        f"({entry.template}, model={dispatched or 'proxy default'})"
     )
     sys.exit(
         invoke_codex_bare_proxy(
             base_url=entry.base_url,
             sandbox=cast(CodexSandbox, sandbox),
-            model=default_model,
-            passthrough=list(codex_args),
+            model=launch_default,
+            passthrough=client_args,
         )
     )

@@ -1,0 +1,74 @@
+{
+  "kind": "loopback-only",
+  "criterion": "account_zdr",
+  "generation_bodies": [
+    {
+      "input": "Respond with the single word OK.",
+      "max_output_tokens": 128,
+      "model": "qwen/qwen4-max",
+      "provider": {
+        "zdr": true
+      },
+      "reasoning": {
+        "effort": "none"
+      },
+      "store": false
+    },
+    {
+      "input": "Respond with the single word OK.",
+      "max_output_tokens": 128,
+      "model": "openai/gpt-6.2-astra",
+      "provider": {
+        "zdr": true
+      },
+      "store": false
+    }
+  ],
+  "historical_baseline": {
+    "body_sha256": "6ae1793c7b1c43899a5569ce8adf967485e631f164e20024034e64e9a1e623ab",
+    "http": 404,
+    "model": "qwen/qwen4-max",
+    "path": "evidence/paid-3bb021f0/zdr.json",
+    "reason": "zdr-violation-by-account",
+    "receipt_sha256": "6a04008c3b2921062d4346be4f11e695101bbb737fb8e9dea5f339c9d5b69d7d"
+  },
+  "independent_request_zdr": "unverified",
+  "manifest_sha256": "2feeec7f089df57f2927735a7f36d0e5244bb4afb4844971c0924f641a2e0163",
+  "positive_status": "completed",
+  "requests": [
+    {
+      "model": null,
+      "operation": "key",
+      "status": 200
+    },
+    {
+      "model": null,
+      "operation": "endpoints/zdr",
+      "status": 200
+    },
+    {
+      "error": {
+        "bytes": 232,
+        "code": 404,
+        "format": "json",
+        "ineligibility_reasons": [
+          {
+            "configure_url": "https://openrouter.ai/settings/privacy",
+            "endpoint_count": 1,
+            "reason": "zdr-violation-by-account"
+          }
+        ],
+        "message": "ZDR violation (account settings)",
+        "sha256": "c5ad50041bccd2b068f14a85991eb0884436c10d1b727ee0467c1f25a0092537"
+      },
+      "model": "qwen/qwen4-max",
+      "operation": "responses",
+      "status": 404
+    },
+    {
+      "model": "openai/gpt-6.2-astra",
+      "operation": "responses",
+      "status": 200
+    }
+  ]
+}

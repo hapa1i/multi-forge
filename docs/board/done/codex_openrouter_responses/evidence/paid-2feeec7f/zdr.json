@@ -1,0 +1,68 @@
+{
+  "catalog": {
+    "entries": 1052,
+    "epoch": 1795127846.8647199,
+    "excluded": true,
+    "included": true,
+    "negative_model_ids": [
+      "qwen/qwen4-max",
+      "qwen/qwen4-max-20261115"
+    ],
+    "positive_model": "openai/gpt-6.2-astra",
+    "sha256": "895e89b6b33e07d9ddc4e2292142953af7a0d90ea37b9b62cdceacb9c785c9d9"
+  },
+  "credit": {
+    "includes_byok": true,
+    "resets": false,
+    "usd_limit": 2,
+    "usd_remaining": 2
+  },
+  "criterion": "account_zdr",
+  "historical_baseline": {
+    "body_sha256": "6ae1793c7b1c43899a5569ce8adf967485e631f164e20024034e64e9a1e623ab",
+    "http": 404,
+    "model": "qwen/qwen4-max",
+    "path": "evidence/paid-3bb021f0/zdr.json",
+    "reason": "zdr-violation-by-account",
+    "receipt_sha256": "6a04008c3b2921062d4346be4f11e695101bbb737fb8e9dea5f339c9d5b69d7d"
+  },
+  "independent_request_zdr": "unverified",
+  "manifest_sha256": "2feeec7f089df57f2927735a7f36d0e5244bb4afb4844971c0924f641a2e0163",
+  "reason": "Upstream refusal does not establish a ZDR policy denial. No endpoints found matching your data policy (Zero data retention). Configure: https://openrouter.ai/settings/privacy",
+  "refusal": {
+    "error": {
+      "bytes": 278,
+      "code": 404,
+      "format": "json",
+      "message": "No endpoints found matching your data policy (Zero data retention). Configure: https://openrouter.ai/settings/privacy",
+      "sha256": "1c77a1dda340b6aef7f83c07465f232af64cfaea2f3b4270fd269add4a499eca"
+    },
+    "http": 404
+  },
+  "requests": [
+    {
+      "model": null,
+      "operation": "key",
+      "status": 200
+    },
+    {
+      "model": null,
+      "operation": "endpoints/zdr",
+      "status": 200
+    },
+    {
+      "error": {
+        "bytes": 278,
+        "code": 404,
+        "format": "json",
+        "message": "No endpoints found matching your data policy (Zero data retention). Configure: https://openrouter.ai/settings/privacy",
+        "sha256": "1c77a1dda340b6aef7f83c07465f232af64cfaea2f3b4270fd269add4a499eca"
+      },
+      "model": "qwen/qwen4-max",
+      "operation": "responses",
+      "status": 404
+    }
+  ],
+  "stage": "zdr",
+  "verdict": "inconclusive"
+}

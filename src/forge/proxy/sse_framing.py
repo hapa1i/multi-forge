@@ -14,13 +14,21 @@ class SseJsonDataFramer:
     """Deliver decoded JSON values from complete SSE ``data:`` lines.
 
     Framing is a best-effort side tap: incomplete lines stay buffered, while
-    non-data lines, empty data, ``[DONE]``, invalid UTF-8, and malformed JSON
-    are ignored without retaining or logging payload content. The callback owns
-    protocol semantics and any exception it raises.
+    empty data, ``[DONE]``, and malformed JSON produce no decoded event.
+    A named frame with data also delivers its SSE event name at the frame boundary.
+    Callbacks own protocol semantics and any exceptions they raise.
     """
 
-    def __init__(self, on_event: Callable[[Any], None]) -> None:
+    def __init__(
+        self,
+        on_event: Callable[[Any], None],
+        *,
+        on_event_name: Callable[[str], None] | None = None,
+    ) -> None:
         self._on_event = on_event
+        self._on_event_name = on_event_name
+        self._name = ""
+        self._has_data = False
         self._buffer = ""
 
     def feed(self, chunk: bytes) -> None:
@@ -38,9 +46,19 @@ class SseJsonDataFramer:
         while "\n" in self._buffer:
             line, self._buffer = self._buffer.split("\n", 1)
             line = line.strip()
+            if not line:
+                if self._on_event_name and self._name and self._has_data:
+                    self._on_event_name(self._name)
+                self._name = ""
+                self._has_data = False
+                continue
+            if line.startswith("event:"):
+                self._name = line[6:].strip()
+                continue
             if not line.startswith("data:"):
                 continue
 
+            self._has_data = True
             data = line.removeprefix("data:").strip()
             if not data or data == "[DONE]":
                 continue

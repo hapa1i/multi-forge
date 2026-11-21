@@ -1,0 +1,13 @@
+# Sessionless Codex through OpenRouter. The proxy owns the upstream credential.
+proxy:
+  family: openai
+  preferred_provider: openrouter
+  backend: openrouter
+  default_port: 8106
+  wire_shape: openai_responses_passthrough
+  openrouter:
+    allow_non_zdr: false
+    tiers:
+      haiku: openai/gpt-5.4-mini
+      sonnet: openai/gpt-6.2-astra
+      opus: openai/gpt-6.2-astra

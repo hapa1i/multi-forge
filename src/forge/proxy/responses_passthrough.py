@@ -1,10 +1,8 @@
 """OpenAI Responses-shaped passthrough forwarding (Codex-facing ingress).
 
-Forward Codex's raw OpenAI Responses traffic to an upstream that serves the
-Responses API, WITHOUT translation, so reasoning items survive byte-for-byte
-(signature-safe) -- the same rationale as ``passthrough.py`` for Anthropic. The
-whole ``/v1/responses*`` surface is method- and body-agnostic: create (streamed),
-retrieve, cancel, input_items, delete, compact, input_tokens.
+Forward Responses JSON by value, preserving opaque reasoning items and tool calls.
+The relay streams upstream SSE bytes incrementally. The ingress decides which
+operations a source supports.
 
 The subtle streaming teardown is shared with the Anthropic passthrough via
 ``stream_relay.relay_upstream``; this module owns only the Responses-specific
@@ -20,13 +18,23 @@ import logging
 import math
 from collections.abc import Callable, Mapping
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 from fastapi.responses import Response, StreamingResponse
 
 from forge.core.telemetry.downstream import RequestMode
+from forge.proxy.openrouter_responses import (
+    OpenRouterResponseEvidence,
+    refusal,
+    zdr_refusal,
+)
 from forge.proxy.provider_trace_logger import record_provider_trace
-from forge.proxy.response_headers import merge_response_headers, relay_response_headers
+from forge.proxy.response_headers import (
+    merge_response_headers,
+    relay_response_headers,
+    request_cost_header,
+)
 from forge.proxy.sse_framing import SseJsonDataFramer
 from forge.proxy.stream_relay import relay_upstream
 from forge.proxy.utils import format_stream_lifecycle_summary
@@ -146,6 +154,8 @@ def _failure_from_terminal_status(status: str | None) -> tuple[bool, str | None]
     """
     if status == "failed":
         return True, "response_failed"
+    if status == "cancelled":
+        return True, "response_cancelled"
     return False, None
 
 
@@ -155,13 +165,13 @@ class _ResponsesUsageAccumulator:
     Fed a COPY of each forwarded chunk -- must never raise into the stream or
     mutate the bytes. The terminal ``response.completed`` event carries the
     Responses object (with ``usage``); content/tool deltas mark first-chunk-seen.
-    Cost is header-based (not in the SSE), so ``reported_cost_micros`` stays None
-    here and the forwarder supplies it from the response headers.
+    Direct OpenRouter evidence is observed as each event arrives.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, openrouter: OpenRouterResponseEvidence | None = None) -> None:
+        self.openrouter = openrouter
         self.usage: dict[str, int] = {}
-        self._framer = SseJsonDataFramer(self._merge)
+        self._framer = SseJsonDataFramer(self._merge, on_event_name=self._observe_event_name)
         self.first_chunk_seen = False
         self.final_usage_seen = False
         self.reported_cost_micros: int | None = None
@@ -172,10 +182,30 @@ class _ResponsesUsageAccumulator:
     def feed(self, chunk: bytes) -> None:
         self._framer.feed(chunk)
 
+    def _observe_event_name(self, name: str) -> None:
+        if name in ("error", "response.failed"):
+            self.terminal_status = "failed"
+            if self.openrouter:
+                self.openrouter.observe(None, "failed")
+
     def _merge(self, event: Any) -> None:
         if not isinstance(event, dict):
             return
         etype = event.get("type")
+        if etype == "error" or event.get("error"):
+            self._observe_event_name("error")
+            return
+        if self.terminal_status == "failed":
+            return
+        if self.openrouter and etype in (
+            "response.created",
+            "response.completed",
+            "response.incomplete",
+            "response.failed",
+        ):
+            if self.openrouter.terminal_seen:
+                return
+            self.openrouter.observe(event.get("response"), etype.split(".", 1)[1])
         if etype in ("response.output_text.delta", "response.output_item.added"):
             self.first_chunk_seen = True
         elif etype in ("response.completed", "response.incomplete", "response.failed"):
@@ -200,6 +230,7 @@ async def forward(
     on_complete: OnComplete | None = None,
     provider_trace_ctx: Mapping[str, Any] | None = None,
     extra_response_headers: Mapping[str, str] | None = None,
+    openrouter: OpenRouterResponseEvidence | None = None,
 ) -> Response:
     """Forward a raw Responses-API request to ``{base_url}{url_path}``.
 
@@ -211,10 +242,15 @@ async def forward(
     ``extra_response_headers`` (e.g. ``X-Spend-Warning`` in warn mode) ride every
     returned response so a warn-mode cap is never silently dropped.
     """
-    url = base_url.rstrip("/") + url_path
+    base = base_url.rstrip("/")
+    if urlsplit(base).path.endswith("/v1") and url_path.startswith("/v1/"):
+        url_path = url_path.removeprefix("/v1")
+    url = base + url_path
     if query_string:
         url = f"{url}?{query_string}"
     headers = build_upstream_headers(inbound_headers, api_key)
+    if openrouter:
+        headers["x-openrouter-metadata"] = "enabled"
     is_stream = body is not None and bool(body.get("stream"))
 
     if is_stream:
@@ -226,6 +262,7 @@ async def forward(
             on_complete=on_complete,
             provider_trace_ctx=provider_trace_ctx,
             extra_response_headers=extra_response_headers,
+            openrouter=openrouter,
         )
 
     provider_attempt_started = False
@@ -249,16 +286,26 @@ async def forward(
 
     # Accounting and the provider-trace plane both attach only to the billable
     # generation endpoint, so a non-generation relay skips body parsing entirely.
-    if on_complete is not None or provider_trace_ctx is not None:
+    response_headers = relay_response_headers(resp.headers, request_id)
+    invalid_unary = False
+    reported_cost = None
+    if on_complete is not None or provider_trace_ctx is not None or openrouter:
         response_body: dict[str, Any] | None = None
-        if "json" in resp.headers.get("content-type", ""):
+        if (not openrouter or 200 <= resp.status_code < 300) and "json" in resp.headers.get("content-type", ""):
             try:
                 parsed = json.loads(resp.content)
                 response_body = parsed if isinstance(parsed, dict) else None
             except (ValueError, TypeError):
                 response_body = None
         usage = extract_usage_from_response(response_body)
-        reported_cost = reported_cost_micros_from_headers(resp.headers)
+        if openrouter:
+            openrouter.generation_id = resp.headers.get("x-generation-id") or None
+            if 200 <= resp.status_code < 300:
+                invalid_unary = not openrouter.observe_unary(response_body)
+            reported_cost = openrouter.cost_micros
+            response_headers.update(request_cost_header(reported_cost))
+        else:
+            reported_cost = reported_cost_micros_from_headers(resp.headers)
         if on_complete is not None:
             # Fail on transport status OR a terminal application status of "failed"
             # (a 200 body can still carry "status": "failed").
@@ -266,6 +313,8 @@ async def forward(
                 (response_body or {}).get("status") if isinstance(response_body, Mapping) else None
             )
             http_failed = resp.status_code >= 400
+            if invalid_unary:
+                status_failed, status_error = True, "invalid_upstream_response"
             _safe_on_complete(
                 on_complete,
                 usage,
@@ -285,13 +334,29 @@ async def forward(
             final_usage_seen=bool(usage),
             client_disconnected=False,
             reported_cost_micros=reported_cost,
+            provider_meta=openrouter.provider_meta() if openrouter else None,
         )
 
+    if invalid_unary:
+        error = refusal(
+            "invalid_upstream_response",
+            "OpenRouter returned no synchronous Responses outcome.",
+            request_id,
+            502,
+        )
+        error.headers.update(request_cost_header(reported_cost))
+        error.headers.update(extra_response_headers or {})
+        return error
+    if openrouter and (
+        translated := zdr_refusal(resp.status_code, resp.content, str((body or {}).get("model")), request_id)
+    ):
+        translated.headers.update(extra_response_headers or {})
+        return translated
     return Response(
         status_code=resp.status_code,
         content=resp.content,
         media_type=resp.headers.get("content-type", "application/json"),
-        headers=merge_response_headers(relay_response_headers(resp.headers, request_id), extra_response_headers),
+        headers=merge_response_headers(response_headers, extra_response_headers),
     )
 
 
@@ -304,6 +369,7 @@ async def _forward_streaming(
     on_complete: OnComplete | None,
     provider_trace_ctx: Mapping[str, Any] | None,
     extra_response_headers: Mapping[str, str] | None,
+    openrouter: OpenRouterResponseEvidence | None = None,
 ) -> Response:
     client_cm = httpx.AsyncClient(timeout=_RESPONSES_TIMEOUT)
     stream_cm = None
@@ -328,8 +394,10 @@ async def _forward_streaming(
             headers=merge_response_headers({"X-Request-ID": request_id}, extra_response_headers),
         )
 
+    if openrouter:
+        openrouter.generation_id = resp.headers.get("x-generation-id") or None
     if resp.status_code != 200:
-        reported_cost = reported_cost_micros_from_headers(resp.headers)
+        reported_cost = None if openrouter else reported_cost_micros_from_headers(resp.headers)
         read_failed = False
         try:
             upstream_body = await resp.aread()
@@ -355,6 +423,7 @@ async def _forward_streaming(
             final_usage_seen=False,
             client_disconnected=False,
             reported_cost_micros=reported_cost,
+            provider_meta=openrouter.provider_meta() if openrouter else None,
         )
         if read_failed:
             return Response(
@@ -365,6 +434,11 @@ async def _forward_streaming(
             )
 
         logger.warning("[%s] responses passthrough upstream %s", request_id, resp.status_code)
+        if openrouter and (
+            translated := zdr_refusal(resp.status_code, upstream_body, str((body or {}).get("model")), request_id)
+        ):
+            translated.headers.update(extra_response_headers or {})
+            return translated
         return Response(
             status_code=resp.status_code,
             content=upstream_body,
@@ -372,14 +446,14 @@ async def _forward_streaming(
             headers=merge_response_headers(relay_response_headers(resp.headers, request_id), extra_response_headers),
         )
 
-    # Cost is on the response headers (x-litellm-response-cost), known at open.
-    cost_micros = reported_cost_micros_from_headers(resp.headers)
-    accumulator = _ResponsesUsageAccumulator()
+    header_cost = None if openrouter else reported_cost_micros_from_headers(resp.headers)
+    accumulator = _ResponsesUsageAccumulator(openrouter)
 
     def _on_end(*, failed: bool, client_disconnected: bool, stream_started: bool, chunk_count: int) -> None:
         # `failed` here is transport-only; fold in the terminal application status so
         # a 200 stream ending in response.failed is not recorded as a success.
         status_failed, status_error = _failure_from_terminal_status(accumulator.terminal_status)
+        cost_micros = openrouter.cost_micros if openrouter else header_cost
         combined_failed = failed or status_failed
         error_type = "upstream_error" if failed else status_error
         _safe_on_complete(on_complete, accumulator.usage, cost_micros, combined_failed, error_type, request_id)
@@ -391,6 +465,7 @@ async def _forward_streaming(
             final_usage_seen=accumulator.final_usage_seen,
             client_disconnected=client_disconnected,
             reported_cost_micros=cost_micros,
+            provider_meta=openrouter.provider_meta() if openrouter else None,
         )
         _summary = format_stream_lifecycle_summary(
             request_id,
@@ -432,6 +507,7 @@ def _record_responses_trace(
     final_usage_seen: bool,
     client_disconnected: bool,
     reported_cost_micros: int | None,
+    provider_meta: dict[str, Any] | None = None,
 ) -> None:
     """Mirror a Responses relay's lifecycle into the provider-trace plane.
 
@@ -445,7 +521,7 @@ def _record_responses_trace(
         record_provider_trace(
             **provider_trace_ctx,
             request_mode=request_mode,
-            provider_meta=None,
+            provider_meta=provider_meta,
             stream_started=stream_started,
             first_chunk_seen=first_chunk_seen,
             final_usage_seen=final_usage_seen,

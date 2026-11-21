@@ -43,6 +43,7 @@ from forge.core.logging import (
     configure_debug_logging,
     get_effective_log_level,
 )
+from forge.core.metric_formatting import UsdDisplayPolicy, format_usd_micros
 from forge.core.models.model_reference import strip_transport_model_suffix
 from forge.core.models.model_routes import resolve_model_alternative
 from forge.core.models.types import REQUIRED_TIERS
@@ -78,7 +79,7 @@ from forge.proxy.converters import (
     convert_openai_to_anthropic_sse,
 )
 from forge.proxy.cost_logger import build_request_cost_record
-from forge.proxy.cost_tracker import CostTracker
+from forge.proxy.cost_tracker import CapResult, CostTracker
 from forge.proxy.data_models import (
     MessagesRequest,
     TokenCountRequest,
@@ -103,6 +104,7 @@ from forge.proxy.ports import (
 from forge.proxy.provider_trace_logger import record_provider_trace
 from forge.proxy.reasoning import resolve_reasoning_effort_record
 from forge.proxy.request_id import is_valid_request_id
+from forge.proxy.response_headers import request_cost_header as _request_cost_header
 from forge.proxy.responses_ingress import (
     advertise_responses_ingress,
     build_intercept_capability_section,
@@ -245,6 +247,7 @@ def _attach_cap_summary(metrics: dict[str, Any], tracker: CostTracker | None) ->
     costs = metrics.get("costs")
     if caps and isinstance(costs, dict):
         costs["caps"] = caps
+        costs["on_cap_hit"] = tracker.on_cap_hit
 
 
 _downstream_pruned = False
@@ -517,6 +520,7 @@ def _calc_and_log_cost(
     forge_run_id: str | None = None,
     forge_root_run_id: str | None = None,
     downstream_event_id: str | None = None,
+    requested_model: str | None = None,
     cache_write_tokens: int = 0,
 ) -> int | None:
     """Log a request's cost (microdollars) and return it, or ``None`` if unavailable.
@@ -540,6 +544,7 @@ def _calc_and_log_cost(
                 proxy_id=PROXY_ID or "unknown",
                 backend_id=_backend_instance_id(),
                 model=model,
+                requested_model=requested_model,
                 tier=tier,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
@@ -575,17 +580,6 @@ def _persist_proxy_downstream_record(record: DownstreamRecord) -> None:
         _accounting_persistence.submit_downstream_record(record)
 
 
-def _request_cost_header(cost_micros: int | None) -> dict[str, str]:
-    """``X-Request-Cost`` only when this request reported a cost.
-
-    A ``None`` cost is "unavailable" — omit the header rather than emit a
-    misleading ``0.000000`` (and ``None / 1_000_000`` would raise).
-    """
-    if cost_micros is None:
-        return {}
-    return {"X-Request-Cost": f"{cost_micros / 1_000_000:.6f}"}
-
-
 def _cumulative_cost_header() -> dict[str, str]:
     """``X-Cumulative-Cost`` only once at least one request has reported a cost.
 
@@ -601,15 +595,15 @@ def _cumulative_cost_header() -> dict[str, str]:
 _CAP_CONFIG_KEY = {"daily": "per_day", "monthly": "per_month"}
 
 
-def _cap_result_message(cap_result) -> str:
+def _cap_result_message(cap_result: CapResult) -> str:
     """Format a spend cap result for HTTP headers and errors."""
     cap_type = cap_result.cap_type or "configured"
     config_key = _CAP_CONFIG_KEY.get(cap_type, f"per_{cap_type}")
     return (
         f"{cap_type} spend cap reached: "
-        f"${cap_result.current_micros / 1_000_000:.2f} / "
-        f"${cap_result.limit_micros / 1_000_000:.2f}. "
-        f"Adjust with: forge proxy set <id> costs.caps.{config_key}=<amount>"
+        f"{format_usd_micros(cap_result.current_micros, policy=UsdDisplayPolicy.SPEND_CAP_DETAIL)} / "
+        f"{format_usd_micros(cap_result.limit_micros, policy=UsdDisplayPolicy.SPEND_CAP_DETAIL)}. "
+        f"Adjust with: forge proxy set {PROXY_ID or '<id>'} costs.caps.{config_key}=<amount>"
     )
 
 
@@ -1898,7 +1892,7 @@ async def root(request: Request):
             "Proxy is missing config.proxy.default_tier; ambiguous requests will fail until configured."
         )
 
-    runtime_section = {
+    runtime_section: dict[str, Any] = {
         "template": active_template,
         "provider": preferred_provider,
         "backend_id": _backend_instance_id(),
@@ -1945,11 +1939,22 @@ async def root(request: Request):
     )
     # Advertised Responses-ingress capability for the Phase 4 launcher health-check.
     _responses_ingress = advertise_responses_ingress(_wire_shape, getattr(config.proxy, "backend", "") or "")
+    if _responses_ingress and _backend_instance_id() == "openrouter":
+        runtime_section["responses_policy"] = {
+            "on_unreported_cost": config.proxy.costs.on_unreported_cost or "reject",
+            "cost_scope": "openrouter_credit",
+            "unreported_cost_observed": bool(cost_tracker and cost_tracker.responses_cost_unreported),
+            "requested_default_model": configured_tier_models.get(default_tier) if default_tier else None,
+            "required_zdr": not provider_config.allow_non_zdr,
+            "zdr_fallbacks": _openrouter_zdr_fallbacks(provider_config) if not provider_config.allow_non_zdr else {},
+        }
 
     # Per-proxy metrics (request counts, token usage, latency); spend-cap
     # proximity is attached under metrics.costs.caps when caps are configured.
     metrics_snapshot = proxy_metrics.snapshot()
     _attach_cap_summary(metrics_snapshot, cost_tracker)
+    if "responses_policy" in runtime_section:
+        metrics_snapshot["costs"]["responses_scope"] = "openrouter_credit"
 
     retention_section, retention_degraded = _downstream_retention_status_section()
 

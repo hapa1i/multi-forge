@@ -1,0 +1,39 @@
+{
+  "baseline": {
+    "http": 404
+  },
+  "catalog": {
+    "entries": 1047,
+    "epoch": 1795101520.3308392,
+    "excluded": true,
+    "included": true,
+    "sha256": "a98a11617f37d87cbc1cd1e25f76baec3179e29660ae316cf374b14c75662625"
+  },
+  "credit": {
+    "includes_byok": true,
+    "resets": false,
+    "usd_limit": 2,
+    "usd_remaining": 2
+  },
+  "manifest_sha256": "53895a110f3639b5423a48f7861d7e3ed5936621b7b76fb3f7e3508141e4fbb9",
+  "reason": "Responses request returned HTTP 404.",
+  "requests": [
+    {
+      "model": null,
+      "operation": "key",
+      "status": 200
+    },
+    {
+      "model": null,
+      "operation": "endpoints/zdr",
+      "status": 200
+    },
+    {
+      "model": "anthropic/claude-fable-5.2",
+      "operation": "responses",
+      "status": 404
+    }
+  ],
+  "stage": "zdr",
+  "verdict": "inconclusive"
+}

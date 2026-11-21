@@ -288,6 +288,7 @@ class TestBareProxyArgv:
 # run-tree vars, and the shared codex/anthropic auth (from _CODEX_CHILD_STRIP_VARS).
 _BARE_STRIP_VARS = [
     "OPENAI_API_KEY",
+    "OPENROUTER_API_KEY",
     "OPENAI_ORGANIZATION",
     "OPENAI_ORG_ID",
     "OPENAI_PROJECT",

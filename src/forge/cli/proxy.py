@@ -27,6 +27,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Literal
@@ -53,7 +54,12 @@ from forge.config.loader import (
     template_exists,
     validate_template_name,
 )
-from forge.core.metric_formatting import TokenDisplayPolicy, format_token_count
+from forge.core.metric_formatting import (
+    TokenDisplayPolicy,
+    UsdDisplayPolicy,
+    format_token_count,
+    format_usd,
+)
 from forge.core.paths import display_path, get_forge_home
 from forge.core.process import find_pid_by_port
 from forge.core.state import (
@@ -352,7 +358,7 @@ def show_cmd(proxy_id: str, raw: bool, as_json: bool) -> None:
     "--base-url",
     "upstream_url",
     type=str,
-    help="Upstream LiteLLM base URL (overrides env var)",
+    help="Upstream provider base URL (overrides env var)",
 )
 # Per-tier reasoning effort overrides
 @click.option("--haiku-reasoning", type=str, help="Override reasoning_effort for haiku tier")
@@ -836,6 +842,17 @@ def stop_cmd(proxy_id: str, force: bool, kill_adopted: bool) -> None:
     outcome = _stop_proxy_process(console, entry, kill_adopted=kill_adopted)
 
     if outcome == "stopped":
+        # A fast subsequent start would otherwise adopt the signaled server with its old config.
+        deadline = time.monotonic() + 5
+        while check_proxy_health(
+            base_url=entry.base_url, expected_proxy_id=entry.proxy_id, expected_template=entry.template, timeout_s=0.3
+        ):
+            if time.monotonic() >= deadline:
+                print_error(
+                    "Proxy is still serving after SIGTERM. Check its status before restarting.", console=err_console
+                )
+                sys.exit(1)
+            time.sleep(0.05)
         console.print(f"[green]Stopped[/green] server for [cyan]{proxy_id}[/cyan]")
     elif outcome == "already_stopped":
         console.print(f"[green]Cleared[/green] stale running state for [cyan]{proxy_id}[/cyan]")
@@ -1537,6 +1554,24 @@ def _display_metrics(
         console.print(f"  Failures     {failures:>10,}{fail_pct}")
     else:
         console.print(f"  Failures     {failures:>10,}")
+
+    costs = metrics.get("costs") or {}
+    if costs.get("responses_scope") == "openrouter_credit":
+        console.print("  Responses spend counts OpenRouter account credit, including the OpenRouter charge on BYOK.")
+    caps = costs.get("caps") or {}
+    for window, key in (("daily", "per_day"), ("monthly", "per_month")):
+        cap = caps.get(window)
+        if not isinstance(cap, dict):
+            continue
+        current, limit = cap.get("current_usd"), cap.get("limit_usd")
+        if not isinstance(current, (int, float)) or not isinstance(limit, (int, float)):
+            continue
+        spent_usd = format_usd(current, policy=UsdDisplayPolicy.SPEND_CAP_DETAIL)
+        limit_usd = format_usd(limit, policy=UsdDisplayPolicy.SPEND_CAP_DETAIL)
+        console.print(f"  {window.capitalize()} spend cap  {spent_usd} / {limit_usd}")
+        if current >= limit and costs.get("on_cap_hit") == "reject":
+            console.print("    Cap reached. New generations are blocked.")
+            console.print(f"    forge proxy set {proxy_id} costs.caps.{key}=<amount>", markup=False)
 
     console.print("\n  [bold]Tokens[/bold]")
     console.print(

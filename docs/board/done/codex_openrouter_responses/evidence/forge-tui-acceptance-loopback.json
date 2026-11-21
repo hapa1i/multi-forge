@@ -1,0 +1,179 @@
+{
+  "binary": {
+    "platform": "aarch64-apple-darwin",
+    "sha256": "9248cfeebec9b4cc3034d5114caab10fbf426cbfa79dba410c5fa1b72762abd6",
+    "version": "0.170.0"
+  },
+  "catalog_requests": 0,
+  "credit": {
+    "includes_byok": true,
+    "resets": false,
+    "usd_limit": 5,
+    "usd_remaining": 5
+  },
+  "generations": [
+    {
+      "cost": 0.0100004,
+      "encrypted_reasoning_replayed": false,
+      "generation_id": "gen-loopback-1",
+      "kind": "turn",
+      "model": "openai/gpt-6.2-astra",
+      "openai_beta": null,
+      "read_result_observed": false,
+      "status": 200,
+      "write_result_observed": false
+    },
+    {
+      "cost": 0.0100004,
+      "encrypted_reasoning_replayed": false,
+      "generation_id": "gen-loopback-2",
+      "kind": "title",
+      "model": "openai/gpt-6.2-astra",
+      "openai_beta": null,
+      "read_result_observed": false,
+      "status": 200,
+      "write_result_observed": false
+    },
+    {
+      "cost": 0.0100004,
+      "encrypted_reasoning_replayed": false,
+      "generation_id": "gen-loopback-3",
+      "kind": "turn",
+      "model": "openai/gpt-6.2-astra",
+      "openai_beta": null,
+      "read_result_observed": true,
+      "status": 200,
+      "write_result_observed": false
+    },
+    {
+      "cost": 0.0100004,
+      "encrypted_reasoning_replayed": false,
+      "generation_id": "gen-loopback-4",
+      "kind": "turn",
+      "model": "openai/gpt-6.2-astra",
+      "openai_beta": null,
+      "read_result_observed": true,
+      "status": 200,
+      "write_result_observed": false
+    },
+    {
+      "cost": 0.0100004,
+      "encrypted_reasoning_replayed": false,
+      "generation_id": "gen-loopback-5",
+      "kind": "turn",
+      "model": "openai/gpt-6.2-astra",
+      "openai_beta": null,
+      "read_result_observed": true,
+      "status": 200,
+      "write_result_observed": true
+    },
+    {
+      "cost": 0.0100004,
+      "encrypted_reasoning_replayed": false,
+      "generation_id": "gen-loopback-6",
+      "kind": "turn",
+      "model": "google/gemini-4-carbon",
+      "openai_beta": null,
+      "read_result_observed": false,
+      "status": 200,
+      "write_result_observed": false
+    },
+    {
+      "cost": 0.0100004,
+      "encrypted_reasoning_replayed": false,
+      "generation_id": "gen-loopback-7",
+      "kind": "title",
+      "model": "google/gemini-4-carbon",
+      "openai_beta": null,
+      "read_result_observed": false,
+      "status": 200,
+      "write_result_observed": false
+    },
+    {
+      "cost": 0.0100004,
+      "encrypted_reasoning_replayed": false,
+      "generation_id": "gen-loopback-8",
+      "kind": "turn",
+      "model": "google/gemini-4-carbon",
+      "openai_beta": null,
+      "read_result_observed": true,
+      "status": 200,
+      "write_result_observed": false
+    },
+    {
+      "cost": 0.0100004,
+      "encrypted_reasoning_replayed": false,
+      "generation_id": "gen-loopback-9",
+      "kind": "turn",
+      "model": "google/gemini-4-carbon",
+      "openai_beta": null,
+      "read_result_observed": true,
+      "status": 200,
+      "write_result_observed": false
+    },
+    {
+      "cost": 0.0100004,
+      "encrypted_reasoning_replayed": false,
+      "generation_id": "gen-loopback-10",
+      "kind": "turn",
+      "model": "google/gemini-4-carbon",
+      "openai_beta": null,
+      "read_result_observed": true,
+      "status": 200,
+      "write_result_observed": true
+    }
+  ],
+  "ingress": {
+    "GET /": 4,
+    "POST /v1/responses": 10
+  },
+  "manifest_sha256": "36567394fe4a627dc8398a7e529a6032d199fedf5769a5d7599ba16682075083",
+  "metadata_reads": 7,
+  "mode": "loopback",
+  "models": {
+    "google/gemini-4-carbon": {
+      "attempts": 5,
+      "cost_micros": 50000,
+      "edit_verified": true,
+      "fallback_metadata_warning": true,
+      "followup_sent": true,
+      "lookup_statuses": [
+        404,
+        404,
+        200
+      ],
+      "read_and_edit_matched": true,
+      "reconcile": "joined",
+      "request_id": "req_4b6246ba1b08",
+      "selected_provider": "local",
+      "stop": "turn_ended"
+    },
+    "openai/gpt-6.2-astra": {
+      "attempts": 5,
+      "cost_micros": 50000,
+      "edit_verified": true,
+      "fallback_metadata_warning": false,
+      "followup_sent": true,
+      "lookup_statuses": [
+        404,
+        404,
+        200
+      ],
+      "read_and_edit_matched": true,
+      "reconcile": "joined",
+      "request_id": "req_3077ff6fc7b6",
+      "selected_provider": "local",
+      "stop": "turn_ended"
+    }
+  },
+  "proxy": {
+    "cap_usd": 0.5,
+    "cost_scope": "openrouter_credit",
+    "id": "codex-acceptance",
+    "required_zdr": true,
+    "template": "codex-responses-openrouter"
+  },
+  "refusals": [],
+  "reserved_creates": 10,
+  "verdict": "passed"
+}
