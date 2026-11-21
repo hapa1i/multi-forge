@@ -9,7 +9,7 @@ from click.testing import CliRunner
 
 from forge.cli.main import main
 from forge.proxy.proxies import ProxyEntry
-from forge.proxy.proxy_orchestrator import ProxyStartResult
+from forge.proxy.proxy_orchestrator import ProxyStartResult, SmokeTestResult
 
 pytestmark = pytest.mark.regression
 
@@ -29,8 +29,8 @@ def test_proxy_create_failed_smoke_is_one_json_result_and_nonzero(monkeypatch: p
         lambda **kwargs: ProxyStartResult(proxy=entry, source="spawn"),
     )
     monkeypatch.setattr(
-        "forge.proxy.proxy_orchestrator.smoke_test_proxy",
-        lambda **kwargs: (False, "injected upstream verification fault"),
+        "forge.proxy.proxy_orchestrator.probe_proxy_endpoint",
+        lambda **kwargs: SmokeTestResult(False, "injected upstream verification fault", "messages"),
     )
 
     result = CliRunner().invoke(
@@ -49,7 +49,11 @@ def test_proxy_create_failed_smoke_is_one_json_result_and_nonzero(monkeypatch: p
     )
 
     documents = [json.loads(line) for line in result.stdout.splitlines()]
-    expected_smoke = {"passed": False, "detail": "injected upstream verification fault"}
+    expected_smoke = {
+        "passed": False,
+        "detail": "injected upstream verification fault",
+        "endpoint": "messages",
+    }
     assert (
         result.exit_code,
         len(documents),

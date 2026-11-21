@@ -28,7 +28,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -77,6 +77,8 @@ from forge.proxy.proxies import (
 )
 from forge.proxy.proxy_orchestrator import (
     ProxyStartError,
+    SmokeEndpoint,
+    SmokeTestResult,
     TierOverrideOptions,
     check_proxy_health,
     create_proxy_file,
@@ -373,6 +375,11 @@ def show_cmd(proxy_id: str, raw: bool, as_json: bool) -> None:
     is_flag=True,
     help="Send a test LLM request after start to verify upstream",
 )
+@click.option(
+    "--smoke-endpoint",
+    type=click.Choice(["messages", "responses"]),
+    help="Select the endpoint for --smoke-test.",
+)
 def create_cmd(
     template: str,
     name: str | None,
@@ -388,6 +395,7 @@ def create_cmd(
     sonnet_temperature: float | None,
     opus_temperature: float | None,
     smoke_test: bool,
+    smoke_endpoint: SmokeEndpoint | None,
 ) -> None:
     """Create a proxy from a template and start it.
 
@@ -400,6 +408,8 @@ def create_cmd(
         forge proxy create litellm-openai --base-url https://litellm.corp.com  # Explicit upstream
         forge proxy create openrouter-openai --smoke-test # Verify upstream after start
     """
+    if smoke_endpoint and (not smoke_test or no_start):
+        raise click.UsageError("--smoke-endpoint requires --smoke-test and a running proxy. Omit --no-start.")
     console = Console(width=200)
 
     try:
@@ -531,21 +541,13 @@ def create_cmd(
                     console=console,
                 )
 
-        smoke_ok = True
-        smoke_detail = ""
+        smoke = None
         if smoke_test:
-            from forge.proxy.proxy_orchestrator import smoke_test_proxy
-
-            if not as_json:
-                console.print("\n[dim]Smoke testing upstream LLM...[/dim]")
-
-            smoke_ok, smoke_detail = smoke_test_proxy(base_url=proxy_entry.base_url)
-
-            if not as_json:
-                if smoke_ok:
-                    console.print(f"[green]Smoke test passed[/green]: {smoke_detail[:80]}")
-                else:
-                    console.print(f"[red]Smoke test failed[/red]: {smoke_detail}")
+            smoke = _run_smoke(
+                proxy_entry.base_url,
+                smoke_endpoint,
+                console=None if as_json else console,
+            )
 
         if as_json:
             import json
@@ -559,11 +561,11 @@ def create_cmd(
                 "status": proxy_entry.status,
                 "source": result.source,
             }
-            if smoke_test:
-                payload["smoke_test"] = {"passed": smoke_ok, "detail": smoke_detail}
+            if smoke:
+                payload["smoke_test"] = asdict(smoke)
             print(json.dumps(payload))
 
-        if not smoke_ok:
+        if smoke and not smoke.passed:
             sys.exit(1)
     else:
         proxy_path = get_proxy_file_path(proxy_name)
@@ -725,6 +727,17 @@ def _stop_proxy_process(console: Console, entry: ProxyEntry, *, kill_adopted: bo
     return "already_stopped"
 
 
+def _run_smoke(base_url: str, endpoint: SmokeEndpoint | None, console: Console | None) -> SmokeTestResult:
+    from forge.proxy.proxy_orchestrator import probe_proxy_endpoint
+
+    result = probe_proxy_endpoint(base_url=base_url, endpoint=endpoint)
+    if console:
+        target = f"/v1/{result.endpoint}" if result.endpoint else "GET /"
+        status = "[green]Smoke test passed[/green]" if result.passed else "[red]Smoke test failed[/red]"
+        console.print(f"{status} ({target}) {result.detail[:80] if result.passed else result.detail}")
+    return result
+
+
 @proxy.command("start")
 @click.argument("proxy_id")
 @click.option(
@@ -732,7 +745,12 @@ def _stop_proxy_process(console: Console, entry: ProxyEntry, *, kill_adopted: bo
     is_flag=True,
     help="Send a test LLM request after start to verify upstream",
 )
-def start_cmd(proxy_id: str, smoke_test: bool) -> None:
+@click.option(
+    "--smoke-endpoint",
+    type=click.Choice(["messages", "responses"]),
+    help="Select the endpoint for --smoke-test.",
+)
+def start_cmd(proxy_id: str, smoke_test: bool, smoke_endpoint: SmokeEndpoint | None) -> None:
     """Start server for an existing proxy.
 
     \b
@@ -740,6 +758,8 @@ def start_cmd(proxy_id: str, smoke_test: bool) -> None:
         forge proxy start my-proxy
         forge proxy start my-proxy --smoke-test
     """
+    if smoke_endpoint and not smoke_test:
+        raise click.UsageError("--smoke-endpoint requires --smoke-test.")
     console = Console(width=200)
 
     proxy_path = get_proxy_file_path(proxy_id)
@@ -783,16 +803,8 @@ def start_cmd(proxy_id: str, smoke_test: bool) -> None:
     console.print(f"  URL: {proxy_entry.base_url}")
     console.print(f"  PID: {proxy_entry.pid}")
 
-    if smoke_test:
-        from forge.proxy.proxy_orchestrator import smoke_test_proxy
-
-        console.print("\n[dim]Smoke testing upstream LLM...[/dim]")
-        ok, detail = smoke_test_proxy(base_url=proxy_entry.base_url)
-        if ok:
-            console.print(f"[green]Smoke test passed[/green]: {detail[:80]}")
-        else:
-            console.print(f"[red]Smoke test failed[/red]: {detail}")
-            sys.exit(1)
+    if smoke_test and not _run_smoke(proxy_entry.base_url, smoke_endpoint, console).passed:
+        sys.exit(1)
 
 
 @proxy.command("stop")

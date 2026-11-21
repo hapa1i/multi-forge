@@ -403,8 +403,9 @@ Use `--smoke-test` after first setup or credential changes to verify the proxy c
 Without it, health checks only confirm the local proxy process is alive.
 
 On the normal create/start path, `--json --smoke-test` prints one JSON object: the usual creation fields plus
-`smoke_test.passed` and `smoke_test.detail`. A failed probe exits non-zero but leaves the successfully created, reused,
-or adopted proxy available for inspection and retry. `--no-start` remains config-only and does not run the probe.
+`smoke_test.endpoint`, `smoke_test.passed` and `smoke_test.detail`. A failed probe exits non-zero but leaves the
+successfully created, reused, or adopted proxy available for inspection and retry. `--no-start` remains config-only and
+does not run the probe.
 
 If a credential change leaves a local LiteLLM backend in a suspect state, run `forge model backend stop --all` (or
 `forge model backend stop --all --yes` in automation) before restarting proxies. This clears managed local backend
@@ -467,8 +468,8 @@ the requested model.
 
 ### Start Codex with a Responses-capable proxy
 
-Run `forge codex start --proxy codex-responses-openrouter` for direct OpenRouter access or use `codex-responses-local`
-for LiteLLM. Both open a sessionless Codex TUI. [Credentials, model selection and spend caps](codex_proxy.md)
+Run `forge codex start --proxy <id>` on any direct OpenRouter proxy, including existing Claude proxies after restart.
+Use `codex-responses-local` for LiteLLM. [Upgrade, smoke endpoints and shared spend caps](codex_proxy.md)
 
 ### Delete a proxy
 

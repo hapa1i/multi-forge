@@ -20,11 +20,15 @@ VALID_WIRE_SHAPES: tuple[WireShape, ...] = (
     OPENAI_RESPONSES_PASSTHROUGH,
 )
 
-# Byte-faithful shapes: raw bodies forwarded unchanged, so signed reasoning
-# (Anthropic thinking blocks / Responses reasoning items) survives.
+# Both transports preserve opaque reasoning. Responses preserves JSON values across serialization.
 PASSTHROUGH_WIRE_SHAPES: tuple[WireShape, ...] = (
     ANTHROPIC_PASSTHROUGH,
     OPENAI_RESPONSES_PASSTHROUGH,
 )
 
 DEFAULT_WIRE_SHAPE: WireShape = OPENAI_TRANSLATED
+
+
+def messages_wire_shape(profile: str) -> WireShape:
+    """Messages is translated unless the listener forwards native Anthropic requests."""
+    return ANTHROPIC_PASSTHROUGH if profile == ANTHROPIC_PASSTHROUGH else OPENAI_TRANSLATED

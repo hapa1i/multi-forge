@@ -373,6 +373,13 @@ def compute_template_digest(template: str) -> str:
     return f"sha256:{full_hash[:12]}"
 
 
+def _saved_backend(data: Mapping[str, Any]) -> Any:
+    backend = data.get("backend", "")
+    if data.get("provider") == "openrouter" and (backend is None or isinstance(backend, str) and not backend.strip()):
+        return ""
+    return backend
+
+
 def load_proxy_instance_config(proxy_id: str) -> "ProxyInstanceConfig | None":
     """Load and parse proxy.yaml for a proxy id.
 
@@ -406,7 +413,11 @@ def load_proxy_instance_config(proxy_id: str) -> "ProxyInstanceConfig | None":
     if (
         isinstance(costs, dict)
         and costs.get("on_unreported_cost") in ("allow", "reject")
-        and not supports_unreported_cost_policy(data.get("backend", ""), data.get("wire_shape", ""))
+        and not supports_unreported_cost_policy(
+            _saved_backend(data),
+            data.get("provider", ""),
+            data.get("upstream_base_url", ""),
+        )
     ):
         logger.warning(
             "Ignoring costs.on_unreported_cost on proxy %s. It applies only to direct OpenRouter Responses. "
@@ -464,6 +475,7 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
         if "source" in data_map:
             raise ValueError(_PROXY_SOURCE_CLEAN_BREAK_TIP)
 
+        data_map = {**data_map, "backend": _saved_backend(data_map)}
         provider = data_map.get("provider", "")
         zdr_fields = sorted({"allow_non_zdr", "zdr_fallbacks"}.intersection(data_map))
         if provider != "openrouter" and zdr_fields:
@@ -596,18 +608,15 @@ def _proxy_instance_to_forge_config(
         **{name: getattr(proxy_config, name) for name in PROXY_PROVIDER_DIRECT_FIELDS},
     )
 
+    fields = {name: getattr(proxy_config, name) for name in (*PROXY_SHARED_NON_BLOCK_FIELDS, *PROXY_BLOCK_FIELDS)}
+    # Route-specific cost validation reads the active provider during construction.
+    fields[proxy_config.provider] = provider_config
     proxy_server_config = ProxyConfig(
         preferred_provider=proxy_config.provider,
         active_template=proxy_config.template,
         default_port=proxy_config.port,
-        **{name: getattr(proxy_config, name) for name in PROXY_SHARED_NON_BLOCK_FIELDS},
-        **{name: getattr(proxy_config, name) for name in PROXY_BLOCK_FIELDS},
+        **fields,
     )
-
-    if proxy_config.provider == "openrouter":
-        proxy_server_config.openrouter = provider_config
-    else:  # litellm is default
-        proxy_server_config.litellm = provider_config
 
     session_config = SessionConfig()
     if secrets.get("session", {}).get("forge_home"):

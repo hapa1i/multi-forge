@@ -78,21 +78,36 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
 {
   "is_proxy": true,
   "status": "running",
-  "proxy": { "template": "litellm-openai", "base_url": "http://localhost:8085" },
+  "template": "openrouter-gemini",
+  "provider": "openrouter",
+  "proxy": { "proxy_id": "cyan-coconut", "template": "openrouter-gemini", "base_url": "http://localhost:8097" },
   "wire_shape": "openai_translated",
   "intercept_mode": "passthrough",
   "intercept": { "mode": "passthrough", "can_inspect": { "...": "..." } },
+  "capabilities": { "responses_ingress": true },
+  "endpoints": {
+    "messages": { "wire_shape": "openai_translated", "thinking_blocks_preserved": false },
+    "responses": { "wire_shape": "openai_responses_passthrough", "thinking_blocks_preserved": true }
+  },
   "tiers": {
-    "haiku": { "model": "gpt-4o-mini", "context_window": 128000 },
-    "sonnet": { "model": "gpt-4o", "context_window": 128000 },
-    "opus": { "model": "o3", "context_window": 200000 }
+    "haiku": { "model": "google/gemini-4-hydrogen", "context_window": 1048576 },
+    "sonnet": { "model": "google/gemini-4-neon", "context_window": 1048576 },
+    "opus": { "model": "google/gemini-4-neon", "context_window": 1048576 }
   },
   "runtime": {
     "backend_id": "openrouter",
     "configured_tier_mappings": { "...": "..." },
     "tier_mappings": { "...": "..." },
-    "model_alternatives": { "opus": { "claude-opus-4-8": "anthropic/claude-opus-4.8" } },
-    "data_policy": { "zdr": "not_applicable", "zdr_fallbacks": {} }
+    "model_alternatives": { "sonnet": { "gemini-4-carbon": "google/gemini-4-carbon" } },
+    "data_policy": { "zdr": "required", "zdr_fallbacks": {} },
+    "responses_policy": {
+      "required_zdr": true,
+      "zdr_fallbacks": { "...": "..." },
+      "requested_default_model": "google/gemini-4-neon",
+      "on_unreported_cost": "reject",
+      "unreported_cost_observed": false,
+      "cost_scope": "openrouter_credit"
+    }
   }
 }
 ```
@@ -118,27 +133,20 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
 
 - Warn-mode spend caps allow the request and attach `X-Spend-Warning`
 
-- `wire_shape` is the authoritative wire truth (a passthrough proxy may carry `provider: litellm` as a credential slot
-  only); `intercept_mode` + `intercept.can_inspect` let a launcher report "inspect active (signature-safe)" vs "inspect
-  active (lossy)" before launch (§7.x)
+- `GET /` retains the legacy profile's `wire_shape` and `intercept`. The `endpoints.messages` report describes the
+  actual Messages wire shape, reasoning preservation and inspection. Native Anthropic passthrough preserves signed
+  thinking. All other profiles translate Messages and drop signed thinking.
 
-- `wire_shape: openai_responses_passthrough` is the **Codex-facing** raw OpenAI **Responses** shape on `/v1/responses*`
-  (create + retrieve/cancel/input_items/delete/compact/input_tokens). It preserves request JSON values, including opaque
-  reasoning items, and streams upstream SSE bytes incrementally. `can_inspect.*=false`. Routing requires that wire shape
-  plus backend `responses_ingress`. `GET /`'s `capabilities.responses_ingress` and Codex preflight's `proxy_supported`
-  expose the conjunction. Reported `x-litellm-response-cost` is USD→micros; an OpenAI-direct upstream is
-  token-telemetry-only. The launcher is `forge codex start --proxy` (§3.4). The shared `proxy.sse_framing` incremental
-  data/JSON framer serves both raw passthrough usage taps; accumulators own protocol event merging and lifecycle
-  semantics.
+- A direct OpenRouter source enables `POST /v1/responses` across profiles. For older snapshots, an exact OpenRouter
+  provider with an absent backend uses the saved upstream subject to direct URL validation. Explicit conflicting
+  backends are ineligible. The local Responses source additionally requires `openai_responses_passthrough` and relays
+  subresources. Both routes preserve request JSON values and stream upstream SSE incrementally through the shared
+  `proxy.sse_framing` framer. Local LiteLLM reports cost through `x-litellm-response-cost`.
 
-  On the canonical OpenRouter source, only create is relayed. The ingress drops native identifiers and applies the live
-  ZDR model and tool policy, including plugin controls on the outgoing request. The direct route rejects background
-  creates because it cannot retrieve their final usage. The LiteLLM template also relays subresources.
-  [Operator contract](end-user/codex_proxy.md)
-
-  The shape governs the Responses ingress; it does not make the proxy exclusive to Codex. The same
-  `codex-responses-local` instance deliberately accepts Claude-backed sessions and workers on `/v1/messages`, where the
-  ordinary Anthropic-to-OpenAI translation path applies. Messages callers receive no raw-Responses signature guarantee.
+- `capabilities.responses_ingress` advertises live availability and `endpoints.responses` describes the available route.
+  Responses preserves opaque reasoning and bypasses body audit. Direct OpenRouter strips native identifiers, enforces
+  model and tool policy, and refuses background creates. The explicit Responses profile keeps its historical bare smoke
+  target. [Operator contract](end-user/codex_proxy.md)
 
 **Marking-practice separation.** Runtime truth identifies effective routes; it does not classify provider practices. The
 package-owned `core/data/model_practices.yaml` separately records dated, source-linked provider declarations under
@@ -356,9 +364,9 @@ reasoning in historical turns is untouched. Mutation records carry hashes/length
 and removed sampling key names only, never sampling values.
 
 **Route-bound caveat.** Intercept is a property of the resolved proxy/route, not the session. A direct-mode session has
-no chokepoint; launch-time preflight reports visibility explicitly (it never silently "degrades to passthrough").
-`GET /` surfaces both axes (`wire_shape`, `intercept_mode`, `intercept.can_inspect`, `thinking_blocks_preserved`) so a
-launcher can say "inspect active (signature-safe)" vs "inspect active (lossy)".
+no chokepoint; launch-time preflight reports visibility explicitly (it never silently "degrades to passthrough"). Claude
+reads `endpoints.messages` for its audit status. A Messages audit payload records `route.endpoint` and the actual
+`route.wire_shape`. Readers accept older records without an endpoint.
 
 **Sidecar-recommended, host-supported.** Both modes support the audit path; sidecar is recommended for an always-on
 posture (lifecycle-coupled, port-isolated), with the narrow mounts of §7 making in-container records host-visible.

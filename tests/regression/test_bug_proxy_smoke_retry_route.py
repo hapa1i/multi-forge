@@ -57,7 +57,17 @@ def test_root_retry_can_recover_direct_route_before_its_only_create(monkeypatch)
                 200,
                 json={
                     "wire_shape": "openai_responses_passthrough",
-                    "runtime": {"responses_policy": {"on_unreported_cost": "reject"}},
+                    "provider": "openrouter",
+                    "capabilities": {"responses_ingress": True},
+                    "runtime": {
+                        "responses_policy": {
+                            "on_unreported_cost": "reject",
+                            "required_zdr": True,
+                            "zdr_fallbacks": {},
+                            "cost_scope": "openrouter_credit",
+                            "requested_default_model": "fixture/model",
+                        }
+                    },
                 },
             )
         return httpx.Response(503, text="upstream unavailable")

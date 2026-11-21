@@ -20,11 +20,15 @@ def test_smoke_sends_the_requested_default_when_the_fallback_also_has_a_mapping(
                 200,
                 json={
                     "wire_shape": "openai_responses_passthrough",
+                    "provider": "openrouter",
+                    "capabilities": {"responses_ingress": True},
                     "runtime": {
                         "tier_mappings": {"sonnet": "fallback/model"},
                         "responses_policy": {
                             "requested_default_model": "requested/model",
                             "zdr_fallbacks": mappings,
+                            "required_zdr": True,
+                            "cost_scope": "openrouter_credit",
                             "on_unreported_cost": "reject",
                         },
                     },

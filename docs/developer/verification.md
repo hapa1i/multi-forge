@@ -60,8 +60,9 @@ live Google AI cases in `test_session_routing_e2e.py`. Follow the Neon and Hydro
 
 ### Sessionless Codex through OpenRouter Responses
 
-The Docker-backed tests exercise the direct route and shared LiteLLM accounting with synthetic credentials and loopback
-upstreams.
+The loopback fixtures exercise translated and explicit Responses profiles, the legacy OpenRouter backend fallback, both
+clients on one port, endpoint-specific audit and smoke output, unreported cost and a shared two-cent cap. They also
+retain coverage for local LiteLLM subresources and accounting. Use synthetic credentials for this suite.
 
 ```bash
 PYTHON_DOTENV_DISABLED=1 GEMINI_API_KEY= OPENROUTER_API_KEY= ./scripts/test-integration.sh \

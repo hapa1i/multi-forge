@@ -33,6 +33,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from forge.backend.responses import available_responses_source
 from forge.backend.sources import ModelSourceNotFoundError, get_model_source
 from forge.config import TierOverride, config, init_config, reload
 from forge.config.schema import RequestLogConfig
@@ -68,7 +69,12 @@ from forge.core.telemetry.downstream import (
 )
 from forge.core.tiers import detect_tier_word
 from forge.core.usage.vocabulary import Confidence, Reporter
-from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE
+from forge.core.wire_shapes import (
+    ANTHROPIC_PASSTHROUGH,
+    DEFAULT_WIRE_SHAPE,
+    OPENAI_RESPONSES_PASSTHROUGH,
+    messages_wire_shape,
+)
 from forge.proxy.accounting_persistence import ProxyAccountingPersistence
 from forge.proxy.base_client import ProxyStreamError
 from forge.proxy.client_factory import ModelProvider, TierClientFactory
@@ -106,7 +112,6 @@ from forge.proxy.reasoning import resolve_reasoning_effort_record
 from forge.proxy.request_id import is_valid_request_id
 from forge.proxy.response_headers import request_cost_header as _request_cost_header
 from forge.proxy.responses_ingress import (
-    advertise_responses_ingress,
     build_intercept_capability_section,
     register_responses_routes,
 )
@@ -156,8 +161,8 @@ def _backend_instance_id() -> str | None:
         if not _warned_absent_backend_instance:
             _warned_absent_backend_instance = True
             logger.info(
-                "proxy.yaml has no 'backend:'; downstream attribution, provider-trace, and "
-                "provider-user grouping are disabled for this proxy. Recreate it to refresh proxy.yaml."
+                "proxy.yaml has no 'backend:'; Messages downstream attribution, provider-trace, and "
+                "provider-user grouping are disabled. Recreate it to refresh proxy.yaml."
             )
         return None
     backend = str(backend)
@@ -521,6 +526,7 @@ def _calc_and_log_cost(
     forge_root_run_id: str | None = None,
     downstream_event_id: str | None = None,
     requested_model: str | None = None,
+    backend_id: str | None = None,
     cache_write_tokens: int = 0,
 ) -> int | None:
     """Log a request's cost (microdollars) and return it, or ``None`` if unavailable.
@@ -542,7 +548,7 @@ def _calc_and_log_cost(
         _persist_proxy_downstream_record(
             build_request_cost_record(
                 proxy_id=PROXY_ID or "unknown",
-                backend_id=_backend_instance_id(),
+                backend_id=backend_id or _backend_instance_id(),
                 model=model,
                 requested_model=requested_model,
                 tier=tier,
@@ -817,7 +823,8 @@ def _inspect_route() -> dict[str, Any]:
         "template": getattr(config.proxy, "active_template", ""),
         "provider": getattr(config.proxy, "preferred_provider", ""),
         "backend": _backend_instance_id() or "",
-        "wire_shape": getattr(config.proxy, "wire_shape", DEFAULT_WIRE_SHAPE),
+        "endpoint": "/v1/messages",
+        "wire_shape": messages_wire_shape(getattr(config.proxy, "wire_shape", DEFAULT_WIRE_SHAPE)),
     }
 
 
@@ -1812,7 +1819,7 @@ async def root(request: Request):
     from forge.proxy.proxy_identity import get_proxy_identity
 
     active_template = os.environ.get("ACTIVE_TEMPLATE", "unknown")
-    preferred_provider = os.environ.get("PREFERRED_PROVIDER", "unknown")
+    preferred_provider = config.proxy.preferred_provider or os.environ.get("PREFERRED_PROVIDER", "unknown")
 
     # Use the request endpoint so identity stays accurate when --auto-port selects the port.
     request_host = request.url.hostname or "localhost"
@@ -1937,9 +1944,22 @@ async def root(request: Request):
         _intercept_mode,
         bool(getattr(_audit_cfg, "audit_full_body", False)),
     )
-    # Advertised Responses-ingress capability for the Phase 4 launcher health-check.
-    _responses_ingress = advertise_responses_ingress(_wire_shape, getattr(config.proxy, "backend", "") or "")
-    if _responses_ingress and _backend_instance_id() == "openrouter":
+    source = available_responses_source(
+        getattr(config.proxy, "backend", ""),
+        config.proxy.preferred_provider,
+        _wire_shape,
+        getattr(provider_config, "base_url", ""),
+    )
+    endpoints = {
+        "messages": build_intercept_capability_section(
+            messages_wire_shape(_wire_shape),
+            _intercept_mode,
+            _intercept_mode != "passthrough" and bool(getattr(_audit_cfg, "audit_full_body", False)),
+        ),
+    }
+    if source:
+        endpoints["responses"] = build_intercept_capability_section(OPENAI_RESPONSES_PASSTHROUGH, "passthrough", False)
+    if source and source.id == "openrouter":
         runtime_section["responses_policy"] = {
             "on_unreported_cost": config.proxy.costs.on_unreported_cost or "reject",
             "cost_scope": "openrouter_credit",
@@ -1967,7 +1987,8 @@ async def root(request: Request):
         "wire_shape": _wire_shape,
         "intercept_mode": _intercept_mode,
         "intercept": intercept_section,
-        "capabilities": {"responses_ingress": _responses_ingress},
+        "capabilities": {"responses_ingress": source is not None},
+        "endpoints": endpoints,
         "tiers": tiers,
         "status": "degraded" if retention_degraded else "running",
         "routing": routing_section,

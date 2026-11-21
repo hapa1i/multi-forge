@@ -6,20 +6,26 @@ running proxy's identity and Responses capability before launching.
 
 ```bash
 forge codex start --proxy codex-responses-openrouter
-forge codex start --proxy codex-responses-openrouter -- -m google/gemini-4-carbon
+forge codex start --proxy cyan-coconut -- -m google/gemini-4-neon
 forge codex start --proxy codex-responses-local --sandbox read-only
 ```
 
-The direct template uses `OPENROUTER_API_KEY` from the environment or the active Forge credential profile. Its default
-model is `openai/gpt-6.2-astra`. After `--`, select a model with `-m` or a top-level `-c model=...` override. An
-explicit `-m` takes precedence when both are supplied. Unrecognized slugs such as the tested Gemini model can trigger
-Codex's fallback model metadata warning. Selection by slug works with Codex's built-in metadata.
+Every direct OpenRouter proxy serves Claude Code on `/v1/messages` and Codex on `/v1/responses` at the same port. Claude
+keeps the saved tier mappings, alternatives and overrides. Codex defaults to the model in the proxy's default tier. For
+example, the Gemini template selects `google/gemini-4-neon`, and `codex-responses-openrouter` selects
+`openai/gpt-6.2-astra`. After `--`, use the full OpenRouter slug with `-m` or a top-level `-c model=...` override. An
+explicit `-m` takes precedence. Codex can warn about missing built-in model metadata for an unfamiliar slug. The proxy
+uses `OPENROUTER_API_KEY` from the environment or active Forge credential profile.
+
+After upgrading Forge, restart an existing listener once. For example, run `forge proxy stop cyan-coconut` then
+`forge proxy start cyan-coconut`. Its saved configuration stays in place. An older snapshot with a missing or blank
+`backend` uses its saved `provider: openrouter` and upstream URL for Responses. An explicit conflicting backend is
+ineligible. Older Forge launchers require the explicit Responses profile.
 
 The direct route supports `POST /v1/responses`. Codex sends full history for each turn, including local compaction.
 Forge preserves tool calls, arguments, results and opaque reasoning by JSON value and streams upstream events as they
 arrive. Live tool continuation with encrypted reasoning was observed on Gemini. Astra emitted no encrypted item in the
-live test. The LiteLLM template also relays Responses subresources and uses the `openai-api` credential. Both templates
-continue to serve translated Messages requests.
+live test. The LiteLLM template also relays Responses subresources and uses the `openai-api` credential.
 
 ## Privacy and routing
 
@@ -37,9 +43,10 @@ A configured `zdr_fallbacks` entry applies even across model families. Forge pri
 differ and keeps the shape Codex built for the requested model. The destination may reject that shape. Launch with the
 destination slug if you want Codex to use that model's metadata.
 
-The saved proxy setting `allow_non_zdr=true` permits caller-supplied routing and hosted tools. OpenRouter account and
-guardrail policies still apply. An account ZDR diagnostic points to OpenRouter's privacy settings. A text-only ZDR
-refusal identifies the endpoint restriction. A ZDR-eligible model can resolve either.
+Codex launch reports when Messages inspection is enabled. Responses preserves opaque reasoning and has no body audit.
+The saved setting `allow_non_zdr=true` permits caller-supplied routing and hosted tools. Forge discloses this at launch.
+OpenRouter account and guardrail policies still apply. An account ZDR diagnostic points to OpenRouter's privacy
+settings. A text-only ZDR refusal identifies the endpoint restriction. A ZDR-eligible model can resolve either.
 
 The child receives a loopback token and temporary `-c` provider settings. Forge strips inherited Codex, OpenAI and
 OpenRouter credentials and Forge session and run-tree variables. A nested Forge command can still load the active
@@ -47,29 +54,34 @@ credential profile or the project's `.env`. Set `PYTHON_DOTENV_DISABLED=1` to di
 
 ## Spend and diagnostics
 
-Direct Responses caps use the OpenRouter account charge in `usage.cost`, rounded per request to integer microdollars. A
-zero account charge on BYOK counts as zero. A separate bill from the BYOK provider falls outside this cap. A stream that
-ends before its terminal usage can also leave spend uncounted. Codex can omit `max_output_tokens`, so OpenRouter can
-require more available credit to admit a request than it ultimately charges.
+Messages and Responses share the proxy’s daily and monthly spend caps. Direct Responses uses the OpenRouter account
+charge in `usage.cost`, rounded per request to integer microdollars. A zero account charge on BYOK counts as zero. A
+separate bill from the BYOK provider falls outside this cap. A stream that ends before its terminal usage can also leave
+spend uncounted. Codex can omit `max_output_tokens`, so OpenRouter can require more available credit to admit a request
+than it ultimately charges.
 
 A completed or incomplete generation without a reported cost blocks the next direct Responses create until restart. A
 malformed unary success returns HTTP 502. Forge records any usable final cost or blocks the next create under the
 default policy. The direct route cannot track a background job to completion. It refuses background creates and treats
 an unexpected pending response as lacking a final charge. An explicit stream error is recorded as a failed attempt.
 
-The default applies even with no dollar cap. Create/start smoke tests check the price on their own unary request. The
-first unpriced success fails the smoke and leaves the proxy available for inspection. To accept uncounted charges, run:
+The default applies even with no dollar cap. A reporting gap still permits Messages requests within the shared cap. On
+`forge proxy create` and `forge proxy start`, add `--smoke-test --smoke-endpoint responses` to check one unary Responses
+generation and its price. Choose `messages` to check Claude's endpoint. A bare `--smoke-test` checks Messages unless the
+saved profile is `openai_responses_passthrough`. An unpriced Responses generation fails its smoke. To accept uncounted
+charges, use the following commands.
 
 ```bash
 forge proxy set <id> costs.on_unreported_cost=allow
 forge proxy stop <id>
-forge proxy start <id> --smoke-test
+forge proxy start <id> --smoke-test --smoke-endpoint responses
 ```
 
-Forge warns at each Codex launch with this setting. Restart clears an observed reporting gap and reloads persisted
-dollar-cap totals. A source that declares its cost unavailable requires the override before its first direct create.
-This setting is specific to direct OpenRouter Responses. To clear it from an older LiteLLM proxy, run
-`forge proxy set <id> costs.on_unreported_cost=null`.
+Forge honors a saved `allow` even if an earlier version ignored it on a translated proxy. Each Codex launch reports that
+unpriced requests can exceed recorded spend. Restarting can interrupt either client. It clears the reporting gap and
+in-memory effort observations, and reloads persisted dollar-cap totals. A source that declares its cost unavailable
+requires the override before its first direct create. This setting is specific to direct OpenRouter Responses. To clear
+it from an older LiteLLM proxy, run `forge proxy set <id> costs.on_unreported_cost=null`.
 
 `forge runtime preflight codex --proxy <id>` reports `proxy_supported` for this route. That command also reports native
 headless login readiness. The sessionless proxy launch uses its loopback credential.

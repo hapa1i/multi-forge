@@ -11,6 +11,16 @@ Older entries are retained verbatim in [2026-08-22](archive/change_log_2026-08-2
 
 ## 2026-11-21
 
+### Serve Claude Code and Codex on one OpenRouter proxy
+
+Existing direct OpenRouter proxies gain Responses after a restart. Claude keeps its tier mappings, and both clients
+charge the same spend cap. Audit reporting and smoke probes identify their endpoint.
+
+In a network-isolated container, Claude Code used Hydrogen through Messages and Codex used Neon to read a fixture file
+and return the tool output through Responses on the same translated proxy. A mixed-version check reproduced the 1.1.8
+refusal and launched with the original saved bytes after restart.
+[Execution evidence](doing/openrouter_responses_by_default/checklist.md)
+
 ### Run sessionless Codex through OpenRouter
 
 The `codex-responses-openrouter` template launches Codex with an OpenRouter credential and requires ZDR by default. It

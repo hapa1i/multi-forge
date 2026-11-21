@@ -14,7 +14,7 @@ from forge.cli.main import main
 from forge.cli.proxy import _format_relative_time as _format_proxy_relative_time
 from forge.cli.proxy import _ProxyInfo
 from forge.proxy.proxies import ProxyEntry, ProxyRegistry, ProxyRegistryStore
-from forge.proxy.proxy_orchestrator import ProxyStartResult
+from forge.proxy.proxy_orchestrator import ProxyStartResult, SmokeTestResult
 from forge.session.identity import make_scoped_key
 
 
@@ -240,8 +240,8 @@ def test_proxy_create_json_smoke_is_one_result_for_every_source(
         lambda **kwargs: ProxyStartResult(proxy=entry, source=source),
     )
     monkeypatch.setattr(
-        "forge.proxy.proxy_orchestrator.smoke_test_proxy",
-        lambda **kwargs: (smoke_ok, detail),
+        "forge.proxy.proxy_orchestrator.probe_proxy_endpoint",
+        lambda **kwargs: SmokeTestResult(smoke_ok, detail, "messages"),
     )
 
     result = runner.invoke(
@@ -261,7 +261,7 @@ def test_proxy_create_json_smoke_is_one_result_for_every_source(
         "pid": entry.pid,
         "status": entry.status,
         "source": source,
-        "smoke_test": {"passed": smoke_ok, "detail": detail},
+        "smoke_test": {"passed": smoke_ok, "detail": detail, "endpoint": "messages"},
     }
     assert proxy_file.exists()
     assert ProxyRegistryStore().read().proxies[entry.proxy_id] == entry
@@ -294,8 +294,8 @@ def test_proxy_create_human_smoke_keeps_existing_status_and_diagnostic(
         lambda **kwargs: ProxyStartResult(proxy=entry, source="spawn"),
     )
     monkeypatch.setattr(
-        "forge.proxy.proxy_orchestrator.smoke_test_proxy",
-        lambda **kwargs: (smoke_ok, "probe detail"),
+        "forge.proxy.proxy_orchestrator.probe_proxy_endpoint",
+        lambda **kwargs: SmokeTestResult(smoke_ok, "probe detail", "messages"),
     )
 
     result = runner.invoke(
@@ -1828,7 +1828,7 @@ class TestProxyCreateNoStart:
         def unexpected_smoke(**kwargs: object) -> tuple[bool, str]:
             pytest.fail("--no-start must not run smoke verification")
 
-        monkeypatch.setattr("forge.proxy.proxy_orchestrator.smoke_test_proxy", unexpected_smoke)
+        monkeypatch.setattr("forge.proxy.proxy_orchestrator.probe_proxy_endpoint", unexpected_smoke)
 
         result = runner.invoke(
             main,
@@ -3191,3 +3191,10 @@ class TestProxyCreateMissingUrl:
     def test_error_suggests_auth_login(self, runner: CliRunner, temp_env: Path) -> None:
         result = runner.invoke(main, ["proxy", "create", "litellm-openai", "--no-start"])
         assert "forge auth login" in result.output
+
+
+@pytest.mark.parametrize("verb", ["create", "start"])
+def test_smoke_selector_requires_explicit_probe_before_proxy_lifecycle(runner, temp_env, verb):
+    result = runner.invoke(main, ["proxy", verb, "openrouter-gemini", "--smoke-endpoint", "responses"])
+    assert result.exit_code == 2 and "--smoke-endpoint requires --smoke-test" in result.output
+    assert not (temp_env / "proxies" / "openrouter-gemini" / "proxy.yaml").exists()

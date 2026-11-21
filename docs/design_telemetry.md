@@ -694,6 +694,9 @@ Semantics and invariants:
   requests enable routing metadata and use the endpoint marked `selected: true` in a Responses object. The body ID
   supplies `provider_response_id`. The `x-generation-id` header supplies the remote lookup identity even if the client
   disconnects before a terminal event.
+- Responses can attribute an older backend-less OpenRouter snapshot to `openrouter`. Messages keeps the saved
+  attribution. Both endpoints charge a single proxy cap. An unreported Responses charge blocks subsequent Responses
+  creates under the default policy. Messages audit payloads record the endpoint and its wire shape.
 - Direct Responses records keep the requested slug in `model` and the dispatched slug in `mapped_model`. Trace show
   displays both on a fallback. Metrics and cost summaries use the dispatched slug. A completed or incomplete terminal
   supplies OpenRouter account credit in `usage.cost`, including explicit zero on BYOK. The upstream BYOK provider's

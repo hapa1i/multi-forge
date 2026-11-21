@@ -27,6 +27,7 @@ from forge.cli.statusline import sources
 from forge.cli.statusline.context import RenderContext
 from forge.cli.statusline.effort import observation_label
 from forge.cli.statusline.names import DEFAULT_ORDER
+from forge.core.wire_shapes import OPENAI_RESPONSES_PASSTHROUGH
 
 logger = logging.getLogger(__name__)
 
@@ -268,11 +269,15 @@ def _produce_audit(ctx: RenderContext) -> Optional[str]:
     if not ctx.is_proxy or ctx.runtime is None:
         return None
     raw = ctx.runtime.raw
-    mode = raw.get("intercept_mode")
+    endpoints = raw.get("endpoints")
+    messages = endpoints.get("messages") if isinstance(endpoints, dict) else None
+    mode = messages.get("mode") if isinstance(messages, dict) else raw.get("intercept_mode")
     if not isinstance(mode, str) or not mode:
         return None
-    intercept = raw.get("intercept")
+    intercept = messages if isinstance(messages, dict) else raw.get("intercept")
     thinking_preserved = bool(intercept.get("thinking_blocks_preserved")) if isinstance(intercept, dict) else False
+    if messages is None and raw.get("wire_shape") == OPENAI_RESPONSES_PASSTHROUGH:
+        thinking_preserved = False  # Older listeners translated Messages on this profile too.
     return fmt.format_audit(mode, thinking_preserved)
 
 
