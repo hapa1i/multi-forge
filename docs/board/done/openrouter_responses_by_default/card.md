@@ -1,5 +1,7 @@
 # Enable Responses by default on all OpenRouter proxies
 
+Shipped on `main` on 2026-11-21. [Execution checklist](checklist.md)
+
 Forge 1.1.8 refused `forge codex start --proxy cyan-coconut` when this saved `openrouter-gemini` proxy used
 `wire_shape: openai_translated`. With a one-field edit and restart, the same ID and port advertised Responses and
 `google/gemini-4-neon`. The workaround also switches the bare smoke test to Responses and makes the proxy-wide audit

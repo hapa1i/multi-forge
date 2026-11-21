@@ -1,6 +1,7 @@
 # OpenRouter Responses execution checklist
 
-The [card](card.md) is implemented and ready for merge review on `codex/openrouter-responses-by-default`.
+The [card](card.md) landed on `main` on 2026-11-21 at `b5b0589e`. Its tree matches the verified PR head `56694e7a`.
+[PR #304](https://github.com/hapa1i/multi-forge/pull/304)
 
 ## Implementation and verification
 
@@ -65,4 +66,4 @@ stubbed the Codex child after argument construction and sent no inference traffi
 - [x] `make test-unit` passed 12,055 tests and `make test-regression` passed 2,708. All 47 targeted integration cases,
   `make pre-commit`, repository file limits and the 810-file Markdown link audit passed.
 - [x] Record the verified feature in the [change log](../../change_log.md).
-- [ ] Move the card to `done/` and update inbound links when the implementation lands on `main`.
+- [x] Move the card to `done/` and update the change-log link after merge.

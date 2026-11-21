@@ -15,12 +15,13 @@ Older entries are retained verbatim in [2026-08-23 through 2026-08-24](archive/c
 ### Serve Claude Code and Codex on one OpenRouter proxy
 
 Existing direct OpenRouter proxies gain Responses after a restart. Claude keeps its tier mappings, and both clients
-charge the same spend cap. Audit reporting and smoke probes identify their endpoint.
+charge the same spend cap. Audit reporting and smoke probes identify their endpoint. Forge launches Codex with the
+standard service tier and passes `--no-daemon` when the installed CLI supports it.
 
 In a network-isolated container, Claude Code used Hydrogen through Messages and Codex used Neon to read a fixture file
 and return the tool output through Responses on the same translated proxy. A mixed-version check reproduced the 1.1.8
 refusal and launched with the original saved bytes after restart.
-[Execution evidence](doing/openrouter_responses_by_default/checklist.md)
+[Execution evidence](done/openrouter_responses_by_default/checklist.md)
 
 ### Run sessionless Codex through OpenRouter
 
