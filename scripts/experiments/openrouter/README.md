@@ -20,8 +20,10 @@ controls across five refusal classes. Keep raw transcripts, native IDs and execu
 standard output. [Recorded results](../../../docs/board/done/codex_openrouter_responses/probe-results.md)
 
 The final acceptance runner launches both native TUIs through a saved Forge proxy with a verified $0.50 reject cap. It
-reserves requests before forwarding and relays SSE incrementally. Supply an unused receipt path. The selftest uses
-loopback, synthetic credentials and a scratch workspace.
+reserves requests before forwarding and relays SSE incrementally. Supply an unused path in a private directory. The
+receipt contains identifiers used for reconciliation. For publication, replace generation, request and downstream event
+IDs with stable labels across the receipt, downstream records and checklist. Keep the original locally for lookups. The
+selftest uses loopback, synthetic credentials and a scratch workspace.
 
 ```bash
 uv run --locked python scripts/experiments/openrouter/helpers/forge_acceptance.py --selftest \

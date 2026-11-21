@@ -60,6 +60,27 @@ def test_move_to_done_preserves_pinned_replays_and_receipt_paths(manifest, tmp_p
         codex.read_fixture(pin, archived)
 
 
+def test_published_acceptance_uses_joinable_labels(manifest):
+    _, card = manifest
+    directory = card / "evidence/paid-36567394"
+    receipt = json.loads((directory / "acceptance.json").read_bytes())
+    attempts = json.loads((directory / "downstream.json").read_bytes())["attempts"]
+    by_generation = {row["provider_generation_id"]: row for row in attempts}
+    by_request = {row["request_id"]: row for row in attempts}
+    assert len(by_request) == len(by_generation) == len(receipt["generations"]) == receipt["reserved_creates"]
+    for number, generation in enumerate(receipt["generations"], 1):
+        label = f"generation-{number:02d}"
+        assert generation["generation_id"] == label
+        row = by_generation[label]
+        assert row["provider_response_id"] == label and row["mapped_model"] == generation["model"]
+        assert row["request_id"] == f"request-{number:02d}"
+        assert row["downstream_event_id"] == f"event-{number:02d}"
+    checklist = (card / "checklist.md").read_text()
+    for model, result in receipt["models"].items():
+        request = result["request_id"]
+        assert request in checklist and by_request[request]["mapped_model"] == model
+
+
 @pytest.mark.parametrize("stage", ["cost", "codex"])
 def test_changed_prerequisite_stops_before_ledger_and_transport(manifest, stage, monkeypatch, tmp_path):
     parsed, origin = manifest

@@ -200,9 +200,9 @@ bridge buffered the stream and constructed its own upstream headers.
   [Paid acceptance receipt](evidence/paid-36567394/acceptance.json)
 - [x] Both native 0.170.0 sessions read the fixture and wrote its word on the follow-up. The proxy received ten
   Responses creates and four identity reads. No catalog request was observed. The first lookup joined Astra on Azure
-  (`req_abf301664fec`) and Gemini on Google (`req_ca761be0dff8`). The traces, cost summaries and proxy metrics agreed on
-  239,035 and 50,003 micros respectively. Each request was within half a micro of its reported charge. Gemini replayed
-  encrypted reasoning on three requests. Astra replay remains unverified.
+  (`request-01`) and Gemini on Google (`request-06`). The traces, cost summaries and proxy metrics agreed on 239,035 and
+  50,003 micros respectively. Each request was within half a micro of its reported charge. Gemini replayed encrypted
+  reasoning on three requests. Astra replay remains unverified.
   [Downstream records](evidence/paid-36567394/downstream.json) ·
   [Paid acceptance receipt](evidence/paid-36567394/acceptance.json)
 - [x] Synchronized the runtime, installation and telemetry designs, CLI reference, packaged QA inventory and

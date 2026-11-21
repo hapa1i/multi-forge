@@ -24,7 +24,8 @@ using a local tool, then wrote the word it had read to `proof.txt` on the follow
 All ten creates streamed, returned HTTP 200 and reported terminal usage. Two were title requests. Five downstream
 records also flagged a client disconnect after recording final usage. Per-request rounding produced 289,038 micros from
 $0.2890382 of reported OpenRouter credit. The traces, per-model cost summaries and proxy metrics agreed. Forge's daily
-reject cap was $0.50. Each model's first generation lookup returned HTTP 200 and joined its local trace.
+reject cap was $0.50. Each model's first generation lookup returned HTTP 200 and joined its local trace. The public
+receipts use matching labels for OpenRouter generation IDs, Forge request IDs and downstream event IDs.
 [Downstream records](evidence/paid-36567394/downstream.json) ·
 [Reconciliation results](evidence/paid-36567394/acceptance.json)
 
