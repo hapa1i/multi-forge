@@ -93,12 +93,50 @@ def test_cost_must_pass_before_codex_with_the_same_key(manifest, tmp_path):
     with pytest.raises(ValueError):
         ledger.begin("codex", key="dummy")
     ledger.finish("cost", "passed")
-    with pytest.raises(ValueError):
+    state_path = tmp_path / "state.json"
+    before = state_path.read_bytes()
+    ledger = importlib.import_module("paid_guard").Ledger(tmp_path, parsed["limits"])
+    with pytest.raises(ValueError, match="same dedicated key"):
         ledger.begin("codex", key="another-key")
+    assert state_path.read_bytes() == before
     ledger.begin("codex", key="dummy")
-    state = json.loads((tmp_path / "state.json").read_bytes())
+    state = json.loads(state_path.read_bytes())
     assert state["stages"] == {"cost": "passed", "codex": "running"}
     assert "dummy" not in json.dumps(state)
+
+
+def test_shared_key_verifier_is_salted_per_approval(manifest, tmp_path):
+    parsed, _ = manifest
+    guard = importlib.import_module("paid_guard")
+    salts, verifiers = [], []
+    for name in ("first", "second"):
+        ledger = guard.Ledger(tmp_path / name, parsed["limits"])
+        ledger.begin("cost", key="synthetic-probe-key")
+        raw = (ledger.directory / "state.json").read_bytes()
+        state = json.loads(raw)
+        assert b"synthetic-probe-key" not in raw and "key_sha256" not in state
+        salt = bytes.fromhex(state["key_salt"])
+        assert len(salt) == 16
+        verifier = state["key_pbkdf2_sha256"]
+        assert verifier == hashlib.pbkdf2_hmac("sha256", b"synthetic-probe-key", salt, 600_000).hex()
+        salts.append(salt)
+        verifiers.append(verifier)
+    assert salts[0] != salts[1] and verifiers[0] != verifiers[1]
+
+
+def test_legacy_key_binding_preserves_reservations_and_refuses_continuation(manifest, tmp_path):
+    parsed, _ = manifest
+    ledger = importlib.import_module("paid_guard").Ledger(tmp_path, parsed["limits"])
+    with ledger.locked() as state:
+        state["stages"]["cost"] = "running"
+        state["key_sha256"] = hashlib.sha256(b"dummy").hexdigest()
+    ledger.reserve("cost", "metadata", "key")
+    ledger.finish("cost", "passed")
+    path = tmp_path / "state.json"
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match="separately approved continuation"):
+        ledger.begin("codex", key="dummy")
+    assert path.read_bytes() == before
 
 
 @pytest.mark.parametrize(

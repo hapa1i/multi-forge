@@ -64,7 +64,9 @@ key and catalog, and sends one Astra request. To reproduce that sequence locally
 The [stages 70 and 80 manifest](../../../docs/board/done/codex_openrouter_responses/paid-probe-manifest-cost-codex.json)
 pins the passing stage 60 receipt. Rehearse it with `selftest --selftest-manifest <manifest> --selftest-codex <binary>`.
 After approval, run `./reproduce.sh 70-responses-cost` followed by `./reproduce.sh 80-responses-codex` with the same
-dedicated key. The ledger enforces stage order, the shared deadline and the attempt limits.
+dedicated key. The ledger verifies that key with a fresh salt per approval and enforces stage order, the shared deadline
+and the attempt limits. If an unfinished ledger predates salted key verification, keep its reservations. Stage 80 then
+requires a separately approved continuation.
 
 The [stage 80-only manifest](../../../docs/board/done/codex_openrouter_responses/paid-probe-manifest-codex-only.json)
 reuses the stage 70 metadata decision and pins the prior credit refusal. Pass it to the same loopback command to run

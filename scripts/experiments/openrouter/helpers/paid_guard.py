@@ -10,6 +10,7 @@ import json
 import math
 import os
 import re
+import secrets
 import socket
 import threading
 import time
@@ -182,6 +183,27 @@ def validate_manifest(manifest: dict) -> None:
         raise ValueError("A concrete model is required for each role.")
 
 
+def _bind_shared_key(state: dict, stage: str, key: str | None) -> None:
+    """Use a fresh salt for each approval shared by the cost and Codex processes."""
+    if not key:
+        raise ValueError("Cost and Codex must share one dedicated key.")
+    if stage == "cost":
+        state["key_salt"] = secrets.token_hex(16)
+    salt = state.get("key_salt")
+    if not isinstance(salt, str) or not re.fullmatch(r"[0-9a-f]{32}", salt):
+        raise ValueError(
+            "Approval lacks a valid salted key binding. Keep this ledger and use a separately approved continuation."
+        )
+
+    verifier = hashlib.pbkdf2_hmac("sha256", key.encode(), bytes.fromhex(salt), 600_000).hex()
+    if stage == "cost":
+        state["key_pbkdf2_sha256"] = verifier
+    else:
+        saved = state.get("key_pbkdf2_sha256")
+        if not isinstance(saved, str) or not saved.isascii() or not secrets.compare_digest(saved, verifier):
+            raise ValueError("Cost and Codex must share the same dedicated key and its spending limit.")
+
+
 class Ledger:
     """Persist reservations before dispatch, including attempts with uncertain outcomes."""
 
@@ -218,13 +240,7 @@ class Ledger:
             if any(state["stages"].get(s) != "passed" for s in stages[: stages.index(stage)]):
                 raise ValueError(f"An earlier stage has no passing verdict for {stage}.")
             if stages == ["cost", "codex"]:
-                if not key:
-                    raise ValueError("Cost and Codex must share one dedicated key.")
-                fingerprint = hashlib.sha256(key.encode()).hexdigest()
-                if stage == "cost":
-                    state["key_sha256"] = fingerprint
-                elif state.get("key_sha256") != fingerprint:
-                    raise ValueError("Cost and Codex must share the same dedicated key and its spending limit.")
+                _bind_shared_key(state, stage, key)
             remaining = state["deadline"] - time.time()
             if remaining <= 0:
                 raise ValueError("Approved wall-clock window expired.")
