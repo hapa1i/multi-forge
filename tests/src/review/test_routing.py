@@ -249,6 +249,13 @@ _EXPECTED_WORKFLOW_ROUTES = {
 _OPENROUTER_GPT_ROUTES = tuple(
     template for template in _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"] if template.startswith("openrouter-")
 )
+_FLASH_FIRST_GEMINI_ROUTES = (
+    "openrouter-gemini-flash",
+    "openrouter-gemini",
+    *_EXPECTED_WORKFLOW_ROUTES["gemini-3.1-pro-preview"][2:-2],
+    "litellm-gemini-flash-local",
+    "litellm-gemini-local",
+)
 _EXPECTED_WORKFLOW_ROUTES.update(
     {
         "gpt-6.2-astra": _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"],
@@ -260,15 +267,11 @@ _EXPECTED_WORKFLOW_ROUTES.update(
         "gpt-6-luna": _EXPECTED_WORKFLOW_ROUTES["gpt-6-astra"],
         "gpt-6-sol-pro": _OPENROUTER_GPT_ROUTES,
         "gpt-6-luna-pro": _OPENROUTER_GPT_ROUTES,
+        "gemini-4-neon": _EXPECTED_WORKFLOW_ROUTES["gemini-3.1-pro-preview"],
         "gemini-4-carbon": _EXPECTED_WORKFLOW_ROUTES["gemini-3.1-pro-preview"],
         "gemini-4-argon": _EXPECTED_WORKFLOW_ROUTES["gemini-3.1-pro-preview"],
-        "gemini-3.8-flash": (
-            "openrouter-gemini-flash",
-            "openrouter-gemini",
-            *_EXPECTED_WORKFLOW_ROUTES["gemini-3.1-pro-preview"][2:-2],
-            "litellm-gemini-flash-local",
-            "litellm-gemini-local",
-        ),
+        "gemini-3.8-flash": _FLASH_FIRST_GEMINI_ROUTES,
+        "gemini-4-hydrogen": _FLASH_FIRST_GEMINI_ROUTES,
         "deepseek-v4.1-flash": _EXPECTED_WORKFLOW_ROUTES["deepseek-v4-pro"],
         "deepseek-v4.1-flash-1017": _EXPECTED_WORKFLOW_ROUTES["deepseek-v4-pro"],
         "kimi-k3.1-pro": _EXPECTED_WORKFLOW_ROUTES["kimi-k3"],

@@ -23,7 +23,17 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture(
-    scope="module", params=["carbon", "carbon-openrouter", "argon", "openrouter", "gpt5-tools", "passthrough"]
+    scope="module",
+    params=[
+        "neon",
+        "hydrogen-openrouter",
+        "carbon",
+        "carbon-openrouter",
+        "argon",
+        "openrouter",
+        "gpt5-tools",
+        "passthrough",
+    ],
 )
 def effort_proxy(request, tmp_path_factory: pytest.TempPathFactory):
     route = request.param
@@ -94,6 +104,8 @@ def effort_proxy(request, tmp_path_factory: pytest.TempPathFactory):
     thread.start()
     home = tmp_path_factory.mktemp(f"effort-{route}")
     template = {
+        "neon": "litellm-gemini",
+        "hydrogen-openrouter": "openrouter-gemini",
         "carbon": "litellm-gemini",
         "carbon-openrouter": "openrouter-gemini",
         "argon": "litellm-gemini",
@@ -102,6 +114,8 @@ def effort_proxy(request, tmp_path_factory: pytest.TempPathFactory):
         "passthrough": "anthropic-passthrough",
     }[route]
     mapped = {
+        "neon": "vertex_ai/gemini-4-neon",
+        "hydrogen-openrouter": "google/gemini-4-hydrogen",
         "carbon": "vertex_ai/gemini-4-carbon",
         "carbon-openrouter": "google/gemini-4-carbon",
         "argon": "vertex_ai/gemini-4-argon",
@@ -160,9 +174,12 @@ def test_reported_effort_matches_captured_outbound_request(effort_proxy, stream:
     requests.clear()
     launch = mint_run_id()
     requested = "low" if route == "passthrough" else "max"
+    # Client max clamps to each Gemini 4 model's highest thinking level.
+    ceilings = {"neon": "xhigh", "hydrogen-openrouter": "xhigh", "carbon": "high", "carbon-openrouter": "high"}
+    ceiling = ceilings.get(route)
     client_model = "claude-opus-4-6" if route == "passthrough" else "gemini-4-argon"
-    if route.startswith("carbon"):
-        client_model = "gemini-4-carbon"
+    if ceiling is not None:
+        client_model = f"gemini-4-{route.split('-')[0]}"
     with httpx.Client(base_url=base_url, timeout=30) as client:
         assert client.get("/", params={"forge_launch": launch}).json()["runtime"]["effort"] == {}
         response = client.post(
@@ -170,7 +187,7 @@ def test_reported_effort_matches_captured_outbound_request(effort_proxy, stream:
             headers={FORGE_LAUNCH_HEADER: launch, "X-Forge-Model-Tier": "opus", "X-Forge-Effort-Source": "client"},
             json={
                 "model": client_model,
-                "max_tokens": 65_536 if route.startswith("carbon") else 64,
+                "max_tokens": 65_536 if ceiling is not None else 64,
                 "temperature": 0.2,
                 "top_p": 0.8,
                 "top_k": 20,
@@ -191,10 +208,12 @@ def test_reported_effort_matches_captured_outbound_request(effort_proxy, stream:
     assert len(requests) == 1
     upstream_body = requests[0]["body"]
     assert not any(name.lower().startswith("x-forge-") for name in requests[0]["headers"])
-    if route.startswith("carbon"):
+    if ceiling is not None:
         assert {"temperature", "top_p", "top_k"}.isdisjoint(upstream_body)
+        # Only Carbon's Vertex unary request is capped; Neon keeps the full limit on the same route.
         assert upstream_body["max_tokens"] == (32_768 if route == "carbon" and not stream else 65_536)
         assert upstream_body["tools"][0]["function"]["name"] == "Read"
+        assert observation["applied"] == ceiling
     assert observation["mapped_model"] == upstream_body["model"]
     assert observation["client_model"] == client_model
     assert observation["requested"] == requested
@@ -207,6 +226,8 @@ def test_reported_effort_matches_captured_outbound_request(effort_proxy, stream:
         assert observation["note"]
     else:
         wire = {
+            "neon": "thinkingConfig.thinkingLevel",
+            "hydrogen-openrouter": "reasoning.effort",
             "carbon": "thinkingConfig.thinkingLevel",
             "carbon-openrouter": "reasoning.effort",
             "argon": "thinkingConfig.thinkingLevel",

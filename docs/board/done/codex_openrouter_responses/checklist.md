@@ -223,8 +223,8 @@ bridge buffered the stream and constructed its own upstream headers.
 - [x] Closed the card in `done/`, updated inbound links and recorded acceptance in the
   [change log](../../change_log.md). The [2026-08-22 archive](../../archive/change_log_2026-08-22.md) keeps the oldest
   date block verbatim. The original manifests and historical receipts are among 54 relocated files verified
-  byte-for-byte. The current change log uses 23,699 of its 25,000 target tokens. The implementation-note correction
-  below was submitted to the local shadow notes for human review.
+  byte-for-byte. After merging the Gemini defaults, the change log used 24,402 of its 25,000 target tokens. The
+  implementation-note correction below was submitted to the local shadow notes for human review.
 
 ### Proposed correction to the June 23 launcher note
 

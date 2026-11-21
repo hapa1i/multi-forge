@@ -149,6 +149,8 @@ class TestDefaultModels:
             ("gpt-6-sol-pro", "openai"),
             ("gpt-6-luna", "openai"),
             ("gpt-6-luna-pro", "openai"),
+            ("gemini-4-hydrogen", "gemini"),
+            ("gemini-4-carbon", "gemini"),
             ("gemini-3.1-pro-preview", "gemini"),
             ("gemini-3.8-flash", "gemini"),
             ("deepseek-v4.1-flash", "deepseek"),
@@ -208,15 +210,26 @@ class TestDefaultModels:
         routes = derive_model_routes(DEFAULT_MODELS[GEMINI_DEFAULT])
         assert preferred_proxy_for_routes(routes) == "openrouter-gemini"
 
-    def test_carbon_is_default_and_prior_gemini_workers_are_retained(self):
-        assert GEMINI_DEFAULT == "gemini-4-carbon"
+    def test_neon_is_default_and_prior_gemini_workers_are_retained(self):
+        assert GEMINI_DEFAULT == "gemini-4-neon"
         assert MODEL_ALIASES["gemini-3.1-pro"] == "gemini-3.1-pro-preview"
 
-        assert resolve_model_specs("gemini-4-carbon")[0].name == GEMINI_DEFAULT
-        specs = resolve_model_specs("gemini-4-argon,gemini-3.1-pro")
+        assert resolve_model_specs("gemini-4-neon")[0].name == GEMINI_DEFAULT
+        specs = resolve_model_specs("gemini-4-hydrogen,gemini-4-carbon,gemini-4-argon,gemini-3.1-pro")
 
-        assert [s.name for s in specs] == ["gemini-4-argon", "gemini-3.1-pro-preview"]
-        assert [s.effective_worker_id for s in specs] == ["gemini-4-argon", "gemini-3.1-pro"]
+        assert [s.name for s in specs] == [
+            "gemini-4-hydrogen",
+            "gemini-4-carbon",
+            "gemini-4-argon",
+            "gemini-3.1-pro-preview",
+        ]
+        assert [s.effective_worker_id for s in specs] == [
+            "gemini-4-hydrogen",
+            "gemini-4-carbon",
+            "gemini-4-argon",
+            "gemini-3.1-pro",
+        ]
+        specs = specs[2:]
         assert {route.model_ref for route in derive_model_routes(specs[1])} == {
             "google/gemini-3.1-pro-preview",
             "vertex_ai/gemini-3.1-pro-preview",

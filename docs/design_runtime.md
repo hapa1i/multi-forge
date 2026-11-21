@@ -650,25 +650,36 @@ Launch builders scrub an inherited shape when the selected proxy's shape is unkn
 predicted classifier request model, and the CLI names its backend through read-side route prediction on the launch
 snapshot.
 
-Gemini 4 Carbon is the Gemini Sonnet/Opus default and default Gemini workflow worker. Gemini 3.8 Flash remains the Haiku
-and Flash-template default; Argon and older Pro models remain explicit selections. Carbon uses `google/gemini-4-carbon`
-on OpenRouter, `gemini/gemini-4-carbon` on local LiteLLM, and `vertex_ai/gemini-4-carbon` on remote LiteLLM. Existing
-request and workflow deadlines still apply.
+Gemini 4 Neon is the Gemini Sonnet/Opus default and default Gemini workflow worker. Gemini 4 Hydrogen is the Haiku and
+Flash-template default. Carbon, Argon, Gemini 3.8 Flash, and older Pro models remain explicit selections. Each model
+uses its `google/` slug on OpenRouter, `gemini/` on local LiteLLM, and `vertex_ai/` on remote LiteLLM. The policy
+plan-check and team-tagger defaults stay on Gemini 3.8 Flash. Existing request and workflow deadlines still apply.
 
-Carbon and Argon share a 1,048,576-token context across input, thinking, and output. Ordinary Google AI requests allow
-65,536 output tokens. The catalog retains that maximum; Forge's LiteLLM client caps unary requests on their explicit
-`vertex_ai/` routes to 32,768 after merging request overrides. Streaming and other provider routes retain their
-configured limits. Long decode through continuation is outside Forge's request contract. Both models support `low`,
-`medium`, and `high` thinking with `medium` as the model default. The translated builder filters unsupported
-temperature, top-p, and top-k overrides. Both use implicit caching, without explicit cache creation.
+The four Gemini 4 models share a 1,048,576-token context across input, thinking, and output. Ordinary Google AI requests
+allow 65,536 output tokens, and the catalog retains that maximum. Forge's LiteLLM client caps unary requests on Carbon
+and Argon's explicit `vertex_ai/` routes to 32,768 after merging request overrides. Neon and Hydrogen allow 65,536 on
+unary Vertex requests and are not capped. Streaming and other provider routes retain their configured limits. Long
+decode through continuation is outside Forge's request contract. Carbon and Argon support `low`, `medium`, and `high`
+thinking with `medium` as the model default. Neon and Hydrogen add `xhigh` and default to `high`, so a thinking budget
+of at least 25,000 tokens, or a client `max` on a launch that opted into client effort, resolves to `xhigh` on them and
+to `high` on Carbon. Fresh Pro-family templates pin Haiku to `low` so Hydrogen requests without thinking do not inherit
+its default. The translated builder filters unsupported temperature, top-p, and top-k overrides. All four use implicit
+caching, without explicit cache creation.
 
-Bundled Google AI deployments use API-key authentication. Remote Vertex deployments require Vertex route identities and
-Google Cloud credentials. Both providers currently document a 4,096-token cache minimum for Carbon and Argon. Operators
-must adapt the complete deployment metadata to the provider and model when updating saved configurations. See the
-[model migration guidance](end-user/model_selection.md#gemini-4-carbon) for sources and introductory pricing, including
-Argon's.
+LiteLLM 1.102 special-cases Gemini 3 model names and packages no Gemini 4 metadata, so Forge covers three gaps. The
+LiteLLM client sends the native thinking level instead of a generic effort. It also gives the first tool call of each
+unsigned assistant step a placeholder thought signature, because Google rejects Gemini 4 tool history without one and a
+call made by another provider's model has none. The bundled deployments set `supports_system_messages` so the system
+prompt travels as a system instruction instead of user text. OpenRouter needs none of these.
 
-On pinned LiteLLM 1.102, Forge sends native `thinkingConfig` for Carbon and Argon's `gemini/`, `vertex_ai/`, and bare
+Bundled Google AI deployments use API-key authentication; Neon requires a paid-tier key. Remote Vertex deployments
+require Vertex route identities and Google Cloud credentials. Both providers currently document a 4,096-token cache
+minimum for the Gemini 4 models. Operators must adapt the complete deployment metadata to the provider and model when
+updating saved configurations. See the
+[model migration guidance](end-user/model_selection.md#gemini-4-neon-and-hydrogen) for sources and pricing, including
+Carbon and Argon's introductory schedule.
+
+On pinned LiteLLM 1.102, Forge sends native `thinkingConfig` for the Gemini 4 models' `gemini/`, `vertex_ai/`, and bare
 routes, for both streaming and unary requests. It replaces generic `reasoning_effort` with the validated `thinkingLevel`
 and `includeThoughts: true` after merging request overrides. This bypasses the adapter's incompatible `thinkingBudget`
 conversion without changing the OpenRouter request shape or upgrading the managed backend runtime.
@@ -698,9 +709,9 @@ translated request builder removes unsupported sampling fields after merging pro
 catalog even when gateway metadata does not yet recognize the model.
 
 LiteLLM 1.102 packages original GPT-6 Astra and Gemini 3.8 Flash metadata. Bundled GPT-6.2 Astra/Sol, GPT-6.1 Sol, GPT-6
-Sol/Luna, Carbon, Argon, Claude 5.5, and Fable 5.2 deployments supply capability and token/cache pricing in
-`model_info`. GPT-6.2 and 6.1 Sol cache reads cost 5% of uncached input. The GPT-6.2 deployments include the premium
-above 272K tokens. LiteLLM 1.102 omits the long-context Ultrafast pricing fields when calculating reported cost.
+Sol/Luna, Gemini 4, Claude 5.5, and Fable 5.2 deployments supply capability and token/cache pricing in `model_info`.
+GPT-6.2 and 6.1 Sol cache reads cost 5% of uncached input. The GPT-6.2 deployments include the premium above 272K
+tokens. LiteLLM 1.102 omits the long-context Ultrafast pricing fields when calculating reported cost.
 [GPT-6.2 upgrade guide](end-user/model_selection.md#gpt-62-astra-and-sol). Boundary tests require removing overrides
 when packaged support arrives. Pricing belongs to backend configuration, outside the intrinsic catalog. Sonnet 5.5's
 `thinking_always_on: false` prevents LiteLLM from silently deleting invalid `disabled` requests and enabling adaptive

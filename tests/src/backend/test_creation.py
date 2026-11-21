@@ -80,6 +80,8 @@ class TestCreateBackendConfig:
     @pytest.mark.parametrize(
         ("model_name", "upstream_model"),
         [
+            ("gemini/gemini-4-hydrogen", "gemini/gemini-4-hydrogen"),
+            ("gemini-4-hydrogen", "gemini/gemini-4-hydrogen"),
             ("gemini/gemini-3.8-flash", "gemini/gemini-3.8-flash"),
             ("gemini-3.8-flash", "gemini/gemini-3.8-flash"),
             ("gemini/gemini-3.7-flash", "gemini/gemini-3.7-flash"),

@@ -107,6 +107,8 @@ async def test_vertex_streaming_keeps_full_catalog_limit(
         ("google/gemini-4-argon", "openrouter"),
         ("gemini/gemini-4-carbon", "litellm_local"),
         ("google/gemini-4-carbon", "openrouter"),
+        ("vertex_ai/gemini-4-neon", "litellm_remote"),
+        ("vertex_ai/gemini-4-hydrogen", "litellm_remote"),
         ("vertex_ai/gemini-3.1-pro-preview", "litellm_remote"),
     ],
 )

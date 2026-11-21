@@ -8,6 +8,7 @@ tools, verbosity, and reasoning together for GPT-5 and Astra models.
 """
 
 import asyncio
+import base64
 import json
 import logging
 import ssl
@@ -51,6 +52,34 @@ logger = logging.getLogger(__name__)
 # LiteLLM proxy reports the computed spend for a request in this response header.
 # Direct providers (and surfaces that drop raw headers) don't set it → cost unavailable.
 LITELLM_COST_HEADER = "x-litellm-response-cost"
+
+# LiteLLM 1.102 special-cases "gemini-3" names only. For Gemini 4 it maps generic effort to unsupported
+# token budgets and leaves unsigned tool calls unsigned, so Forge sends the native thinking level and a
+# placeholder signature. A deployment may be addressed with or without a prefix.
+_GEMINI_4_MODELS = frozenset(
+    f"{prefix}{model}"
+    for model in ("gemini-4-neon", "gemini-4-hydrogen", "gemini-4-carbon", "gemini-4-argon")
+    for prefix in ("gemini/", "vertex_ai/", "")
+)
+# The placeholder LiteLLM sends for unsigned Gemini 3 tool calls. Google also accepts it for Gemini 4.
+_PLACEHOLDER_THOUGHT_SIGNATURE = base64.b64encode(b"skip_thought_signature_validator").decode()
+# LiteLLM returns a real Gemini signature inside the tool call ID, after this separator.
+_THOUGHT_SIGNATURE_SEPARATOR = "__thought__"
+# Vertex generateContent caps these models at 32K per hop. Neon and Hydrogen allow the full 64K.
+_VERTEX_UNARY_32K_MODELS = frozenset({"vertex_ai/gemini-4-argon", "vertex_ai/gemini-4-carbon"})
+
+
+def _sign_unsigned_tool_steps(messages: list[dict[str, Any]]) -> None:
+    """Give the first tool call of each unsigned assistant step a placeholder thought signature.
+
+    Google rejects Gemini 4 tool history whose function call has no signature. A call made by another
+    provider's model has none, so a session that switched models during tool use would fail. Gemini signs
+    only the first call of a parallel batch, so later calls need nothing.
+    """
+    for message in messages:
+        tool_calls = message.get("tool_calls")
+        if tool_calls and _THOUGHT_SIGNATURE_SEPARATOR not in tool_calls[0]["id"]:
+            tool_calls[0]["provider_specific_fields"] = {"thought_signature": _PLACEHOLDER_THOUGHT_SIGNATURE}
 
 
 def cost_from_response_headers(headers: Any) -> float | None:
@@ -399,16 +428,9 @@ class LiteLLMClient:
         effort_wire = "reasoning_effort"
         effort_dropped = False
 
-        if self._model in (
-            "gemini/gemini-4-argon",
-            "vertex_ai/gemini-4-argon",
-            "gemini-4-argon",
-            "gemini/gemini-4-carbon",
-            "vertex_ai/gemini-4-carbon",
-            "gemini-4-carbon",
-        ):
-            # LiteLLM 1.102 maps Gemini 4 generic effort to unsupported token budgets.
-            # Its native provider parameter preserves all three thinking levels.
+        if self._model in _GEMINI_4_MODELS:
+            _sign_unsigned_tool_steps(kwargs["messages"])
+            # The native provider parameter preserves every cataloged thinking level.
             extra_body = dict(kwargs.get("extra_body") or {})
             effort = extra_body.pop("reasoning_effort", kwargs.pop("reasoning_effort", None))
             spec = get_model_spec(self._model)
@@ -546,9 +568,8 @@ class LiteLLMClient:
             )
 
         kwargs, effort = self._build_request_kwargs(messages, tools, merged_params)
-        if self._model in ("vertex_ai/gemini-4-argon", "vertex_ai/gemini-4-carbon"):
-            # Vertex generateContent allows 32K per hop; the catalog's 64K limit
-            # applies to streamGenerateContent and the Google AI routes.
+        if self._model in _VERTEX_UNARY_32K_MODELS:
+            # The catalog's 64K limit applies to streamGenerateContent and the Google AI routes.
             extra_body = kwargs.get("extra_body")
             if isinstance(extra_body, dict):
                 kwargs["extra_body"] = extra_body.copy()

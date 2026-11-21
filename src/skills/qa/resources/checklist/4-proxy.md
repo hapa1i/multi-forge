@@ -428,8 +428,9 @@ forge model backend show litellm-4000 --raw
 
 - [ ] Backend config created (or reports it already exists)
 - [ ] `forge model backend show` displays config YAML
-- [ ] A freshly created backend includes Gemini 4 Carbon, Gemini 4 Argon, Gemini 3.8 Flash, Claude Opus 5.5, Claude
-  Sonnet 5.5, GPT-6.2 Astra and Sol, GPT-6.1 Sol, and GPT-6 Sol/Luna routes; an existing user-owned config is preserved
+- [ ] A freshly created backend includes Gemini 4 Neon, Hydrogen, Carbon, and Argon, Gemini 3.8 Flash, Claude Opus 5.5,
+  Claude Sonnet 5.5, GPT-6.2 Astra and Sol, GPT-6.1 Sol, and GPT-6 Sol/Luna routes; an existing user-owned config is
+  preserved
 
 ### 4.17 OpenRouter Templates
 
@@ -480,10 +481,10 @@ forge proxy template show openrouter-qwen
   opus=gpt-6.2-astra)
 - [ ] Both OpenRouter OpenAI templates expose GPT-6.2 Sol and both GPT-6.2 Pro models, plus the prior versioned
   alternatives
-- [ ] `openrouter-gemini` maps tiers to Gemini models (haiku=gemini-3.8-flash, sonnet/opus=gemini-4-carbon) and retains
-  explicit older Pro alternatives
-- [ ] `openrouter-gemini-flash` maps all tiers to gemini-3.8-flash with tier_overrides for reasoning_effort
-  (low/medium/high)
+- [ ] `openrouter-gemini` maps tiers to Gemini models (haiku=gemini-4-hydrogen, sonnet/opus=gemini-4-neon), pins Haiku
+  to `low` effort, and retains Carbon, Gemini 3.8 Flash, and older Pro alternatives
+- [ ] `openrouter-gemini-flash` maps all tiers to gemini-4-hydrogen with tier_overrides for reasoning_effort
+  (low/medium/high) and retains Gemini 3.8 Flash as an alternative
 - [ ] Each OpenRouter template has a distinct default_port (8095-8104)
 
 ### 4.18 OpenRouter Proxy Create
