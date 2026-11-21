@@ -506,9 +506,15 @@ def resolve_responses_posture(proxy_id: str | None) -> _Responses:
             "Omit --proxy to run native 'codex exec' directly.",
         )
 
-    from forge.backend.responses import available_responses_source
+    from forge.backend.responses import resolve_responses_source
 
-    if available_responses_source(config.backend, config.provider, config.wire_shape, config.upstream_base_url):
+    try:
+        source = resolve_responses_source(config.backend, config.provider, config.wire_shape, config.upstream_base_url)
+    except ValueError as exc:
+        return _Responses(
+            "proxy_unsupported", f"proxy '{proxy_id}' has an invalid upstream_base_url for Responses. {exc}"
+        )
+    if source is not None:
         return _Responses("proxy_supported", None)
 
     return _Responses(

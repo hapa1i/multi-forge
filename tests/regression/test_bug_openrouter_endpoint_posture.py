@@ -7,6 +7,7 @@ import pytest
 from forge.cli.statusline.registry import _produce_audit
 from forge.config.loader import get_proxy_file_path
 from forge.core.runtime.codex_preflight import resolve_responses_posture
+from forge.proxy.proxy_orchestrator import create_proxy_file
 
 pytestmark = pytest.mark.regression
 
@@ -31,6 +32,21 @@ tiers:
     posture = resolve_responses_posture("cyan-coconut")
     assert posture.posture == "proxy_supported", posture.blocking_reason
     assert path.read_bytes() == saved
+
+
+@pytest.mark.parametrize("template", ["openrouter-gemini", "codex-responses-openrouter"])
+def test_preflight_reports_unsafe_openrouter_base(template):
+    create_proxy_file(
+        proxy_id="remote-base",
+        template=template,
+        base_url="http://localhost:8085",
+        port=8085,
+        upstream_base_url="http://remote.example/api/v1",
+    )
+
+    posture = resolve_responses_posture("remote-base")
+    assert posture.posture == "proxy_unsupported"
+    assert "Remote OpenRouter bases require HTTPS." in (posture.blocking_reason or "")
 
 
 def test_claude_audit_reads_messages_on_responses_profile():

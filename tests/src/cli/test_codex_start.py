@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
@@ -200,7 +201,15 @@ class TestUsage:
         assert "proxy" in (result.stderr + result.output).lower()
 
 
-def test_matching_old_listener_gives_both_restart_commands():
+@pytest.mark.parametrize(
+    ("upstream", "expected"),
+    [
+        ("https://openrouter.ai/api/v1", ("forge proxy stop cyan-coconut", "forge proxy start cyan-coconut")),
+        ("http://remote.example/api/v1", ("upstream_base_url", "Remote OpenRouter bases require HTTPS.")),
+    ],
+    ids=["old-listener-needs-restart", "saved-destination-needs-https"],
+)
+def test_matching_listener_refusal_uses_saved_configuration_for_recovery(upstream, expected):
     from forge.proxy.proxy_orchestrator import create_proxy_file
 
     create_proxy_file(
@@ -208,6 +217,7 @@ def test_matching_old_listener_gives_both_restart_commands():
         template="openrouter-gemini",
         base_url="http://localhost:8084",
         port=8084,
+        upstream_base_url=upstream,
     )
     ensure = MagicMock(
         return_value=(
@@ -219,7 +229,7 @@ def test_matching_old_listener_gives_both_restart_commands():
     result, _, _, invoke = _invoke_start(["--proxy", "cyan-coconut"], ensure=ensure, capable=capable)
     assert result.exit_code == 1
     err = " ".join(result.stderr.split())
-    assert "forge proxy stop cyan-coconut" in err and "forge proxy start cyan-coconut" in err
+    assert all(text in err for text in expected)
     invoke.assert_not_called()
 
 

@@ -404,9 +404,11 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
     except ProxyNotResponsesCapableError as e:
         from forge.core.runtime.codex_preflight import resolve_responses_posture
 
-        tip = "Choose a direct OpenRouter proxy or a codex-responses-local profile."
-        if resolve_responses_posture(entry.proxy_id).posture == "proxy_supported":
+        saved = resolve_responses_posture(entry.proxy_id)
+        if saved.posture == "proxy_supported":
             tip = f"Restart the listener with 'forge proxy stop {entry.proxy_id}' then 'forge proxy start {entry.proxy_id}'."
+        else:
+            tip = saved.blocking_reason or "Choose a direct OpenRouter proxy or a codex-responses-local profile."
         print_error_with_tip(
             f"Responses-capable proxy required: proxy '{entry.proxy_id}' ({e}).",
             tip,

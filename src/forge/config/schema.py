@@ -833,13 +833,12 @@ PROXY_PROVIDER_DIRECT_FIELDS: tuple[str, ...] = (
 PROXY_PROVIDER_TRANSFORMED_FIELDS: frozenset[str] = frozenset({"tier_overrides", "tiers"})
 
 
-def supports_unreported_cost_policy(backend: str, provider: str, base_url: str) -> bool:
-    from forge.backend.responses import available_responses_source
+def validate_unreported_cost_policy(backend: str, provider: str, base_url: str) -> None:
+    """Require a direct Responses source and preserve its destination validation error."""
+    from forge.backend.responses import resolve_responses_source
 
-    return (
-        provider == "openrouter"
-        and available_responses_source(backend, provider, DEFAULT_WIRE_SHAPE, base_url) is not None
-    )
+    if provider != "openrouter" or resolve_responses_source(backend, provider, DEFAULT_WIRE_SHAPE, base_url) is None:
+        raise ValueError("costs.on_unreported_cost applies only to direct OpenRouter Responses.")
 
 
 def _coerce_proxy_blocks(cfg: Any) -> None:
@@ -852,10 +851,7 @@ def _coerce_proxy_blocks(cfg: Any) -> None:
             provider, base = cfg.provider, cfg.upstream_base_url
         else:
             provider, base = cfg.preferred_provider, cfg.get_provider().base_url
-        if not supports_unreported_cost_policy(cfg.backend, provider, base):
-            raise ValueError(
-                "costs.on_unreported_cost applies only to direct OpenRouter Responses. Remove it on this proxy."
-            )
+        validate_unreported_cost_policy(cfg.backend, provider, base)
 
 
 _VALID_DEFAULT_TIERS = frozenset({"haiku", "sonnet", "opus"})

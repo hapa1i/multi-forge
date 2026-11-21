@@ -110,14 +110,34 @@ def test_decimal_spend_cap_triggers_at_exact_microdollar_threshold(period, cap, 
 
 
 @pytest.mark.parametrize(
-    ("backend", "provider", "wire_shape"),
+    ("backend", "provider", "wire_shape", "base", "reason"),
     [
-        ("codex-responses-local", "litellm", "openai_responses_passthrough"),
-        ("litellm-remote", "openrouter", "openai_translated"),
+        (
+            "codex-responses-local",
+            "litellm",
+            "openai_responses_passthrough",
+            "http://localhost:4000",
+            "costs.on_unreported_cost applies only to direct OpenRouter Responses",
+        ),
+        (
+            "litellm-remote",
+            "openrouter",
+            "openai_translated",
+            "http://localhost:4000",
+            "costs.on_unreported_cost applies only to direct OpenRouter Responses",
+        ),
+        (
+            "openrouter",
+            "openrouter",
+            "openai_translated",
+            "http://remote.example/v1",
+            "Remote OpenRouter bases require HTTPS.",
+        ),
     ],
+    ids=["local-responses", "conflicting-backend", "invalid-openrouter-base"],
 )
 def test_reject_inapplicable_unreported_cost_policy_before_proxy_set_writes(
-    backend, provider, wire_shape, tmp_path, monkeypatch, caplog
+    backend, provider, wire_shape, base, reason, tmp_path, monkeypatch, caplog
 ):
     from click.testing import CliRunner
 
@@ -130,19 +150,20 @@ def test_reject_inapplicable_unreported_cost_policy_before_proxy_set_writes(
     path = proxy_dir / "proxy.yaml"
     path.write_text(
         f"template: {backend}\nbackend: {backend}\nprovider: {provider}\nwire_shape: {wire_shape}\n"
-        "proxy_endpoint: http://localhost:8085\nport: 8085\nupstream_base_url: http://localhost:4000\n"
+        f"proxy_endpoint: http://localhost:8085\nport: 8085\nupstream_base_url: {base}\n"
         "tiers:\n  sonnet: openai/gpt-6.2-astra\n"
     )
     original = path.read_bytes()
     result = CliRunner().invoke(main, ["proxy", "set", "cost-proxy", "costs.on_unreported_cost=reject"])
     assert result.exit_code != 0
-    assert "costs.on_unreported_cost applies only to direct OpenRouter Responses" in result.output
+    assert reason in result.output
     assert path.read_bytes() == original
 
     # Earlier instances could save this explicit, ineffective policy.
     path.write_bytes(original + b"costs:\n  on_unreported_cost: reject\n")
     saved = path.read_bytes()
     assert load_config(proxy_id="cost-proxy").proxy.costs.on_unreported_cost is None
+    assert reason in caplog.text
     assert "forge proxy set cost-proxy costs.on_unreported_cost=null" in caplog.text
     assert path.read_bytes() == saved
     cleared = CliRunner().invoke(main, ["proxy", "set", "cost-proxy", "costs.on_unreported_cost=null"])
