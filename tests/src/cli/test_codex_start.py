@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
@@ -198,3 +199,46 @@ class TestUsage:
         result = CliRunner().invoke(main, ["codex", "start"])
         assert result.exit_code != 0
         assert "proxy" in (result.stderr + result.output).lower()
+
+
+@pytest.mark.parametrize(
+    ("upstream", "expected"),
+    [
+        ("https://openrouter.ai/api/v1", ("forge proxy stop cyan-coconut", "forge proxy start cyan-coconut")),
+        ("http://remote.example/api/v1", ("upstream_base_url", "Remote OpenRouter bases require HTTPS.")),
+    ],
+    ids=["old-listener-needs-restart", "saved-destination-needs-https"],
+)
+def test_matching_listener_refusal_uses_saved_configuration_for_recovery(upstream, expected):
+    from forge.proxy.proxy_orchestrator import create_proxy_file
+
+    create_proxy_file(
+        proxy_id="cyan-coconut",
+        template="openrouter-gemini",
+        base_url="http://localhost:8084",
+        port=8084,
+        upstream_base_url=upstream,
+    )
+    ensure = MagicMock(
+        return_value=(
+            _entry(proxy_id="cyan-coconut", template="openrouter-gemini"),
+            False,
+        )
+    )
+    capable = MagicMock(side_effect=ProxyNotResponsesCapableError("openai_translated"))
+    result, _, _, invoke = _invoke_start(["--proxy", "cyan-coconut"], ensure=ensure, capable=capable)
+    assert result.exit_code == 1
+    err = " ".join(result.stderr.split())
+    assert all(text in err for text in expected)
+    invoke.assert_not_called()
+
+
+def test_direct_proxy_without_default_accepts_an_explicit_slug():
+    capable = MagicMock(
+        return_value=(None, {"requested_default_model": None, "required_zdr": True, "zdr_fallbacks": {}})
+    )
+    result, _, _, invoke = _invoke_start(["--proxy", "p"], capable=capable)
+    assert result.exit_code == 1 and "no model configured" in result.output
+    invoke.assert_not_called()
+    result, _, _, invoke = _invoke_start(["--proxy", "p", "--", "-m", "google/gemini-4-neon"], capable=capable)
+    assert result.exit_code == 0 and invoke.call_args.kwargs["passthrough"][-2:] == ["-m", "google/gemini-4-neon"]

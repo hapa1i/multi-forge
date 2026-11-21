@@ -71,6 +71,7 @@ def test_inspect_route_uses_backend_not_source(monkeypatch: pytest.MonkeyPatch) 
         "template": "openrouter-openai",
         "provider": "openrouter",
         "backend": "openrouter",
+        "endpoint": "messages",
         "wire_shape": "openai_translated",
     }
     assert "source" not in route
@@ -95,6 +96,7 @@ async def test_root_exposes_effective_backend_and_model_alternatives(
     import forge.proxy.proxy_identity as identity
 
     provider = SimpleNamespace(
+        base_url="",
         tiers=TierModels(
             haiku="",
             sonnet="qwen/qwen3.6-flash",
@@ -122,7 +124,6 @@ async def test_root_exposes_effective_backend_and_model_alternatives(
         lambda **_kwargs: SimpleNamespace(model_dump=lambda **_dump_kwargs: {}),
     )
     monkeypatch.setattr(server, "build_intercept_capability_section", lambda *_args: {})
-    monkeypatch.setattr(server, "advertise_responses_ingress", lambda *_args: False)
     monkeypatch.setattr(server, "_downstream_retention_status_section", lambda: ({}, False))
     monkeypatch.setattr(
         identity,

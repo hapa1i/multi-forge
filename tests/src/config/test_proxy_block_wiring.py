@@ -209,3 +209,51 @@ def test_unreported_cost_policy_is_optional_in_saved_config():
     assert "on_unreported_cost" not in yaml.safe_load(path.read_text())["costs"]
     with pytest.raises(ValueError, match="on_unreported_cost"):
         load_proxy_instance_config_from_dict({**_VALID_PROXY, "costs": {"on_unreported_cost": "warn"}})
+
+
+def test_openrouter_templates_keep_effective_claude_routes_when_responses_is_enabled():
+    from forge.backend.responses import available_responses_source
+    from forge.backend.sources import OPENROUTER_TEMPLATE_NAMES
+    from forge.config import load_config
+    from forge.proxy.model_routes import effective_proxy_model_maps
+    from forge.proxy.proxy_orchestrator import create_proxy_file
+
+    for template in OPENROUTER_TEMPLATE_NAMES:
+        original = load_config(template=template).proxy
+        path = create_proxy_file(
+            proxy_id=template,
+            template=template,
+            port=8080,
+            base_url="http://localhost:8080",
+        )
+        before = path.read_bytes()
+        saved = load_config(proxy_id=template).proxy
+        provider = saved.get_provider()
+        source = available_responses_source(
+            saved.backend, saved.preferred_provider, saved.wire_shape, provider.base_url
+        )
+        assert source and source.id == "openrouter", template
+        assert saved.wire_shape == original.wire_shape
+        assert effective_proxy_model_maps(saved) == effective_proxy_model_maps(original)
+        assert provider.tier_overrides == original.get_provider().tier_overrides
+        assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("backend_line", ["", "backend:\n", 'backend: ""\n', 'backend: "   "\n'])
+def test_legacy_openrouter_policy_uses_saved_destination_and_preserves_bytes(backend_line):
+    from forge.config import load_config
+    from forge.config.loader import get_proxy_file_path
+
+    path = get_proxy_file_path("legacy")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        backend_line + "provider: openrouter\nproxy_endpoint: http://localhost:8105\nport: 8105\n"
+        "upstream_base_url: https://router.example/custom/v1\ntiers: {sonnet: google/gemini-4-neon}\n"
+        "costs: {on_unreported_cost: allow}\n"
+    )
+    before = path.read_bytes()
+    proxy = load_config(proxy_id="legacy").proxy
+    assert proxy.backend == ""
+    assert proxy.get_provider().base_url == "https://router.example/custom/v1"
+    assert proxy.costs.on_unreported_cost == "allow"
+    assert path.read_bytes() == before

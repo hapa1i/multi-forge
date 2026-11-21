@@ -432,6 +432,7 @@ def _proxy_cfg(*, wire_shape: str, backend: str):
     provider = SimpleNamespace(base_url="https://upstream.test")
     return SimpleNamespace(
         wire_shape=wire_shape,
+        preferred_provider="litellm",
         backend=backend,
         default_tier="sonnet",
         get_provider=lambda name=None: provider,
@@ -590,7 +591,10 @@ def test_intercept_section_translated_inspect_mode_can_inspect():
     ],
 )
 def test_advertise_responses_ingress_matrix(wire_shape, source_id, expected):
-    assert ri.advertise_responses_ingress(wire_shape, source_id) is expected
+    from forge.backend.responses import available_responses_source
+
+    source = available_responses_source(source_id, "litellm", wire_shape, "https://example.test")
+    assert (source is not None) is expected
 
 
 # Accounting applies only to the generation endpoint
@@ -1291,9 +1295,11 @@ async def test_direct_openrouter_refuses_before_dispatch(monkeypatch, proxy_runt
     if reason == "declared_cost_gap":
         source = catalog.get_model_source("openrouter")
         monkeypatch.setattr(
-            catalog,
-            "get_model_source",
-            lambda _: replace(source, capabilities=replace(source.capabilities, responses_reports_cost=False)),
+            "forge.backend.responses.get_model_source",
+            lambda _: replace(
+                source,
+                capabilities=replace(source.capabilities, responses_reports_cost=False),
+            ),
         )
     monkeypatch.setattr(
         "forge.core.auth.template_secrets.resolve_env_or_credential",

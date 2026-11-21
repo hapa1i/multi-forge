@@ -23,7 +23,7 @@ import sys
 import time
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from rich.console import Console
@@ -49,8 +49,8 @@ from forge.core.paths import get_forge_home
 from forge.core.process import is_pid_alive
 from forge.core.state import now_iso
 from forge.core.wire_shapes import (
+    ANTHROPIC_PASSTHROUGH,
     OPENAI_RESPONSES_PASSTHROUGH,
-    PASSTHROUGH_WIRE_SHAPES,
     VALID_WIRE_SHAPES,
 )
 from forge.proxy.ports import (
@@ -121,12 +121,13 @@ class ProxyNotResponsesCapableError(Exception):
     output (e.g. ``wire_shape=openai_translated``).
     """
 
-    def __init__(self, wire_shape: str) -> None:
+    def __init__(
+        self,
+        wire_shape: str,
+        reason: str = "the listener does not advertise Responses ingress",
+    ) -> None:
         self.wire_shape = wire_shape
-        super().__init__(
-            f"proxy is not Responses-capable (wire_shape={wire_shape}); "
-            "needs wire_shape=openai_responses_passthrough and a responses_ingress source"
-        )
+        super().__init__(f"{reason} (wire_shape={wire_shape})")
 
 
 @dataclass
@@ -1029,20 +1030,6 @@ def _verify_proxy_identity(
         )
 
 
-def assert_proxy_responses_capable(
-    base_url: str,
-    *,
-    expected_proxy_id: str | None = None,
-    expected_template: str | None = None,
-    timeout_s: float = 5.0,
-) -> tuple[str | None, str]:
-    """Return the effective default model and wire shape of the verified proxy."""
-    model, _ = read_responses_launch(
-        base_url, expected_proxy_id=expected_proxy_id, expected_template=expected_template, timeout_s=timeout_s
-    )
-    return model, OPENAI_RESPONSES_PASSTHROUGH
-
-
 def read_responses_launch(
     base_url: str,
     *,
@@ -1052,27 +1039,8 @@ def read_responses_launch(
 ) -> tuple[str | None, dict[str, Any]]:
     """Read the effective default model and launch policy from a verified live proxy.
 
-    Reads ``GET {base_url}/`` and enforces the *same conjunction* the runtime route gate
-    enforces: top-level ``wire_shape == "openai_responses_passthrough"`` **and**
-    ``capabilities.responses_ingress is True``. Checking both fields (not only the
-    pre-ANDed ``responses_ingress``) means a proxy that advertised the flag under a
-    different wire shape is still rejected -- the launcher mirrors the runtime gate
-    instead of trusting the server's internal invariant that the advert already ANDs them.
-
-    When ``expected_proxy_id``/``expected_template`` are given, also verifies the live
-    proxy's identity (is_proxy + proxy_id + template) from the same body -- so a stale
-    registry entry whose port is now held by a *different* capable Forge proxy is rejected
-    rather than silently routed (``ensure_proxy`` returns exact ids by presence, not
-    liveness). Identity is checked *before* capability, so the wrong-proxy case reports a
-    mismatch, not a misleading capability verdict.
-
-    ``default_model`` is the advertised default tier's model when present, else ``None``
-    (the caller then skips ``-m`` and lets codex/proxy choose).
-
-    Raises:
-        ProxyUnreachableError: GET / failed (connection, timeout, non-200, or non-JSON).
-        ProxyIdentityMismatchError: reachable, but not the resolved proxy (stale entry).
-        ProxyNotResponsesCapableError: right proxy, but the capability conjunction is false.
+    Verify identity before endpoint capability. Direct OpenRouter also needs a
+    complete live policy so the launcher can apply ZDR and explain spend behavior.
     """
     url = f"{base_url.rstrip('/')}/"
     try:
@@ -1096,30 +1064,79 @@ def read_responses_launch(
         expected_template=expected_template,
     )
 
-    wire_shape = data.get("wire_shape")
-    wire_shape_str = wire_shape if isinstance(wire_shape, str) else "unknown"
+    policy = _live_responses_policy(data)
+    # 1.1.8 only reported its configured intercept mode at the top level.
+    endpoints = data.get("endpoints")
+    messages = endpoints.get("messages") if isinstance(endpoints, dict) else None
+    mode = messages.get("mode") if isinstance(messages, dict) else data.get("intercept_mode")
+    if mode in ("inspect", "override"):
+        policy = {**policy, "messages_inspected": True}
+    return _default_model_from_root(data), policy
+
+
+def _live_responses_policy(data: dict[str, Any]) -> dict[str, Any]:
+    shape = data.get("wire_shape")
+    shape = shape if isinstance(shape, str) else "unknown"
     capabilities = data.get("capabilities")
-    responses_ingress = capabilities.get("responses_ingress") if isinstance(capabilities, dict) else None
-    if wire_shape_str != OPENAI_RESPONSES_PASSTHROUGH or responses_ingress is not True:
-        raise ProxyNotResponsesCapableError(wire_shape_str)
+    if (
+        shape not in VALID_WIRE_SHAPES
+        or not isinstance(capabilities, dict)
+        or capabilities.get("responses_ingress") is not True
+    ):
+        raise ProxyNotResponsesCapableError(shape)
 
     runtime = data.get("runtime")
-    policy = runtime.get("responses_policy") if isinstance(runtime, dict) else None
-    return _default_model_from_root(data), policy if isinstance(policy, dict) else {}
+    runtime = runtime if isinstance(runtime, dict) else {}
+    provider = data.get("provider")
+    backend = runtime.get("backend_id")
+    if (provider == "openrouter" and backend not in (None, "", "openrouter")) or (
+        backend == "openrouter" and provider != "openrouter"
+    ):
+        raise ProxyNotResponsesCapableError(shape, "the live provider and backend disagree about the Responses source")
+    if provider != "openrouter":
+        if shape != OPENAI_RESPONSES_PASSTHROUGH:
+            raise ProxyNotResponsesCapableError(shape)
+        return {}
+    policy = runtime.get("responses_policy")
+    if not isinstance(policy, dict) or not (
+        isinstance(policy.get("required_zdr"), bool)
+        and policy.get("on_unreported_cost") in ("allow", "reject")
+        and policy.get("cost_scope") == "openrouter_credit"
+        and "requested_default_model" in policy
+        and (policy["requested_default_model"] is None or isinstance(policy["requested_default_model"], str))
+        and isinstance(policy.get("zdr_fallbacks"), dict)
+        and all(isinstance(k, str) and isinstance(v, str) for k, v in policy["zdr_fallbacks"].items())
+    ):
+        raise ProxyNotResponsesCapableError(shape, "the listener returned an incomplete OpenRouter Responses policy")
+    return policy
+
+
+SmokeEndpoint = Literal["messages", "responses"]
+
+
+@dataclass(frozen=True)
+class SmokeTestResult:
+    passed: bool
+    detail: str
+    endpoint: SmokeEndpoint | None
 
 
 def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, str]:
-    """Send a minimal completion request through the proxy to verify the upstream LLM.
+    """Probe the default endpoint and return the historical (success, detail) pair."""
+    result = probe_proxy_endpoint(base_url=base_url, timeout_s=timeout_s)
+    return result.passed, result.detail
 
-    Returns (success, detail) where detail is the model response text on
-    success or the error message on failure. Direct OpenRouter sends one create.
-    """
+
+def probe_proxy_endpoint(
+    *, base_url: str, endpoint: SmokeEndpoint | None = None, timeout_s: float = 30.0
+) -> SmokeTestResult:
+    """Probe one endpoint. Only direct OpenRouter Responses limits the probe to one create."""
     base_url = base_url.rstrip("/")
     last_error = ""
     for attempt in range(2):
         if attempt:
             time.sleep(2)
-        direct = False
+        direct_responses = False
         try:
             with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
                 root_response = client.get(f"{base_url}/")
@@ -1130,35 +1147,46 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
                 if not isinstance(root, dict) or root.get("wire_shape") not in VALID_WIRE_SHAPES:
                     last_error = "GET / did not identify a supported proxy wire shape"
                     continue
-                model = _smoke_test_model(root)
-                if root["wire_shape"] == OPENAI_RESPONSES_PASSTHROUGH:
-                    runtime = root.get("runtime")
-                    policy = runtime.get("responses_policy") if isinstance(runtime, dict) else None
-                    cost_policy = None
-                    if isinstance(policy, dict):
-                        direct = True
-                        model = policy.get("requested_default_model") or model
-                        cost_policy = policy.get("on_unreported_cost", "reject")
+                if endpoint is None:
+                    endpoint = "responses" if root["wire_shape"] == OPENAI_RESPONSES_PASSTHROUGH else "messages"
+                if endpoint == "responses":
+                    try:
+                        policy = _live_responses_policy(root)
+                    except ProxyNotResponsesCapableError as exc:
+                        return SmokeTestResult(False, str(exc), endpoint)
+                    direct_responses = bool(policy)
                     identity = root.get("proxy")
+                    model = policy.get("requested_default_model") or _smoke_test_model(root)
+                    if not model:
+                        return SmokeTestResult(
+                            False,
+                            "GET / did not identify an upstream Responses model",
+                            endpoint,
+                        )
                     ok, last_error = _smoke_test_responses(
                         client=client,
                         base_url=base_url,
                         model=model,
                         proxy_id=((identity.get("proxy_id") or "<id>") if isinstance(identity, dict) else "<id>"),
-                        cost_policy=cost_policy,
+                        cost_policy=policy.get("on_unreported_cost"),
                     )
                 else:
+                    model = (
+                        (_smoke_test_model(root) or "sonnet")
+                        if root["wire_shape"] == ANTHROPIC_PASSTHROUGH
+                        else "sonnet"
+                    )
                     ok, last_error = _smoke_test_messages(client, base_url, model)
                 if ok:
-                    return True, last_error
+                    return SmokeTestResult(True, last_error, endpoint)
         except httpx.TimeoutException:
             last_error = f"Request timed out after {timeout_s}s"
         except (httpx.RequestError, ValueError) as e:
             last_error = str(e)
-        if direct:
+        if direct_responses:
             break
 
-    return False, last_error
+    return SmokeTestResult(False, last_error, endpoint)
 
 
 def _smoke_test_messages(client: httpx.Client, base_url: str, model: str) -> tuple[bool, str]:
@@ -1186,11 +1214,8 @@ def _smoke_test_messages(client: httpx.Client, base_url: str, model: str) -> tup
     return False, f"Unexpected response shape: {resp.text[:200]}"
 
 
-def _smoke_test_model(data: dict[str, Any]) -> str:
-    """Translated routes accept a tier name. Passthrough routes require an upstream slug."""
-    fallback = "sonnet"
-    if data.get("wire_shape") not in PASSTHROUGH_WIRE_SHAPES:
-        return fallback
+def _smoke_test_model(data: dict[str, Any]) -> str | None:
+    """Read the upstream model for a passthrough probe from the live tier map."""
 
     routing = data.get("routing")
     runtime = data.get("runtime")
@@ -1217,7 +1242,7 @@ def _smoke_test_model(data: dict[str, Any]) -> str:
         if isinstance(tier_info, str) and tier_info:
             return tier_info
 
-    return fallback
+    return None
 
 
 def _smoke_test_responses(

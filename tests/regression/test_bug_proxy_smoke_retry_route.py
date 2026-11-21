@@ -45,25 +45,51 @@ def test_messages_retry_refreshes_the_model_before_the_second_post(monkeypatch):
     assert requests == ["old-model", "new-model"]
 
 
-def test_root_retry_can_recover_direct_route_before_its_only_create(monkeypatch):
+def test_translated_openrouter_messages_retries_after_503(monkeypatch):
+    paths = []
+    statuses = iter((503, 200))
+
+    def handle(request):
+        paths.append(request.url.path)
+        if request.method == "GET":
+            return httpx.Response(200, json={"wire_shape": "openai_translated", "provider": "openrouter"})
+        assert json.loads(request.content)["model"] == "sonnet"
+        return httpx.Response(next(statuses), json={"content": [{"text": "hi"}]})
+
+    assert smoke(monkeypatch, handle) == (True, "hi")
+    assert paths == ["/", "/v1/messages", "/", "/v1/messages"]
+
+
+@pytest.mark.parametrize("first_get_fails", [False, True])
+def test_direct_responses_allows_root_retry_but_only_one_create(monkeypatch, first_get_fails):
     paths = []
 
     def handle(request):
         paths.append(request.url.path)
-        if len(paths) == 1:
+        if first_get_fails and len(paths) == 1:
             return httpx.Response(503)
         if request.method == "GET":
             return httpx.Response(
                 200,
                 json={
                     "wire_shape": "openai_responses_passthrough",
-                    "runtime": {"responses_policy": {"on_unreported_cost": "reject"}},
+                    "provider": "openrouter",
+                    "capabilities": {"responses_ingress": True},
+                    "runtime": {
+                        "responses_policy": {
+                            "on_unreported_cost": "reject",
+                            "required_zdr": True,
+                            "zdr_fallbacks": {},
+                            "cost_scope": "openrouter_credit",
+                            "requested_default_model": "fixture/model",
+                        }
+                    },
                 },
             )
         return httpx.Response(503, text="upstream unavailable")
 
     assert smoke(monkeypatch, handle) == (False, "HTTP 503: upstream unavailable")
-    assert paths == ["/", "/", "/v1/responses"]
+    assert paths == (["/"] if first_get_fails else []) + ["/", "/v1/responses"]
 
 
 def test_unidentified_route_sends_no_generation(monkeypatch):

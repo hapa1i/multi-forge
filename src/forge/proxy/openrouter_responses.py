@@ -8,9 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
-from urllib.parse import urlsplit
 
-import httpx
 from fastapi.responses import JSONResponse
 
 from forge.core.llm.clients.openai_compat import extract_reported_cost_usd
@@ -89,27 +87,6 @@ class OpenRouterResponseEvidence:
             "provider_generation_id": self.generation_id,
             "selected_provider": self.selected_provider,
         }
-
-
-def validate_base(base: str) -> None:
-    """Validate the configured destination before resolving or attaching a bearer."""
-    try:
-        parsed = urlsplit(base)
-        url = httpx.URL(base)
-        parsed.port
-    except (ValueError, httpx.InvalidURL):
-        raise ValueError("OpenRouter base URL is malformed.") from None
-    if (
-        not parsed.hostname
-        or not url.host
-        or parsed.username is not None
-        or parsed.scheme not in {"http", "https"}
-        or any(c in base for c in ("?", "#", "\\"))
-        or any(c.isspace() or ord(c) < 32 for c in base)
-    ):
-        raise ValueError("Configure an OpenRouter HTTP(S) base URL without credentials, query or fragment.")
-    if parsed.scheme == "http" and parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
-        raise ValueError("Remote OpenRouter bases require HTTPS.")
 
 
 def _validate_tools(tools: Any) -> None:

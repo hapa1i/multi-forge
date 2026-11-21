@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from forge.backend.responses import validate_base
 from forge.proxy import openrouter_responses as route
 
 
@@ -28,14 +29,14 @@ from forge.proxy import openrouter_responses as route
 )
 def test_bad_base_rejected(base):
     with pytest.raises(ValueError):
-        route.validate_base(base)
+        validate_base(base)
 
 
 @pytest.mark.parametrize(
     "base", ["https://router.test/prefix/v1", "http://[::1]:8106", "http://localhost:8081/api", "http://127.0.0.1"]
 )
 def test_tls_and_loopback_bases(base):
-    route.validate_base(base)
+    validate_base(base)
 
 
 @pytest.mark.parametrize(
@@ -138,3 +139,22 @@ def test_only_reported_terminal_account_credit_counts(amount, expected):
     attempt.observe({"usage": {"cost": 999}}, "completed")
     assert attempt.cost_micros == expected and len(observed) == int(expected is None)
     assert attempt.response_id == "resp_only" and attempt.generation_id is None
+
+
+@pytest.mark.parametrize(
+    "backend,provider,base,eligible",
+    [
+        ("openrouter", "openrouter", "https://router.example/v1", True),
+        ("", "openrouter", "http://127.0.0.1:9010/gateway/v1", True),
+        ("", "openrouter", "http://router.example/v1", False),
+        ("openrouter", "litellm", "https://router.example/v1", False),
+        ("codex-responses-local", "openrouter", "https://router.example/v1", False),
+        ("undeclared", "openrouter", "https://router.example/v1", False),
+    ],
+)
+def test_only_matching_saved_sources_enable_direct_responses(backend, provider, base, eligible):
+    from forge.backend.responses import available_responses_source
+
+    for shape in ("openai_translated", "openai_responses_passthrough"):
+        source = available_responses_source(backend, provider, shape, base)
+        assert (source is not None) is eligible

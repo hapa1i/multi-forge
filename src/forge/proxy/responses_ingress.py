@@ -1,6 +1,6 @@
 """Codex-facing OpenAI Responses ingress: FastAPI<->transport glue + capability advert.
 
-Server glue for the ``openai_responses_passthrough`` wire shape. It sits above the
+Server glue for the Responses endpoint. It sits above the
 pure transport (``responses_passthrough.py``) and below the proxy routes: it owns the
 capability gate, upstream-credential resolution, the spend-cap + accounting wiring
 (generation endpoint only), the route registration, and the GET / advertisement
@@ -23,7 +23,6 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
 from forge.core.wire_shapes import (
-    DEFAULT_WIRE_SHAPE,
     OPENAI_RESPONSES_PASSTHROUGH,
     PASSTHROUGH_WIRE_SHAPES,
 )
@@ -51,40 +50,17 @@ def build_intercept_capability_section(wire_shape: str, intercept_mode: str, aud
     }
 
 
-def advertise_responses_ingress(wire_shape: str, source_id: str) -> bool:
-    """Whether GET / advertises responses_ingress (Phase 4 launcher health-check).
-
-    True only for the Responses passthrough wire shape backed by a source that
-    declares the capability -- the same conjunction the /v1/responses route
-    enforces, so the advertisement cannot promise an ingress the route then 501s.
-    """
-    if wire_shape != OPENAI_RESPONSES_PASSTHROUGH or not source_id:
-        return False
-    from forge.backend.sources import ModelSourceNotFoundError, get_model_source
-
-    try:
-        return get_model_source(source_id).capabilities.responses_ingress
-    except ModelSourceNotFoundError:
-        return False
-
-
 async def handle_responses_passthrough(raw_request: Request, *, method: str, url_path: str) -> Response:
     """Forward a raw OpenAI Responses request to the Responses-capable upstream.
 
-    Codex-facing ingress for ``forge codex start --proxy``. Gated on
-    ``wire_shape == openai_responses_passthrough`` AND the source's
-    ``responses_ingress`` capability -- the same conjunction the codex preflight
-    mirrors, so a green preflight cannot 501 here. Reasoning items survive by
-    value. Body audit is structurally unavailable. The body
-    is read only for POST -- bodyless GET/DELETE never call ``.json()``.
+    Direct OpenRouter accepts stateless creates. A local Responses source uses the
+    explicit passthrough profile for creates and subresources. Requests bypass body audit.
     """
     import forge.proxy.server as server
-    from forge.backend.sources import (
-        ModelSourceNotFoundError,
-        get_model_source,
-        source_bearer_auth_env_var,
-    )
+    from forge.backend.responses import resolve_responses_source
+    from forge.backend.sources import source_bearer_auth_env_var
     from forge.core.auth.template_secrets import resolve_env_or_credential
+    from forge.proxy import openrouter_responses
     from forge.proxy.responses_passthrough import forward
 
     server._ensure_runtime_state()
@@ -99,40 +75,29 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
             headers={"X-Request-ID": request_id},
         )
 
-    # Capability gate = the runtime guard the codex preflight mirrors.
-    wire_shape = getattr(config.proxy, "wire_shape", DEFAULT_WIRE_SHAPE)
-    backend_id = getattr(config.proxy, "backend", "") or ""
-    source = None
-    if wire_shape == OPENAI_RESPONSES_PASSTHROUGH and backend_id:
-        try:
-            source = get_model_source(backend_id)
-        except ModelSourceNotFoundError:
-            source = None
-    if source is None or not source.capabilities.responses_ingress:
-        return _error(
-            501,
-            "not_implemented",
-            "This proxy is not Responses-capable (needs wire_shape=openai_responses_passthrough "
-            "and a responses_ingress source). Run native 'codex' directly.",
-        )
-
-    base_url = config.proxy.get_provider().base_url
-    from forge.proxy import openrouter_responses
+    proxy = config.proxy
+    base_url = proxy.get_provider().base_url
+    try:
+        source = resolve_responses_source(proxy.backend, proxy.preferred_provider, proxy.wire_shape, base_url)
+    except ValueError as exc:
+        return openrouter_responses.refusal("configuration_error", str(exc), request_id)
+    if source is None:
+        return _error(501, "not_implemented", "This proxy does not serve the Responses API.")
 
     direct = source.id == "openrouter"
     is_generation = method == "POST" and url_path == "/v1/responses"
     if direct and not is_generation:
         return openrouter_responses.refusal(
-            "unsupported_operation", "This source supports only POST /v1/responses. Send the full history.", request_id
+            "unsupported_operation",
+            "This source supports only POST /v1/responses. Send the full history.",
+            request_id,
         )
     if not base_url:
-        return _error(500, "configuration_error", "responses passthrough upstream base_url is not configured")
-    if direct:
-        try:
-            openrouter_responses.validate_base(base_url)
-        except ValueError as exc:
-            return openrouter_responses.refusal("configuration_error", str(exc), request_id)
-
+        return _error(
+            500,
+            "configuration_error",
+            "responses passthrough upstream base_url is not configured",
+        )
     try:
         bearer_env = source_bearer_auth_env_var(source)
     except ValueError as e:  # ModelSourceCatalogError: ambiguous/missing bearer secret
@@ -207,6 +172,7 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
         )
         cost = server._calc_and_log_cost(
             model=model,
+            backend_id=source.id,
             requested_model=requested_model if direct else None,
             tier=resolved_tier,
             input_tokens=in_tok,
@@ -235,7 +201,7 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
 
     provider_trace_ctx = (
         {
-            "backend_id": server._backend_instance_id(),
+            "backend_id": source.id,
             "proxy_id": server.PROXY_ID or "unknown",
             "mapped_model": model,
             "requested_model": requested_model if direct else None,

@@ -57,7 +57,6 @@ from forge.core.auth.template_secrets import (
 from forge.core.runtime.codex_rollouts import codex_home
 from forge.core.runtime.registry import RuntimeSpec, get_runtime
 from forge.core.usage.ledger import BillingMode
-from forge.core.wire_shapes import OPENAI_RESPONSES_PASSTHROUGH
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +122,7 @@ HookSeam = Literal[
 
 # Whether a Codex run can get the Responses API it requires. Codex emits
 # ``wire_api="responses"`` only. Direct ``codex exec`` is ``native_direct``;
-# ``--proxy`` is supported only when the proxy's wire shape and backend source
-# advertise Forge's Responses passthrough capability.
+# Saved proxy readiness uses the same source and upstream eligibility as Responses ingress.
 ProxyResponses = Literal["native_direct", "proxy_supported", "proxy_unsupported"]
 
 
@@ -199,7 +197,7 @@ def preflight_codex(
         features_hooks_enabled=(_probe_features_hooks_enabled(runtime) if installed else None),
         managed_only=_read_managed_only(),
     )
-    responses = _resolve_responses_posture(proxy_id)
+    responses = resolve_responses_posture(proxy_id)
 
     # Blocking-reason precedence: install is most fundamental (codex can't run at all),
     # then auth (can't authenticate), then the proxy/Responses posture.
@@ -482,19 +480,8 @@ class _Responses(NamedTuple):
     blocking_reason: str | None
 
 
-def _resolve_responses_posture(proxy_id: str | None) -> _Responses:
-    """Whether the chosen route can serve Codex its required Responses API.
-
-    No ``--proxy`` -> ``native_direct`` (direct ``codex exec`` to OpenAI; preferred, not a
-    blocker). With ``--proxy <id>``: read that *existing* proxy's ``proxy.yaml`` via the
-    config loader (lazy import -- keeps this module light and avoids a ``core -> config``
-    edge at import time; it reads the file and starts nothing). A proxy is
-    ``proxy_supported`` only when its wire shape is ``openai_responses_passthrough``
-    AND its source declares the ``responses_ingress`` capability -- the same
-    conjunction the proxy ``/v1/responses`` route enforces, so a green preflight
-    cannot 501 at launch. The ``openai_translated``/``anthropic_passthrough`` shapes
-    serve Anthropic/OpenAI-chat, never Responses, so they are ``proxy_unsupported``.
-    """
+def resolve_responses_posture(proxy_id: str | None) -> _Responses:
+    """Predict endpoint support after restart from the existing proxy.yaml without starting a listener."""
     if proxy_id is None:
         return _Responses("native_direct", None)
 
@@ -519,18 +506,16 @@ def _resolve_responses_posture(proxy_id: str | None) -> _Responses:
             "Omit --proxy to run native 'codex exec' directly.",
         )
 
-    # proxy_supported requires BOTH the responses passthrough wire shape AND a
-    # source that declares responses_ingress -- the exact conjunction the proxy
-    # /v1/responses route enforces (fail closed on an unknown/empty source).
-    if config.wire_shape == OPENAI_RESPONSES_PASSTHROUGH:
-        from forge.backend.sources import ModelSourceNotFoundError, get_model_source
+    from forge.backend.responses import resolve_responses_source
 
-        source_id = getattr(config, "backend", "") or ""
-        try:
-            if source_id and get_model_source(source_id).capabilities.responses_ingress:
-                return _Responses("proxy_supported", None)
-        except ModelSourceNotFoundError:
-            pass  # fail closed -> proxy_unsupported below
+    try:
+        source = resolve_responses_source(config.backend, config.provider, config.wire_shape, config.upstream_base_url)
+    except ValueError as exc:
+        return _Responses(
+            "proxy_unsupported", f"proxy '{proxy_id}' has an invalid upstream_base_url for Responses. {exc}"
+        )
+    if source is not None:
+        return _Responses("proxy_supported", None)
 
     return _Responses(
         "proxy_unsupported",

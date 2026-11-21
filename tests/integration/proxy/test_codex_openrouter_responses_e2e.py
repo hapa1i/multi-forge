@@ -74,6 +74,7 @@ class ResponsesUpstream:
     status: int = 200
     gateway_cost_header: str | None = "0.125"
     generation_id: str | None = "gen-test"
+    chat_cost: float = 0
     drop_connection: bool = False
     reply: dict[str, Any] = field(
         default_factory=lambda: {
@@ -120,9 +121,18 @@ def responses_upstream():
                             "object": "chat.completion",
                             "model": body["model"],
                             "choices": [
-                                {"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": "hi"}}
+                                {
+                                    "index": 0,
+                                    "finish_reason": "stop",
+                                    "message": {"role": "assistant", "content": "hi"},
+                                }
                             ],
-                            "usage": {"prompt_tokens": 3, "completion_tokens": 1, "total_tokens": 4, "cost": 0},
+                            "usage": {
+                                "prompt_tokens": 3,
+                                "completion_tokens": 1,
+                                "total_tokens": 4,
+                                "cost": upstream.chat_cost,
+                            },
                         }
                     ).encode()
                 )
@@ -166,8 +176,12 @@ def proxy_settings():
 
 
 @pytest.fixture
-def local_responses_proxy(tmp_path, responses_upstream, proxy_template, proxy_settings):
-    proxy_id = "codex-fixture"
+def proxy_id():
+    return "codex-fixture"
+
+
+@pytest.fixture
+def local_responses_proxy(tmp_path, responses_upstream, proxy_template, proxy_settings, proxy_id):
     port = allocate_ephemeral_port()
     forge_home = get_forge_home()
     _register_proxy_for_test(
@@ -180,7 +194,10 @@ def local_responses_proxy(tmp_path, responses_upstream, proxy_template, proxy_se
     path = forge_home / "proxies" / proxy_id / "proxy.yaml"
     config = yaml.safe_load(path.read_text())
     config.update(proxy_settings)
+    if config.get("backend") is None:
+        config.pop("backend", None)
     path.write_text(yaml.safe_dump(config))
+    saved = path.read_bytes()
     key = "OPENROUTER_API_KEY" if config["provider"] == "openrouter" else "OPENAI_API_KEY"
     proc = _start_proxy_subprocess(
         template=proxy_template,
@@ -206,6 +223,7 @@ def local_responses_proxy(tmp_path, responses_upstream, proxy_template, proxy_se
         responses_upstream.release_terminal.set()
         kill_process(proc.pid)
         proc.wait(timeout=5)
+        assert path.read_bytes() == saved
 
 
 @pytest.mark.parametrize("proxy_template", ["codex-responses-local", "codex-responses-openrouter"])
@@ -327,6 +345,13 @@ def test_recorded_layouts_and_cross_family_policy(local_responses_proxy, proxy_t
         ),
         ("codex-responses-local", {}),
         ("openrouter-openai-codex", {}),
+        ("openrouter-gemini", {"backend": None}),
+        ("openrouter-gemini", {"backend": "", "costs": {"on_unreported_cost": "allow"}}),
+        (
+            "openrouter-gemini",
+            {"allow_non_zdr": True, "intercept": {"mode": "inspect"}},
+        ),
+        ("openrouter-gemini", {"backend": "litellm-remote"}),
     ],
 )
 def test_template_name_launch_uses_verified_proxy(
@@ -337,6 +362,7 @@ def test_template_name_launch_uses_verified_proxy(
     child.write_text(
         f"#!{sys.executable}\nimport json, sys, os\nfrom pathlib import Path\n"
         "if '--version' in sys.argv: print('codex-cli 0.170.0'); sys.exit()\n"
+        "if sys.argv[1:] == ['--help']: print('--no-daemon'); sys.exit()\n"
         "assert 'OPENROUTER_API_KEY' not in os.environ\n"
         f"Path({str(captured)!r}).write_text(json.dumps(sys.argv[1:]))\n"
     )
@@ -344,22 +370,34 @@ def test_template_name_launch_uses_verified_proxy(
     monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ["PATH"])
     for args in ([], ["--", "-m", "qwen/qwen4-max"]):
         result = CliRunner().invoke(main, ["codex", "start", "--proxy", proxy_template, *args])
-        if proxy_template == "openrouter-openai-codex":
+        if proxy_settings.get("backend") == "litellm-remote":
             assert result.exit_code == 1 and "Responses-capable proxy required" in result.output
             assert not captured.exists()
             continue
         assert result.exit_code == 0, result.output
         argv = json.loads(captured.read_bytes())
-        assert ('web_search="disabled"' in argv) == (proxy_template == "codex-responses-openrouter")
-        assert argv[argv.index("-m") + 1] == ("qwen/qwen4-max" if args else "openai/gpt-6.2-astra")
+        direct = proxy_template != "codex-responses-local"
+        assert ('service_tier="default"' in argv) == direct
+        assert ("--no-daemon" in argv) == direct
+        assert ('web_search="disabled"' in argv) == (direct and not proxy_settings.get("allow_non_zdr"))
+        if proxy_settings.get("costs", {}).get("on_unreported_cost") == "allow":
+            assert "Unreported OpenRouter account charges" in result.output
+        if proxy_settings.get("allow_non_zdr"):
+            assert "hosted tools and caller-supplied routing" in result.output
+            assert "Codex Responses requests have no body audit" in result.output
+        default = {
+            "openrouter-openai-codex": "openai/gpt-5.3-codex",
+            "openrouter-gemini": "google/gemini-4-neon",
+        }.get(proxy_template, "openai/gpt-6.2-astra")
+        assert argv[argv.index("-m") + 1] == ("qwen/qwen4-max" if args else default)
         if proxy_template == "codex-responses-openrouter":
             assert "dispatching google/gemini-4-carbon" in " ".join(result.output.split())
 
 
-def _attempt(request_id):
+def _attempt(request_id, proxy_id="codex-fixture"):
     end = time.monotonic() + 5
     while time.monotonic() < end:
-        rows = read_downstream_records(proxy_id="codex-fixture", request_id=request_id)
+        rows = read_downstream_records(kind="attempt", proxy_id=proxy_id, request_id=request_id)
         if rows and rows[0].request_mode is not None:
             assert len(rows) == 1
             return rows[0]
@@ -536,7 +574,8 @@ def test_next_create_after_missing_cost(
 
 
 @pytest.mark.parametrize("stored", [False, True], ids=["env-only", "credential-store"])
-def test_create_start_smoke_and_missing_cost_recovery(responses_upstream, monkeypatch, stored, tmp_path):
+@pytest.mark.parametrize("template", ["codex-responses-openrouter", "openrouter-gemini"])
+def test_create_start_smoke_and_missing_cost_recovery(responses_upstream, monkeypatch, stored, tmp_path, template):
     provider = responses_upstream
     proxy_id = "smoke-acceptance"
     port = allocate_ephemeral_port()
@@ -557,6 +596,11 @@ def test_create_start_smoke_and_missing_cost_recovery(responses_upstream, monkey
     child.chmod(0o700)
     monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ["PATH"])
     runner = CliRunner()
+    probe = (
+        ["--smoke-test"]
+        if template == "codex-responses-openrouter"
+        else ["--smoke-test", "--smoke-endpoint", "responses"]
+    )
     provider.reply["usage"].pop("cost")
     try:
         create = runner.invoke(
@@ -564,7 +608,7 @@ def test_create_start_smoke_and_missing_cost_recovery(responses_upstream, monkey
             [
                 "proxy",
                 "create",
-                "codex-responses-openrouter",
+                template,
                 "--name",
                 proxy_id,
                 "--port",
@@ -572,23 +616,29 @@ def test_create_start_smoke_and_missing_cost_recovery(responses_upstream, monkey
                 "--base-url",
                 provider.base_url,
                 "--json",
-                "--smoke-test",
+                *probe,
             ],
         )
         assert create.exit_code == 1, (create.output, create.exception)
         payload = json.loads(create.stdout)
+        assert payload["smoke_test"]["endpoint"] == "responses"
         assert payload["status"] == "healthy" and not payload["smoke_test"]["passed"]
         assert f"forge proxy set {proxy_id} costs.on_unreported_cost=allow" in payload["smoke_test"]["detail"]
         assert len(provider.requests) == 1
         assert provider.requests[0][1]["authorization"] == "Bearer " + key
-        again = runner.invoke(main, ["proxy", "start", proxy_id, "--smoke-test"])
+        again = runner.invoke(main, ["proxy", "start", proxy_id, *probe])
         assert again.exit_code == 1 and "costs.on_unreported_cost=allow" in again.output
         assert len(provider.requests) == 1
+        messages_probe = (
+            ["--smoke-test"] if template == "openrouter-gemini" else ["--smoke-test", "--smoke-endpoint", "messages"]
+        )
+        assert "/v1/messages" in _forge("proxy", "start", proxy_id, *messages_probe)
+        assert len(provider.requests) == 2 and provider.requests[-1][0].endswith("/chat/completions")
         _forge("proxy", "set", proxy_id, "costs.caps.per_day=0.25")
         _forge("proxy", "stop", proxy_id)
         provider.reply["usage"]["cost"] = 0.125
-        assert "Smoke test passed" in _forge("proxy", "start", proxy_id, "--smoke-test")
-        assert len(provider.requests) == 2
+        assert "Smoke test passed" in _forge("proxy", "start", proxy_id, *probe)
+        assert len(provider.requests) == 3
         assert not httpx.get(base).json()["runtime"]["responses_policy"]["unreported_cost_observed"]
         preflight = runner.invoke(main, ["runtime", "preflight", "codex", "--proxy", proxy_id, "--json"])
         assert json.loads(preflight.stdout)["proxy_responses"] == "proxy_supported"
@@ -596,12 +646,12 @@ def test_create_start_smoke_and_missing_cost_recovery(responses_upstream, monkey
         _forge("proxy", "set", proxy_id, "costs.on_unreported_cost=allow")
         _forge("proxy", "stop", proxy_id)
         provider.reply["usage"].pop("cost")
-        assert "Smoke test passed" in _forge("proxy", "start", proxy_id, "--smoke-test")
+        assert "Smoke test passed" in _forge("proxy", "start", proxy_id, *probe)
         restarted = httpx.get(base).json()
         assert restarted["runtime"]["responses_policy"]["on_unreported_cost"] == "allow"
         assert restarted["metrics"]["costs"]["caps"]["daily"]["current_usd"] == 0.125
         assert "Unreported OpenRouter" in _forge("codex", "start", "--proxy", proxy_id)
-        assert len(provider.requests) == 3
+        assert len(provider.requests) == 4
     finally:
         runner.invoke(main, ["proxy", "stop", proxy_id])
 
@@ -615,4 +665,141 @@ def test_unpriced_litellm_responses_still_serves(local_responses_proxy, response
             response = client.post("/v1/responses", json={"model": "local/model", "input": "hi"})
             assert response.status_code == 200 and "x-request-cost" not in response.headers
         assert client.get("/").json()["metrics"]["costs"]["total_micros"] == 0
+    assert len(calls) == 2
+
+
+def _message(model):
+    return {
+        "model": model,
+        "max_tokens": 32,
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+
+
+@pytest.mark.parametrize("proxy_id", ["cyan-coconut"])
+@pytest.mark.parametrize("proxy_template", ["openrouter-gemini"])
+@pytest.mark.parametrize(
+    "proxy_settings",
+    [
+        {
+            "backend": "openrouter",
+            "wire_shape": "openai_translated",
+            "model_alternatives": {"sonnet": {"sonnet-fixture": "google/gemini-4-carbon"}},
+            "tier_overrides": {
+                "haiku": {"reasoning_effort": "low"},
+                "sonnet": {"reasoning_effort": "high"},
+            },
+        }
+    ],
+)
+def test_saved_gemini_serves_both_clients(local_responses_proxy, proxy_id):
+    base, calls, _ = local_responses_proxy
+    with httpx.Client(base_url=base) as client:
+        root = client.get("/").json()
+        assert root["proxy"]["proxy_id"] == proxy_id
+        assert root["wire_shape"] == "openai_translated" and root["capabilities"]["responses_ingress"]
+        assert root["runtime"]["responses_policy"]["requested_default_model"] == "google/gemini-4-neon"
+        for tier, expected in [
+            ("haiku", "hydrogen"),
+            ("sonnet", "neon"),
+            ("opus", "neon"),
+            ("sonnet-fixture", "carbon"),
+        ]:
+            reply = client.post("/v1/messages", json=_message(tier))
+            assert reply.status_code == 200, reply.text
+            assert calls[-1][0].endswith("/chat/completions")
+            assert calls[-1][2]["model"] == f"google/gemini-4-{expected}"
+            if tier == "sonnet":
+                assert calls[-1][2]["reasoning"]["effort"] == "high"
+        body = _codex_request("0.161.0-exec-gemini-4-carbon-function-output")
+        body.update(model="google/gemini-4-neon", stream=False)
+        reply = client.post("/v1/responses", json=body)
+        assert reply.status_code == 200, reply.text
+        path, _, sent = calls[-1]
+        assert path.endswith("/responses") and sent["model"] == body["model"]
+        assert sent["input"][-2:] == body["input"][-2:]
+        assert sent["provider"]["zdr"] is True
+    assert len(calls) == 5
+
+
+@pytest.mark.parametrize("proxy_template", ["openrouter-gemini"])
+@pytest.mark.parametrize(
+    "proxy_settings",
+    [{"backend": None, "costs": {"caps": {"per_day": 0.02}, "on_cap_hit": "reject"}}],
+)
+def test_legacy_endpoint_attribution_and_shared_cap(local_responses_proxy, responses_upstream):
+    base, calls, _ = local_responses_proxy
+    responses_upstream.chat_cost = responses_upstream.reply["usage"]["cost"] = 0.01
+    with httpx.Client(base_url=base) as client:
+        root = client.get("/").json()["runtime"]
+        assert root["backend_id"] is None and root["responses_policy"]["required_zdr"]
+        message = client.post("/v1/messages", json=_message("haiku"))
+        assert message.status_code == 200, message.text
+        body = {"model": "google/gemini-4-neon", "input": "hello"}
+        response = client.post("/v1/responses", json=body)
+        assert response.status_code == 200 and response.headers["x-request-cost"] == "0.010000"
+        attempt = _attempt(response.headers["x-request-id"])
+        assert (
+            attempt.backend_id,
+            attempt.cost_micros,
+            attempt.provider_generation_id,
+        ) == ("openrouter", 10000, "gen-test")
+        rows = read_downstream_records(kind="attempt", request_id=message.headers["x-request-id"])
+        assert len(rows) == 1 and rows[0].cost_micros == 10000
+        assert rows[0].backend_id is None and rows[0].request_mode is None
+        assert client.get("/").json()["metrics"]["costs"]["caps"]["daily"]["current_usd"] == 0.02
+        for path, request in [
+            ("/v1/messages", _message("opus")),
+            ("/v1/responses", body),
+        ]:
+            assert client.post(path, json=request).status_code == 429
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize("proxy_template", ["openrouter-gemini"])
+@pytest.mark.parametrize(
+    "proxy_settings",
+    [{"wire_shape": "openai_responses_passthrough", "intercept": {"mode": "inspect"}}],
+)
+def test_audit_and_smoke_describe_each_endpoint(local_responses_proxy):
+    from forge.proxy.audit_logger import read_audit_logs
+
+    base, calls, _ = local_responses_proxy
+    with httpx.Client(base_url=base) as client:
+        root = client.get("/").json()
+        assert root["intercept"]["thinking_blocks_preserved"] is True
+        messages = root["endpoints"]["messages"]
+        responses = root["endpoints"]["responses"]
+        assert messages["wire_shape"] == "openai_translated" and not messages["thinking_blocks_preserved"]
+        assert messages["can_inspect"]["system_prompt"]
+        assert responses["thinking_blocks_preserved"] and not any(responses["can_inspect"].values())
+        msg = client.post("/v1/messages", json=_message("sonnet"))
+        assert msg.status_code == 200
+        records = read_audit_logs(request_id=msg.headers["x-request-id"])
+        assert records and all(
+            r["route"]["endpoint"] == "messages" and r["route"]["wire_shape"] == "openai_translated" for r in records
+        )
+    for args, endpoint in [
+        ([], "responses"),
+        (["--smoke-endpoint", "messages"], "messages"),
+        (["--smoke-endpoint", "responses"], "responses"),
+    ]:
+        out = _forge("proxy", "start", "codex-fixture", "--smoke-test", *args)
+        assert f"/v1/{endpoint}" in out
+        assert calls[-1][0].endswith("/chat/completions" if endpoint == "messages" else "/responses")
+        assert calls[-1][2]["model"] == "google/gemini-4-neon"
+    assert len(calls) == 4
+
+
+@pytest.mark.parametrize("proxy_template", ["openrouter-gemini"])
+@pytest.mark.parametrize("proxy_settings", [{"backend": "", "costs": {"on_unreported_cost": "allow"}}])
+def test_dormant_saved_allow_admits_unpriced_responses(local_responses_proxy, responses_upstream):
+    base, calls, _ = local_responses_proxy
+    responses_upstream.reply["usage"].pop("cost")
+    with httpx.Client(base_url=base) as client:
+        assert client.get("/").json()["runtime"]["responses_policy"]["on_unreported_cost"] == "allow"
+        for _ in range(2):
+            reply = client.post("/v1/responses", json={"model": "google/gemini-4-neon", "input": "hi"})
+            assert reply.status_code == 200 and "x-request-cost" not in reply.headers
+            assert _attempt(reply.headers["x-request-id"]).cost_micros is None
     assert len(calls) == 2
