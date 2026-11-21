@@ -143,8 +143,8 @@ forge proxy template edit <name> # Customize a template (copy-on-first-edit)
 forge proxy template reset <name># Reset to built-in default
 
 # Create / start
-forge proxy create <template> [--name <id>] [--no-start] [--smoke-test] [--json]
-forge proxy start <proxy_id> [--smoke-test]
+forge proxy create <template> [--name <id>] [--no-start] [--smoke-test [--smoke-endpoint messages|responses]] [--json]
+forge proxy start <proxy_id> [--smoke-test [--smoke-endpoint messages|responses]]
 forge proxy stop <proxy_id> [--force] [--kill-adopted]
 
 # Show / list
@@ -402,10 +402,13 @@ forge proxy create openrouter-openai --json --smoke-test
 Use `--smoke-test` after first setup or credential changes to verify the proxy can reach its upstream LLM provider.
 Without it, health checks only confirm the local proxy process is alive.
 
-On the normal create/start path, `--json --smoke-test` prints one JSON object: the usual creation fields plus
-`smoke_test.endpoint`, `smoke_test.passed` and `smoke_test.detail`. A failed probe exits non-zero but leaves the
-successfully created, reused, or adopted proxy available for inspection and retry. `--no-start` remains config-only and
-does not run the probe.
+Use `--smoke-endpoint messages` to check Claude Code or `--smoke-endpoint responses` to check Codex. A bare smoke checks
+Messages unless the proxy uses an explicit Responses profile. Messages can retry once after a failed request. Direct
+OpenRouter Responses sends at most one generation request per probe.
+
+`forge proxy create --json --smoke-test` prints one JSON object with the usual creation fields plus
+`smoke_test.endpoint`, `smoke_test.passed` and `smoke_test.detail`. A failed probe exits nonzero and leaves the proxy
+available for inspection and retry. A config-only `--no-start` skips the probe.
 
 If a credential change leaves a local LiteLLM backend in a suspect state, run `forge model backend stop --all` (or
 `forge model backend stop --all --yes` in automation) before restarting proxies. This clears managed local backend

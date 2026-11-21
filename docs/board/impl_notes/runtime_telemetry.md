@@ -355,24 +355,28 @@ Shipped 2026-06-03 (statusline-enhancement card). Durable rules for `src/forge/c
   the `127.0.0.1` bind probe and raises neutral `NoAvailablePortError`; `server.find_available_port()` still translates
   to `RuntimeError`, while `proxy_orchestrator._find_available_port()` still translates to `ProxyStartError`.
 
-### Sessionless Codex proxy launcher: Responses passthrough + identity gates (shipped 2026-06-23)
+### Sessionless Codex proxy launcher
 
-Durable invariants from `forge_codex_command_group` for `forge codex start --proxy` and the Codex-facing Responses
-transport.
+`forge codex start --proxy` shipped on 2026-06-23. The 2026-11-21 update extends Responses to existing direct OpenRouter
+proxies across wire profiles.
 
-- **Codex proxy support is a Responses passthrough, not a translation layer.** The shipped wire shape is
-  `openai_responses_passthrough`: Codex's raw `/v1/responses*` HTTP/SSE traffic is forwarded byte-for-byte so signed
-  reasoning items survive. Do not "simplify" this through the Anthropic/OpenAI chat converters unless `core.llm` has a
-  first-class reasoning-item channel and the signature/continuity story is re-proven.
-- **Capability is the full runtime conjunction.** A proxy is Codex-launchable only when live `GET /` reports both
-  `wire_shape == "openai_responses_passthrough"` and `capabilities.responses_ingress is true`; file presence or a
-  healthy Anthropic `/v1/messages` proxy is not enough. Keep preflight, route gating, smoke tests, and
-  `assert_proxy_responses_capable` aligned to that same conjunction.
-- **Identity verification is part of the capability gate.** `ensure_proxy()` resolves a proxy id by registry presence,
-  not by proving the live port still belongs to that id.
-  `assert_proxy_responses_capable(..., expected_proxy_id, expected_template)` must re-check `is_proxy`, `proxy_id`, and
-  `template` from the same live `GET /` body before routing Codex. This prevents a stale registry entry whose port is
-  now held by another capable proxy from silently misrouting the TUI.
+- **Responses preserves tool continuations and opaque reasoning by JSON value.** Direct OpenRouter accepts
+  `POST /v1/responses`, strips `client_metadata` and `prompt_cache_key`, and applies the configured ZDR routing policy.
+  Both direct OpenRouter and local LiteLLM stream upstream SSE incrementally. Local LiteLLM also relays Responses
+  subresources.
+- **Responses eligibility follows the source.** Direct OpenRouter serves Responses on every proxy wire profile. Older
+  snapshots with a missing or blank backend qualify when the saved provider is exactly `openrouter` and the saved
+  upstream passes URL validation. An explicit conflicting backend disqualifies the route. This fallback applies only to
+  Responses. Local LiteLLM requires both the `openai_responses_passthrough` profile and a source with
+  `responses_ingress`.
+- **Launch verifies the listener that owns the port.** Saved preflight predicts support after restart.
+  `read_responses_launch` checks `is_proxy`, proxy ID and template in the same live `GET /` that must advertise
+  `capabilities.responses_ingress: true`. Direct OpenRouter must also return its complete `runtime.responses_policy`. A
+  matching older listener can need a restart. A different proxy on the port is an identity error.
+- **Inspection and smoke follow the endpoint.** Top-level `wire_shape` and `intercept` describe the legacy profile.
+  Claude reads `endpoints.messages`. Messages audit records use `route.endpoint: messages` and the actual wire shape.
+  Responses bypasses body audit. A bare smoke probes Messages unless the profile explicitly selects Responses. Messages
+  can retry once. Direct OpenRouter Responses sends at most one create. Both endpoints charge the same spend cap.
 - **The launcher configures Codex with argv `-c` provider overrides, never by writing `config.toml`.** The Phase 2 live
   probe proved list-mode `-c model_providers.forge_proxy.*` + env auth is sufficient. Preserve the no-`config.toml`
   boundary because Codex hook trust hashes the registration/config surface.

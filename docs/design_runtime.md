@@ -45,10 +45,12 @@ Default adopted detach, explicit `--no-kill`, already-stopped processes, and del
 remains are intentional successful outcomes. Multi-delete continues independent targets but exits non-zero and reports
 failures if any required stop fails.
 
-**Create smoke-result contract.** On the normal reuse/adopt/spawn path, `proxy create --json` emits one creation result.
-Without `--smoke-test`, its established top-level fields remain unchanged. With `--smoke-test`, the same object adds
-`smoke_test: {passed, detail}`; a failed probe exits non-zero but retains the successfully created or resolved proxy.
-Human-mode verification output remains unchanged. `--no-start` is config-only and does not run a smoke probe.
+**Smoke results.** On reuse, adoption or spawn, `proxy create --json --smoke-test` emits one creation result with a
+`smoke_test` object containing `passed`, `detail` and `endpoint`. The endpoint is `messages` or `responses`. It is
+`null` if discovery fails before a bare probe can select one. In human mode, create and start print
+`Smoke testing upstream LLM...` before the probe, then report the path and detail, for example
+`Smoke test passed (/v1/messages) hi`. A failed probe exits nonzero and retains the proxy. Messages can retry once.
+Direct OpenRouter Responses sends at most one create. A config-only `--no-start` skips the probe.
 
 **Translated request-metadata contract.** The `openai_translated` route carries the inbound User-Agent through internal
 `_user_agent` metadata for both LiteLLM (local or remote) and OpenRouter clients. The adapter strips control characters
@@ -80,7 +82,7 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
   "status": "running",
   "template": "openrouter-gemini",
   "provider": "openrouter",
-  "proxy": { "proxy_id": "cyan-coconut", "template": "openrouter-gemini", "base_url": "http://localhost:8097" },
+  "proxy": { "proxy_id": "<id>", "template": "openrouter-gemini", "base_url": "http://localhost:<port>" },
   "wire_shape": "openai_translated",
   "intercept_mode": "passthrough",
   "intercept": { "mode": "passthrough", "can_inspect": { "...": "..." } },
@@ -365,8 +367,8 @@ and removed sampling key names only, never sampling values.
 
 **Route-bound caveat.** Intercept is a property of the resolved proxy/route, not the session. A direct-mode session has
 no chokepoint; launch-time preflight reports visibility explicitly (it never silently "degrades to passthrough"). Claude
-reads `endpoints.messages` for its audit status. A Messages audit payload records `route.endpoint` and the actual
-`route.wire_shape`. Readers accept older records without an endpoint.
+reads `endpoints.messages` for its audit status. A Messages audit payload records `route.endpoint` as `messages` and the
+actual `route.wire_shape`. Readers accept older records without an endpoint.
 
 **Sidecar-recommended, host-supported.** Both modes support the audit path; sidecar is recommended for an always-on
 posture (lifecycle-coupled, port-isolated), with the narrow mounts of §7 making in-container records host-visible.

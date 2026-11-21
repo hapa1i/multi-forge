@@ -490,6 +490,9 @@ Every record carries `schema_version`, `ts`, `request_id`, `proxy_id`, and a `re
   `pattern_hash`, `stripped_count`, `effort_floor`, `budget_before/after`, and key-name-only
   `removed_sampling_parameters`.
 
+For Messages inspection, `route.endpoint` is `messages` and `route.wire_shape` is the shape used for that request. Older
+records can lack the endpoint. Responses bypasses body audit.
+
 Reading skips records written by a newer Forge (`schema_version` > current) with a one-time warning.
 `forge proxy audit show|diff` (§4.0) is the read surface.
 

@@ -45,18 +45,20 @@ stubbed the Codex child after argument construction and sent no inference traffi
   · [Template matrix](../../../../tests/src/config/test_proxy_block_wiring.py)
 - The clean-wheel LiteLLM start, health and cleanup check passed.
 
-## Implementation note for human review
+## Review verification
 
-The existing [launcher invariant](../../impl_notes/runtime_telemetry.md) needs the direct OpenRouter exception. Verify
-the live ID, template, affirmative ingress and direct policy on every OpenRouter profile. Retain the wire-shape gate for
-local Responses. Use the actual endpoint for body audit, reasoning preservation and smoke selection. The proposal is
-also recorded in the local shadow implementation notes.
+- A translated OpenRouter Messages smoke received a 503, reread the live route and passed after the second POST. A
+  direct Responses smoke sent one create after a successful discovery, including when the first discovery needed a
+  retry. Human smoke output appeared before the upstream request. JSON output contained only the creation result.
+- Saved preflight, the Codex launcher and `proxy set` identified the HTTPS requirement on a remote HTTP base. The failed
+  edit preserved the saved bytes. New Messages audit records use the same `messages` value as smoke JSON.
+- Promoted the reviewed source and identity rules and the JSON-value preservation contract to the
+  [launcher implementation note](../../impl_notes/runtime_telemetry.md#sessionless-codex-proxy-launcher).
 
 ## Closeout
 
-- [x] Sync design, CLI, end-user and verification docs, and prepare the durable note correction for human review.
-- [x] `make test-unit` passed 12,047 tests. `make test-regression` passed 2,703. The 47 targeted integration cases,
-  `make pre-commit`, repository file limits and the Markdown link audit passed. Two tests comparing a watchdog deadline
-  and policy-feedback timing failed during concurrent suite runs and passed when the full suites ran separately.
+- [x] Sync design, CLI, end-user and verification docs and record the reviewed launcher invariant.
+- [x] `make test-unit` passed 12,049 tests and `make test-regression` passed 2,708. All 47 targeted integration cases,
+  `make pre-commit`, repository file limits and the 810-file Markdown link audit passed.
 - [x] Record the verified feature in the [change log](../../change_log.md).
 - [ ] Move the card to `done/` and update inbound links when the implementation lands on `main`.
