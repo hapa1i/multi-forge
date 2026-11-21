@@ -34,7 +34,6 @@ from forge.core.models.model_routes import (
 from forge.core.wire_shapes import (
     ANTHROPIC_PASSTHROUGH,
     DEFAULT_WIRE_SHAPE,
-    OPENAI_RESPONSES_PASSTHROUGH,
     VALID_WIRE_SHAPES,
 )
 
@@ -834,8 +833,13 @@ PROXY_PROVIDER_DIRECT_FIELDS: tuple[str, ...] = (
 PROXY_PROVIDER_TRANSFORMED_FIELDS: frozenset[str] = frozenset({"tier_overrides", "tiers"})
 
 
-def supports_unreported_cost_policy(backend: str, wire_shape: str) -> bool:
-    return backend == "openrouter" and wire_shape == OPENAI_RESPONSES_PASSTHROUGH
+def supports_unreported_cost_policy(backend: str, provider: str, base_url: str) -> bool:
+    from forge.backend.responses import available_responses_source
+
+    return (
+        provider == "openrouter"
+        and available_responses_source(backend, provider, DEFAULT_WIRE_SHAPE, base_url) is not None
+    )
 
 
 def _coerce_proxy_blocks(cfg: Any) -> None:
@@ -843,10 +847,15 @@ def _coerce_proxy_blocks(cfg: Any) -> None:
     for name, coercer in PROXY_BLOCK_COERCERS.items():
         setattr(cfg, name, coercer(getattr(cfg, name)))
     _validate_wire_shape_intercept(cfg.wire_shape, cfg.intercept)
-    if cfg.costs.on_unreported_cost is not None and not supports_unreported_cost_policy(cfg.backend, cfg.wire_shape):
-        raise ValueError(
-            "costs.on_unreported_cost applies only to direct OpenRouter Responses. Remove it on this proxy."
-        )
+    if cfg.costs.on_unreported_cost is not None:
+        if isinstance(cfg, ProxyInstanceConfig):
+            provider, base = cfg.provider, cfg.upstream_base_url
+        else:
+            provider, base = cfg.preferred_provider, cfg.get_provider().base_url
+        if not supports_unreported_cost_policy(cfg.backend, provider, base):
+            raise ValueError(
+                "costs.on_unreported_cost applies only to direct OpenRouter Responses. Remove it on this proxy."
+            )
 
 
 _VALID_DEFAULT_TIERS = frozenset({"haiku", "sonnet", "opus"})

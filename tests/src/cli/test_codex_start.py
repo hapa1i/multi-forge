@@ -198,3 +198,37 @@ class TestUsage:
         result = CliRunner().invoke(main, ["codex", "start"])
         assert result.exit_code != 0
         assert "proxy" in (result.stderr + result.output).lower()
+
+
+def test_matching_old_listener_gives_both_restart_commands():
+    from forge.proxy.proxy_orchestrator import create_proxy_file
+
+    create_proxy_file(
+        proxy_id="cyan-coconut",
+        template="openrouter-gemini",
+        base_url="http://localhost:8084",
+        port=8084,
+    )
+    ensure = MagicMock(
+        return_value=(
+            _entry(proxy_id="cyan-coconut", template="openrouter-gemini"),
+            False,
+        )
+    )
+    capable = MagicMock(side_effect=ProxyNotResponsesCapableError("openai_translated"))
+    result, _, _, invoke = _invoke_start(["--proxy", "cyan-coconut"], ensure=ensure, capable=capable)
+    assert result.exit_code == 1
+    err = " ".join(result.stderr.split())
+    assert "forge proxy stop cyan-coconut" in err and "forge proxy start cyan-coconut" in err
+    invoke.assert_not_called()
+
+
+def test_direct_proxy_without_default_accepts_an_explicit_slug():
+    capable = MagicMock(
+        return_value=(None, {"requested_default_model": None, "required_zdr": True, "zdr_fallbacks": {}})
+    )
+    result, _, _, invoke = _invoke_start(["--proxy", "p"], capable=capable)
+    assert result.exit_code == 1 and "no model configured" in result.output
+    invoke.assert_not_called()
+    result, _, _, invoke = _invoke_start(["--proxy", "p", "--", "-m", "google/gemini-4-neon"], capable=capable)
+    assert result.exit_code == 0 and invoke.call_args.kwargs["passthrough"][-2:] == ["-m", "google/gemini-4-neon"]

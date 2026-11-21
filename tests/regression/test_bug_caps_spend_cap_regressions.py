@@ -113,7 +113,7 @@ def test_decimal_spend_cap_triggers_at_exact_microdollar_threshold(period, cap, 
     ("backend", "provider", "wire_shape"),
     [
         ("codex-responses-local", "litellm", "openai_responses_passthrough"),
-        ("openrouter", "openrouter", "openai_translated"),
+        ("litellm-remote", "openrouter", "openai_translated"),
     ],
 )
 def test_reject_inapplicable_unreported_cost_policy_before_proxy_set_writes(

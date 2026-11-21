@@ -1652,3 +1652,79 @@ class TestProxyIdentityVerification:
         with _patch_root(body=_capable_root_body(is_proxy=False, proxy=None)):
             _model, ws = assert_proxy_responses_capable("http://x")
         assert ws == "openai_responses_passthrough"
+
+
+@pytest.mark.parametrize("profile", ["openai_translated", "openai_responses_passthrough"])
+@pytest.mark.parametrize("selector", [None, "messages", "responses"])
+def test_openrouter_smoke_selects_one_endpoint_and_wire_model(monkeypatch, profile, selector):
+    from forge.proxy import proxy_orchestrator as orch
+
+    selected = selector or ("responses" if profile == "openai_responses_passthrough" else "messages")
+    calls = []
+    policy = {
+        "on_unreported_cost": "reject",
+        "cost_scope": "openrouter_credit",
+        "required_zdr": True,
+        "zdr_fallbacks": {},
+        "requested_default_model": "google/gemini-4-neon",
+    }
+
+    def handle(request):
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                json=_capable_root_body(
+                    wire_shape=profile,
+                    provider="openrouter",
+                    runtime={"responses_policy": policy},
+                ),
+            )
+        import json
+
+        calls.append((request.url.path, json.loads(request.content)["model"]))
+        return httpx.Response(
+            200,
+            json={"output_text": "hi", "content": [{"text": "hi"}]},
+            headers={"X-Request-Cost": "0.010000"},
+        )
+
+    client = httpx.Client
+    monkeypatch.setattr(
+        orch.httpx,
+        "Client",
+        lambda **kw: client(transport=httpx.MockTransport(handle), **kw),
+    )
+    result = orch.probe_proxy_endpoint(base_url="http://localhost", endpoint=selector)
+    assert result == orch.SmokeTestResult(True, "hi", selected)
+    assert calls == [
+        (
+            f"/v1/{selected}",
+            "sonnet" if selected == "messages" else "google/gemini-4-neon",
+        )
+    ]
+
+
+@pytest.mark.parametrize("shape", ["openai_translated", "openai_responses_passthrough"])
+def test_direct_launch_requires_live_policy_even_with_capability(shape):
+    body = _capable_root_body(
+        wire_shape=shape,
+        provider="openrouter",
+        runtime={"responses_policy": {"required_zdr": True}},
+    )
+    with (
+        _patch_root(body=body),
+        pytest.raises(
+            ProxyNotResponsesCapableError,
+            match="incomplete OpenRouter Responses policy",
+        ),
+    ):
+        assert_proxy_responses_capable("http://x")
+
+
+def test_unsupported_responses_smoke_ends_before_generation(monkeypatch):
+    from forge.proxy import proxy_orchestrator as orch
+
+    body = _capable_root_body(wire_shape="openai_translated", capabilities={"responses_ingress": False})
+    with _patch_root(body=body):
+        result = orch.probe_proxy_endpoint(base_url="http://local", endpoint="responses")
+    assert not result.passed and result.endpoint == "responses"
