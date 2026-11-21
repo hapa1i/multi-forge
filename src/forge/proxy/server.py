@@ -823,7 +823,7 @@ def _inspect_route() -> dict[str, Any]:
         "template": getattr(config.proxy, "active_template", ""),
         "provider": getattr(config.proxy, "preferred_provider", ""),
         "backend": _backend_instance_id() or "",
-        "endpoint": "/v1/messages",
+        "endpoint": "messages",
         "wire_shape": messages_wire_shape(getattr(config.proxy, "wire_shape", DEFAULT_WIRE_SHAPE)),
     }
 

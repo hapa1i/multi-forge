@@ -1030,20 +1030,6 @@ def _verify_proxy_identity(
         )
 
 
-def assert_proxy_responses_capable(
-    base_url: str,
-    *,
-    expected_proxy_id: str | None = None,
-    expected_template: str | None = None,
-    timeout_s: float = 5.0,
-) -> tuple[str | None, str]:
-    """Return the effective default model and wire shape of the verified proxy."""
-    model, _ = read_responses_launch(
-        base_url, expected_proxy_id=expected_proxy_id, expected_template=expected_template, timeout_s=timeout_s
-    )
-    return model, OPENAI_RESPONSES_PASSTHROUGH
-
-
 def read_responses_launch(
     base_url: str,
     *,
@@ -1144,13 +1130,13 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
 def probe_proxy_endpoint(
     *, base_url: str, endpoint: SmokeEndpoint | None = None, timeout_s: float = 30.0
 ) -> SmokeTestResult:
-    """Select one live endpoint and report its upstream result. Direct OpenRouter sends one generation."""
+    """Probe one endpoint. Only direct OpenRouter Responses limits the probe to one create."""
     base_url = base_url.rstrip("/")
     last_error = ""
     for attempt in range(2):
         if attempt:
             time.sleep(2)
-        direct = False
+        direct_responses = False
         try:
             with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
                 root_response = client.get(f"{base_url}/")
@@ -1163,13 +1149,12 @@ def probe_proxy_endpoint(
                     continue
                 if endpoint is None:
                     endpoint = "responses" if root["wire_shape"] == OPENAI_RESPONSES_PASSTHROUGH else "messages"
-                direct = root.get("provider") == "openrouter"
                 if endpoint == "responses":
                     try:
                         policy = _live_responses_policy(root)
                     except ProxyNotResponsesCapableError as exc:
                         return SmokeTestResult(False, str(exc), endpoint)
-                    direct = bool(policy)
+                    direct_responses = bool(policy)
                     identity = root.get("proxy")
                     model = policy.get("requested_default_model") or _smoke_test_model(root)
                     if not model:
@@ -1198,7 +1183,7 @@ def probe_proxy_endpoint(
             last_error = f"Request timed out after {timeout_s}s"
         except (httpx.RequestError, ValueError) as e:
             last_error = str(e)
-        if direct:
+        if direct_responses:
             break
 
     return SmokeTestResult(False, last_error, endpoint)

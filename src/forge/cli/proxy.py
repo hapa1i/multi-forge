@@ -730,8 +730,10 @@ def _stop_proxy_process(console: Console, entry: ProxyEntry, *, kill_adopted: bo
 def _run_smoke(base_url: str, endpoint: SmokeEndpoint | None, console: Console | None) -> SmokeTestResult:
     from forge.proxy.proxy_orchestrator import probe_proxy_endpoint
 
+    if console is not None:
+        console.print("[dim]Smoke testing upstream LLM...[/dim]")
     result = probe_proxy_endpoint(base_url=base_url, endpoint=endpoint)
-    if console:
+    if console is not None:
         target = f"/v1/{result.endpoint}" if result.endpoint else "GET /"
         status = "[green]Smoke test passed[/green]" if result.passed else "[red]Smoke test failed[/red]"
         console.print(f"{status} ({target}) {result.detail[:80] if result.passed else result.detail}")

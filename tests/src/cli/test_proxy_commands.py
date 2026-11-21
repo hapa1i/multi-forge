@@ -293,10 +293,12 @@ def test_proxy_create_human_smoke_keeps_existing_status_and_diagnostic(
         "forge.cli.proxy.start_proxy",
         lambda **kwargs: ProxyStartResult(proxy=entry, source="spawn"),
     )
-    monkeypatch.setattr(
-        "forge.proxy.proxy_orchestrator.probe_proxy_endpoint",
-        lambda **kwargs: SmokeTestResult(smoke_ok, "probe detail", "messages"),
-    )
+
+    def probe(**kwargs):
+        print("fixture upstream request")
+        return SmokeTestResult(smoke_ok, "probe detail", "messages")
+
+    monkeypatch.setattr("forge.proxy.proxy_orchestrator.probe_proxy_endpoint", probe)
 
     result = runner.invoke(
         main,
@@ -305,7 +307,11 @@ def test_proxy_create_human_smoke_keeps_existing_status_and_diagnostic(
 
     assert result.exit_code == expected_exit
     assert "Started proxy human-smoke" in result.stdout
-    assert message in result.stdout
+    assert result.stdout.splitlines()[-3:] == [
+        "Smoke testing upstream LLM...",
+        "fixture upstream request",
+        f"{message} (/v1/messages) probe detail",
+    ]
     assert result.stderr == ""
 
 

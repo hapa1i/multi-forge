@@ -71,7 +71,7 @@ def test_inspect_route_uses_backend_not_source(monkeypatch: pytest.MonkeyPatch) 
         "template": "openrouter-openai",
         "provider": "openrouter",
         "backend": "openrouter",
-        "endpoint": "/v1/messages",
+        "endpoint": "messages",
         "wire_shape": "openai_translated",
     }
     assert "source" not in route

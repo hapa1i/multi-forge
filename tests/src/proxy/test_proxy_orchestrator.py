@@ -18,7 +18,7 @@ from forge.proxy.proxy_orchestrator import (
     ProxyNotResponsesCapableError,
     ProxyStartError,
     ProxyUnreachableError,
-    assert_proxy_responses_capable,
+    read_responses_launch,
     start_proxy,
 )
 
@@ -1471,7 +1471,7 @@ class TestEnsureProxy:
         assert started is True
 
 
-# assert_proxy_responses_capable (`forge codex start --proxy` gate)
+# read_responses_launch (`forge codex start --proxy` gate)
 
 
 def _capable_root_body(**overrides):
@@ -1521,35 +1521,34 @@ def _patch_root(*, status=200, body=None, json_exc=None, get_exc=None):
     )
 
 
-class TestAssertProxyResponsesCapable:
-    def test_capable_returns_model_and_wire_shape(self) -> None:
+class TestReadResponsesLaunch:
+    def test_local_returns_model_and_empty_policy(self) -> None:
         with _patch_root(body=_capable_root_body()):
-            model, ws = assert_proxy_responses_capable("http://127.0.0.1:8084")
+            model, policy = read_responses_launch("http://127.0.0.1:8084")
         assert model == "gpt-5.5"
-        assert ws == "openai_responses_passthrough"
+        assert policy == {}
 
     def test_trailing_slash_base_url_is_fine(self) -> None:
         with _patch_root(body=_capable_root_body()):
-            model, ws = assert_proxy_responses_capable("http://127.0.0.1:8084/")
-        assert (model, ws) == ("gpt-5.5", "openai_responses_passthrough")
+            model, policy = read_responses_launch("http://127.0.0.1:8084/")
+        assert (model, policy) == ("gpt-5.5", {})
 
     def test_responses_ingress_false_rejects(self) -> None:
         with _patch_root(body=_capable_root_body(capabilities={"responses_ingress": False})):
             with pytest.raises(ProxyNotResponsesCapableError):
-                assert_proxy_responses_capable("http://x")
+                read_responses_launch("http://x")
 
     def test_capabilities_absent_rejects_fail_closed(self) -> None:
         body = _capable_root_body()
         del body["capabilities"]
         with _patch_root(body=body):
             with pytest.raises(ProxyNotResponsesCapableError):
-                assert_proxy_responses_capable("http://x")
+                read_responses_launch("http://x")
 
-    def test_wrong_wire_shape_with_ingress_true_still_rejects(self) -> None:
-        # The conjunction: responses_ingress True under a different shape -> still rejected.
+    def test_local_translated_profile_with_ingress_true_still_rejects(self) -> None:
         with _patch_root(body=_capable_root_body(wire_shape="openai_translated")):
             with pytest.raises(ProxyNotResponsesCapableError) as ei:
-                assert_proxy_responses_capable("http://x")
+                read_responses_launch("http://x")
         assert ei.value.wire_shape == "openai_translated"
 
     def test_missing_wire_shape_rejects_as_unknown(self) -> None:
@@ -1557,44 +1556,44 @@ class TestAssertProxyResponsesCapable:
         del body["wire_shape"]
         with _patch_root(body=body):
             with pytest.raises(ProxyNotResponsesCapableError) as ei:
-                assert_proxy_responses_capable("http://x")
+                read_responses_launch("http://x")
         assert ei.value.wire_shape == "unknown"
 
     def test_default_tier_none_returns_none_model(self) -> None:
         with _patch_root(body=_capable_root_body(routing={"default_tier": None})):
-            model, ws = assert_proxy_responses_capable("http://x")
+            model, policy = read_responses_launch("http://x")
         assert model is None
-        assert ws == "openai_responses_passthrough"
+        assert policy == {}
 
     def test_malformed_tiers_returns_none_model(self) -> None:
         with _patch_root(body=_capable_root_body(tiers="not-a-dict")):
-            model, _ = assert_proxy_responses_capable("http://x")
+            model, _ = read_responses_launch("http://x")
         assert model is None
 
     def test_default_tier_absent_from_tiers_returns_none(self) -> None:
         with _patch_root(body=_capable_root_body(routing={"default_tier": "opus"})):
-            model, _ = assert_proxy_responses_capable("http://x")
+            model, _ = read_responses_launch("http://x")
         assert model is None  # 'opus' is not a key in tiers
 
     def test_non_200_raises_unreachable(self) -> None:
         with _patch_root(status=503, body={}):
             with pytest.raises(ProxyUnreachableError):
-                assert_proxy_responses_capable("http://x")
+                read_responses_launch("http://x")
 
     def test_connect_error_raises_unreachable(self) -> None:
         with _patch_root(get_exc=httpx.ConnectError("boom")):
             with pytest.raises(ProxyUnreachableError):
-                assert_proxy_responses_capable("http://x")
+                read_responses_launch("http://x")
 
     def test_non_json_body_raises_unreachable(self) -> None:
         with _patch_root(json_exc=ValueError("not json")):
             with pytest.raises(ProxyUnreachableError):
-                assert_proxy_responses_capable("http://x")
+                read_responses_launch("http://x")
 
     def test_non_dict_body_raises_unreachable(self) -> None:
         with _patch_root(body=["not", "a", "dict"]):
             with pytest.raises(ProxyUnreachableError):
-                assert_proxy_responses_capable("http://x")
+                read_responses_launch("http://x")
 
 
 class TestProxyIdentityVerification:
@@ -1603,35 +1602,35 @@ class TestProxyIdentityVerification:
 
     def test_matching_identity_passes(self) -> None:
         with _patch_root(body=_capable_root_body()):
-            model, ws = assert_proxy_responses_capable(
+            model, policy = read_responses_launch(
                 "http://x",
                 expected_proxy_id="proxy_abc",
                 expected_template="codex-responses-local",
             )
-        assert (model, ws) == ("gpt-5.5", "openai_responses_passthrough")
+        assert (model, policy) == ("gpt-5.5", {})
 
     def test_proxy_id_mismatch_rejects(self) -> None:
         # The stale entry's port now serves a different (also capable) proxy.
         with _patch_root(body=_capable_root_body(proxy={"proxy_id": "proxy_other"})):
             with pytest.raises(ProxyIdentityMismatchError) as ei:
-                assert_proxy_responses_capable("http://x", expected_proxy_id="proxy_abc")
+                read_responses_launch("http://x", expected_proxy_id="proxy_abc")
         assert ei.value.expected_proxy_id == "proxy_abc"
         assert ei.value.actual_proxy_id == "proxy_other"
 
     def test_template_mismatch_rejects(self) -> None:
         with _patch_root(body=_capable_root_body(template="openrouter-qwen")):
             with pytest.raises(ProxyIdentityMismatchError):
-                assert_proxy_responses_capable("http://x", expected_template="codex-responses-local")
+                read_responses_launch("http://x", expected_template="codex-responses-local")
 
     def test_is_proxy_false_rejects(self) -> None:
         with _patch_root(body=_capable_root_body(is_proxy=False)):
             with pytest.raises(ProxyIdentityMismatchError):
-                assert_proxy_responses_capable("http://x", expected_proxy_id="proxy_abc")
+                read_responses_launch("http://x", expected_proxy_id="proxy_abc")
 
     def test_missing_proxy_block_with_expected_id_rejects(self) -> None:
         with _patch_root(body=_capable_root_body(proxy=None)):
             with pytest.raises(ProxyIdentityMismatchError) as ei:
-                assert_proxy_responses_capable("http://x", expected_proxy_id="proxy_abc")
+                read_responses_launch("http://x", expected_proxy_id="proxy_abc")
         assert ei.value.actual_proxy_id is None
 
     def test_identity_checked_before_capability(self) -> None:
@@ -1644,30 +1643,50 @@ class TestProxyIdentityVerification:
         )
         with _patch_root(body=body):
             with pytest.raises(ProxyIdentityMismatchError):
-                assert_proxy_responses_capable("http://x", expected_proxy_id="proxy_abc")
+                read_responses_launch("http://x", expected_proxy_id="proxy_abc")
 
     def test_no_expected_skips_identity(self) -> None:
         # Capability-only callers (no expected_*) don't trigger identity checks, even on a
         # body that wouldn't pass identity -- backward-compatible with the original signature.
         with _patch_root(body=_capable_root_body(is_proxy=False, proxy=None)):
-            _model, ws = assert_proxy_responses_capable("http://x")
-        assert ws == "openai_responses_passthrough"
+            _model, policy = read_responses_launch("http://x")
+        assert policy == {}
 
 
-@pytest.mark.parametrize("profile", ["openai_translated", "openai_responses_passthrough"])
-@pytest.mark.parametrize("selector", [None, "messages", "responses"])
-def test_openrouter_smoke_selects_one_endpoint_and_wire_model(monkeypatch, profile, selector):
-    from forge.proxy import proxy_orchestrator as orch
-
-    selected = selector or ("responses" if profile == "openai_responses_passthrough" else "messages")
-    calls = []
-    policy = {
+@pytest.fixture
+def openrouter_responses_policy():
+    return {
         "on_unreported_cost": "reject",
         "cost_scope": "openrouter_credit",
         "required_zdr": True,
         "zdr_fallbacks": {},
         "requested_default_model": "google/gemini-4-neon",
     }
+
+
+def test_translated_openrouter_launch_returns_model_and_live_policy(openrouter_responses_policy):
+    body = _capable_root_body(
+        wire_shape="openai_translated",
+        provider="openrouter",
+        runtime={"backend_id": "openrouter", "responses_policy": openrouter_responses_policy},
+        template="openrouter-gemini",
+        tiers={"sonnet": {"model": "google/gemini-4-neon"}},
+    )
+    with _patch_root(body=body):
+        assert read_responses_launch(
+            "http://x", expected_proxy_id="proxy_abc", expected_template="openrouter-gemini"
+        ) == ("google/gemini-4-neon", openrouter_responses_policy)
+
+
+@pytest.mark.parametrize("profile", ["openai_translated", "openai_responses_passthrough"])
+@pytest.mark.parametrize("selector", [None, "messages", "responses"])
+def test_openrouter_smoke_selects_one_endpoint_and_wire_model(
+    monkeypatch, profile, selector, openrouter_responses_policy
+):
+    from forge.proxy import proxy_orchestrator as orch
+
+    selected = selector or ("responses" if profile == "openai_responses_passthrough" else "messages")
+    calls = []
 
     def handle(request):
         if request.method == "GET":
@@ -1676,7 +1695,7 @@ def test_openrouter_smoke_selects_one_endpoint_and_wire_model(monkeypatch, profi
                 json=_capable_root_body(
                     wire_shape=profile,
                     provider="openrouter",
-                    runtime={"responses_policy": policy},
+                    runtime={"responses_policy": openrouter_responses_policy},
                 ),
             )
         import json
@@ -1718,7 +1737,7 @@ def test_direct_launch_requires_live_policy_even_with_capability(shape):
             match="incomplete OpenRouter Responses policy",
         ),
     ):
-        assert_proxy_responses_capable("http://x")
+        read_responses_launch("http://x")
 
 
 def test_unsupported_responses_smoke_ends_before_generation(monkeypatch):

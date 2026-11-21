@@ -774,8 +774,7 @@ def test_audit_and_smoke_describe_each_endpoint(local_responses_proxy):
         assert msg.status_code == 200
         records = read_audit_logs(request_id=msg.headers["x-request-id"])
         assert records and all(
-            r["route"]["endpoint"] == "/v1/messages" and r["route"]["wire_shape"] == "openai_translated"
-            for r in records
+            r["route"]["endpoint"] == "messages" and r["route"]["wire_shape"] == "openai_translated" for r in records
         )
     for args, endpoint in [
         ([], "responses"),
