@@ -18,6 +18,7 @@ from collections.abc import Callable
 from concurrent.futures import Future
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from forge.core.state import decode_json_object, try_parse_iso
@@ -34,6 +35,13 @@ _MICROS_PER_DOLLAR = 1_000_000
 _24H_SECONDS = 86400
 _CAP_STATE_PERSIST_EVERY_RECORDS = 10
 _CAP_STATE_PERSIST_INTERVAL_SECONDS = 5.0
+
+
+def _cap_micros(usd: float | None) -> int | None:
+    """Round the configured decimal amount to the nearest microdollar, with ties up."""
+    if usd is None:
+        return None
+    return int((Decimal(str(usd)) * _MICROS_PER_DOLLAR).to_integral_value(rounding=ROUND_HALF_UP))
 
 
 @dataclass
@@ -70,8 +78,8 @@ class CostTracker:
         on_cap_hit: str = "reject",
         cap_state_persister: Callable[[CapState], Future[bool] | None] | None = None,
     ) -> None:
-        self.daily_cap_micros = int(daily_cap_usd * _MICROS_PER_DOLLAR) if daily_cap_usd is not None else None
-        self.monthly_cap_micros = int(monthly_cap_usd * _MICROS_PER_DOLLAR) if monthly_cap_usd is not None else None
+        self.daily_cap_micros = _cap_micros(daily_cap_usd)
+        self.monthly_cap_micros = _cap_micros(monthly_cap_usd)
         self.on_cap_hit = on_cap_hit
         self.responses_cost_unreported = False
 

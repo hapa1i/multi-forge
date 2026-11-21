@@ -240,6 +240,7 @@ def test_incremental_relay_preserves_opaque_reasoning_and_tool_results(local_res
         assert sent_headers["x-openrouter-metadata"] == "enabled"
         del body["client_metadata"], body["prompt_cache_key"]
         body["provider"] = {"zdr": True}
+        body["plugins"] = [{"id": "web", "enabled": False}]
     assert sent == body
     assert sent["input"][-3:] == [opaque, call, result]
 
@@ -301,6 +302,7 @@ def test_recorded_layouts_and_cross_family_policy(local_responses_proxy, proxy_t
             del body["client_metadata"], body["prompt_cache_key"]
             if not allow:
                 body["provider"]["zdr"] = True
+                body["plugins"] = [{"id": "web", "enabled": False}]
                 if body["model"] == "openai/gpt-6.2-astra":
                     body["model"] = "google/gemini-4-carbon"
             assert sent == body
@@ -422,12 +424,38 @@ def test_byok_fallback_cost_and_duplicate_terminal(
 
 
 @pytest.mark.parametrize("proxy_template", ["codex-responses-openrouter"])
+@pytest.mark.parametrize("proxy_settings", [{"costs": {"caps": {"per_day": 4.10}, "on_cap_hit": "warn"}}])
+def test_zdr_refusal_retains_warn_header_at_exact_cap(local_responses_proxy, responses_upstream):
+    base, calls, _ = local_responses_proxy
+    body = {"model": "fixture/model", "input": "hi"}
+    with httpx.Client(base_url=base) as client:
+        for cost in (4.099999, 0.000001):
+            responses_upstream.reply["usage"]["cost"] = cost
+            paid = client.post("/v1/responses", json=body)
+            assert paid.status_code == 200
+            assert "X-Spend-Warning" not in paid.headers
+        responses_upstream.status = 404
+        responses_upstream.reply = {
+            "error": {"message": "No endpoints found matching your data policy (Zero data retention)"}
+        }
+        for stream in (False, True):
+            refusal = client.post("/v1/responses", json={**body, "stream": stream})
+            assert refusal.status_code == 400
+            assert refusal.json()["error"]["code"] == "zdr_unavailable"
+            assert "$4.10 / $4.10" in refusal.headers["X-Spend-Warning"]
+            assert "X-Request-ID" in refusal.headers
+        assert len(calls) == 4
+
+
+@pytest.mark.parametrize("proxy_template", ["codex-responses-openrouter"])
 @pytest.mark.parametrize("proxy_settings", [{}])
 @pytest.mark.parametrize(
     "case,stream",
     [
         ("completed", False),
         ("incomplete", True),
+        ("absent-status", False),
+        ("queued", False),
         ("failed", False),
         ("failed", True),
         ("http", True),
@@ -449,6 +477,8 @@ def test_next_create_after_missing_cost(
     provider.reply["id"] = "resp-only"
     del provider.reply["usage"]["cost"], provider.reply["openrouter_metadata"]
     provider.reply["status"] = case
+    if case == "absent-status":
+        del provider.reply["status"]
     if case in ("http", "account", "request"):
         provider.status = 404
         error: dict[str, Any] = {"message": "fixture missing"}
@@ -466,7 +496,14 @@ def test_next_create_after_missing_cost(
     body = {"model": "fixture/model", "input": "hi"}
     with httpx.Client(base_url=base, timeout=10) as client:
         with client.stream("POST", "/v1/responses", json={**body, "stream": stream}) as response:
-            expected = {"http": 404, "account": 400, "request": 400, "transport": 502}.get(case, 200)
+            expected = {
+                "http": 404,
+                "account": 400,
+                "request": 400,
+                "transport": 502,
+                "absent-status": 502,
+                "queued": 502,
+            }.get(case, 200)
             assert response.status_code == expected
             assert "x-request-cost" not in response.headers
             if case == "disconnect":
@@ -481,7 +518,7 @@ def test_next_create_after_missing_cost(
         assert row.cost_micros is None and row.provider_generation_id is None and row.selected_provider is None
         if case == "disconnect":
             assert row.client_disconnected and row.provider_response_id == "gen-test"
-        missing = case in ("completed", "incomplete")
+        missing = case in ("completed", "incomplete", "absent-status", "queued")
         assert client.get("/").json()["runtime"]["responses_policy"]["unreported_cost_observed"] is missing
         release.set()
         provider.status, provider.drop_connection = 200, False

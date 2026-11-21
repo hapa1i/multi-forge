@@ -58,6 +58,23 @@ OpenRouter and through local LiteLLM to Google AI. The default no-argument integ
 live Google AI cases in `test_session_routing_e2e.py`. Follow the Neon and Hydrogen migration in
 `docs/end-user/model_selection.md` before using the default Gemini workflow worker with a saved LiteLLM backend.
 
+### Sessionless Codex through OpenRouter Responses
+
+The Docker-backed tests exercise the direct route and shared LiteLLM accounting with synthetic credentials and loopback
+upstreams.
+
+```bash
+PYTHON_DOTENV_DISABLED=1 GEMINI_API_KEY= OPENROUTER_API_KEY= ./scripts/test-integration.sh \
+  tests/integration/proxy/test_codex_openrouter_responses_e2e.py \
+  tests/integration/proxy/test_litellm_streaming_cost_e2e.py \
+  tests/integration/cli/test_proxy_commands_integration.py::TestProxyCreateAndStart::test_create_json_failed_smoke_is_one_result_and_preserves_proxy
+```
+
+For native TUI acceptance, run `forge_acceptance.py --selftest` with the manifest's pinned Codex binary and a new
+receipt path. Verify the read and follow-up edit on both model slugs, the cap and the generation lookups. A live rerun
+requires a separately approved manifest and a dedicated credit-limited key.
+[Harness and commands](../../scripts/experiments/openrouter/README.md#codex-responses)
+
 ## Backends, telemetry and costs
 
 For downstream-telemetry retention or config-ownership changes, inspect configured, effective, and source state with

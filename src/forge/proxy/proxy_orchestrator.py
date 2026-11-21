@@ -48,7 +48,11 @@ from forge.core.auth.template_secrets import resolve_env_or_credential
 from forge.core.paths import get_forge_home
 from forge.core.process import is_pid_alive
 from forge.core.state import now_iso
-from forge.core.wire_shapes import OPENAI_RESPONSES_PASSTHROUGH, PASSTHROUGH_WIRE_SHAPES
+from forge.core.wire_shapes import (
+    OPENAI_RESPONSES_PASSTHROUGH,
+    PASSTHROUGH_WIRE_SHAPES,
+    VALID_WIRE_SHAPES,
+)
 from forge.proxy.ports import (
     NoAvailablePortError,
 )
@@ -1110,67 +1114,76 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
     Returns (success, detail) where detail is the model response text on
     success or the error message on failure. Direct OpenRouter sends one create.
     """
-    root = _proxy_smoke_root(base_url=base_url, timeout_s=timeout_s)
-    model = _smoke_test_model(root)
-    if root.get("wire_shape") == OPENAI_RESPONSES_PASSTHROUGH:
-        runtime = root.get("runtime")
-        policy = runtime.get("responses_policy") if isinstance(runtime, dict) else None
-        identity = root.get("proxy")
-        if isinstance(policy, dict) and policy.get("requested_default_model"):
-            model = policy["requested_default_model"]
-        return _smoke_test_responses(
-            base_url=base_url,
-            timeout_s=timeout_s,
-            model=model,
-            proxy_id=(identity.get("proxy_id") or "<id>") if isinstance(identity, dict) else "<id>",
-            cost_policy=policy.get("on_unreported_cost", "reject") if isinstance(policy, dict) else None,
-        )
-
-    url = f"{base_url.rstrip('/')}/v1/messages"
+    base_url = base_url.rstrip("/")
     last_error = ""
-
     for attempt in range(2):
-        if attempt > 0:
+        if attempt:
             time.sleep(2)
+        direct = False
         try:
             with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
-                # max_tokens must be large enough for thinking models (e.g., Gemini 2.5 Pro)
-                # which consume tokens for internal reasoning before producing visible output.
-                payload = {
-                    "model": model,
-                    "max_tokens": 256,
-                    "messages": [{"role": "user", "content": "Say hi"}],
-                }
-                resp = client.post(url, json=payload)
-
-            if resp.status_code != 200:
-                last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
-                continue
-
-            data = resp.json()
-            content = data.get("content", [])
-            if content and isinstance(content, list):
-                text = content[0].get("text", "")
-                if text:
-                    return True, text.strip()
-                # Valid structure but empty text — thinking models may consume
-                # all tokens for reasoning. Report model + usage for diagnosis.
-                response_model = data.get("model", "unknown")
-                usage = data.get("usage", {})
-                last_error = (
-                    f"Empty response from {response_model} "
-                    f"(input={usage.get('input_tokens', '?')}, "
-                    f"output={usage.get('output_tokens', '?')} tokens)"
-                )
-                continue
-
-            last_error = f"Unexpected response shape: {resp.text[:200]}"
+                root_response = client.get(f"{base_url}/")
+                if root_response.status_code != 200:
+                    last_error = f"GET / returned HTTP {root_response.status_code}"
+                    continue
+                root = root_response.json()
+                if not isinstance(root, dict) or root.get("wire_shape") not in VALID_WIRE_SHAPES:
+                    last_error = "GET / did not identify a supported proxy wire shape"
+                    continue
+                model = _smoke_test_model(root)
+                if root["wire_shape"] == OPENAI_RESPONSES_PASSTHROUGH:
+                    runtime = root.get("runtime")
+                    policy = runtime.get("responses_policy") if isinstance(runtime, dict) else None
+                    cost_policy = None
+                    if isinstance(policy, dict):
+                        direct = True
+                        model = policy.get("requested_default_model") or model
+                        cost_policy = policy.get("on_unreported_cost", "reject")
+                    identity = root.get("proxy")
+                    ok, last_error = _smoke_test_responses(
+                        client=client,
+                        base_url=base_url,
+                        model=model,
+                        proxy_id=((identity.get("proxy_id") or "<id>") if isinstance(identity, dict) else "<id>"),
+                        cost_policy=cost_policy,
+                    )
+                else:
+                    ok, last_error = _smoke_test_messages(client, base_url, model)
+                if ok:
+                    return True, last_error
         except httpx.TimeoutException:
             last_error = f"Request timed out after {timeout_s}s"
         except (httpx.RequestError, ValueError) as e:
             last_error = str(e)
+        if direct:
+            break
 
     return False, last_error
+
+
+def _smoke_test_messages(client: httpx.Client, base_url: str, model: str) -> tuple[bool, str]:
+    # Thinking models may spend most of a small output allowance on reasoning.
+    payload = {
+        "model": model,
+        "max_tokens": 256,
+        "messages": [{"role": "user", "content": "Say hi"}],
+    }
+    resp = client.post(f"{base_url}/v1/messages", json=payload)
+    if resp.status_code != 200:
+        return False, f"HTTP {resp.status_code}: {resp.text[:200]}"
+
+    data = resp.json()
+    content = data.get("content") if isinstance(data, dict) else None
+    if isinstance(content, list) and content and isinstance(content[0], dict):
+        text = content[0].get("text")
+        if isinstance(text, str) and text:
+            return True, text.strip()
+        usage = data.get("usage") or {}
+        return False, (
+            f"Empty response from {data.get('model', 'unknown')} "
+            f"(input={usage.get('input_tokens', '?')}, output={usage.get('output_tokens', '?')} tokens)"
+        )
+    return False, f"Unexpected response shape: {resp.text[:200]}"
 
 
 def _smoke_test_model(data: dict[str, Any]) -> str:
@@ -1207,79 +1220,53 @@ def _smoke_test_model(data: dict[str, Any]) -> str:
     return fallback
 
 
-def _proxy_smoke_root(*, base_url: str, timeout_s: float) -> dict[str, Any]:
-    """Read routing and cost policy from the same proxy snapshot."""
-    try:
-        with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
-            resp = client.get(f"{base_url.rstrip('/')}/")
-        if resp.status_code != 200:
-            return {}
-        data = resp.json()
-    except Exception as e:
-        logger.debug("Could not resolve proxy wire shape from GET /: %s", e)
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
 def _smoke_test_responses(
-    *, base_url: str, timeout_s: float, model: str, proxy_id: str, cost_policy: str | None
+    *,
+    client: httpx.Client,
+    base_url: str,
+    model: str,
+    proxy_id: str,
+    cost_policy: str | None,
 ) -> tuple[bool, str]:
-    """Smoke-test a Responses passthrough proxy via ``POST /v1/responses``."""
-    url = f"{base_url.rstrip('/')}/v1/responses"
-    last_error = ""
+    """Smoke-test a Responses passthrough proxy via one unary create."""
+    payload = {
+        "model": model,
+        "input": "Say hi",
+        "max_output_tokens": 256,
+        "stream": False,
+    }
+    resp = client.post(f"{base_url}/v1/responses", json=payload)
+    if resp.status_code != 200:
+        detail = resp.text[:200]
+        if cost_policy is not None:
+            try:
+                error_body = resp.json()
+            except ValueError:
+                error_body = None
+            error = error_body.get("error") if isinstance(error_body, dict) else None
+            if isinstance(error, dict) and isinstance(error.get("message"), str):
+                detail = error["message"][:1000]
+        return False, f"HTTP {resp.status_code}: {detail}"
 
-    for attempt in range(1 if cost_policy is not None else 2):
-        if attempt > 0:
-            time.sleep(2)
-        try:
-            with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
-                payload = {
-                    "model": model,
-                    "input": "Say hi",
-                    "max_output_tokens": 256,
-                    "stream": False,
-                }
-                resp = client.post(url, json=payload)
+    data = resp.json()
+    text = _extract_responses_text(data)
+    if (
+        text
+        and cost_policy == "reject"
+        and not re.fullmatch(r"[0-9]+\.[0-9]{6}", resp.headers.get("X-Request-Cost", ""))
+    ):
+        from forge.proxy.openrouter_responses import unreported_cost_message
 
-            if resp.status_code != 200:
-                detail = resp.text[:200]
-                if cost_policy is not None:
-                    try:
-                        error_body = resp.json()
-                    except ValueError:
-                        error_body = None
-                    error = error_body.get("error") if isinstance(error_body, dict) else None
-                    if isinstance(error, dict) and isinstance(error.get("message"), str):
-                        detail = error["message"][:1000]
-                last_error = f"HTTP {resp.status_code}: {detail}"
-                continue
+        return False, unreported_cost_message(proxy_id)
+    if text:
+        return True, text.strip()
 
-            data = resp.json()
-            text = _extract_responses_text(data)
-            if (
-                text
-                and cost_policy == "reject"
-                and not re.fullmatch(r"[0-9]+\.[0-9]{6}", resp.headers.get("X-Request-Cost", ""))
-            ):
-                from forge.proxy.openrouter_responses import unreported_cost_message
-
-                return False, unreported_cost_message(proxy_id)
-            if text:
-                return True, text.strip()
-
-            response_model = data.get("model", "unknown") if isinstance(data, dict) else "unknown"
-            usage = data.get("usage", {}) if isinstance(data, dict) else {}
-            last_error = (
-                f"Empty response from {response_model} "
-                f"(input={usage.get('input_tokens', '?')}, "
-                f"output={usage.get('output_tokens', '?')} tokens)"
-            )
-        except httpx.TimeoutException:
-            last_error = f"Request timed out after {timeout_s}s"
-        except (httpx.RequestError, ValueError) as e:
-            last_error = str(e)
-
-    return False, last_error
+    response_model = data.get("model", "unknown") if isinstance(data, dict) else "unknown"
+    usage = data.get("usage", {}) if isinstance(data, dict) else {}
+    return False, (
+        f"Empty response from {response_model} "
+        f"(input={usage.get('input_tokens', '?')}, output={usage.get('output_tokens', '?')} tokens)"
+    )
 
 
 def _extract_responses_text(data: object) -> str:

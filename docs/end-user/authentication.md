@@ -95,7 +95,7 @@ withheld.
 
 | Credential       | Env var(s)                                              | What it unlocks                                                                                  |
 | ---------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `openrouter`     | `OPENROUTER_API_KEY` (+ optional `OPENROUTER_BASE_URL`) | All `openrouter-*` proxy templates, OSS workflow models                                          |
+| `openrouter`     | `OPENROUTER_API_KEY` (+ optional `OPENROUTER_BASE_URL`) | `openrouter-*` and `codex-responses-openrouter` proxy templates, OSS workflow models             |
 | `anthropic-api`  | `ANTHROPIC_API_KEY`                                     | Forge subprocesses, direct Anthropic workers, `litellm-anthropic-local`, `anthropic-passthrough` |
 | `openai-api`     | `OPENAI_API_KEY`                                        | `litellm-openai-local` and `codex-responses-local` proxies                                       |
 | `gemini-api`     | `GEMINI_API_KEY`                                        | `litellm-gemini-local` proxy                                                                     |
@@ -138,7 +138,7 @@ If you see authentication errors in workflow output, run `forge auth login -c an
 | `forge workflow panel` (default)                | `ANTHROPIC_API_KEY` + active `openrouter-openai` + `openrouter-gemini` |
 | `forge workflow ... --models codex`             | Fresh `forge runtime preflight codex` (native Codex auth)              |
 | `forge session resume --fresh -s ai-curated`    | `OPENROUTER_API_KEY`                                                   |
-| OpenRouter proxy (`openrouter-*`)               | `OPENROUTER_API_KEY`                                                   |
+| `openrouter-*` or `codex-responses-openrouter`  | `OPENROUTER_API_KEY`                                                   |
 | Anthropic passthrough (`anthropic-passthrough`) | `ANTHROPIC_API_KEY`                                                    |
 | Remote LiteLLM proxy (`litellm-openai`)         | `LITELLM_API_KEY` + `LITELLM_BASE_URL`                                 |
 | Local LiteLLM proxy (`litellm-openai-local`)    | `OPENAI_API_KEY`                                                       |

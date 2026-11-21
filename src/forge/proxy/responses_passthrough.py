@@ -24,7 +24,11 @@ import httpx
 from fastapi.responses import Response, StreamingResponse
 
 from forge.core.telemetry.downstream import RequestMode
-from forge.proxy.openrouter_responses import OpenRouterResponseEvidence, zdr_refusal
+from forge.proxy.openrouter_responses import (
+    OpenRouterResponseEvidence,
+    refusal,
+    zdr_refusal,
+)
 from forge.proxy.provider_trace_logger import record_provider_trace
 from forge.proxy.response_headers import (
     merge_response_headers,
@@ -150,6 +154,8 @@ def _failure_from_terminal_status(status: str | None) -> tuple[bool, str | None]
     """
     if status == "failed":
         return True, "response_failed"
+    if status == "cancelled":
+        return True, "response_cancelled"
     return False, None
 
 
@@ -165,7 +171,7 @@ class _ResponsesUsageAccumulator:
     def __init__(self, openrouter: OpenRouterResponseEvidence | None = None) -> None:
         self.openrouter = openrouter
         self.usage: dict[str, int] = {}
-        self._framer = SseJsonDataFramer(self._merge)
+        self._framer = SseJsonDataFramer(self._merge, on_event_name=self._observe_event_name)
         self.first_chunk_seen = False
         self.final_usage_seen = False
         self.reported_cost_micros: int | None = None
@@ -176,10 +182,21 @@ class _ResponsesUsageAccumulator:
     def feed(self, chunk: bytes) -> None:
         self._framer.feed(chunk)
 
+    def _observe_event_name(self, name: str) -> None:
+        if name in ("error", "response.failed"):
+            self.terminal_status = "failed"
+            if self.openrouter:
+                self.openrouter.observe(None, "failed")
+
     def _merge(self, event: Any) -> None:
         if not isinstance(event, dict):
             return
         etype = event.get("type")
+        if etype == "error" or event.get("error"):
+            self._observe_event_name("error")
+            return
+        if self.terminal_status == "failed":
+            return
         if self.openrouter and etype in (
             "response.created",
             "response.completed",
@@ -270,6 +287,8 @@ async def forward(
     # Accounting and the provider-trace plane both attach only to the billable
     # generation endpoint, so a non-generation relay skips body parsing entirely.
     response_headers = relay_response_headers(resp.headers, request_id)
+    invalid_unary = False
+    reported_cost = None
     if on_complete is not None or provider_trace_ctx is not None or openrouter:
         response_body: dict[str, Any] | None = None
         if (not openrouter or 200 <= resp.status_code < 300) and "json" in resp.headers.get("content-type", ""):
@@ -281,8 +300,8 @@ async def forward(
         usage = extract_usage_from_response(response_body)
         if openrouter:
             openrouter.generation_id = resp.headers.get("x-generation-id") or None
-            if 200 <= resp.status_code < 300 and response_body is not None:
-                openrouter.observe(response_body, response_body.get("status"))
+            if 200 <= resp.status_code < 300:
+                invalid_unary = not openrouter.observe_unary(response_body)
             reported_cost = openrouter.cost_micros
             response_headers.update(request_cost_header(reported_cost))
         else:
@@ -294,6 +313,8 @@ async def forward(
                 (response_body or {}).get("status") if isinstance(response_body, Mapping) else None
             )
             http_failed = resp.status_code >= 400
+            if invalid_unary:
+                status_failed, status_error = True, "invalid_upstream_response"
             _safe_on_complete(
                 on_complete,
                 usage,
@@ -316,9 +337,20 @@ async def forward(
             provider_meta=openrouter.provider_meta() if openrouter else None,
         )
 
+    if invalid_unary:
+        error = refusal(
+            "invalid_upstream_response",
+            "OpenRouter returned no synchronous Responses outcome.",
+            request_id,
+            502,
+        )
+        error.headers.update(request_cost_header(reported_cost))
+        error.headers.update(extra_response_headers or {})
+        return error
     if openrouter and (
         translated := zdr_refusal(resp.status_code, resp.content, str((body or {}).get("model")), request_id)
     ):
+        translated.headers.update(extra_response_headers or {})
         return translated
     return Response(
         status_code=resp.status_code,
@@ -405,6 +437,7 @@ async def _forward_streaming(
         if openrouter and (
             translated := zdr_refusal(resp.status_code, upstream_body, str((body or {}).get("model")), request_id)
         ):
+            translated.headers.update(extra_response_headers or {})
             return translated
         return Response(
             status_code=resp.status_code,

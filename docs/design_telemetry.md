@@ -698,7 +698,9 @@ Semantics and invariants:
   displays both on a fallback. Metrics and cost summaries use the dispatched slug. A completed or incomplete terminal
   supplies OpenRouter account credit in `usage.cost`, including explicit zero on BYOK. The upstream BYOK provider's
   invoice falls outside that scope. Forge rounds once per create to integer micros and joins lifecycle and cost by
-  attempt ID. Missing terminal cost can block subsequent creates. A pre-terminal disconnect can leave cost unavailable.
+  attempt ID. Daily and monthly dollar limits use decimal half-up rounding to the nearest microdollar. Missing terminal
+  cost can block subsequent creates, including an unusable unary success with no final price. An explicit SSE error
+  marks a failed attempt. A pre-terminal disconnect can leave cost unavailable.
 - **`first_chunk_seen`** = first user-visible content chunk. The first-event `_provider_meta` carrier does not count, so
   a pre-content cancellation can retain its generation id with `first_chunk_seen=false`.
 - **`local_usage_status`** = `available` after final usage or reported cost, else `unavailable`. Probe 2

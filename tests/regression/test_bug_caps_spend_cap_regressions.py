@@ -94,6 +94,64 @@ def test_bug_caps_monthly_rollover_clears_stale_total_before_rejecting():
     assert tracker.monthly_spend_micros() == 0
 
 
+@pytest.mark.parametrize("period", ["daily", "monthly"])
+@pytest.mark.parametrize(("cap", "expected_micros"), [(4.10, 4_100_000), (0.0000025, 3)])
+def test_decimal_spend_cap_triggers_at_exact_microdollar_threshold(period, cap, expected_micros):
+    from forge.proxy.cost_tracker import CostTracker
+
+    tracker = CostTracker(**{f"{period}_cap_usd": cap})
+    tracker.record(expected_micros - 1)
+    assert not tracker.check_cap().exceeded
+    tracker.record(1)
+    reached = tracker.check_cap()
+    assert reached.exceeded and reached.cap_type == period
+    assert reached.current_micros == reached.limit_micros == expected_micros
+    assert tracker.cap_summary()[period]["limit_usd"] == expected_micros / 1_000_000
+
+
+@pytest.mark.parametrize(
+    ("backend", "provider", "wire_shape"),
+    [
+        ("codex-responses-local", "litellm", "openai_responses_passthrough"),
+        ("openrouter", "openrouter", "openai_translated"),
+    ],
+)
+def test_reject_inapplicable_unreported_cost_policy_before_proxy_set_writes(
+    backend, provider, wire_shape, tmp_path, monkeypatch, caplog
+):
+    from click.testing import CliRunner
+
+    from forge.cli.main import main
+    from forge.config import load_config
+
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+    proxy_dir = tmp_path / "proxies" / "cost-proxy"
+    proxy_dir.mkdir(parents=True)
+    path = proxy_dir / "proxy.yaml"
+    path.write_text(
+        f"template: {backend}\nbackend: {backend}\nprovider: {provider}\nwire_shape: {wire_shape}\n"
+        "proxy_endpoint: http://localhost:8085\nport: 8085\nupstream_base_url: http://localhost:4000\n"
+        "tiers:\n  sonnet: openai/gpt-6.2-astra\n"
+    )
+    original = path.read_bytes()
+    result = CliRunner().invoke(main, ["proxy", "set", "cost-proxy", "costs.on_unreported_cost=reject"])
+    assert result.exit_code != 0
+    assert "costs.on_unreported_cost applies only to direct OpenRouter Responses" in result.output
+    assert path.read_bytes() == original
+
+    # Earlier instances could save this explicit, ineffective policy.
+    path.write_bytes(original + b"costs:\n  on_unreported_cost: reject\n")
+    saved = path.read_bytes()
+    assert load_config(proxy_id="cost-proxy").proxy.costs.on_unreported_cost is None
+    assert "forge proxy set cost-proxy costs.on_unreported_cost=null" in caplog.text
+    assert path.read_bytes() == saved
+    cleared = CliRunner().invoke(main, ["proxy", "set", "cost-proxy", "costs.on_unreported_cost=null"])
+    assert cleared.exit_code == 0, cleared.output
+    caplog.clear()
+    assert load_config(proxy_id="cost-proxy").proxy.costs.on_unreported_cost is None
+    assert "Ignoring costs.on_unreported_cost" not in caplog.text
+
+
 class _DummyRequestState:
     def __init__(self, request_id: str) -> None:
         self.request_id = request_id

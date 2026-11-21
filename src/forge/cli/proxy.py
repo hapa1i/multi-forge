@@ -844,7 +844,7 @@ def stop_cmd(proxy_id: str, force: bool, kill_adopted: bool) -> None:
     if outcome == "stopped":
         # A fast subsequent start would otherwise adopt the signaled server with its old config.
         deadline = time.monotonic() + 5
-        while entry.pid is not None and check_proxy_health(
+        while check_proxy_health(
             base_url=entry.base_url, expected_proxy_id=entry.proxy_id, expected_template=entry.template, timeout_s=0.3
         ):
             if time.monotonic() >= deadline:

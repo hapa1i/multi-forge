@@ -1123,6 +1123,11 @@ class TestAdoptionUnderLock:
 # smoke_test_proxy
 
 
+class _MessagesSmokeClient:
+    def get(self, url):
+        return httpx.Response(200, json={"wire_shape": "openai_translated"})
+
+
 class TestSmokeTestProxy:
     def test_success_returns_text(self, monkeypatch):
         from forge.proxy import proxy_orchestrator
@@ -1134,7 +1139,7 @@ class TestSmokeTestProxy:
             def json(self):
                 return {"content": [{"text": "Hi there!"}]}
 
-        class _FakeClient:
+        class _FakeClient(_MessagesSmokeClient):
             def __enter__(self):
                 return self
 
@@ -1178,7 +1183,7 @@ class TestSmokeTestProxy:
             def json(self):
                 return {"content": [{"text": "Hi"}]}
 
-        class _FakeClient:
+        class _FakeClient(_MessagesSmokeClient):
             def __enter__(self):
                 return self
 
@@ -1209,7 +1214,7 @@ class TestSmokeTestProxy:
             status_code = 500
             text = "Internal Server Error"
 
-        class _FakeClient:
+        class _FakeClient(_MessagesSmokeClient):
             def __enter__(self):
                 return self
 
@@ -1245,7 +1250,7 @@ class TestSmokeTestProxy:
             def json(self):
                 return {"content": [{"text": "ok"}]}
 
-        class _FakeClient:
+        class _FakeClient(_MessagesSmokeClient):
             def __enter__(self):
                 return self
 
@@ -1269,7 +1274,7 @@ class TestSmokeTestProxy:
 
         from forge.proxy import proxy_orchestrator
 
-        class _FakeClient:
+        class _FakeClient(_MessagesSmokeClient):
             def __enter__(self):
                 return self
 

@@ -35,6 +35,18 @@ class OpenRouterResponseEvidence:
     cost_micros: int | None = None
     terminal_seen: bool = False
 
+    def observe_unary(self, response: dict[str, Any] | None) -> bool:
+        """Check the synchronous outcome and account for ambiguous successful HTTP replies."""
+        data = response or {}
+        status = data.get("status")
+        self.observe(data, status)
+        if self.terminal_seen:
+            return True
+        # An active job can incur further charges and this route cannot poll it.
+        # For malformed final replies retain any explicit account charge.
+        self._observe_charge(None if status in ("queued", "in_progress") else data.get("usage"))
+        return False
+
     def observe(self, response: object, status: object) -> None:
         data = response if isinstance(response, dict) else {}
         if isinstance(response_id := data.get("id"), str) and response_id:
@@ -49,13 +61,20 @@ class OpenRouterResponseEvidence:
                     if isinstance(provider, str) and provider:
                         self.selected_provider = provider
                         break
-        if self.terminal_seen or status not in ("completed", "incomplete", "failed"):
+        if self.terminal_seen or status not in (
+            "completed",
+            "incomplete",
+            "failed",
+            "cancelled",
+        ):
             return
         self.terminal_seen = True
-        if status == "failed":
-            return
+        if status in ("completed", "incomplete"):
+            self._observe_charge(data.get("usage"))
+
+    def _observe_charge(self, usage: Any) -> None:
         try:
-            cost = extract_reported_cost_usd(data.get("usage"))
+            cost = extract_reported_cost_usd(usage)
         except OverflowError:
             cost = None
         if cost is not None and cost >= 0 and math.isfinite(cost * 1_000_000):
@@ -114,6 +133,8 @@ def prepare_request(body: dict[str, Any], provider: Any) -> dict[str, Any]:
     model = result.get("model")
     if not isinstance(model, str) or not model.strip():
         raise ValueError("Supply an OpenRouter model slug.")
+    if body.get("background"):
+        raise ValueError("Background Responses require polling. This proxy supports synchronous creates and streaming.")
     if provider.allow_non_zdr:
         return result
     if "tools" in body:
@@ -128,7 +149,29 @@ def prepare_request(body: dict[str, Any], provider: Any) -> dict[str, Any]:
         raise ValueError("The OpenRouter provider field must be an object.")
     result["provider"] = {**routing, "zdr": True}
     result["model"] = model_for_zdr_policy(model, provider="openrouter", provider_config=provider)
+    alternatives = body.get("models", [])
+    if not isinstance(alternatives, list) or any(not isinstance(slug, str) for slug in alternatives):
+        raise ValueError("Expected a list of alternative OpenRouter model slugs.")
+    if any("online" in slug.strip().lower().split(":")[1:] for slug in (model, result["model"], *alternatives)):
+        raise ValueError("Online model variants enable hosted search. Remove the variant or set allow_non_zdr=true.")
+    result["plugins"] = _disabled_plugins(body.get("plugins", []))
     return result
+
+
+def _disabled_plugins(plugins: Any) -> list[dict]:
+    if not isinstance(plugins, list):
+        raise ValueError("Expected a list of OpenRouter plugins.")
+    disabled = []
+    for plugin in plugins:
+        if not isinstance(plugin, dict) or not isinstance(plugin.get("id"), str) or plugin.get("enabled") is not False:
+            raise ValueError(
+                "Hosted plugins are unavailable under required ZDR. Disable them or set allow_non_zdr=true."
+            )
+        disabled.append({"id": plugin["id"], "enabled": False})
+    # Omission inherits the account's web plugin default.
+    if not any(plugin["id"] == "web" for plugin in disabled):
+        disabled.append({"id": "web", "enabled": False})
+    return disabled
 
 
 def refusal(code: str, message: str, request_id: str, status: int = 400) -> JSONResponse:
@@ -160,7 +203,10 @@ def zdr_refusal(status: int, content: bytes, model: str, request_id: str) -> JSO
         .lower()
         .startswith("no endpoints found matching your data policy (zero data retention)")
     ):
-        message = f"OpenRouter found no ZDR-eligible endpoint for {model}. Choose a ZDR-eligible model."
+        message = (
+            f"OpenRouter found no ZDR-eligible endpoint for {model}. Choose a ZDR-eligible model. "
+            "If account and guardrail policies permit, allow_non_zdr=true relaxes this proxy's ZDR requirement."
+        )
     else:
         return None
     return refusal("zdr_unavailable", message, request_id)

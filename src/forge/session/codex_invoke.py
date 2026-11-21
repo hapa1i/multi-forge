@@ -16,6 +16,7 @@ import os
 import struct
 import subprocess
 import sys
+import tomllib
 from collections.abc import Mapping, Sequence
 
 from forge.core.invoker.codex import (
@@ -243,7 +244,7 @@ def _build_codex_proxy_argv(
     custom provider means codex needs no OpenAI login. Inner double-quotes are literal tokens
     (list-mode argv, no shell) -- matching the proven shell-quoted probe. Never pass
     ``--strict-config``. ``model`` auto-defaults ``-m`` only when the user did not already
-    pass ``-m``/``--model`` (user intent wins).
+    select a model with a model flag or a top-level model config override.
     """
     proxy_v1 = f"{base_url.rstrip('/')}/v1"
     argv: list[str] = [
@@ -268,14 +269,31 @@ def _build_codex_proxy_argv(
 
 
 def passthrough_model(passthrough: Sequence[str]) -> str | None:
-    """Read the operator's model selection as Codex will receive it."""
-    for index, arg in enumerate(passthrough):
+    """Codex gives the model flag precedence over the last top-level model override."""
+    config_model = None
+    args = iter(passthrough)
+    for arg in args:
         if arg == "--":
             break
         if arg in ("-m", "--model"):
-            return passthrough[index + 1] if index + 1 < len(passthrough) else ""
+            return next(args, "")
         if arg.startswith("--model="):
             return arg.removeprefix("--model=")
         if arg.startswith("-m") and len(arg) > 2:
             return arg[2:].removeprefix("=")
-    return None
+        if arg in ("-c", "--config"):
+            override = next(args, "")
+        elif arg.startswith("--config="):
+            override = arg.removeprefix("--config=")
+        elif arg.startswith("-c"):
+            override = arg[2:].removeprefix("=")
+        else:
+            continue
+        name, sep, value = override.partition("=")
+        if sep and name.strip() == "model":
+            try:
+                parsed = tomllib.loads(f"value = {value}")["value"]
+            except tomllib.TOMLDecodeError:
+                parsed = value.strip()
+            config_model = parsed if isinstance(parsed, str) else value.strip()
+    return config_model

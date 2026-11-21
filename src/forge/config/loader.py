@@ -46,6 +46,7 @@ from forge.config.schema import (
     TierModels,
     TierOverride,
     TierOverrides,
+    supports_unreported_cost_policy,
     warn_deprecated_forge_config_fields,
     warn_deprecated_proxy_instance_fields,
 )
@@ -400,6 +401,20 @@ def load_proxy_instance_config(proxy_id: str) -> "ProxyInstanceConfig | None":
     if not isinstance(data, dict):
         raise StateCorruptedError(str(path), f"proxy file must be a mapping, got {type(data).__name__}")
 
+    # Older instances could explicitly name a policy that their route never enforced.
+    costs = data.get("costs")
+    if (
+        isinstance(costs, dict)
+        and costs.get("on_unreported_cost") in ("allow", "reject")
+        and not supports_unreported_cost_policy(data.get("backend", ""), data.get("wire_shape", ""))
+    ):
+        logger.warning(
+            "Ignoring costs.on_unreported_cost on proxy %s. It applies only to direct OpenRouter Responses. "
+            "Clear it with forge proxy set %s costs.on_unreported_cost=null.",
+            proxy_id,
+            proxy_id,
+        )
+        del costs["on_unreported_cost"]
     return load_proxy_instance_config_from_dict(data)
 
 

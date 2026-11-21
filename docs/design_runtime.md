@@ -132,7 +132,9 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
   semantics.
 
   On the canonical OpenRouter source, only create is relayed. The ingress drops native identifiers and applies the live
-  ZDR model and tool policy. The LiteLLM template also relays subresources. [Operator contract](end-user/codex_proxy.md)
+  ZDR model and tool policy, including plugin controls on the outgoing request. The direct route rejects background
+  creates because it cannot retrieve their final usage. The LiteLLM template also relays subresources.
+  [Operator contract](end-user/codex_proxy.md)
 
   The shape governs the Responses ingress; it does not make the proxy exclusive to Codex. The same
   `codex-responses-local` instance deliberately accepts Claude-backed sessions and workers on `/v1/messages`, where the

@@ -46,7 +46,7 @@ _VALID_PROXY: dict[str, Any] = {
 # proof grows with the registry instead of silently narrowing.
 _BLOCK_MARKERS: dict[str, object] = {
     "costs": {"caps": {"per_day": 12.5}, "on_cap_hit": "warn", "on_unreported_cost": "allow"},
-    "wire_shape": "anthropic_passthrough",
+    "wire_shape": "openai_responses_passthrough",
     "intercept": {"mode": "inspect"},
     "audit": {"audit_full_body": True, "retention_days": 3},
     "provider_trace": {"retention_days": 5, "max_total_mb": 77},
@@ -73,7 +73,7 @@ def _assert_markers(proxy_cfg) -> None:
     assert proxy_cfg.costs.caps.per_day == 12.5
     assert proxy_cfg.costs.on_cap_hit == "warn"
     assert proxy_cfg.costs.on_unreported_cost == "allow"
-    assert proxy_cfg.wire_shape == "anthropic_passthrough"
+    assert proxy_cfg.wire_shape == "openai_responses_passthrough"
     assert proxy_cfg.intercept.mode == "inspect"
     assert proxy_cfg.audit.audit_full_body is True
     assert proxy_cfg.audit.retention_days == 3
@@ -94,7 +94,7 @@ def test_markers_cover_every_direct_field_registry() -> None:
 
 def test_every_block_survives_both_hops_to_forge_config() -> None:
     """The live-read path: dict -> ProxyInstanceConfig -> ForgeConfig.proxy."""
-    instance = load_proxy_instance_config_from_dict({**_VALID_PROXY, **_BLOCK_MARKERS})
+    instance = load_proxy_instance_config_from_dict({**_VALID_PROXY, **_BLOCK_MARKERS, "backend": "openrouter"})
     _assert_markers(instance)
 
     forge_config = _proxy_instance_to_forge_config(instance)

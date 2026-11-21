@@ -47,6 +47,14 @@ def test_tls_and_loopback_bases(base):
         {"tools": {}},
         {"tools": [{"type": "namespace", "tools": {}}]},
         {"provider": None},
+        {"plugins": [{"id": "web"}]},
+        {"plugins": [{"id": "other", "enabled": True}]},
+        {"plugins": [{"id": "web", "enabled": 0}]},
+        {"plugins": {"id": "web"}},
+        {"model": "fixture:free:online"},
+        {"models": ["alternate:online"]},
+        {"models": "alternate:online"},
+        {"background": True},
     ],
 )
 def test_required_zdr_fails_closed(fields):
@@ -56,6 +64,38 @@ def test_required_zdr_fails_closed(fields):
 
 def test_generic_endpoint_404_passes_through():
     assert route.zdr_refusal(404, b'{"error":{"message":"No endpoints found for this model."}}', "m", "req") is None
+
+
+def test_configured_fallback_cannot_enable_online_search():
+    provider = SimpleNamespace(allow_non_zdr=False, zdr_fallbacks={"requested": "mapped:online"})
+    with pytest.raises(ValueError, match="Online model"):
+        route.prepare_request({"model": "requested"}, provider)
+
+
+@pytest.mark.parametrize("plugins", [[], [{"id": "web", "enabled": False}]])
+def test_required_zdr_disables_account_default_web_plugin(plugins):
+    provider = SimpleNamespace(allow_non_zdr=False)
+    body = {
+        "model": "m",
+        "plugins": [{"id": "other", "enabled": False}, *plugins],
+        "models": ["alternate"],
+    }
+    result = route.prepare_request(body, provider)
+    assert result["plugins"] == [
+        {"id": "other", "enabled": False},
+        {"id": "web", "enabled": False},
+    ]
+    assert result["models"] == ["alternate"] and len(body["plugins"]) == len(plugins) + 1
+    assert route.prepare_request({"model": "m"}, provider)["plugins"] == [{"id": "web", "enabled": False}]
+
+
+def test_unrestricted_search_fields_pass_through():
+    body = {
+        "model": "m:online",
+        "plugins": [{"id": "web", "max_results": 1}],
+        "models": ["alternate:online"],
+    }
+    assert route.prepare_request(body, SimpleNamespace(allow_non_zdr=True)) == body
 
 
 def test_text_only_qwen_404_names_the_restriction():
@@ -70,7 +110,8 @@ def test_text_only_qwen_404_names_the_restriction():
     translated = route.zdr_refusal(404, wire, "qwen/qwen4-max", "req")
     assert translated.status_code == 400
     message = json.loads(translated.body)["error"]["message"]
-    assert "ZDR-eligible" in message and "qwen/qwen4-max" in message and "account" not in message
+    assert "ZDR-eligible" in message and "qwen/qwen4-max" in message
+    assert "allow_non_zdr=true" in message and "If account and guardrail policies permit" in message
 
 
 @pytest.mark.parametrize(

@@ -11,7 +11,8 @@ from forge.proxy.proxies import ProxyEntry, ProxyRegistryStore
 pytestmark = pytest.mark.regression
 
 
-def test_stop_waits_for_owned_proxy_to_release_its_identity(monkeypatch):
+@pytest.mark.parametrize("pid,flags", [(4242, []), (None, ["--kill-adopted"])])
+def test_stop_waits_for_signaled_proxy_to_release_its_identity(monkeypatch, pid, flags):
     store = ProxyRegistryStore()
     registry = store.read()
     entry = ProxyEntry(
@@ -20,14 +21,14 @@ def test_stop_waits_for_owned_proxy_to_release_its_identity(monkeypatch):
         port=8106,
         base_url="http://127.0.0.1:8106",
         status="healthy",
-        pid=4242,
+        pid=pid,
     )
     registry.proxies[entry.proxy_id] = entry
     store.write(registry)
     monkeypatch.setattr("forge.cli.proxy._stop_proxy_process", lambda *a, **kw: "stopped")
     check = Mock(side_effect=[True, False])
     monkeypatch.setattr("forge.cli.proxy.check_proxy_health", check)
-    result = CliRunner().invoke(main, ["proxy", "stop", entry.proxy_id])
+    result = CliRunner().invoke(main, ["proxy", "stop", entry.proxy_id, *flags])
     assert result.exit_code == 0, result.output
     assert check.call_count == 2
     assert check.call_args.kwargs["expected_proxy_id"] == "draining"

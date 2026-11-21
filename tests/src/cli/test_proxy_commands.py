@@ -2869,7 +2869,8 @@ class TestStopForceUpdatesSiblings:
             }
         )
         monkeypatch.setattr("forge.cli.proxy.find_pid_by_port", lambda port: 42)
-        monkeypatch.setattr("forge.cli.proxy.check_proxy_health", lambda **_: True)
+        health_checks = iter([True, False])  # Verify identity before SIGTERM, then observe shutdown.
+        monkeypatch.setattr("forge.cli.proxy.check_proxy_health", lambda **_: next(health_checks))
         monkeypatch.setattr("forge.cli.proxy.os.kill", lambda pid, sig: None)
 
         result = runner.invoke(main, ["proxy", "stop", "alias-a", "--force", "--kill-adopted"])

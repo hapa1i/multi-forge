@@ -8,6 +8,7 @@ Covers the wire-shape's three honesty constraints from the card:
 
 from __future__ import annotations
 
+import json
 import logging
 from types import SimpleNamespace
 
@@ -16,6 +17,7 @@ import pytest
 import forge.proxy.responses_ingress as ri
 import forge.proxy.responses_passthrough as rp
 from forge.core.credential_registry import Credential, EnvVar
+from forge.proxy.openrouter_responses import OpenRouterResponseEvidence
 from tests.fixtures.proxy_transport import FakeResponse, FakeStream, ProxyTransportFake
 
 
@@ -685,6 +687,134 @@ def test_accumulator_tracks_terminal_status():
     acc.feed(b'data: {"type":"response.failed","response":{"usage":{"input_tokens":5,"output_tokens":0}}}\n\n')
     assert acc.terminal_status == "failed"
     assert acc.usage == {"input_tokens": 5, "output_tokens": 0}  # usage still captured
+
+
+@pytest.mark.parametrize(
+    "wire",
+    [
+        b'data: {"type":"error","message":"failed"}\n\n',
+        b'event: error\r\ndata: {"message":"failed"}\r\n\r\n',
+        b'data: {"message":"failed"}\nevent: error\n\n',
+    ],
+)
+def test_explicit_sse_error_sets_application_failure_without_charging(wire):
+    missing = []
+    evidence = OpenRouterResponseEvidence(lambda: missing.append(True))
+    acc = rp._ResponsesUsageAccumulator(evidence)
+    for i in range(0, len(wire), 5):
+        acc.feed(wire[i : i + 5])
+    assert rp._failure_from_terminal_status(acc.terminal_status) == (
+        True,
+        "response_failed",
+    )
+    assert evidence.terminal_seen and evidence.cost_micros is None and not missing
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "wire,media,status,charge,latch,reason",
+    [
+        (
+            b'{"usage":{"cost":0.4}}',
+            "application/json",
+            502,
+            400_000,
+            False,
+            "invalid_upstream_response",
+        ),
+        (
+            b'{"status":"unknown"}',
+            "application/json",
+            502,
+            None,
+            True,
+            "invalid_upstream_response",
+        ),
+        (
+            b'{"status":"queued","usage":{"cost":0}}',
+            "application/json",
+            502,
+            None,
+            True,
+            "invalid_upstream_response",
+        ),
+        (
+            b'{"status":"in_progress"}',
+            "application/json",
+            502,
+            None,
+            True,
+            "invalid_upstream_response",
+        ),
+        (
+            b'{"status":"failed"}',
+            "application/json",
+            200,
+            None,
+            False,
+            "response_failed",
+        ),
+        (
+            b'{"status":"cancelled"}',
+            "application/json",
+            200,
+            None,
+            False,
+            "response_cancelled",
+        ),
+        (
+            b"malformed",
+            "application/json",
+            502,
+            None,
+            True,
+            "invalid_upstream_response",
+        ),
+        (b"OK", "text/plain", 502, None, True, "invalid_upstream_response"),
+    ],
+)
+async def test_direct_unary_classifies_entire_reply(responses_transport, wire, media, status, charge, latch, reason):
+    responses_transport.response = FakeResponse(content=wire, headers={"content-type": media})
+    missing, completed = [], []
+    resp = await rp.forward(
+        method="POST",
+        url_path="/v1/responses",
+        body={"model": "m"},
+        query_string="",
+        inbound_headers={},
+        base_url="https://u.test",
+        api_key="K",
+        request_id="req_unary",
+        openrouter=OpenRouterResponseEvidence(lambda: missing.append(True)),
+        on_complete=lambda usage, cost, failed, error: completed.append((cost, failed, error)),
+        extra_response_headers={"X-Spend-Warning": "over cap"},
+    )
+    assert resp.status_code == status and resp.headers["X-Spend-Warning"] == "over cap"
+    assert completed == [(charge, True, reason)] and bool(missing) == latch
+    if charge is not None:
+        assert resp.headers["X-Request-Cost"] == "0.400000"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream", [False, True])
+async def test_translated_zdr_refusal_keeps_warning(responses_transport, stream):
+    wire = b'{"error":{"message":"No endpoints found matching your data policy (Zero data retention)."}}'
+    responses_transport.response = FakeResponse(status_code=404, content=wire)
+    responses_transport.stream_response = FakeStream(status_code=404, chunks=(wire,))
+    resp = await rp.forward(
+        method="POST",
+        url_path="/v1/responses",
+        body={"model": "m", "stream": stream},
+        query_string="",
+        inbound_headers={},
+        base_url="https://u.test",
+        api_key="K",
+        request_id="req_warn",
+        openrouter=OpenRouterResponseEvidence(),
+        extra_response_headers={"X-Spend-Warning": "over cap"},
+    )
+    assert resp.status_code == 400 and json.loads(resp.body)["error"]["code"] == "zdr_unavailable"
+    assert resp.headers["X-Spend-Warning"] == "over cap" and resp.headers["X-Request-ID"] == "req_warn"
 
 
 async def _drain(resp):

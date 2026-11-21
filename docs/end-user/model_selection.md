@@ -303,10 +303,10 @@ New general OpenAI proxies use `openai/gpt-6.2-astra` for Sonnet and Opus. The `
 and `litellm-openai-local` templates set Sonnet to medium effort and Opus to high. The Codex-specialized templates use
 Astra at Opus.
 
-| Templates                                                                              | Haiku              | Sonnet        | Opus          |
-| -------------------------------------------------------------------------------------- | ------------------ | ------------- | ------------- |
-| `openrouter-openai`, `litellm-openai`, `litellm-openai-local`, `codex-responses-local` | GPT-5.4 Mini       | GPT-6.2 Astra | GPT-6.2 Astra |
-| `openrouter-openai-codex`, `litellm-openai-codex-local`                                | GPT-5.1 Codex Mini | GPT-5.3 Codex | GPT-6.2 Astra |
+| Templates                                                                                                            | Haiku              | Sonnet        | Opus          |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------- | ------------- |
+| `openrouter-openai`, `litellm-openai`, `litellm-openai-local`, `codex-responses-local`, `codex-responses-openrouter` | GPT-5.4 Mini       | GPT-6.2 Astra | GPT-6.2 Astra |
+| `openrouter-openai-codex`, `litellm-openai-codex-local`                                                              | GPT-5.1 Codex Mini | GPT-5.3 Codex | GPT-6.2 Astra |
 
 Use `--model astra` or `--model sol` for the standard 6.2 models. The session aliases `gpt-astra` and `gpt-sol` also
 select 6.2. OpenRouter exposes `openai/gpt-6.2-astra-pro` and `openai/gpt-6.2-sol-pro` as separate IDs. Their session
