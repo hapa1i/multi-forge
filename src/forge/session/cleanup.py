@@ -127,6 +127,7 @@ def clean_old_sessions(
     delete_worktree: bool = False,
     delete_branch: bool = False,
     force: bool = False,
+    discard_abandoned_leases: bool = False,
 ) -> SessionCleanupResult:
     """Delete sessions whose last_accessed_at is older than the threshold.
 
@@ -139,6 +140,7 @@ def clean_old_sessions(
         delete_worktree: Delete git worktree directories (default False for safety).
         delete_branch: Delete git branches (requires delete_worktree=True).
         force: Bypass dirty-worktree protection (only relevant when delete_worktree=True).
+        discard_abandoned_leases: An explicit --force from the manual cleanup command.
     """
     result = SessionCleanupResult()
     manager = SessionManager()
@@ -199,6 +201,7 @@ def clean_old_sessions(
                 delete_worktree=delete_worktree,
                 delete_branch=delete_branch,
                 force=force,
+                discard_abandoned_leases=discard_abandoned_leases,
             )
             if plan.refusals:
                 result.failed.append((name, "; ".join(plan.refusals)))

@@ -19,7 +19,7 @@ from forge.session.workers import (
     SIDECAR_LEASE_ENV,
     _sidecar_exit_confirmed,
     capture_session_instance,
-    find_active_session_workers,
+    inspect_session_workers,
     session_worker_lease,
     sidecar_session_lease,
 )
@@ -122,6 +122,35 @@ def test_host_cleanup_refuses_delegated_sidecar_lease(tmp_path: Path, monkeypatc
         assert index.peek_session("worker", str(host)) is not None
 
 
+@pytest.mark.parametrize("container_stopped", [False, True])
+def test_force_checks_the_container_when_its_launcher_has_exited(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, container_stopped: bool
+) -> None:
+    from forge.session.deletion import apply_session_deletion, plan_session_deletion
+
+    root = tmp_path / "host"
+    index = IndexStore()
+    entry = publish_session_from_fields(index, "worker", root, root)
+    assert entry.instance_id is not None
+    monkeypatch.setattr("forge.session.workers.is_pid_alive", lambda _pid: False)
+    monkeypatch.setattr("forge.session.workers._sidecar_exit_confirmed", lambda _name: container_stopped)
+    with sidecar_session_lease(root, "worker", expected_instance_id=entry.instance_id) as lease:
+        plan = plan_session_deletion(
+            index,
+            "worker",
+            forge_root=str(root),
+            force=True,
+            discard_abandoned_leases=True,
+        )
+        if container_stopped:
+            assert not plan.refusals
+            apply_session_deletion(index, plan)
+            assert not lease.exists()
+        else:
+            assert any("Cannot confirm sidecar" in reason for reason in plan.refusals)
+            assert not plan.content.abandoned_worker_leases and lease.exists()
+
+
 @pytest.mark.parametrize("interrupt", [False, True])
 def test_uncertain_sidecar_exit_retains_host_lease(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, interrupt: bool
@@ -137,7 +166,7 @@ def test_uncertain_sidecar_exit_retains_host_lease(
                 raise KeyboardInterrupt
     except KeyboardInterrupt:
         pass
-    assert len(find_active_session_workers(host, "worker", token)) == 1
+    assert len(inspect_session_workers(host, "worker", token)) == 1
 
 
 @pytest.mark.parametrize(

@@ -267,12 +267,12 @@ exclusions, then use `--yes` to apply. `--json` emits a read-only preview. Adopt
 labelled as created outside Forge. Purge supports the verified Claude 2.1.245 and Codex 0.162.1 layouts; unsupported or
 ambiguous files refuse removal.
 
-Both verbs refuse existing dependent sessions, including inactive children, borrowed plans and supervisor bindings. They
-also refuse active sessions or workers; `--force` bypasses dirty-worktree protection only. Purge additionally requires a
-successful native process census and refuses while any client of the selected runtime is observed. Claude Code CLIs,
-including Desktop's bundled copy, count; the Desktop chat app does not. This check cannot prevent an external client
-from starting afterward. Exit native clients before applying purge. Codex purge checks supported rollout headers for
-descendants regardless of filename age; unknown layouts and uncharacterized archived entries refuse removal.
+Both verbs refuse existing dependent sessions, including inactive children, borrowed plans and supervisor bindings.
+Active sessions and live workers also block cleanup. Purge additionally requires a successful native process census and
+refuses while any client of the selected runtime is observed. Claude Code CLIs, including Desktop's bundled copy, count;
+the Desktop chat app does not. This check cannot prevent an external client from starting afterward. Exit native clients
+before applying purge. Codex purge checks supported rollout headers for descendants regardless of filename age; unknown
+layouts and uncharacterized archived entries refuse removal.
 
 `delete --all` and `purge --all` select sessions owned by the current Forge project, including incognito sessions. From
 a sibling Git worktree, `session list` defaults to the whole repository. Use `session list --scope project` inside a
@@ -301,8 +301,10 @@ If a file changes between preview and confirmation, review a fresh preview befor
 approved inventory under `$FORGE_HOME/session-cleanup/`, an interruption prints a retry command with the original
 options and `--forge-root`. It works even after checkout removal. The name stays reserved until that inventory
 completes. Changed files, new content or replacement ownership refuse instead of expanding the approved set. A crashed
-worker may leave a lease under `$FORGE_HOME/session-workers/`; inspect its native subprocesses before explicitly
-removing an abandoned lease. `--force` does not bypass these checks.
+worker may leave a lease under `$FORGE_HOME/session-workers/`. Use `forge session delete --all --force` to preview
+abandoned leases and confirm their removal with the sessions. A recorded launcher that has exited may have left a native
+child running. `--force` accepts that risk and also permits removal of dirty worktrees. Add `--keep-worktree` to
+preserve those checkouts. For a delegated sidecar, Forge checks that the container has stopped.
 
 Purge cannot remove provider-side copies, Git history, global telemetry, project memory documents, unrecorded copies,
 Claude history/file-history or unverified native indexes. Unknown historical QA/reviewer copies are listed as
@@ -315,11 +317,13 @@ forge session clean --older-than 30 --yes   # Apply; native conversations remain
 forge config set session_retention_days=90
 ```
 
-Clean and automatic retention use delete semantics and keep worktrees unless explicitly requested by manual clean. They
-skip active sessions and refuse dependencies, worker leases, incompatible projects or unreadable state. Cleanup previews
-and cancelled confirmation do not drain queued work or repair indexes. Starting incognito authorizes its automatic purge
-attempt after runtime exit. Incomplete cleanup offers recovery only when the original ownership is verified; an initial
-refusal offers a new preview, while an interrupted inventory offers its exact retry command.
+Clean and automatic retention use delete semantics and keep worktrees unless explicitly requested by manual clean. Only
+an explicit `--force` on session delete, purge or clean can clear abandoned worker leases. Automatic retention and
+incognito cleanup keep them. Active sessions, dependencies, incompatible projects and unreadable state still block
+cleanup. Cleanup previews and cancelled confirmation do not drain queued work or repair indexes. Starting incognito
+authorizes its automatic purge attempt after runtime exit. Incomplete cleanup offers recovery only when the original
+ownership is verified; an initial refusal offers a new preview, while an interrupted inventory offers its exact retry
+command.
 
 ### Repairing invisible sessions
 

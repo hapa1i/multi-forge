@@ -235,7 +235,7 @@ def _print_session_list_tips(items: list) -> None:
     help="Delete sessions not accessed in DAYS days",
 )
 @click.option("--yes", "-y", is_flag=True, help="Actually delete (default is a preview)")
-@click.option("--force", "-f", is_flag=True, help="Bypass dirty-worktree protection")
+@click.option("--force", "-f", is_flag=True, help="Allow dirty worktree removal and clear abandoned worker leases")
 @click.option(
     "--delete-worktree",
     is_flag=True,
@@ -266,6 +266,7 @@ def clean(older_than: int, yes: bool, force: bool, delete_worktree: bool, delete
         delete_worktree=delete_worktree,
         delete_branch=delete_branch,
         force=force,
+        discard_abandoned_leases=force,
     )
     if result.is_empty:
         console.print(f"[dim]No sessions older than {older_than} days found.[/dim]")

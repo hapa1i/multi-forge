@@ -57,6 +57,7 @@ from .purge_native import (
 )
 from .store import SessionStore
 from .validation import validate_name
+from .workers import SessionWorkerLeaseStatus, inspect_session_workers
 
 MAX_RETRY_BYTES = 8 * 1024 * 1024
 
@@ -85,6 +86,14 @@ class SessionDeletionPlan:
     refusals: tuple[str, ...] = ()
     notes: tuple[str, ...] = ()
     retry: bool = False
+
+    def validate_content_scope(self) -> None:
+        """Bind any selected worker lease to the forced cleanup of this instance."""
+        validate_forge_content_scope(
+            self.content,
+            self.state,
+            worker_instance_id=self.instance_id if self.force else None,
+        )
 
     def to_dict(self) -> dict[str, Any]:
         """Return the private durable retry representation."""
@@ -164,7 +173,7 @@ class SessionDeletionPlan:
                 raise ValueError("Cleanup inventory has a noncanonical repository root")
         if plan.native:
             validate_native_purge_scope(plan.native, plan.state)
-        validate_forge_content_scope(plan.content, plan.state)
+        plan.validate_content_scope()
         return replace(plan, retry=True)
 
 
@@ -177,6 +186,7 @@ def plan_session_deletion(
     delete_worktree: bool = True,
     delete_branch: bool = False,
     force: bool = False,
+    discard_abandoned_leases: bool = False,
 ) -> SessionDeletionPlan:
     """Select content and refusals without repairing manifests, indexes or queues."""
     from .manager import SessionManager
@@ -204,6 +214,10 @@ def plan_session_deletion(
             raise ForgeSessionError(
                 f"An interrupted {plan.mode} owns this session; retry with its original worktree, branch and force options"
             )
+        if plan.content.abandoned_worker_leases and not discard_abandoned_leases:
+            raise ForgeSessionError(
+                f"An interrupted {plan.mode} selected abandoned worker leases; retry that cleanup command with --force"
+            )
         retry_refusals = (*_admission_refusals(index, plan), *_retry_refusals(plan))
         return replace(plan, refusals=tuple(dict.fromkeys(retry_refusals)))
     if key is None:
@@ -222,7 +236,14 @@ def plan_session_deletion(
         raise ForgeSessionError(f"Session '{name}' has inconsistent ownership; restore its original owner file")
     if _manifest_digest(store) != manifest_sha256:
         raise ForgeSessionError(f"Session '{name}' changed during preview; retry")
-    content = plan_forge_content(state, forge_root=Path(root))
+    instance_id = rows[key].instance_id or owner
+    workers = inspect_session_workers(root, name, instance_id) if instance_id else ()
+    # Retention, rollback and incognito cleanup can force dirty worktrees. Only an
+    # explicit cleanup command can authorize discarding abandoned worker leases.
+    abandoned = (
+        tuple(worker.path for worker in workers if worker.abandoned) if force and discard_abandoned_leases else ()
+    )
+    content = plan_forge_content(state, forge_root=Path(root), abandoned_worker_leases=abandoned)
     native = plan_native_purge(state) if purge else None
     notes = list(content.notes)
     if not purge:
@@ -269,7 +290,7 @@ def plan_session_deletion(
     plan = SessionDeletionPlan(
         name=name,
         forge_root=root,
-        instance_id=rows[key].instance_id or owner,
+        instance_id=instance_id,
         manifest_sha256=manifest_sha256,
         mode="purge" if purge else "delete",
         state=state,
@@ -286,7 +307,7 @@ def plan_session_deletion(
         branch=branch,
         notes=tuple(notes),
     )
-    refusals.extend(_admission_refusals(index, plan))
+    refusals.extend(_admission_refusals(index, plan, workers=workers))
     return replace(plan, refusals=tuple(dict.fromkeys(refusals)))
 
 
@@ -359,7 +380,7 @@ def apply_session_deletion(index: IndexStore, plan: SessionDeletionPlan) -> tupl
                 removed.append(str(store.session_dir))
 
         def cleanup() -> None:
-            validate_forge_content_scope(plan.content, plan.state)
+            plan.validate_content_scope()
             with forge_content_leases(plan.content):
                 cleanup_while_leased()
 
@@ -395,14 +416,16 @@ def apply_session_deletion(index: IndexStore, plan: SessionDeletionPlan) -> tupl
 
 
 def _admission_refusals(
-    index: IndexStore, plan: SessionDeletionPlan, *, reviewer_leases_held: bool = False
+    index: IndexStore,
+    plan: SessionDeletionPlan,
+    *,
+    reviewer_leases_held: bool = False,
+    workers: tuple[SessionWorkerLeaseStatus, ...] | None = None,
 ) -> tuple[str, ...]:
-    from .workers import find_active_session_workers
-
     reasons: list[str] = []
     if not reviewer_leases_held:
         try:
-            validate_forge_content_scope(plan.content, plan.state)
+            plan.validate_content_scope()
             with forge_content_leases(plan.content):
                 pass
         except (OSError, ValueError) as error:
@@ -422,9 +445,21 @@ def _admission_refusals(
     ) as error:
         reasons.append(f"Cannot verify active session registry {active.index_path}: {error}; restore it before cleanup")
     if plan.instance_id:
-        workers = find_active_session_workers(plan.forge_root, plan.name, plan.instance_id)
-        if workers:
-            reasons.append("Session worker leases prevent cleanup: " + "; ".join(workers))
+        if workers is None:
+            workers = inspect_session_workers(plan.forge_root, plan.name, plan.instance_id)
+        selected = plan.content.abandoned_worker_leases
+        blockers = []
+        for worker in workers:
+            if worker.abandoned and worker.path in selected:
+                continue
+            if worker.abandoned and plan.retry:
+                blockers.append(
+                    f"Abandoned lease outside the saved inventory: {worker.path}; inspect it before retrying"
+                )
+            else:
+                blockers.append(worker.refusal)
+        if blockers:
+            reasons.append("Session worker leases prevent cleanup: " + "; ".join(blockers))
     dependencies = find_cleanup_dependencies(
         index,
         plan.state,

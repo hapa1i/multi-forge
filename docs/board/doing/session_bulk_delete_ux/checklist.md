@@ -35,4 +35,12 @@ The implementation is on `codex/session-bulk-delete-ux`, based on `main` at `3e6
   marker stayed intact while the index was busy and the next uncontended listing processed it.
 - [x] Verify the final changes. All 12,058 unit tests, 2,720 regressions and 18 targeted Docker integration cases
   passed. `make pre-commit` passed.
+- [x] Reproduce an abandoned launch in Docker with its native child still running. Ordinary delete refused. The forced
+  preview named the lease, cancellation preserved it, and confirmation removed the session and its lease. The native
+  transcript survived delete. Purge identified the live child and refused.
+- [x] Cover explicit force on delete, purge and age-based clean, changed or replaced leases, sidecar liveness, and
+  partial retries. Automatic cleanup preserves abandoned leases. An older worktree-only inventory cannot acquire one
+  during retry.
+- [x] Verify forced cleanup with 12,060 unit tests, 2,732 regressions, nine targeted Docker cases and `make pre-commit`.
+  All passed.
 - [ ] Record the merge and changelog entry and close the card after it ships.

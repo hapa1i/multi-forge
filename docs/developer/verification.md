@@ -200,6 +200,10 @@ dependents. Include `--delete-worktree` and missing-root retries through `--forg
 repair indexes or drain work. Test stale instance writers, changed inventories and partial failures; retain external
 retry evidence until all removals succeed. Native-layout probes require a separately approved concrete manifest.
 
+For abandoned worker recovery, use an isolated launcher that exits before releasing its lease. Check that
+`delete --all --force` lists the lease, cancellation preserves it, and confirmation clears it even if a native child
+survived. Verify live workers still block and purge still checks native runtime activity.
+
 For native-session adoption changes, run `forge session adopt [--json]` from the native launch directory, adopt a full
 Claude conversation or Codex thread id with `forge session adopt <conversation-id> --name <name>`, then resume the
 managed session. Bare preview lists Claude conversations only and `--model` is Claude-only; runtime selection must come

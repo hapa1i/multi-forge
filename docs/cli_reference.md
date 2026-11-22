@@ -166,6 +166,9 @@ update of an already tracked package can be repaired by sync.
 | `forge session incognito [name]`        | Start an ephemeral session (automatic purge attempt after runtime exit); accepts catalog `--model`/`--model-tier`                                                                                                       |
 | `forge session shell [name]`            | Open shell in sidecar container                                                                                                                                                                                         |
 
+On `session delete`, `session purge` and `session clean`, `--force` permits dirty worktree removal and selects abandoned
+worker leases for cleanup. The preview names each selected lease. A live worker still blocks its session.
+
 `session list --json` and `session show --json` include an additive `launchability` field: `launchable`,
 `missing_worktree`, or `unknown` when no validated recorded path is available. A valid manifest whose recorded worktree
 is missing remains listed and keeps its name and conversation bindings. Human list/show output names the missing path

@@ -14,7 +14,7 @@ from forge.session.exceptions import SessionNotFoundError
 from forge.session.index import IndexStore
 from forge.session.workers import (
     capture_session_instance,
-    find_active_session_workers,
+    inspect_session_workers,
     session_worker_lease,
 )
 from tests.fixtures.session_state import (
@@ -29,10 +29,10 @@ def test_worker_lease_exists_only_for_admitted_work(tmp_path: Path) -> None:
     token = capture_session_instance(root, "worker")
 
     with session_worker_lease(root, "worker", expected_instance_id=token, label="memory writer"):
-        live = find_active_session_workers(root, "worker", token)
-        assert len(live) == 1 and "memory writer" in live[0]
+        live = inspect_session_workers(root, "worker", token)
+        assert len(live) == 1 and "memory writer" in live[0].refusal and not live[0].abandoned
 
-    assert find_active_session_workers(root, "worker", token) == ()
+    assert inspect_session_workers(root, "worker", token) == ()
 
 
 def test_detached_admission_cannot_follow_name_reuse(tmp_path: Path) -> None:
@@ -80,9 +80,9 @@ def test_abandoned_worker_lease_remains_an_explicit_refusal(tmp_path: Path, monk
     token = capture_session_instance(root, "worker")
     with session_worker_lease(root, "worker", expected_instance_id=token, label="writer"):
         monkeypatch.setattr("forge.session.workers.is_pid_alive", lambda _pid: False)
-        refusal = find_active_session_workers(root, "worker", token)
-        assert "exited without releasing lease" in refusal[0]
-        assert "inspect native subprocesses" in refusal[0]
+        refusal = inspect_session_workers(root, "worker", token)
+        assert refusal[0].abandoned and "exited without releasing lease" in refusal[0].refusal
+        assert "inspect native subprocesses" in refusal[0].refusal and "--force" in refusal[0].refusal
 
 
 def test_corrupt_worker_lease_is_not_ignored(tmp_path: Path) -> None:
@@ -97,4 +97,4 @@ def test_corrupt_worker_lease_is_not_ignored(tmp_path: Path) -> None:
         data["future"] = True
         lease.write_text(json.dumps(data))
         with pytest.raises(UnexpectedDataError, match="future"):
-            find_active_session_workers(root, "worker", token)
+            inspect_session_workers(root, "worker", token)

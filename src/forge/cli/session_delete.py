@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import cast
 
 import click
+import dacite
 from rich.markup import escape
 from rich.progress import track
 
@@ -23,6 +24,7 @@ from forge.core.ops.context import _cwd_forge_root
 from forge.core.state import FileLockTimeoutError
 from forge.install.project_compat import ProjectCompatibilityError
 from forge.session import ForgeSessionError, IndexStore, SessionManager
+from forge.session.cleanup_content import ABANDONED_WORKER_LEASE
 from forge.session.cleanup_dependencies import session_entries
 from forge.session.deletion import (
     SessionDeletionPlan,
@@ -46,7 +48,7 @@ session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circu
 )
 @click.option("--yes", "-y", is_flag=True, help="Skip the confirmation prompt")
 @click.option("--verbose", "-v", is_flag=True, help="Show the full per-session inventory and results with --all")
-@click.option("--force", "-f", is_flag=True, help="Bypass dirty-worktree protection")
+@click.option("--force", "-f", is_flag=True, help="Allow dirty worktree removal and clear abandoned worker leases")
 @click.option("--keep-worktree", "-K", is_flag=True, help="Preserve worktree directory")
 @click.option(
     "--delete-branch",
@@ -105,7 +107,7 @@ def delete(
 )
 @click.option("--json", "as_json", is_flag=True, help="Output the read-only preview as JSON")
 @click.option("--verbose", "-v", is_flag=True, help="Show the full per-session inventory and results with --all")
-@click.option("--force", "-f", is_flag=True, help="Bypass dirty-worktree protection only")
+@click.option("--force", "-f", is_flag=True, help="Allow dirty worktree removal and clear abandoned worker leases")
 @click.option("--keep-worktree", "-K", is_flag=True, help="Preserve worktree directory")
 @click.option(
     "--delete-branch",
@@ -163,6 +165,11 @@ def _print_refusal(name: str, reason: str) -> None:
     console.print(f"Refused {name}: {reason}", style="yellow", markup=False, soft_wrap=True)
 
 
+def _file_label(category: str, session_name: str) -> str:
+    # Bulk previews group files from several sessions, and lease filenames contain only UUIDs.
+    return f"abandoned worker lease for {session_name}" if category == ABANDONED_WORKER_LEASE else category
+
+
 def _print_native_inventory(plans: Sequence[NativePurgePlan]) -> None:
     for runtime, title in (("claude", "Claude store"), ("codex", "Codex store")):
         files = [file for plan in plans for file in plan.files if file.runtime == runtime]
@@ -192,7 +199,7 @@ def print_deletion_plan(plan: SessionDeletionPlan) -> None:
         f"    {Path(plan.forge_root) / '.forge' / 'sessions' / plan.name} (entire session metadata directory)"
     )
     for file in plan.content.files:
-        _print_inventory_line(f"    {file.path} ({file.category})")
+        _print_inventory_line(f"    {file.path} ({_file_label(file.category, plan.name)})")
     for directory in plan.content.directories:
         _print_inventory_line(f"    {directory.path} (directory after its inventoried files)")
     for path in plan.content.search_keys:
@@ -212,13 +219,13 @@ def _print_bulk_preview(root: str, mode: str, admitted: list[SessionDeletionPlan
     if not admitted:
         return
     files: set[str] = set()
-    external_files: dict[str, str] = {}
+    individual_files: dict[str, str] = {}
     for plan in admitted:
         project_state = Path(plan.forge_root) / ".forge"
         for file in plan.content.files:
             files.add(file.path)
-            if not Path(file.path).is_relative_to(project_state):
-                external_files[file.path] = file.category
+            if file.category == ABANDONED_WORKER_LEASE or not Path(file.path).is_relative_to(project_state):
+                individual_files[file.path] = _file_label(file.category, plan.name)
     names = ", ".join(plan.name for plan in admitted)
     search_records = {key for plan in admitted for key in plan.content.search_keys}
     console.print(f"Sessions to {mode} ({len(admitted)}): {escape(names)}")
@@ -227,7 +234,7 @@ def _print_bulk_preview(root: str, mode: str, admitted: list[SessionDeletionPlan
     )
     for note in dict.fromkeys(note for plan in admitted for note in _plan_notes(plan)):
         _print_inventory_line(f"  {note}")
-    for path, category in external_files.items():
+    for path, category in individual_files.items():
         _print_inventory_line(f"  Remove {category}: {path}")
     _print_native_inventory([plan.native for plan in admitted if plan.native is not None])
 
@@ -308,6 +315,7 @@ def _run_cleanup(
                     delete_worktree=not keep_worktree,
                     delete_branch=delete_branch,
                     force=force,
+                    discard_abandoned_leases=force,
                 )
             )
         except (
@@ -316,6 +324,7 @@ def _run_cleanup(
             ProjectCompatibilityError,
             OSError,
             ValueError,
+            dacite.DaciteError,
         ) as exc:
             refused.append({"name": name, "forge_root": selected_root, "reason": str(exc)})
     admitted = [plan for plan in plans if not plan.refusals]
