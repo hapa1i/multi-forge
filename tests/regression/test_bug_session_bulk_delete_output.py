@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from forge.cli.main import main
 from forge.core.paths import get_forge_home
 from forge.core.state import file_lock_for_target
 from forge.session import IndexStore, SessionStore
+from forge.session.cleanup_state import cleanup_state_path
 from forge.session.workers import capture_session_instance, session_worker_lease
 from tests.fixtures.session_state import publish_session_from_fields
 
@@ -49,20 +51,23 @@ def test_busy_index_preserves_direct_command_response(monkeypatch: pytest.Monkey
     decision = json.loads(result.stdout)
     assert decision["decision"] == "block"
     assert "busy" in decision["reason"] and "index.json.lock" in decision["reason"]
+    assert "retry" in decision["reason"].lower()
 
 
 def test_bulk_delete_summarizes_inventory_and_preserves_refusal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.chdir(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.chdir(project)
     index = IndexStore()
-    publish_session_from_fields(index, "first", tmp_path, tmp_path, claude_session_id="fixture-id")
+    publish_session_from_fields(index, "first", project, project, claude_session_id="fixture-id")
     for name in ("second", "working"):
-        publish_session_from_fields(index, name, tmp_path, tmp_path)
-    artifact = tmp_path / ".forge/artifacts/first/routine-copy.txt"
+        publish_session_from_fields(index, name, project, project)
+    artifact = project / ".forge/artifacts/first/routine-copy.txt"
     artifact.parent.mkdir(parents=True)
     artifact.write_text("test data")
-    notes = tmp_path / ".forge/prev_sessions/second/children/old-child.notes.md"
+    notes = project / ".forge/prev_sessions/second/children/old-child.notes.md"
     notes.parent.mkdir(parents=True)
     notes.write_text("user-authored notes")
     retained = get_forge_home() / "manual-testing/qa/runs/other/transcript.jsonl"
@@ -73,8 +78,12 @@ def test_bulk_delete_summarizes_inventory_and_preserves_refusal(
     owned.write_text('{"sessionId":"fixture-id"}\n')
     runner = CliRunner()
     args = ["sess", "delete", "--all"]
-    token = capture_session_instance(tmp_path, "working")
-    with session_worker_lease(tmp_path, "working", expected_instance_id=token, label="test worker"):
+    # A selection root may spell the same project differently from its plans.
+    alias = tmp_path / "project-alias"
+    alias.symlink_to(project, target_is_directory=True)
+    monkeypatch.setattr("forge.cli.session_delete._cwd_forge_root", lambda: str(alias))
+    token = capture_session_instance(project, "working")
+    with session_worker_lease(project, "working", expected_instance_id=token, label="test worker"):
         monkeypatch.setattr("forge.session.workers.is_pid_alive", lambda pid: False)
         preview = runner.invoke(main, args, input="n\n")
         assert preview.exit_code == 1
@@ -93,9 +102,10 @@ def test_bulk_delete_summarizes_inventory_and_preserves_refusal(
         result = runner.invoke(main, [*args, "--yes"])
     assert result.exit_code == 1
     assert "Deleted 2 sessions" in result.stdout
+    assert "--verbose" not in result.stdout
     assert "Deleted session first" not in result.stdout
     assert "1 session(s) refused or failed" in result.stderr
-    assert retained.exists() and SessionStore(str(tmp_path), "working").exists()
+    assert retained.exists() and SessionStore(str(project), "working").exists()
     assert not artifact.exists() and not notes.exists() and not owned.exists()
 
 
@@ -116,6 +126,9 @@ def test_bulk_result_counts_only_completed_deletions(tmp_path: Path, monkeypatch
     assert result.exit_code == 1
     assert "Deleted 1 session." in result.stdout
     assert "changed:" in result.stderr
+    assert "--yes" not in result.stderr
+    assert "preview" in result.stderr.lower() and "again" in result.stderr.lower()
+    assert not cleanup_state_path(tmp_path, "changed").exists()
     assert artifact.read_text() == "new content"
     assert not SessionStore(str(tmp_path), "unchanged").exists()
 
@@ -132,3 +145,42 @@ def test_bulk_delete_with_busy_index_counts_failure(tmp_path: Path, monkeypatch:
     assert "target: Forge state is busy" in result.stderr
     assert "--yes" not in result.stderr
     assert SessionStore(str(tmp_path), "target").exists()
+
+
+def test_saved_cleanup_retry_is_one_copyable_command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / ("long-project-" * 9) / ("nested-directory-" * 6) / "operator's [project]"
+    root.mkdir(parents=True)
+    monkeypatch.chdir(root)
+    index = IndexStore()
+    publish_session_from_fields(index, "target", root, root)
+    artifact = root / ".forge/artifacts/target/owned.txt"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("previewed")
+    runner = CliRunner()
+    args = ["session", "delete", "--all", "--yes", "--keep-worktree"]
+
+    def interrupt_removal(*args, **kwargs):
+        raise OSError("interrupted after saving the inventory")
+
+    with monkeypatch.context() as failure:
+        failure.setattr("forge.session.deletion.apply_forge_content", interrupt_removal)
+        interrupted = runner.invoke(main, args)
+    assert interrupted.exit_code == 1
+    assert cleanup_state_path(root, "target").is_file()
+    monkeypatch.setattr("forge.session.index.CLI_LOCK_TIMEOUT_S", 0.0)
+    with file_lock_for_target(target_path=index.index_path, timeout_s=1):
+        busy = runner.invoke(main, args)
+    assert busy.exit_code == 1
+    assert "busy" in busy.stderr and "index.json.lock" in busy.stderr
+    assert ".." not in busy.stderr
+    command = shlex.join(
+        ["forge", "session", "delete", "target", "--yes", "--forge-root", str(root), "--keep-worktree"]
+    )
+    for result in (interrupted, busy):
+        assert result.stderr.lower().count("retry with") == 1
+        assert "Retry after the other operation finishes" not in result.stderr
+        assert command in [line.strip() for line in result.stderr.splitlines()]
+
+    resumed = runner.invoke(main, shlex.split(command)[1:])
+    assert resumed.exit_code == 0, resumed.output
+    assert not artifact.exists() and not cleanup_state_path(root, "target").exists()

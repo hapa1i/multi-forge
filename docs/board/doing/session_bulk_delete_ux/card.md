@@ -4,8 +4,9 @@ A concurrent delete held the global session index lock long enough for `forge se
 The delete preview printed the same nine QA and walkthrough exclusions for each of 105 sessions. Thirteen worker lease
 refusals were interleaved with that inventory.
 
-Report lock contention with the lock path and retry guidance. Give `delete --all` a compact preview and completion
-count. Keep each refused session and its reason visible before confirmation, along with worktree, branch and
-user-authored content removals. Offer the full per-session inventory with `--verbose`.
+Report lock contention with the lock path and retry guidance. Give `delete --all` and `purge --all` a compact preview
+and completion count. Show each refused session and its reason alongside worktree, branch and user-authored content
+removals. Purge also shows exact native paths and adopted conversations. Offer the full per-session inventory with
+`--verbose`. An apply failure can offer a noninteractive retry only when Forge has saved the approved inventory.
 
 The [session cleanup contract](../../../design_sessions.md#session-cleanup) governs admission, confirmation and retry.

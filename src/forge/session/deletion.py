@@ -38,7 +38,11 @@ from .cleanup_dependencies import (
 )
 from .cleanup_git import CleanupGitIdentity, capture_cleanup_git, validate_cleanup_git
 from .cleanup_state import cleanup_state_path
-from .exceptions import ForgeSessionError, SessionNotFoundError
+from .exceptions import (
+    ForgeSessionError,
+    SessionCleanupRetryError,
+    SessionNotFoundError,
+)
 from .identity import resolve_key_strict
 from .index import IndexStore
 from .models import SessionState
@@ -376,9 +380,9 @@ def apply_session_deletion(index: IndexStore, plan: SessionDeletionPlan) -> tupl
         retry_path.unlink(missing_ok=True)
         return tuple(removed)
     except (OSError, ValueError, ForgeSessionError, dacite.DaciteError, FileLockTimeoutError) as error:
-        if isinstance(error, FileLockTimeoutError) and not retry_path.is_file():
+        if not retry_path.is_file():
             # There is no saved selection to authorize a noninteractive retry.
-            raise ForgeSessionError(str(error)) from error
+            raise ForgeSessionError(f"{error}\nPreview the selection again before applying cleanup.") from error
         options = ["--yes", "--forge-root", plan.forge_root]
         if not plan.delete_worktree:
             options.append("--keep-worktree")
@@ -387,8 +391,7 @@ def apply_session_deletion(index: IndexStore, plan: SessionDeletionPlan) -> tupl
         if plan.force:
             options.append("--force")
         command = shlex.join(["forge", "session", plan.mode, plan.name, *options])
-        recovery = f"Retry with the same inventory using: {command}"
-        raise ForgeSessionError(f"Session cleanup did not finish: {error}. {recovery}") from error
+        raise SessionCleanupRetryError(f"Session cleanup did not finish: {error}", command) from error
 
 
 def _admission_refusals(

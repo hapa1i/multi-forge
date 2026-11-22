@@ -85,7 +85,12 @@ class AliasGroup(click.Group):
     """Click group that resolves short aliases to canonical command names."""
 
     def main(self, *args: Any, **kwargs: Any) -> Any:
-        """Render unhandled durable-state errors once for all terminal commands."""
+        """Handle durable-state exceptions that escape Click's standalone error handler.
+
+        Click handles ClickException, while stores raise domain exceptions shared with
+        non-CLI callers. Only confirmed corruption warrants a reset. A failed read or
+        a busy lock leaves the contents unknown and calls for a check or retry.
+        """
         try:
             return super().main(*args, **kwargs)
         except StateCorruptedError as e:
@@ -97,9 +102,9 @@ class AliasGroup(click.Group):
 
             handle_unreadable_state_error(e)  # prints + sys.exit(1)
         except FileLockTimeoutError as e:
-            from forge.cli.output import print_error
+            from forge.cli.output import print_error_with_tip
 
-            print_error(escape(str(e)))
+            print_error_with_tip(escape(str(e)), e.retry_hint)
             raise SystemExit(1) from e
 
     def resolve_command(

@@ -29,13 +29,12 @@ from .exceptions import StateError
 class FileLockTimeoutError(StateError):
     """Raised when a lock cannot be acquired within the timeout."""
 
+    retry_hint = "Retry after the other operation finishes."
+
     def __init__(self, lock_path: Path, timeout_s: float) -> None:
         self.lock_path = lock_path
         self.timeout_s = timeout_s
-        super().__init__(
-            f"Forge state is busy. Waited {timeout_s:g}s for lock '{lock_path}'. "
-            "Retry after the other operation finishes."
-        )
+        super().__init__(f"Forge state is busy. Waited {timeout_s:g}s for lock '{lock_path}'.")
 
 
 def get_lock_path_for_target(target_path: Path) -> Path:

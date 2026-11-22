@@ -1457,7 +1457,7 @@ def _run_incognito_cleanup(
                 command = shlex.join(
                     ["forge", "session", "purge", manifest.name, "--forge-root", manifest.forge_root, "--force"]
                 )
-                message += f". After resolving the refusal, review a new purge preview with: {command}"
+                message += f"\nAfter resolving the refusal, review a new purge preview with: {command}"
         except Exception:
             logger.debug("Cannot verify incognito cleanup recovery ownership", exc_info=True)
         presenter.on_incognito_cleanup_warning(message)

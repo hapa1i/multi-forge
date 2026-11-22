@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import shlex
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -958,6 +958,7 @@ def test_fork_model_override_lock_failure_returns_styled_warning(
     event = events[0]
     assert isinstance(event, ForkModelOverridePersistenceWarning)
     assert "future resumes may use the previous stored model" in event.continuation
+    assert f"{event.error} {event.continuation}".lower().count("retry after") == 1
     with (
         patch("forge.cli.session_fork.console.print") as mock_print,
         patch("forge.cli.session_fork.print_tip") as mock_tip,
@@ -969,6 +970,28 @@ def test_fork_model_override_lock_failure_returns_styled_warning(
         f"[green]persist-warning[/green]: {event.error}"
     )
     mock_tip.assert_called_once_with(event.continuation, blank_before=False, console=session_cli.console)
+
+
+def test_resume_model_override_lock_warning_gives_one_retry_hint(temp_env: Path) -> None:
+    from forge.core.ops.claude_session import (
+        ClaudeResumePresenter,
+        _apply_resume_direct_model_override,
+    )
+    from forge.core.state import FileLockTimeoutError
+
+    state = create_session_state("persist-warning", worktree_path=str(temp_env))
+    presenter = Mock(spec=ClaudeResumePresenter)
+    with patch.object(
+        SessionStore, "update", side_effect=FileLockTimeoutError(temp_env / "forge.session.json.lock", 5.0)
+    ):
+        _apply_resume_direct_model_override(
+            state=state, direct_model="claude-opus-4-6", forge_root=temp_env, use_sidecar=False, presenter=presenter
+        )
+    presenter.on_warning.assert_called_once()
+    warning = presenter.on_warning.call_args.args[0]
+    assert "forge.session.json.lock" in warning.message
+    assert "future resumes may use the previous stored model" in warning.tip
+    assert f"{warning.message} {warning.tip}".lower().count("retry after") == 1
 
 
 def test_apply_direct_model_env_legacy_proxy_returns_error_not_traceback() -> None:
