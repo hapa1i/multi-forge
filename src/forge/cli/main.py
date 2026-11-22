@@ -12,8 +12,10 @@ from typing import Any
 
 import click
 from dotenv import load_dotenv
+from rich.markup import escape
 
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
+from forge.core.state.lock import FileLockTimeoutError
 
 logger = logging.getLogger(__name__)
 
@@ -83,14 +85,7 @@ class AliasGroup(click.Group):
     """Click group that resolves short aliases to canonical command names."""
 
     def main(self, *args: Any, **kwargs: Any) -> Any:
-        """Run the CLI, surfacing any corrupt durable state through one handler.
-
-        StateCorruptedError is not a ClickException, so it propagates out of
-        Click's standalone-mode loop to here — the single place that turns
-        corruption (manifests, indexes, registries, proxy config) into a clear
-        reset instruction instead of a traceback. StateUnreadableError (a failed
-        read, not bad content) routes to its own handler: check/retry, no delete.
-        """
+        """Render unhandled durable-state errors once for all terminal commands."""
         try:
             return super().main(*args, **kwargs)
         except StateCorruptedError as e:
@@ -101,6 +96,11 @@ class AliasGroup(click.Group):
             from forge.cli.output import handle_unreadable_state_error
 
             handle_unreadable_state_error(e)  # prints + sys.exit(1)
+        except FileLockTimeoutError as e:
+            from forge.cli.output import print_error
+
+            print_error(escape(str(e)))
+            raise SystemExit(1) from e
 
     def resolve_command(
         self, ctx: click.Context, args: list[str]

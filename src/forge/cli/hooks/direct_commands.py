@@ -182,7 +182,7 @@ def _handle_cmd_session(data: dict[str, Any], argv: list[str]) -> None:
     except (StateCorruptedError, StateUnreadableError) as e:
         _emit_state_error_block(e)
         return
-    except ForgeOpError as e:
+    except (ForgeOpError, FileLockTimeoutError) as e:
         click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
         return
 

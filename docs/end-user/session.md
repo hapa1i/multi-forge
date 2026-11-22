@@ -196,6 +196,7 @@ forge session fork <parent> [--name <name>] [--proxy <proxy_id>] [--no-proxy] [-
 
 # Delete
 forge session delete <name>... [--yes] [--keep-worktree] [--delete-branch] [--force]
+forge session delete --all [--verbose] [--yes]
 
 # Purge (preview native-file removal; --yes to apply)
 forge session purge <name>... [--json] [--yes] [--keep-worktree] [--delete-branch] [--force]
@@ -277,6 +278,12 @@ descendants regardless of filename age; unknown layouts and uncharacterized arch
 combined with names or `--forge-root`. Every target is admitted before deletion starts; dependent targets stay refused
 for that batch even if another selected session is removed. Eligible targets are processed and any refusal or failure
 produces a nonzero exit. An empty project succeeds.
+
+Before confirmation, `delete --all` names the sessions it can delete and gives a reason for each refusal. It summarizes
+routine files and lists worktree, branch, user-authored transfer note and external file removals. Use
+`forge session delete --all --verbose` to inspect each session's full inventory and exclusions before answering the
+prompt. During deletion, a concurrent `session list` may report that the global session index is busy. Retry once the
+other operation finishes.
 
 Worktrees are removed by default for explicit delete/purge when owned and unshared; `--keep-worktree` preserves them,
 and `--delete-branch` additionally removes their branch. Cleanup refuses worktree removal when it overlaps the selected

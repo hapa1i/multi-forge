@@ -17,6 +17,7 @@ import dacite
 
 from forge.core.paths import get_forge_home
 from forge.core.runtime.codex_review_source import directory_fd, read_regular
+from forge.core.state import FileLockTimeoutError
 from forge.install.project_compat import enforce_project_compatibility
 from forge.search.cleanup import indexed_transcript_paths
 
@@ -374,7 +375,10 @@ def apply_session_deletion(index: IndexStore, plan: SessionDeletionPlan) -> tupl
             _verify_completed(plan)
         retry_path.unlink(missing_ok=True)
         return tuple(removed)
-    except (OSError, ValueError, ForgeSessionError, dacite.DaciteError) as error:
+    except (OSError, ValueError, ForgeSessionError, dacite.DaciteError, FileLockTimeoutError) as error:
+        if isinstance(error, FileLockTimeoutError) and not retry_path.is_file():
+            # There is no saved selection to authorize a noninteractive retry.
+            raise ForgeSessionError(str(error)) from error
         options = ["--yes", "--forge-root", plan.forge_root]
         if not plan.delete_worktree:
             options.append("--keep-worktree")
@@ -417,7 +421,7 @@ def _admission_refusals(
     if plan.instance_id:
         workers = find_active_session_workers(plan.forge_root, plan.name, plan.instance_id)
         if workers:
-            reasons.append("Session workers are still running: " + "; ".join(workers))
+            reasons.append("Session worker leases prevent cleanup: " + "; ".join(workers))
     dependencies = find_cleanup_dependencies(
         index,
         plan.state,

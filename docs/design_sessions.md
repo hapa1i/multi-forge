@@ -290,6 +290,10 @@ membership; ambiguous parent candidates remain protected. Unreadable state refus
 cascade: all targets are admitted before any mutation and initially refused targets stay refused, independent of
 processing order.
 
+The default `delete --all` preview summarizes the admitted Forge inventories and reports each refusal before
+confirmation. Worktree and branch removals, user-authored transfer notes and files outside the project's `.forge/`
+remain visible. `--verbose` renders the full per-session plans. Both views apply the same frozen selection.
+
 Ordinary delete removes the session manifest and its unreferenced Forge content: artifacts, authority/routing/review
 journals, plans, reports, compaction copies, transfer snapshots and author notes, attributable pending QA/reviewer
 copies, queue markers and derived search records. `cleanup_content.py` owns the exact file inventory and retry

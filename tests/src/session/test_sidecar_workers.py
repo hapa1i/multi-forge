@@ -117,7 +117,7 @@ def test_host_cleanup_refuses_delegated_sidecar_lease(tmp_path: Path, monkeypatc
     assert token is not None
     monkeypatch.setattr("forge.session.workers._sidecar_exit_confirmed", lambda _name: True)
     with sidecar_session_lease(host, "worker", expected_instance_id=token):
-        with pytest.raises(ForgeSessionError, match="Session workers are still running"):
+        with pytest.raises(ForgeSessionError, match="worker leases prevent cleanup"):
             SessionManager(index_store=index).delete_session("worker", forge_root=str(host))
         assert index.peek_session("worker", str(host)) is not None
 

@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
 from typing import cast
 
 import click
 from rich.markup import escape
+from rich.progress import track
 
 from forge.cli.output import console, err_console, print_error, print_tip
 from forge.cli.session import session as _session_untyped
 from forge.core.ops.context import _cwd_forge_root
+from forge.core.state import FileLockTimeoutError
 from forge.install.project_compat import ProjectCompatibilityError
 from forge.session import ForgeSessionError, IndexStore, SessionManager
 from forge.session.cleanup_dependencies import session_entries
@@ -35,6 +38,7 @@ session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circu
     help="Delete all sessions in this Forge project",
 )
 @click.option("--yes", "-y", is_flag=True, help="Skip the confirmation prompt")
+@click.option("--verbose", "-v", is_flag=True, help="Show the full per-session inventory and results with --all")
 @click.option("--force", "-f", is_flag=True, help="Bypass dirty-worktree protection")
 @click.option("--keep-worktree", "-K", is_flag=True, help="Preserve worktree directory")
 @click.option(
@@ -52,6 +56,7 @@ def delete(
     names: tuple[str, ...],
     delete_all: bool,
     yes: bool,
+    verbose: bool,
     force: bool,
     keep_worktree: bool,
     delete_branch: bool,
@@ -72,6 +77,7 @@ def delete(
         purge=False,
         as_json=False,
         explicit_root=forge_root,
+        compact=delete_all and not verbose,
     )
 
 
@@ -132,20 +138,36 @@ def purge(
     )
 
 
+def _plan_notes(plan: SessionDeletionPlan) -> Iterator[str]:
+    yield from plan.notes
+    if plan.branch:
+        yield f"Remove branch: {plan.branch}"
+
+
+def _print_inventory_line(line: str) -> None:
+    # Preserve copyable paths when Rich renders to a narrow terminal or a pipe.
+    console.print(line, markup=False, soft_wrap=True)
+
+
+def _print_refusal(name: str, reason: str) -> None:
+    console.print(f"Refused {name}: {reason}", style="yellow", markup=False, soft_wrap=True)
+
+
 def print_deletion_plan(plan: SessionDeletionPlan) -> None:
     """Render exact absolute inventory paths and all admission refusals on stdout."""
-    console.print(f"[bold]{plan.mode.capitalize()} {escape(plan.name)}[/bold] ({escape(plan.forge_root)})")
-    console.print("  Forge project:")
     console.print(
-        f"    {escape(str(Path(plan.forge_root) / '.forge' / 'sessions' / plan.name))}"
-        " (entire session metadata directory)"
+        f"[bold]{plan.mode.capitalize()} {escape(plan.name)}[/bold] ({escape(plan.forge_root)})", soft_wrap=True
+    )
+    console.print("  Forge project:")
+    _print_inventory_line(
+        f"    {Path(plan.forge_root) / '.forge' / 'sessions' / plan.name} (entire session metadata directory)"
     )
     for file in plan.content.files:
-        console.print(f"    {escape(file.path)} ({escape(file.category)})")
+        _print_inventory_line(f"    {file.path} ({file.category})")
     for directory in plan.content.directories:
-        console.print(f"    {escape(directory.path)} (directory after its inventoried files)")
+        _print_inventory_line(f"    {directory.path} (directory after its inventoried files)")
     for path in plan.content.search_keys:
-        console.print(f"    Search document: {escape(path)}")
+        _print_inventory_line(f"    Search document: {path}")
     if plan.native:
         for runtime, title in (("claude", "Claude store"), ("codex", "Codex store")):
             files = [file for file in plan.native.files if file.runtime == runtime]
@@ -157,16 +179,35 @@ def print_deletion_plan(plan: SessionDeletionPlan) -> None:
                 label += native_file.provenance
                 if native_file.fingerprint is None:
                     label += "; already absent"
-                console.print(f"    {escape(native_file.path)} ({label})")
+                _print_inventory_line(f"    {native_file.path} ({label})")
         console.print("  Outside removal scope:")
         for exclusion in plan.native.outside_scope:
-            console.print(f"    {escape(exclusion)}")
-    for note in plan.notes:
-        console.print(f"  {escape(note)}")
+            _print_inventory_line(f"    {exclusion}")
+    for note in _plan_notes(plan):
+        _print_inventory_line(f"  {note}")
     for exclusion in plan.content.exclusions:
-        console.print(f"  Outside removal scope: {escape(exclusion)}")
+        _print_inventory_line(f"  Outside removal scope: {exclusion}")
     for reason in plan.refusals:
-        console.print(f"  [yellow]Refused: {escape(reason)}[/yellow]")
+        console.print(f"  Refused: {reason}", style="yellow", markup=False, soft_wrap=True)
+
+
+def _print_bulk_delete_preview(root: str, admitted: list[SessionDeletionPlan]) -> None:
+    console.print(f"[bold]Forge project[/bold] {escape(root)}", soft_wrap=True)
+    if admitted:
+        names = ", ".join(plan.name for plan in admitted)
+        files = {file.path: file.category for plan in admitted for file in plan.content.files}
+        search_records = {key for plan in admitted for key in plan.content.search_keys}
+        console.print(f"Sessions to delete ({len(admitted)}): {escape(names)}")
+        console.print(
+            f"Remove session metadata and Forge content ({len(files)} files, {len(search_records)} search records)."
+        )
+        for note in dict.fromkeys(note for plan in admitted for note in _plan_notes(plan)):
+            _print_inventory_line(f"  {note}")
+        project_state = Path(root) / ".forge"
+        for path, category in files.items():
+            if not Path(path).is_relative_to(project_state):
+                _print_inventory_line(f"  Remove {category}: {path}")
+    print_tip("Use --verbose for individual paths and per-session exclusions.", blank_before=False, console=console)
 
 
 def _target_root(name: str, root: str | None, manager: SessionManager) -> str | None:
@@ -192,6 +233,7 @@ def _run_cleanup(
     purge: bool,
     as_json: bool,
     explicit_root: Path | None,
+    compact: bool = False,
 ) -> None:
     mode = "purge" if purge else "delete"
     if all_sessions and names:
@@ -247,12 +289,15 @@ def _run_cleanup(
                 )
             )
         except (
+            FileLockTimeoutError,
             ForgeSessionError,
             ProjectCompatibilityError,
             OSError,
             ValueError,
         ) as exc:
             refused.append({"name": name, "forge_root": selected_root, "reason": str(exc)})
+    admitted = [plan for plan in plans if not plan.refusals]
+    failed = len(targets) - len(admitted)
     if as_json:
         click.echo(
             json.dumps(
@@ -266,14 +311,18 @@ def _run_cleanup(
             )
         )
     else:
-        for plan in plans:
-            print_deletion_plan(plan)
+        if compact and targets and root is not None:
+            _print_bulk_delete_preview(root, admitted)
+            for plan in plans:
+                for reason in plan.refusals:
+                    _print_refusal(plan.name, reason)
+        else:
+            for plan in plans:
+                print_deletion_plan(plan)
         for refusal in refused:
-            console.print(f"[yellow]Refused {escape(str(refusal['name']))}: {escape(str(refusal['reason']))}[/yellow]")
+            _print_refusal(str(refusal["name"]), str(refusal["reason"]))
         if not targets:
             console.print(f"[dim]No sessions to {mode}.[/dim]")
-    failed = len(refused) + sum(bool(plan.refusals) for plan in plans)
-    admitted = [plan for plan in plans if not plan.refusals]
     if purge and not yes:
         if admitted and not as_json:
             print_tip("Use --yes to apply this purge selection.", console=console)
@@ -281,14 +330,23 @@ def _run_cleanup(
         if not yes and not click.confirm(f"Delete Forge data for {len(admitted)} session(s)?", err=True):
             err_console.print("[dim]Cancelled[/dim]")
             raise SystemExit(1 if failed else 0)
-        for plan in admitted:
+        to_apply = (
+            track(admitted, description="Deleting sessions", console=err_console, transient=True)
+            if compact and err_console.is_terminal
+            else admitted
+        )
+        for plan in to_apply:
             try:
                 apply_session_deletion(index, plan)
             except (ForgeSessionError, OSError, ValueError) as exc:
-                print_error(f"{plan.name}: {exc}")
+                print_error(escape(f"{plan.name}: {exc}"))
                 failed += 1
             else:
-                console.print(f"{'Purged' if purge else 'Deleted'} session [green]{escape(plan.name)}[/green]")
+                if not compact:
+                    console.print(f"{'Purged' if purge else 'Deleted'} session [green]{escape(plan.name)}[/green]")
+        if compact:
+            deleted = len(targets) - failed
+            console.print(f"Deleted {deleted} {'session' if deleted == 1 else 'sessions'}.")
     if failed:
         print_error(f"{failed} session(s) refused or failed {mode}.")
         raise SystemExit(1)
