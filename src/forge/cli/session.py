@@ -121,11 +121,6 @@ def _resolve_routing_from_cli(
     )
 
 
-def _session_scope_key(name: str, entry: SessionIndexEntry) -> tuple[str, str]:
-    """Return the list/cleanup identity tuple for a session entry."""
-    return (name, entry.forge_root or entry.worktree_path)
-
-
 def _session_list_location(entry: SessionIndexEntry) -> str:
     """Return a short location label for human session-list disambiguation."""
     if entry.relative_path and entry.relative_path != ".":

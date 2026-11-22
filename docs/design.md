@@ -288,11 +288,17 @@ An exception from the manifest callback does not prove the manifest is absent --
 not there. Compensation itself never raises: it is unwinding the callback's exception, which the caller must receive
 unchanged, and a row it fails to remove is prunable.
 
-Locked readers never observe the in-flight state -- `list_sessions` and `get_session` take the index lock -- and their
-unlocked filesystem probes are safe because every prune delete is re-verified under a re-acquired lock, which spares a
-row republished in the meantime. Readers that deliberately skip the lock *can* see a row before its manifest, so the
-binding scans read the row's conversation columns as well as the manifest, leaving an in-flight conversation reported as
-bound: the safe direction for a uniqueness check.
+The authoritative `IndexStore.list_sessions` and `get_session` reads take the index lock. Their unlocked filesystem
+probes are safe because every prune delete is re-verified under a re-acquired lock, which spares a row republished in
+the meantime. Readers that deliberately skip the lock *can* see a row before its manifest, so the binding scans read the
+row's conversation columns as well as the manifest, leaving an in-flight conversation reported as bound: the safe
+direction for a uniqueness check.
+
+Display commands try the ordinary list with a nonblocking lock. When a writer holds it, they read the atomically
+replaced index, filter to the requested scope and report a snapshot hint. A snapshot row needs a published instance and
+a manifest or durable cleanup reservation. The listing checks the instance again before showing manifest details. This
+omits provisional and unverified legacy rows during contention. The next uncontended list can prune stale rows under the
+usual lock.
 
 Orphan manifests with no row still exist -- written by crashes before row-first creation shipped, or by older Forge
 versions -- and still own their name and conversation binding invisibly to any index-driven check. Reads that decide

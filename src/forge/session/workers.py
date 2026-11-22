@@ -68,6 +68,7 @@ def session_worker_lease(
     expected_instance_id: str,
     label: str,
     index_store: IndexStore | None = None,
+    timeout_s: float | None = None,
 ) -> Iterator[None]:
     """Admit a worker and protect its provider writes without holding a global lock.
 
@@ -79,7 +80,7 @@ def session_worker_lease(
         _require_sidecar_lease(forge_root, name, expected_instance_id)
         yield
         return
-    path = _create_worker_lease(forge_root, name, expected_instance_id, label, index_store)
+    path = _create_worker_lease(forge_root, name, expected_instance_id, label, index_store, timeout_s=timeout_s)
     try:
         yield
     finally:
@@ -201,6 +202,8 @@ def _create_worker_lease(
     expected_instance_id: str,
     label: str,
     index_store: IndexStore | None,
+    *,
+    timeout_s: float | None = None,
 ) -> Path:
     root = str(Path(forge_root).resolve())
     lease = _WorkerLease(1, root, name, expected_instance_id, os.getpid(), label)
@@ -210,6 +213,7 @@ def _create_worker_lease(
         root,
         expected_instance_id=expected_instance_id,
         callback=lambda: atomic_write_json(path, asdict(lease)),
+        timeout_s=timeout_s,
     )
     if not admitted:
         raise SessionNotFoundError(name)

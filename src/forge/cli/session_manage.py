@@ -22,7 +22,6 @@ from forge.cli.session import (  # noqa: E402
     _get_session_type,
     _hint_cross_project_session,
     _session_list_location,
-    _session_scope_key,
     _template_display_label,
     console,
     handle_session_error,
@@ -99,21 +98,8 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
 
     ctx = ExecutionContext.from_cwd()
 
-    if older_than is not None:
-        from forge.core.ops.session import list_sessions_older_than
-
-        old_sessions = list_sessions_older_than(
-            ctx=ctx,
-            older_than_days=older_than,
-            include_incognito=include_incognito,
-            scope=scope,
-        )
-        old_scope_keys = {_session_scope_key(name, entry) for name, entry in old_sessions}
-    else:
-        old_scope_keys = None
-
     try:
-        result = list_sessions_op(ctx=ctx, include_incognito=include_incognito, scope=scope)
+        result = list_sessions_op(ctx=ctx, include_incognito=include_incognito, scope=scope, older_than_days=older_than)
     except ForgeOpError as e:
         if as_json:
             import json
@@ -123,9 +109,9 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
             print_error(f"{e}")
         sys.exit(1)
 
+    if result.hint:
+        print_tip(result.hint, blank_before=False, console=err_console)
     items = result.sessions
-    if old_scope_keys is not None:
-        items = [item for item in items if _session_scope_key(item.name, item.entry) in old_scope_keys]
 
     if as_json:
         import json
@@ -156,6 +142,8 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
     if not items:
         if older_than is not None:
             console.print(f"[dim]No sessions older than {older_than} days.[/dim]")
+        elif result.hint:
+            console.print("[dim]No confirmed sessions in this snapshot.[/dim]")
         else:
             console.print("[dim]No sessions found.[/dim]")
             print_tip("Run 'forge session start <name>'.", console=console)
@@ -199,7 +187,7 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
             console=console,
         )
 
-    if older_than is None:
+    if older_than is None and not result.hint:
         _print_session_list_tips(items)
 
 

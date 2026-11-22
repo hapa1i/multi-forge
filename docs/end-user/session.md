@@ -283,8 +283,12 @@ another selected session is removed. Any refusal or failure produces a nonzero e
 Both bulk previews name the sessions selected for removal and explain each refusal. They summarize routine Forge files
 and list worktrees, branches, user-authored transfer notes and external files. `purge --all` also shows each native
 path, including which conversations were created outside Forge. Add `--verbose` to either command for each session's
-full inventory and exclusions. During cleanup, a concurrent `session list` may report that the global session index is
-busy. Retry once the other operation finishes.
+full inventory and exclusions.
+
+You can run `session list` while another project is cleaning up. When the shared index is busy, Forge shows a snapshot
+of confirmed sessions and prints a hint on stderr, including with `--json`. Sessions being created and older records
+whose ownership Forge has yet to verify can be missing from that snapshot. Rerun the listing after cleanup for the full
+result.
 
 Worktrees are removed by default for explicit delete/purge when owned and unshared; `--keep-worktree` preserves them,
 and `--delete-branch` additionally removes their branch. Cleanup refuses worktree removal when it overlaps the selected

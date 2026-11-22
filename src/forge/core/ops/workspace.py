@@ -31,6 +31,7 @@ class ListWorkspaceWorktreesResult:
     primary_root: Path
     common_dir: Path | None
     worktrees: tuple[WorkspaceWorktreeSummary, ...]
+    hint: str | None = None
 
 
 def list_workspace_worktrees(*, ctx: ExecutionContext) -> ListWorkspaceWorktreesResult:
@@ -74,6 +75,7 @@ def list_workspace_worktrees(*, ctx: ExecutionContext) -> ListWorkspaceWorktrees
         primary_root=workspace.primary_root,
         common_dir=workspace.common_dir,
         worktrees=summaries,
+        hint=session_result.hint,
     )
 
 

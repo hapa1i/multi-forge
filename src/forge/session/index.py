@@ -19,6 +19,7 @@ import dacite
 
 from forge.core.paths import get_forge_home
 from forge.core.state import (
+    FileLockTimeoutError,
     atomic_write_json,
     file_lock_for_target,
     iso_to_timestamp,
@@ -74,6 +75,19 @@ def _session_recency_sort_key(
         return (0, -iso_to_timestamp(entry.last_accessed_at), name)
     except (ValueError, TypeError, AttributeError):
         return (1, 0.0, name)
+
+
+def _select_sessions(
+    index: SessionIndex, include_incognito: bool, project_root_filter: str | None, forge_root_filter: str | None
+) -> list[tuple[str, SessionIndexEntry]]:
+    sessions = [
+        (session_name_from_key(key), entry)
+        for key, entry in index.sessions.items()
+        if (include_incognito or not entry.is_incognito)
+        and (project_root_filter is None or entry.project_root == project_root_filter)
+        and (forge_root_filter is None or entry.forge_root == forge_root_filter)
+    ]
+    return sorted(sessions, key=_session_recency_sort_key)
 
 
 class IndexStore:
@@ -209,6 +223,7 @@ class IndexStore:
         *,
         project_root_filter: str | None = None,
         forge_root_filter: str | None = None,
+        timeout_s: float | None = None,
     ) -> list[tuple[str, SessionIndexEntry]]:
         """List sessions sorted by last_accessed_at DESC, then name ASC.
 
@@ -220,19 +235,18 @@ class IndexStore:
             include_incognito: Whether to include incognito sessions.
             project_root_filter: If set, only return entries matching this project_root.
             forge_root_filter: If set, only return entries matching this forge_root.
+            timeout_s: Override the CLI lock wait for reading and pruning.
 
         Returns:
             List of (name, entry) tuples sorted deterministically.
         """
 
-        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+        lock_timeout = CLI_LOCK_TIMEOUT_S if timeout_s is None else timeout_s
+        with file_lock_for_target(target_path=self._index_path, timeout_s=lock_timeout):
             index = self.read()
 
-        # Filesystem probes run without the lock to avoid timeout on slow I/O.
-        # TOCTOU window: a concurrent writer could modify the index between the
-        # read above and the prune below. The re-read at the prune step mitigates
-        # this (double-check pattern). Worst case is a false-positive prune that
-        # gets re-added on the next session start.
+        # Probe outside the lock, then recheck each candidate under publication authority.
+        # A creator may have published a new instance under that name in between.
         stale: set[str] = set()  # scoped keys (dict keys)
         for key, entry in index.sessions.items():
             display_name = session_name_from_key(key)
@@ -243,7 +257,7 @@ class IndexStore:
                 stale.add(key)
 
         if stale:
-            with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            with file_lock_for_target(target_path=self._index_path, timeout_s=lock_timeout):
                 latest = self.read()
 
                 pruned_any = False
@@ -264,21 +278,32 @@ class IndexStore:
 
                 index = latest
 
-        sessions = [
-            (session_name_from_key(key), entry)
-            for key, entry in index.sessions.items()
-            if include_incognito or not entry.is_incognito
-        ]
+        return _select_sessions(index, include_incognito, project_root_filter, forge_root_filter)
 
-        # Apply project identity filters (see design.md §3 "session list --scope")
-        if project_root_filter is not None:
-            sessions = [(n, e) for n, e in sessions if e.project_root == project_root_filter]
-        if forge_root_filter is not None:
-            sessions = [(n, e) for n, e in sessions if e.forge_root == forge_root_filter]
-
-        # Sort by last_accessed_at DESC, then name ASC for determinism
-        sessions.sort(key=_session_recency_sort_key)
-        return sessions
+    def list_sessions_for_display(
+        self, *, include_incognito: bool, project_root_filter: str | None, forge_root_filter: str | None
+    ) -> tuple[list[tuple[str, SessionIndexEntry]], bool]:
+        """Return scoped rows and whether contention required a read-only snapshot."""
+        try:
+            rows = self.list_sessions(
+                include_incognito=include_incognito,
+                project_root_filter=project_root_filter,
+                forge_root_filter=forge_root_filter,
+                timeout_s=0,
+            )
+        except FileLockTimeoutError:
+            # Index replacement is atomic. A creator writes its row before the manifest and
+            # stamps its instance only after publication. A legacy unstamped row cannot be
+            # distinguished from that provisional row while a writer holds the lock.
+            rows = _select_sessions(self.read(), include_incognito, project_root_filter, forge_root_filter)
+            published = [
+                (name, entry)
+                for name, entry in rows
+                if entry.instance_id is not None
+                and (get_manifest_path(entry.root, name).is_file() or _cleanup_pending(entry.root, name))
+            ]
+            return published, True
+        return rows, False
 
     def peek_sessions(
         self,
@@ -296,18 +321,11 @@ class IndexStore:
         with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
             index = self.read()
 
-        sessions = [
-            (session_name_from_key(key), entry)
-            for key, entry in index.sessions.items()
-            if (self._manifest_exists_for_row(key, entry) or _cleanup_pending(entry.root, session_name_from_key(key)))
-            and (include_incognito or not entry.is_incognito)
+        return [
+            (name, entry)
+            for name, entry in _select_sessions(index, include_incognito, project_root_filter, forge_root_filter)
+            if get_manifest_path(entry.root, name).is_file() or _cleanup_pending(entry.root, name)
         ]
-        if project_root_filter is not None:
-            sessions = [(name, entry) for name, entry in sessions if entry.project_root == project_root_filter]
-        if forge_root_filter is not None:
-            sessions = [(name, entry) for name, entry in sessions if entry.forge_root == forge_root_filter]
-        sessions.sort(key=_session_recency_sort_key)
-        return sessions
 
     def run_session_entries_txn(
         self,
@@ -682,6 +700,7 @@ class IndexStore:
         expected_instance_id: str,
         callback: Callable[[], None],
         required_instances: tuple[tuple[str, str, str], ...] = (),
+        timeout_s: float | None = None,
     ) -> bool:
         """Persist bounded worker output only while its original session is live.
 
@@ -694,7 +713,8 @@ class IndexStore:
         """
         validate_name(name)
         _require_instance_id(expected_instance_id)
-        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+        lock_timeout = CLI_LOCK_TIMEOUT_S if timeout_s is None else timeout_s
+        with file_lock_for_target(target_path=self._index_path, timeout_s=lock_timeout):
             index = self.read()
             key = resolve_key_strict(index.sessions, name, forge_root)
             if key is None or index.sessions[key].instance_id != expected_instance_id:

@@ -307,11 +307,13 @@ class ActiveSessionStore:
             self.write(latest)
             return None
 
-    def peek_session(self, session_name: str, forge_root: str | None = None) -> ActiveSessionEntry | None:
+    def peek_session(
+        self, session_name: str, forge_root: str | None = None, *, timeout_s: float = CLI_LOCK_TIMEOUT_S
+    ) -> ActiveSessionEntry | None:
         """Return a live entry without repairing or pruning the runtime registry."""
         from forge.session.identity import resolve_key_strict
 
-        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+        with file_lock_for_target(target_path=self._index_path, timeout_s=timeout_s):
             index = self._read_validated() if self.exists() else ActiveSessionIndex()
             key = resolve_key_strict(index.sessions, session_name, forge_root)
 

@@ -324,6 +324,10 @@ launch registration and event writers carry the admitted instance. Worker leases
 index lock; cleanup refuses live or abandoned leases. An abandoned lease requires explicit inspection/recovery, not
 inference from its parent process having exited.
 
+`session list` can display a scoped snapshot during cleanup. Its contention hint goes to stderr, including for JSON, or
+into the response text for `%session list`. The [index publication contract](design.md) describes which rows the
+snapshot can show.
+
 Worktree removal refuses containment overlap with the selected Forge home, configured native homes or recorded native
 sources, including those of other discovered sessions. Admission checks lexical and resolved paths again before apply,
 so removing a checkout cannot destroy a Forge-home symlink even when its target is elsewhere. `--keep-worktree`

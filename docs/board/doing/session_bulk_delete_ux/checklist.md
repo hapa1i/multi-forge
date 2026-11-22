@@ -4,7 +4,7 @@ The implementation is on `codex/session-bulk-delete-ux`, based on `main` at `3e6
 
 | Fixture                                    | Expected result                                                                           |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| A held session index lock                  | Listing exits with a retry message on stderr and succeeds once the lock is released       |
+| A held session index lock                  | Listing succeeds with confirmed sessions and a snapshot hint on stderr                    |
 | Several sessions and one unrelated QA copy | Bulk confirmation identifies the selected sessions and offers full paths with `--verbose` |
 | One session with a worker lease            | Its name and reason appear before confirmation, and only admitted sessions are removed    |
 
@@ -27,4 +27,12 @@ The implementation is on `codex/session-bulk-delete-ux`, based on `main` at `3e6
   without a Forge project refused both bulk commands. The terminal displayed purge progress and the final count.
 - [x] Verify the review fixes. All 12,058 unit tests, 2,715 regressions and eight targeted Docker integration cases
   passed.
+- [x] Verify listing during a delete in another repository. With session work queued, a separate CLI process returned
+  both scoped sessions as JSON in 0.71 seconds while apply held the global index lock. The snapshot hint appeared once
+  on stderr and cleared after release. Regressions cover age filtering, in-chat output, provisional rows, legacy
+  ownership and name reuse.
+- [x] Verify that listing with queued session work respects the startup processor's 50 ms admission timeout. The pending
+  marker stayed intact while the index was busy and the next uncontended listing processed it.
+- [x] Verify the final changes. All 12,058 unit tests, 2,720 regressions and 18 targeted Docker integration cases
+  passed. `make pre-commit` passed.
 - [ ] Record the merge and changelog entry and close the card after it ships.

@@ -206,8 +206,9 @@ Session content markers capture `instance_id` at enqueue. Managed consumers reje
 instead of attributing them to the current occupant of the name. A worker lease is admitted under the index lock before
 the marker lock; provider work runs after releasing the index. Detached memory, curation and shadow processes carry the
 same instance. Their lease prevents deletion during direct provider writes, and final persistence rechecks ownership.
-Session cleanup commands bypass opportunistic queue draining and retention before preview or confirmation. See
-[session cleanup](design_sessions.md#session-cleanup) for refusal and crash-recovery rules.
+Startup uses its 50 ms marker lock timeout for lease admission too. A busy session index leaves the marker for a later
+drain and preserves its retry count. Session cleanup commands bypass opportunistic queue draining and retention before
+preview or confirmation. See [session cleanup](design_sessions.md#session-cleanup) for refusal and crash-recovery rules.
 
 Sidecar launches delegate their host lifetime lease through a read-only mount of the instance's lease directory. Hooks
 validate that lease against the mounted manifest's name, host root and instance before writing content or host queue

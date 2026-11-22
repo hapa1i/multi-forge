@@ -189,11 +189,12 @@ def _handle_cmd_session(data: dict[str, Any], argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
         return
 
-    if not result.sessions:
-        click.echo(json.dumps({"decision": "block", "reason": "No sessions found."}))
-        return
-
-    lines = ["Sessions:"]
+    if result.sessions:
+        lines = ["Sessions:"]
+    elif result.hint:
+        lines = ["No confirmed sessions in this snapshot."]
+    else:
+        lines = ["No sessions found."]
     for item in result.sessions:
         template = item.proxy_template or "-"
         model = f", model: {item.model}" if item.model else ""
@@ -205,6 +206,8 @@ def _handle_cmd_session(data: dict[str, Any], argv: list[str]) -> None:
                 f"    Recovery: recreate the checkout at that path, or run 'forge session delete {item.name}'."
             )
 
+    if result.hint:
+        lines.append(result.hint)
     click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
 
 
