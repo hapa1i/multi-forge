@@ -1,5 +1,7 @@
 # Add Gemini 4 Neon and Hydrogen as the Gemini defaults
 
+Shipped in `v1.1.8` via [PR #302](https://github.com/hapa1i/multi-forge/pull/302). [Completed checklist](checklist.md)
+
 User-authorized November 19, 2026. Branch: `neon`, based on `main` at `819717bd`.
 
 Make Gemini 4 Neon the Gemini Sonnet/Opus default and Gemini 4 Hydrogen the Haiku and Flash-template default across the

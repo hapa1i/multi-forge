@@ -1,6 +1,7 @@
 # Gemini 4 Neon and Hydrogen execution
 
-Current focus: implementation verified on branch `neon`; awaiting review and merge.
+Merged into `main` on 2026-11-19 as `82f10e13` and released in `v1.1.8` on 2026-11-21.
+[PR #302](https://github.com/hapa1i/multi-forge/pull/302)
 
 ## Implementation
 
@@ -43,7 +44,9 @@ Current focus: implementation verified on branch `neon`; awaiting review and mer
 ## Closeout
 
 - [x] Review the complete diff and synchronize the changelog when implementation is verified.
-- [ ] Merge, record shipped closeout, and move the card to `done/`.
+- [x] Closed the card on 2026-11-23 after verifying the merge and release. The
+  [change log](../../change_log.md#make-gemini-4-neon-and-hydrogen-the-gemini-defaults) links to the completed
+  checklist.
 
 ## Evidence and limits
 

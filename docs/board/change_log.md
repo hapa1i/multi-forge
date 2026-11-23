@@ -79,7 +79,8 @@ Verification covered 11,950 unit tests, 2,604 regressions, 593 integration tests
 and `xhigh` on OpenRouter under required ZDR, both models through local LiteLLM to Google AI, and another model's tool
 call continued on both routes. It also covered saved-proxy upgrades and a clean-wheel install. Two unit runs each hit
 one intermittent failure; the one captured was a watchdog timing test outside this change. Remote Vertex inference was
-not exercised. [Checklist](doing/gemini_4_neon_hydrogen/checklist.md)
+not exercised. Shipped in `v1.1.8` via [PR #302](https://github.com/hapa1i/multi-forge/pull/302).
+[Completed checklist](done/gemini_4_neon_hydrogen/checklist.md)
 
 ### Fix excessive resource use in DNS zone parsing
 
