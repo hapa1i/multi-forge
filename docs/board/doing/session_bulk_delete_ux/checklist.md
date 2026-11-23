@@ -43,4 +43,6 @@ The implementation is on `codex/session-bulk-delete-ux`, based on `main` at `3e6
   during retry.
 - [x] Verify forced cleanup with 12,060 unit tests, 2,732 regressions, nine targeted Docker cases and `make pre-commit`.
   All passed.
+- [x] Reproduce the CI failure at 40 columns. Delete, purge and age-based clean now print each refused lease path and
+  its `--force` hint on one copyable line.
 - [ ] Record the merge and changelog entry and close the card after it ships.

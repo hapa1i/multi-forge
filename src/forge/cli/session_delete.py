@@ -161,7 +161,8 @@ def _print_inventory_line(line: str) -> None:
     console.print(line, markup=False, soft_wrap=True)
 
 
-def _print_refusal(name: str, reason: str) -> None:
+def print_cleanup_refusal(name: str, reason: str) -> None:
+    """Preserve copyable lease paths and recovery commands in cleanup refusals."""
     console.print(f"Refused {name}: {reason}", style="yellow", markup=False, soft_wrap=True)
 
 
@@ -346,7 +347,7 @@ def _run_cleanup(
             _print_bulk_preview(root, mode, admitted)
             for plan in plans:
                 for reason in plan.refusals:
-                    _print_refusal(plan.name, reason)
+                    print_cleanup_refusal(plan.name, reason)
             if not yes:
                 print_tip(
                     "Use --verbose for individual paths and per-session exclusions.",
@@ -357,7 +358,7 @@ def _run_cleanup(
             for plan in plans:
                 print_deletion_plan(plan)
         for refusal in refused:
-            _print_refusal(str(refusal["name"]), str(refusal["reason"]))
+            print_cleanup_refusal(str(refusal["name"]), str(refusal["reason"]))
         if not targets:
             console.print(f"[dim]No sessions to {mode}.[/dim]")
     if purge and not yes:

@@ -73,9 +73,11 @@ def test_manual_force_clears_only_abandoned_leases(tmp_path: Path, monkeypatch: 
     abandoned, live = _lease(tmp_path, "abandoned"), _lease(tmp_path, "live", pid=os.getpid())
     before = index.index_path.read_bytes()
     args = ["sess", verb, *(["--older-than", "1"] if verb == "clean" else ["--all"])]
-    runner = CliRunner()
+    runner = CliRunner(env={"COLUMNS": "40"})
     refused = runner.invoke(main, args)
-    assert refused.exit_code == 1 and "abandoned lease" in refused.stdout and "--force" in refused.stdout
+    assert refused.exit_code == 1, refused.output
+    refusal = next(line for line in refused.stdout.splitlines() if line.startswith("Refused abandoned:"))
+    assert str(abandoned) in refusal and "abandoned lease" in refusal and "--force" in refusal
     if verb == "purge":
         preview = runner.invoke(main, [*args, "--force", "--json"])
         plans = {p["name"]: p for p in json.loads(preview.stdout)["targets"]}

@@ -257,7 +257,7 @@ def clean(older_than: int, yes: bool, force: bool, delete_worktree: bool, delete
         raise click.UsageError("--older-than must be >= 1")
     if delete_branch and not delete_worktree:
         raise click.UsageError("--delete-branch requires --delete-worktree")
-    from forge.cli.session_delete import print_deletion_plan
+    from forge.cli.session_delete import print_cleanup_refusal, print_deletion_plan
     from forge.session.cleanup import clean_old_sessions
 
     result = clean_old_sessions(
@@ -286,10 +286,10 @@ def clean(older_than: int, yes: bool, force: bool, delete_worktree: bool, delete
     for name in result.skipped_unparseable:
         console.print(f"Skipped session with unparseable timestamp: {escape(name)}")
     for skip in result.skipped_project_compatibility:
-        console.print(f"Refused {escape(skip.target)} ({escape(skip.state)}): {escape(skip.reason)}")
+        print_cleanup_refusal(f"{skip.target} ({skip.state})", skip.reason)
         print_tip(skip.recovery, console=console)
     for name, reason in result.failure_items():
-        console.print(f"Refused {escape(name)}: {escape(reason)}")
+        print_cleanup_refusal(name, reason)
     if result.should_exit_nonzero:
         print_error("Session cleanup refused or failed one or more targets.")
         raise SystemExit(1)
