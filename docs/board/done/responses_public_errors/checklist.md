@@ -1,6 +1,7 @@
 # Verify Responses refusals
 
-Branch `codex/responses-safe-errors`, based on `main` at `37eb0bd6`.
+Merged as `98b66c1c`. Its tree matches the tested PR head `adcef226`. Both Python versions and the pre-commit suite
+passed the [PR checks](https://github.com/hapa1i/multi-forge/pull/308/checks).
 
 | Fixture                                              | Expected HTTP 400 response                          |
 | ---------------------------------------------------- | --------------------------------------------------- |
@@ -13,4 +14,6 @@ Branch `codex/responses-safe-errors`, based on `main` at `37eb0bd6`.
   [Codex proxy guide](../../../end-user/codex_proxy.md#spend-and-diagnostics).
 - [x] All 204 focused tests and 47 loopback integration tests passed, including OpenRouter Responses, LiteLLM streaming
   cost, and the failed-smoke CLI case.
-- [ ] After merge, verify the alert on `main`, record the outcome in the change log and close the card.
+- [x] The [CodeQL scan of the merge](https://github.com/hapa1i/multi-forge/actions/runs/45160349728) passed. GitHub
+  marked [alert #35](https://github.com/hapa1i/multi-forge/security/code-scanning/35) fixed on `main` at 10:57:01 UTC on
+  2026-11-23. Recorded the fix in the [change log](../../change_log.md#keep-internal-errors-out-of-responses-replies).

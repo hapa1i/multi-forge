@@ -12,6 +12,13 @@ Older entries are retained verbatim in [2026-08-23 through 2026-08-24](archive/c
 
 ## 2026-11-23
 
+### Keep internal errors out of Responses replies
+
+When source resolution or request preparation fails, the Responses proxy now returns a fixed HTTP 400 message and the
+request ID. Known request-policy refusals still explain what to change. GitHub marked
+[CodeQL alert #35](https://github.com/hapa1i/multi-forge/security/code-scanning/35) fixed after scanning the merge on
+`main`. [Completed checklist](done/responses_public_errors/checklist.md)
+
 ### Refuse incomplete shadow discovery
 
 When the session index is busy, workspace and global shadow discovery now exit with a retry message. Previously, a
