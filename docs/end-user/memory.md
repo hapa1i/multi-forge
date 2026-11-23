@@ -63,6 +63,10 @@ forge memory track docs/developer/coding_standards.md \
 The shadow file contains `- [ ]` checkboxes with rationale. The human reviews and merges what's valuable into the
 official doc. Already-merged items are self-pruned on the next run.
 
+Use `forge memory shadows list` to see proposals in the current project. With `--scope workspace` or `--scope all`,
+Forge needs the session index to find other projects. If it reports that the index is busy, retry the command after the
+other operation finishes.
+
 ---
 
 ## Configuration

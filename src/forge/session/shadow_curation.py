@@ -82,9 +82,13 @@ def collect_shadow_entries(
     Returns (entries, scanned_roots). Each entry carries the forge_root
     for repo-scope deduplication and file reads.
     """
-    from forge.core.ops.session import list_sessions
+    from forge.core.ops.session import ForgeOpError, list_sessions
 
     result = list_sessions(ctx=ctx, include_incognito=False, scope=scope)
+    if scope != "project" and result.hint:
+        raise ForgeOpError(
+            f"The session index is busy. Retry shadow discovery with --scope {scope} after the other operation finishes."
+        )
     entries: list[ShadowEntry] = []
     scanned_roots: set[str] = set()
 

@@ -208,7 +208,9 @@ deferred.
   `$FORGE_SESSION` when `--session` is omitted; errors outside a session without `--session`.
 - **`forge memory list`** shows passported docs under scan roots (sessionless scan, no writer filtering).
 
-**Shadow discovery** scans passports under the scan roots for shadow-only docs (unfiltered by writer).
+**Shadow discovery** scans passports under the scan roots for shadow-only docs (unfiltered by writer). Workspace and
+global discovery use the session index to identify other Forge projects. A partial index snapshot makes discovery fail
+before the passport scan. Project discovery uses the current Forge root and can proceed during contention.
 
 New tracking and explicit upgrade require a logical project-relative path ending exactly in `.md`. Logical and resolved
 official basenames are compared case-insensitively against the OKF-reserved `index.md` and `log.md` names before any
