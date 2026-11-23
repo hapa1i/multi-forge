@@ -12,6 +12,12 @@ Older entries are retained verbatim in [2026-08-23 through 2026-08-24](archive/c
 
 ## 2026-11-23
 
+### Start LiteLLM from projects with a local litellm.py
+
+The managed gateway now starts with `python -P -m` so a project-local `litellm.py` no longer shadows the installed
+package during startup. A clean-wheel test launched the backend from Forge's own adapter directory, checked its health
+and confirmed its process group exited after shutdown. [Completed checklist](done/litellm_launcher_cwd/checklist.md)
+
 ### Keep internal errors out of Responses replies
 
 When source resolution or request preparation fails, the Responses proxy now returns a fixed HTTP 400 message and the
