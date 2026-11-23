@@ -314,35 +314,28 @@ class TierClientFactory:
 
             return client
 
-    async def invalidate_and_retry(self, model_name: str, *, tier: Optional[str]) -> Any:
-        """
-        Invalidate cached credentials and fetch new ones.
+    async def invalidate_and_retry(self, model_name: str, *, tier: str) -> Any:
+        """Evict the failed request's cached client and return a rebuilt one.
 
-        Called when authentication fails, indicating credentials may be expired.
+        Call this once after an authentication failure. Eviction covers only the
+        ``(model_name, tier)`` entry, so the rebuilt client keeps the tier hyperparameters
+        of the failed request.
 
-        Args:
-            model_name: The model whose credentials should be refreshed
-            tier: The request-resolved tier name. If None, invalidates all tiers for this model and rebuilds the
-                  configured default tier.
-
-        Returns:
-            Fresh credentials or client
+        Other cached clients that share the credential stay cached. Each core client
+        discards its own HTTP client and invalidates the shared credential entry when its
+        own request fails authentication. A stale client therefore recovers after its
+        first failure. Streaming failures never reach this method, so wider eviction
+        here could not cover them.
         """
         logger.warning(f"Invalidating cached credentials for {model_name} (tier={tier}) due to auth failure")
 
         async with self._refresh_lock:
-            # A missing tier invalidates every cached tier for this model.
-            if tier is not None:
-                cache_key = (model_name, tier)
-                if cache_key in self._cache:
-                    del self._cache[cache_key]
-            else:
-                keys_to_remove = [k for k in self._cache if k[0] == model_name]
-                for key in keys_to_remove:
-                    del self._cache[key]
+            cache_key = (model_name, tier)
+            if cache_key in self._cache:
+                del self._cache[cache_key]
 
-        retry_tier = tier if tier is not None else config.proxy.default_tier
-        return await self.get_client(model_name, tier=retry_tier)
+        # get_client() takes _refresh_lock itself, so it must run after the lock is released.
+        return await self.get_client(model_name, tier=tier)
 
     def _resolve_tier_hyperparams(
         self,

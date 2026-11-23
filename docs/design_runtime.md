@@ -58,6 +58,17 @@ and caps the upstream value at 256 characters. This is a narrow identity relay, 
 authorization, API keys, cookies, and internal `X-Forge-*` correlation headers do not enter it, and the Anthropic-native
 and Responses passthrough allowlists are unchanged.
 
+**Translated authentication-refresh contract.** A running proxy caches at three layers: `TierClientFactory` holds one
+adapter per `(model, tier)`, each adapter's core client holds one HTTP client, and `CredentialManager` holds one entry
+per credential provider. A core client that classifies an upstream failure as authentication invalidates its provider's
+credential entry and discards its own HTTP client, so its next request resolves the credential again. A non-streaming
+Messages request also retries once through `TierClientFactory.invalidate_and_retry`, which evicts and rebuilds only the
+failed `(model, tier)` adapter with that tier's hyperparameters. A streaming failure reaches the caller as an
+`authentication_error` chunk without a retry. Other cached adapters sharing the credential stay cached, and each
+recovers after its own first authentication failure. Resolution follows the precedence in
+[design_installation.md §A.6](design_installation.md#a6-credentials-and-connection-values-369): the credential file is
+read on every resolution, but a key in the proxy process's environment cannot change until the proxy restarts.
+
 **Launch-time auto-start (lookup-or-start).** `--proxy` (session start/resume/fork, `forge claude`) and
 `--supervisor-proxy` (session start/fork, `forge policy supervisor set`) accept a template name. When the name is a
 template, the launcher routes through `ensure_proxy()` → `start_proxy()` (reuse a live proxy, else adopt/spawn) instead

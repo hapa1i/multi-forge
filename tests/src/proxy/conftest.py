@@ -6,11 +6,13 @@ and reduce monkeypatch boilerplate for orchestrator/identity/routing tests.
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 import pytest
 
 import forge.proxy.proxy_orchestrator as _orchestrator_module
+from forge.proxy.client_factory import TierClientFactory
 from forge.proxy.proxies import ProxyRegistryStore
 from tests.fixtures.proxy_transport import ProxyTransportFake
 
@@ -169,3 +171,27 @@ def proxy_runtime_ready(monkeypatch: pytest.MonkeyPatch, server_stubs):
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server, "cost_tracker", None)
     return server
+
+
+# ---------------------------------------------------------------------------
+# Client factory fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def tier_client_factory(monkeypatch: pytest.MonkeyPatch) -> TierClientFactory:
+    """Return the ``TierClientFactory`` singleton with an empty cache and default TTLs.
+
+    The factory is process-wide, so its cache, refresh lock, and TTLs are replaced for the test.
+    Provider-selection variables are cleared so ``openai/`` models route to remote LiteLLM
+    whatever the developer's shell or ``.env`` sets.
+    Used by: test_client_factory.py, test_client_factory_integration.py.
+    """
+    factory = TierClientFactory()
+    monkeypatch.setattr(factory, "_cache", {})
+    monkeypatch.setattr(factory, "_refresh_lock", asyncio.Lock())
+    monkeypatch.setattr(factory, "_default_ttl", 3600.0)
+    monkeypatch.setattr(factory, "_litellm_ttl", 3600.0)
+    for name in ("PREFERRED_PROVIDER", "MODEL_FAMILY", "FORGE_PROXY_ID"):
+        monkeypatch.delenv(name, raising=False)
+    return factory
