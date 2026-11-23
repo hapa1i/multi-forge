@@ -164,7 +164,7 @@ class TestLiteLLMAdapterStart:
         # Use the same interpreter as Forge and preserve the original gateway arguments.
         call_args = mock_popen.call_args
         cmd = call_args[0][0]
-        assert cmd[:3] == [sys.executable, "-m", "forge.backend.litellm_pricing"]
+        assert cmd[:4] == [sys.executable, "-P", "-m", "forge.backend.litellm_pricing"]
         assert "--config" in cmd
         assert str(config_path) in cmd
         assert "--port" in cmd

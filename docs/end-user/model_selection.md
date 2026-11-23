@@ -367,7 +367,7 @@ explicitly requested, LiteLLM 1.102.2 uses the requested tier to calculate the c
 caps can differ from the provider's bill.
 [Saved backend upgrade procedure](proxy.md#updating-saved-proxy-and-backend-configurations)
 
-For an independently operated gateway, run `python -m forge.backend.litellm_pricing` in the updated Forge environment
+For an independently operated gateway, run `python -P -m forge.backend.litellm_pricing` in the updated Forge environment
 with the gateway's usual `--config` and `--port` arguments. The launcher also installs the correction in each Uvicorn
 worker when using `--num_workers`. The stock `litellm` command bypasses the backport. If you use another launcher,
 verify its reported price on both sides of the threshold. Earlier telemetry and cap totals retain the amounts originally
