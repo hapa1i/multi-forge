@@ -18,6 +18,7 @@ import dacite
 
 from forge.core.paths import get_forge_home
 from forge.core.process import is_pid_alive
+from forge.core.runtime.codex_review_source import directory_fd
 from forge.core.state import atomic_write_json
 
 from .exceptions import ForgeSessionError, SessionNotFoundError
@@ -40,6 +41,13 @@ class _WorkerLease:
     label: str
 
 
+@dataclass(frozen=True)
+class SessionWorkerLeaseStatus:
+    path: Path
+    refusal: str
+    abandoned: bool = False
+
+
 def capture_session_instance(forge_root: str | Path, name: str, *, index_store: IndexStore | None = None) -> str:
     """Capture a producer's generation, explicitly migrating a live legacy row."""
     if os.environ.get("FORGE_SIDECAR") == "1":
@@ -57,7 +65,7 @@ def capture_session_instance(forge_root: str | Path, name: str, *, index_store: 
 def _lease_dir(instance_id: str) -> Path:
     if len(instance_id) != 32 or any(c not in "0123456789abcdef" for c in instance_id):
         raise ValueError("Invalid session worker instance identity")
-    return get_forge_home() / "session-workers" / instance_id
+    return get_forge_home().resolve() / "session-workers" / instance_id
 
 
 @contextmanager
@@ -68,6 +76,7 @@ def session_worker_lease(
     expected_instance_id: str,
     label: str,
     index_store: IndexStore | None = None,
+    timeout_s: float | None = None,
 ) -> Iterator[None]:
     """Admit a worker and protect its provider writes without holding a global lock.
 
@@ -79,7 +88,7 @@ def session_worker_lease(
         _require_sidecar_lease(forge_root, name, expected_instance_id)
         yield
         return
-    path = _create_worker_lease(forge_root, name, expected_instance_id, label, index_store)
+    path = _create_worker_lease(forge_root, name, expected_instance_id, label, index_store, timeout_s=timeout_s)
     try:
         yield
     finally:
@@ -201,6 +210,8 @@ def _create_worker_lease(
     expected_instance_id: str,
     label: str,
     index_store: IndexStore | None,
+    *,
+    timeout_s: float | None = None,
 ) -> Path:
     root = str(Path(forge_root).resolve())
     lease = _WorkerLease(1, root, name, expected_instance_id, os.getpid(), label)
@@ -210,6 +221,7 @@ def _create_worker_lease(
         root,
         expected_instance_id=expected_instance_id,
         callback=lambda: atomic_write_json(path, asdict(lease)),
+        timeout_s=timeout_s,
     )
     if not admitted:
         raise SessionNotFoundError(name)
@@ -217,35 +229,41 @@ def _create_worker_lease(
 
 
 def _read_worker_lease(path: Path) -> _WorkerLease:
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-    with os.fdopen(fd, "r", encoding="utf-8") as stream:
-        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
-            raise ValueError(f"Invalid session worker lease: {path}")
-        return dacite.from_dict(_WorkerLease, json.load(stream), config=dacite.Config(strict=True))
-
-
-def find_active_session_workers(forge_root: str | Path, name: str, instance_id: str) -> tuple[str, ...]:
-    """Read live producer leases without repairing or discarding unknown state."""
-    root = str(Path(forge_root).resolve())
-    directory = _lease_dir(instance_id)
-    if directory.is_symlink():
-        raise ValueError(f"Session worker lease directory is a symlink: {directory}")
-    if not directory.exists():
-        return ()
-    active: list[str] = []
-    for path in sorted(directory.iterdir()):
-        if not path.name.endswith(".json"):
-            continue
-        try:
-            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-        except FileNotFoundError:
-            continue
+    with directory_fd(path.parent) as parent:
+        fd = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
         with os.fdopen(fd, "r", encoding="utf-8") as stream:
             if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
                 raise ValueError(f"Invalid session worker lease: {path}")
-            lease = dacite.from_dict(_WorkerLease, json.load(stream), config=dacite.Config(strict=True))
+            value = json.load(stream)
+            if not isinstance(value, dict):
+                raise ValueError(f"Invalid session worker lease: {path}")
+            return dacite.from_dict(_WorkerLease, value, config=dacite.Config(strict=True))
+
+
+def inspect_session_workers(
+    forge_root: str | Path, name: str, instance_id: str
+) -> tuple[SessionWorkerLeaseStatus, ...]:
+    """Distinguish a dead host worker from a live worker or a delegated container."""
+    root = str(Path(forge_root).resolve())
+    directory = _lease_dir(instance_id)
+    try:
+        with directory_fd(directory) as descriptor:
+            entries = sorted(os.listdir(descriptor))
+    except FileNotFoundError:
+        return ()
+    workers: list[SessionWorkerLeaseStatus] = []
+    for entry in entries:
+        if not entry.endswith(".json"):
+            continue
+        path = directory / entry
+        try:
+            lease = _read_worker_lease(path)
+        except FileNotFoundError:
+            continue
         if (
-            lease.schema_version != 1
+            re.fullmatch(r"[0-9a-f]{32}\.json", entry) is None
+            or type(lease.schema_version) is not int
+            or lease.schema_version != 1
             or lease.forge_root != root
             or lease.session_name != name
             or lease.instance_id != instance_id
@@ -254,10 +272,17 @@ def find_active_session_workers(forge_root: str | Path, name: str, instance_id: 
         ):
             raise ValueError(f"Invalid session worker lease ownership: {path}")
         if is_pid_alive(lease.pid):
-            active.append(f"{lease.label} (pid {lease.pid}; lease {path})")
+            workers.append(SessionWorkerLeaseStatus(path, f"{lease.label} (pid {lease.pid}; lease {path})"))
+        elif lease.label == _SIDECAR_LEASE_LABEL and not _sidecar_exit_confirmed(name):
+            # A container holds its own admission even after its host launcher exits.
+            workers.append(SessionWorkerLeaseStatus(path, f"Cannot confirm sidecar {name} has stopped (lease {path})"))
         else:
-            active.append(
-                f"{lease.label}: worker exited without releasing lease {path}; "
-                "inspect native subprocesses before explicitly removing the abandoned lease"
+            workers.append(
+                SessionWorkerLeaseStatus(
+                    path,
+                    f"{lease.label}: worker exited without releasing lease {path}; "
+                    "inspect native subprocesses or use --force to clear the abandoned lease during session cleanup",
+                    abandoned=True,
+                )
             )
-    return tuple(active)
+    return tuple(workers)

@@ -22,6 +22,7 @@ import dacite
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import (
     ForgeSessionError,
+    IndexStore,
     SessionIndexEntry,
     SessionManager,
     SessionState,
@@ -68,6 +69,7 @@ class ListSessionsItem:
 @dataclass(frozen=True)
 class ListSessionsResult:
     sessions: list[ListSessionsItem]
+    hint: str | None = None
 
 
 VALID_SCOPES = {"workspace", "project", "all"}
@@ -89,12 +91,15 @@ def _scope_filters(ctx: ExecutionContext, scope: str) -> tuple[str | None, str |
     return None, None
 
 
-def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str = "workspace") -> ListSessionsResult:
+def list_sessions(
+    *, ctx: ExecutionContext, include_incognito: bool, scope: str = "workspace", older_than_days: int | None = None
+) -> ListSessionsResult:
     """List sessions with lightweight derived metadata.
 
     Args:
         ctx: execution context (provides project_root and forge_root for filtering).
         include_incognito: whether to include incognito sessions.
+        older_than_days: optional last-access age filter, applied to the same index snapshot.
         scope: filtering scope:
             - ``"workspace"``: sessions in the same workspace / logical repo (project_root match). Default.
             - ``"project"``: sessions in the same Forge project (forge_root match).
@@ -117,11 +122,10 @@ def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str 
         scope,
     )
 
-    manager = SessionManager()
     project_root_filter, forge_root_filter = _scope_filters(ctx, scope)
 
     try:
-        sessions = manager.list_sessions(
+        sessions, index_busy = IndexStore().list_sessions_for_display(
             include_incognito=include_incognito,
             project_root_filter=project_root_filter,
             forge_root_filter=forge_root_filter,
@@ -131,6 +135,8 @@ def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str 
     except ForgeSessionError as e:
         raise ForgeOpError(str(e)) from e
 
+    if older_than_days is not None:
+        sessions = _older_sessions(sessions, older_than_days)
     active_store = ActiveSessionStore()
 
     items: list[ListSessionsItem] = []
@@ -142,8 +148,9 @@ def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str 
         recorded_worktree_path: str | None = None
 
         try:
-            session_forge_root = entry.forge_root or entry.worktree_path
-            manifest = manager.get_session(name, forge_root=session_forge_root)
+            session_forge_root = entry.root
+            store = SessionStore(session_forge_root, name)
+            manifest = store.read()
             recorded_worktree_path = manifest.worktree.path if manifest.worktree is not None else None
             launchability = derive_launchability(recorded_worktree_path)
             if manifest.intent.proxy:
@@ -152,13 +159,24 @@ def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str 
                 proxy_template = "direct"
                 models = _direct_model_history(manifest, forge_root=Path(session_forge_root))
                 model = _display_model_history(models)
+            if index_busy:
+                # A name can be reused between the index snapshot and the metadata reads.
+                try:
+                    if store.review_identity() != entry.instance_id:
+                        continue
+                except (OSError, ValueError):
+                    _log.debug("Cannot confirm snapshot ownership for session %r", name, exc_info=True)
+                    continue
         except ForgeSessionError as e:
             # Best-effort: listing should not fail if a manifest is missing/corrupt.
             _log.debug("Failed to read manifest for session %r: %s", name, e)
 
         is_active = False
         try:
-            is_active = active_store.is_session_active(name, forge_root=entry.forge_root or entry.worktree_path)
+            if index_busy:
+                is_active = active_store.peek_session(name, forge_root=entry.root, timeout_s=0) is not None
+            else:
+                is_active = active_store.is_session_active(name, forge_root=entry.root)
         except Exception:
             # Best-effort: a runtime-registry probe failure must not fail the listing.
             _log.debug("Active-session liveness probe failed for %r", name, exc_info=True)
@@ -176,7 +194,13 @@ def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str 
             )
         )
 
-    return ListSessionsResult(sessions=items)
+    hint = None
+    if index_busy:
+        hint = (
+            "The session index is busy. This snapshot may omit new or unverified sessions. "
+            "Rerun the listing after the other operation finishes."
+        )
+    return ListSessionsResult(sessions=items, hint=hint)
 
 
 def _display_model_history(models: tuple[str, ...]) -> str | None:
@@ -280,14 +304,9 @@ def list_sessions_older_than(
 ) -> list[tuple[str, SessionIndexEntry]]:
     """List sessions whose last_accessed_at is older than the threshold.
 
-    Entries with unparseable timestamps are excluded (they cannot be confirmed
-    as old). This is a shared op used by both CLI and %session list.
-    Respects the same scope filters as list_sessions().
+    Uses the authoritative index read and the same scope filters as list_sessions().
+    Entries with unparseable timestamps cannot be confirmed as old.
     """
-    from datetime import UTC, datetime
-
-    from forge.core.state import parse_iso
-
     if scope not in VALID_SCOPES:
         raise ForgeOpError(f"Invalid scope: {scope!r}. Must be one of {VALID_SCOPES}")
 
@@ -299,11 +318,22 @@ def list_sessions_older_than(
         forge_root_filter=forge_root_filter,
     )
 
+    return _older_sessions(all_sessions, older_than_days)
+
+
+def _older_sessions(
+    sessions: list[tuple[str, SessionIndexEntry]], older_than_days: int
+) -> list[tuple[str, SessionIndexEntry]]:
+    from datetime import UTC, datetime
+
+    from forge.core.state import parse_iso
+
     result: list[tuple[str, SessionIndexEntry]] = []
-    for name, entry in all_sessions:
+    now = datetime.now(UTC)
+    for name, entry in sessions:
         try:
             dt = parse_iso(entry.last_accessed_at)
-            age_days = (datetime.now(UTC) - dt).total_seconds() / 86400
+            age_days = (now - dt).total_seconds() / 86400
         except (ValueError, TypeError, AttributeError):
             continue
         if age_days > older_than_days:

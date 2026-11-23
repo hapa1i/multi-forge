@@ -11,7 +11,7 @@ from click.testing import CliRunner
 from forge.cli.main import main
 from forge.core.workqueue import Marker, enqueue_index_marker, process_pending_work
 from forge.session.index import IndexStore
-from forge.session.workers import capture_session_instance, find_active_session_workers
+from forge.session.workers import capture_session_instance, inspect_session_workers
 from tests.fixtures.session_state import (
     delete_published_session,
     publish_session_from_fields,
@@ -56,14 +56,14 @@ def test_queue_handler_holds_an_instance_lease_through_persistence(tmp_path: Pat
     leases: list[str] = []
 
     def persist(marker: Marker) -> None:
-        leases.extend(find_active_session_workers(tmp_path, "worker", token))
+        leases.extend(worker.refusal for worker in inspect_session_workers(tmp_path, "worker", token))
 
     result = process_pending_work(handlers={"index": persist})
 
     assert result.processed == 1
     assert len(leases) == 1 and "queued index" in leases[0]
     assert not marker.exists()
-    assert find_active_session_workers(tmp_path, "worker", token) == ()
+    assert inspect_session_workers(tmp_path, "worker", token) == ()
 
 
 def test_search_rebuild_does_not_recreate_a_removed_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -117,7 +117,7 @@ def test_transfer_worker_excludes_cleanup_until_cache_is_written(
     assert attempts == ["refused"]
     assert generated_path(tmp_path, "planner").is_file()
     token = capture_session_instance(tmp_path, "planner")
-    assert find_active_session_workers(tmp_path, "planner", token) == ()
+    assert inspect_session_workers(tmp_path, "planner", token) == ()
 
 
 def test_notes_editor_protects_both_parent_and_child(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

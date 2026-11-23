@@ -9,6 +9,17 @@ class ForgeSessionError(Exception):
     """Base exception for session module."""
 
 
+class SessionCleanupRetryError(ForgeSessionError):
+    """An interrupted cleanup has a saved inventory that authorizes a retry."""
+
+    hint = "Retry with the saved inventory."
+
+    def __init__(self, reason: str, command: str) -> None:
+        self.reason = reason
+        self.command = command
+        super().__init__(f"{reason}\n{self.hint}\n  {command}")
+
+
 class InvalidSessionNameError(ForgeSessionError):
     """Raised when session name validation fails."""
 

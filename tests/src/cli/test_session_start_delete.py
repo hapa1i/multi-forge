@@ -723,7 +723,10 @@ class TestSessionDelete:
         assert SessionStore(str(temp_env), "refused").exists()
         assert not SessionStore(str(temp_env), "admitted").exists()
 
-    def test_worktree_preview_lists_removed_content_and_native_directory_loss(self, runner, temp_env, git_repo):
+    @pytest.mark.parametrize("selector", ["subject", "--all"])
+    def test_worktree_preview_lists_removed_content_and_native_directory_loss(
+        self, runner, temp_env, git_repo, selector
+    ):
         worktree = temp_env.parent / "owned"
         subprocess.run(
             ["git", "worktree", "add", "-b", "subject-branch", str(worktree)],
@@ -739,11 +742,12 @@ class TestSessionDelete:
         artifact = temp_env / ".forge/artifacts/subject/copy.txt"
         artifact.parent.mkdir(parents=True)
         artifact.write_text("synthetic")
-        result = runner.invoke(main, ["session", "delete", "subject"], input="n\n")
+        result = runner.invoke(main, ["session", "delete", selector, "--delete-branch"], input="n\n")
         assert result.exit_code == 0, result.output
         assert "Remove worktree:" in result.output
         assert "lose their original directory" in result.output
-        assert str(artifact) in result.output
+        assert "Remove branch: subject-branch" in result.output
+        assert (str(artifact) in result.output) == (selector == "subject")
         assert artifact.exists()
         assert worktree.exists()
 

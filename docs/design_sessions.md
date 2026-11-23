@@ -290,6 +290,11 @@ membership; ambiguous parent candidates remain protected. Unreadable state refus
 cascade: all targets are admitted before any mutation and initially refused targets stay refused, independent of
 processing order.
 
+The default `delete --all` and `purge --all` previews summarize the admitted Forge inventories and report each refusal.
+They list worktree and branch removals, user-authored transfer notes and files outside each plan's project `.forge/`.
+Purge also lists every selected native path with its provenance and prints shared native exclusions once. `--verbose`
+renders the full per-session plans. Both views use the same admission and apply logic.
+
 Ordinary delete removes the session manifest and its unreferenced Forge content: artifacts, authority/routing/review
 journals, plans, reports, compaction copies, transfer snapshots and author notes, attributable pending QA/reviewer
 copies, queue markers and derived search records. `cleanup_content.py` owns the exact file inventory and retry
@@ -316,8 +321,14 @@ under those locks. Neither names nor timestamps identify a replacement.
 Apply holds the index publication and target manifest locks from final admission through bounded removal. It validates
 paths, ownership, dependencies, activity and workers again before mutation. Hooks, queue consumers, detached workers,
 launch registration and event writers carry the admitted instance. Worker leases span provider calls without holding the
-index lock; cleanup refuses live or abandoned leases. An abandoned lease requires explicit inspection/recovery, not
-inference from its parent process having exited.
+index lock. A live worker blocks cleanup. When the recorded PID is gone, an explicit `--force` on delete, purge or clean
+admits the abandoned lease even if a native child survived. A delegated sidecar also requires a verified container exit.
+The preview fingerprints each selected lease. Apply checks its ownership and liveness under the index lock before
+removing it with the saved inventory. Retention, incognito cleanup and rollback retain abandoned leases.
+
+`session list` can display a scoped snapshot during cleanup. Its contention hint goes to stderr, including for JSON, or
+into the response text for `%session list`. The [index publication contract](design.md) describes which rows the
+snapshot can show.
 
 Worktree removal refuses containment overlap with the selected Forge home, configured native homes or recorded native
 sources, including those of other discovered sessions. Admission checks lexical and resolved paths again before apply,
@@ -325,12 +336,13 @@ so removing a checkout cannot destroy a Forge-home symlink even when its target 
 preserves the checkout and its retained storage.
 
 Before its first removal, apply saves a private retry inventory under `$FORGE_HOME/session-cleanup/`, outside the
-checkout. The inventory reserves the name, stops new producers and survives worktree removal. Failures leave the index
-owner and inventory for retry; missing already-removed files are accepted, changed files and new targets refuse. Only
-successful completion removes the record and inventory. `--forge-root` selects the original root even when its checkout
-no longer exists. `--force` bypasses dirty-worktree protection only. Incognito exit attempts purge after runtime exit.
-Verified original ownership permits a new preview after initial refusal or the exact retry of an interrupted inventory;
-unverified or replacement ownership receives no cleanup command.
+checkout. Validation failures before that save require a fresh preview. The saved inventory reserves the name, stops new
+producers and survives worktree removal. An interrupted apply prints a retry command when the inventory exists. Retries
+accept already-removed files and refuse changed files or new targets. Only successful completion removes the record and
+inventory. `--forge-root` selects the original root even when its checkout no longer exists. `--force` also permits
+removing an owned dirty worktree. Incognito exit attempts purge after runtime exit. Verified original ownership permits
+a new preview after initial refusal or the exact retry of an interrupted inventory; unverified or replacement ownership
+receives no cleanup command.
 
 Forced fork replacement uses the same cleanup before publishing the new target. Once that cleanup succeeds, a later fork
 failure cannot restore the previous manifest without its removed artifacts and transfer files. It reports that the prior

@@ -22,7 +22,6 @@ from forge.cli.session import (  # noqa: E402
     _get_session_type,
     _hint_cross_project_session,
     _session_list_location,
-    _session_scope_key,
     _template_display_label,
     console,
     handle_session_error,
@@ -99,21 +98,8 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
 
     ctx = ExecutionContext.from_cwd()
 
-    if older_than is not None:
-        from forge.core.ops.session import list_sessions_older_than
-
-        old_sessions = list_sessions_older_than(
-            ctx=ctx,
-            older_than_days=older_than,
-            include_incognito=include_incognito,
-            scope=scope,
-        )
-        old_scope_keys = {_session_scope_key(name, entry) for name, entry in old_sessions}
-    else:
-        old_scope_keys = None
-
     try:
-        result = list_sessions_op(ctx=ctx, include_incognito=include_incognito, scope=scope)
+        result = list_sessions_op(ctx=ctx, include_incognito=include_incognito, scope=scope, older_than_days=older_than)
     except ForgeOpError as e:
         if as_json:
             import json
@@ -123,9 +109,9 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
             print_error(f"{e}")
         sys.exit(1)
 
+    if result.hint:
+        print_tip(result.hint, blank_before=False, console=err_console)
     items = result.sessions
-    if old_scope_keys is not None:
-        items = [item for item in items if _session_scope_key(item.name, item.entry) in old_scope_keys]
 
     if as_json:
         import json
@@ -156,6 +142,8 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
     if not items:
         if older_than is not None:
             console.print(f"[dim]No sessions older than {older_than} days.[/dim]")
+        elif result.hint:
+            console.print("[dim]No confirmed sessions in this snapshot.[/dim]")
         else:
             console.print("[dim]No sessions found.[/dim]")
             print_tip("Run 'forge session start <name>'.", console=console)
@@ -199,7 +187,7 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
             console=console,
         )
 
-    if older_than is None:
+    if older_than is None and not result.hint:
         _print_session_list_tips(items)
 
 
@@ -247,7 +235,7 @@ def _print_session_list_tips(items: list) -> None:
     help="Delete sessions not accessed in DAYS days",
 )
 @click.option("--yes", "-y", is_flag=True, help="Actually delete (default is a preview)")
-@click.option("--force", "-f", is_flag=True, help="Bypass dirty-worktree protection")
+@click.option("--force", "-f", is_flag=True, help="Allow dirty worktree removal and clear abandoned worker leases")
 @click.option(
     "--delete-worktree",
     is_flag=True,
@@ -269,7 +257,7 @@ def clean(older_than: int, yes: bool, force: bool, delete_worktree: bool, delete
         raise click.UsageError("--older-than must be >= 1")
     if delete_branch and not delete_worktree:
         raise click.UsageError("--delete-branch requires --delete-worktree")
-    from forge.cli.session_delete import print_deletion_plan
+    from forge.cli.session_delete import print_cleanup_refusal, print_deletion_plan
     from forge.session.cleanup import clean_old_sessions
 
     result = clean_old_sessions(
@@ -278,6 +266,7 @@ def clean(older_than: int, yes: bool, force: bool, delete_worktree: bool, delete
         delete_worktree=delete_worktree,
         delete_branch=delete_branch,
         force=force,
+        discard_abandoned_leases=force,
     )
     if result.is_empty:
         console.print(f"[dim]No sessions older than {older_than} days found.[/dim]")
@@ -297,10 +286,10 @@ def clean(older_than: int, yes: bool, force: bool, delete_worktree: bool, delete
     for name in result.skipped_unparseable:
         console.print(f"Skipped session with unparseable timestamp: {escape(name)}")
     for skip in result.skipped_project_compatibility:
-        console.print(f"Refused {escape(skip.target)} ({escape(skip.state)}): {escape(skip.reason)}")
+        print_cleanup_refusal(f"{skip.target} ({skip.state})", skip.reason)
         print_tip(skip.recovery, console=console)
     for name, reason in result.failure_items():
-        console.print(f"Refused {escape(name)}: {escape(reason)}")
+        print_cleanup_refusal(name, reason)
     if result.should_exit_nonzero:
         print_error("Session cleanup refused or failed one or more targets.")
         raise SystemExit(1)

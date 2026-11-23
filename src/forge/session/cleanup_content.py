@@ -31,6 +31,8 @@ from forge.search.store import SearchDocumentStore
 from forge.session.models import SessionState
 from forge.session.prev_sessions import child_notes_path, child_path
 
+ABANDONED_WORKER_LEASE = "abandoned-worker-lease"
+
 
 @dataclass(frozen=True)
 class ContentFile:
@@ -70,6 +72,10 @@ class ForgeContentPlan:
     refusals: tuple[str, ...] = ()
     exclusions: tuple[str, ...] = ()
     notes: tuple[str, ...] = ()
+
+    @property
+    def abandoned_worker_leases(self) -> set[Path]:
+        return {Path(item.path) for item in self.files if item.category == ABANDONED_WORKER_LEASE}
 
     def to_dict(self) -> dict[str, Any]:
         """Return the durable retry representation."""
@@ -134,12 +140,24 @@ class _Inventory:
             self.refusals.append(f"Cannot inventory {path}: {error}")
 
 
-def plan_forge_content(state: SessionState, *, forge_root: Path, forge_home: Path | None = None) -> ForgeContentPlan:
+def plan_forge_content(
+    state: SessionState,
+    *,
+    forge_root: Path,
+    forge_home: Path | None = None,
+    abandoned_worker_leases: tuple[Path, ...] = (),
+) -> ForgeContentPlan:
     """Read owned paths without creating locks, directories, or derived state."""
     root = forge_root.expanduser().resolve()
     home = (forge_home or get_forge_home()).expanduser().resolve()
     _safe_name(state.name)
     inventory = _Inventory()
+    for path in abandoned_worker_leases:
+        inventory.add_file(path, home, ABANDONED_WORKER_LEASE)
+    if abandoned_worker_leases:
+        inventory.notes.append(
+            "With --force, cleanup clears the selected abandoned worker leases. Native children may still be running."
+        )
     artifacts = root / ".forge" / "artifacts" / state.name
     inventory.add_tree(artifacts, root, "artifacts")
     inventory.add_tree(root / ".forge" / "prev_sessions" / state.name, root, "transfer")
@@ -303,7 +321,12 @@ def validate_forge_content(plan: ForgeContentPlan) -> None:
         raise ValueError("New search content appeared since cleanup preview")
 
 
-def validate_forge_content_scope(plan: ForgeContentPlan, state: SessionState) -> None:
+def validate_forge_content_scope(
+    plan: ForgeContentPlan,
+    state: SessionState,
+    *,
+    worker_instance_id: str | None = None,
+) -> None:
     """Bind a durable inventory to its session and current global Forge home."""
     _validate_inventory_shape(plan)
     if plan.session_name != state.name or (
@@ -333,6 +356,10 @@ def validate_forge_content_scope(plan: ForgeContentPlan, state: SessionState) ->
                 raise ValueError("Cleanup child context differs from its recorded derivation")
         elif file.category not in {"artifacts", "transfer"} and Path(file.boundary) != home:
             raise ValueError("Cleanup copy or queue marker is outside the current Forge home")
+        elif file.category == ABANDONED_WORKER_LEASE and (
+            worker_instance_id is None or Path(file.path).parent != home / "session-workers" / worker_instance_id
+        ):
+            raise ValueError("Abandoned worker lease does not belong to this forced cleanup's session instance")
     for directory in plan.directories:
         if Path(directory.boundary) not in {home, Path(plan.forge_root)}:
             raise ValueError("Cleanup directory is outside its owning Forge root or home")
@@ -411,6 +438,13 @@ def _owned_file_shape(plan: ForgeContentPlan, file: ContentFile) -> bool:
         )
     if file.category == "queued-work":
         return relative[:-1] in {("pending-work",), ("pending-work", "failed")} and path.suffix == ".json"
+    if file.category == ABANDONED_WORKER_LEASE:
+        return (
+            len(relative) == 3
+            and relative[0] == "session-workers"
+            and re.fullmatch(r"[0-9a-f]{32}", relative[1]) is not None
+            and re.fullmatch(r"[0-9a-f]{32}\.json", path.name) is not None
+        )
     if file.category == "pending-transcript":
         return relative in {
             ("manual-testing", "qa", ".pending-transcript"),

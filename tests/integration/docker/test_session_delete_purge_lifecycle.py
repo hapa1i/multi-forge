@@ -7,6 +7,7 @@ separately approved probe captures real Claude bytes after this offline gate.
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -16,6 +17,7 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from forge.core.paths import get_forge_home
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.claude.paths import encode_project_path
 from forge.session.purge_native import check_native_inactivity
@@ -117,6 +119,55 @@ def test_inactive_child_refuses_parent_cleanup(
     assert result.exit_code == 1 and "child" in result.output
     assert native.exists()
     assert SessionStore(str(root), "parent").exists()
+
+
+def test_force_clears_a_crashed_launch_while_its_native_child_survives(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, container_case_completed: bool
+) -> None:
+    if container_case_completed:
+        return
+    root, home = tmp_path / "project", tmp_path / "native"
+    root.mkdir()
+    monkeypatch.chdir(root)
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(home))
+    native = _fixture(root, "abandoned", home)
+    script = """
+import os, subprocess, sys
+from forge.session.workers import capture_session_instance, session_worker_lease
+root = sys.argv[1]
+instance = capture_session_instance(root, "abandoned")
+with session_worker_lease(root, "abandoned", expected_instance_id=instance, label="session launch"):
+    child = subprocess.Popen(
+        ["claude", "-c", "import select, sys; select.select([sys.stdin], [], [], 60)"],
+        executable=sys.executable, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    print(child.pid, flush=True)
+    os._exit(0)
+"""
+    # Closing the launcher's stdin at the end releases its orphaned synthetic native child.
+    with subprocess.Popen(
+        [sys.executable, "-c", script, str(root)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True,
+    ) as launcher:
+        assert launcher.wait(timeout=15) == 0 and launcher.stdout is not None
+        child_pid = int(launcher.stdout.read())
+        (lease,) = (get_forge_home() / "session-workers").glob("*/*.json")
+        runner = CliRunner()
+        args = ["session", "delete", "--all"]
+        refused = runner.invoke(main, args)
+        assert refused.exit_code == 1 and "--force" in refused.stdout
+        cancelled = runner.invoke(main, [*args, "--force"], input="n\n")
+        assert cancelled.exit_code == 0 and str(lease) in cancelled.stdout and lease.exists()
+        purge = runner.invoke(main, ["session", "purge", "--all", "--force", "--json"])
+        assert purge.exit_code == 1
+        assert any(str(child_pid) in reason for reason in json.loads(purge.stdout)["targets"][0]["refusals"])
+        applied = runner.invoke(main, [*args, "--force", "--yes"])
+        assert applied.exit_code == 0 and "Deleted 1 session" in applied.stdout
+        assert not lease.exists() and not SessionStore(str(root), "abandoned").exists()
+        assert native.exists()
+        os.kill(child_pid, 0)
 
 
 def test_real_process_census_refuses_unmanaged_client(container_case_completed: bool) -> None:

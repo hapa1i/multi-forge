@@ -159,12 +159,15 @@ update of an already tracked package can be repaired by sync.
 | `forge session authority clear <name>`  | Remove the complete authority designation from an inactive session                                                                                                                                                      |
 | `forge session model show [name]`       | Show route intent, latest supported route commitment, labelled live-proxy fallback, provider-declared marking, and launch-scoped outbound effort (`--json`)                                                             |
 | `forge session model history [name]`    | Show every strictly validated routing event in append order and its `supported\|unproven\|null` status (`--json`)                                                                                                       |
-| `forge session delete <name>...`        | Delete Forge content and preserve native conversations (`--all` for current-project bulk deletion)                                                                                                                      |
-| `forge session purge <name>...`         | Preview Forge and verified native content removal; `--yes` applies, `--json` previews, `--all` selects the current project                                                                                              |
+| `forge session delete <name>...`        | Delete Forge content and preserve native conversations. `--all` summarizes the current project selection. Add `--verbose` for the per-session inventory.                                                                |
+| `forge session purge <name>...`         | Preview Forge and verified native removals. `--all` summarizes the current project and lists native paths. `--verbose` shows each inventory, `--json` emits the full preview, and `--yes` applies.                      |
 | `forge session clean --older-than N`    | Preview sessions older than N days; `--yes` to delete                                                                                                                                                                   |
 | `forge session repair`                  | Report session manifests missing from the index (`--json`); `--yes` re-indexes repairable and valid missing-worktree manifests. Scoped to the current Forge root                                                        |
 | `forge session incognito [name]`        | Start an ephemeral session (automatic purge attempt after runtime exit); accepts catalog `--model`/`--model-tier`                                                                                                       |
 | `forge session shell [name]`            | Open shell in sidecar container                                                                                                                                                                                         |
+
+On `session delete`, `session purge` and `session clean`, `--force` permits dirty worktree removal and selects abandoned
+worker leases for cleanup. The preview names each selected lease. A live worker still blocks its session.
 
 `session list --json` and `session show --json` include an additive `launchability` field: `launchable`,
 `missing_worktree`, or `unknown` when no validated recorded path is available. A valid manifest whose recorded worktree

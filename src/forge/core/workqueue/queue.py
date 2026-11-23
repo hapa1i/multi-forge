@@ -538,7 +538,11 @@ def _process_single_marker(
 
             try:
                 with session_worker_lease(
-                    root, session_name, expected_instance_id=token, label="queued " + str(data.get("kind"))
+                    root,
+                    session_name,
+                    expected_instance_id=token,
+                    label="queued " + str(data.get("kind")),
+                    timeout_s=timeout_s,
                 ):
                     return _process_locked_marker(
                         marker_file,
@@ -546,6 +550,9 @@ def _process_single_marker(
                         handlers=handlers,
                         expected_owner=(str(Path(root).resolve()), session_name, token),
                     )
+            except FileLockTimeoutError:
+                # A later drain can admit the same marker after the index writer releases it.
+                return "skipped"
             except (ForgeSessionError, ValueError, OSError) as exc:
                 return _DeferredMarker(f"Pending-work marker {marker_file.name} was not admitted: {exc}")
     return _process_locked_marker(marker_file, timeout_s=timeout_s, handlers=handlers)

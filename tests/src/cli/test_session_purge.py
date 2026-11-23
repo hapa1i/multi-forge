@@ -8,8 +8,10 @@ from pathlib import Path
 import pytest
 
 from forge.cli.main import main
+from forge.core.runtime.codex_rollouts import codex_home
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.claude.paths import encode_project_path
+from forge.session.models import AdoptionConfirmed, CodexConfirmed, LaunchIntent
 from tests.fixtures.session_state import publish_session
 
 THREAD = "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00"
@@ -139,6 +141,49 @@ def test_purge_apply_removes_native_and_forge_record(runner, temp_env, stopped_n
     assert not SessionStore(str(temp_env), "subject").exists()
 
 
+def test_bulk_purge_shows_exact_native_inventory_in_compact_preview(runner, temp_env, stopped_native):
+    transcript = native_file(temp_env, stopped_native)
+    claude = create_session_state("adopted", worktree_path=str(temp_env))
+    claude.confirmed.claude_session_id = THREAD
+    claude.confirmed.claude_project_root = str(temp_env)
+    claude.confirmed.adoption = AdoptionConfirmed(source_runtime="claude_code", source_path=str(transcript))
+    publish_session(IndexStore(), claude, temp_env, forge_root=str(temp_env))
+    thread = "600df106-9a42-4c1f-95fa-36e7080f0dff"
+    rollout = codex_home() / "sessions/2026/10/20" / f"rollout-2026-10-20T00-00-00-{thread}.jsonl"
+    codex = create_session_state("codex", worktree_path=str(temp_env))
+    codex.intent.launch = LaunchIntent(runtime="codex")
+    codex.confirmed.codex = CodexConfirmed(thread_id=thread, rollout_path=str(rollout))
+    publish_session(IndexStore(), codex, temp_env, forge_root=str(temp_env))
+    artifact = temp_env / ".forge/artifacts/adopted/summary.md"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("session artifact")
+    args = ["session", "purge", "--all", "--keep-worktree"]
+
+    preview = runner.invoke(main, args)
+    assert preview.exit_code == 0, preview.output
+    assert "Sessions to purge (2)" in preview.stdout and "--verbose" in preview.stdout
+    assert str(artifact) not in preview.stdout
+    assert f"{transcript} (created outside Forge; original)" in preview.stdout
+    assert f"{rollout} (rollout; already absent)" in preview.stdout
+    assert preview.stdout.count("Provider-side request copies") == 1
+    assert "--yes" in preview.stdout and transcript.is_file()
+
+    verbose = runner.invoke(main, [*args, "-v"])
+    assert verbose.exit_code == 0, verbose.output
+    assert str(artifact) in verbose.stdout and verbose.stdout.count("Provider-side request copies") == 2
+    structured = runner.invoke(main, [*args, "--json"])
+    assert structured.exit_code == 0, structured.output
+    assert runner.invoke(main, [*args, "--json", "-v"]).stdout == structured.stdout
+    assert {target["name"] for target in json.loads(structured.stdout)["targets"]} == {"adopted", "codex"}
+    assert artifact.is_file() and transcript.is_file()
+
+    applied = runner.invoke(main, [*args, "--yes"])
+    assert applied.exit_code == 0, applied.output
+    assert "Purged 2 sessions." in applied.stdout and "Purged session adopted" not in applied.stdout
+    assert "--verbose" not in applied.stdout
+    assert not artifact.exists() and not transcript.exists()
+
+
 def test_delete_cancel_keeps_previewed_state(runner, temp_env):
     seed(temp_env, "subject")
     index = IndexStore().index_path
@@ -155,7 +200,8 @@ def test_purge_batch_refusal_is_not_readmitted_after_child_deleted(runner, temp_
     seed(temp_env, "child", parent="parent")
     result = runner.invoke(main, ["session", "purge", "--all", "--yes", "--keep-worktree"])
     assert result.exit_code == 1, result.output
-    assert "child" in result.output
+    assert "Refused parent" in result.stdout and "child" in result.stdout
+    assert "Purged 1 session." in result.stdout
     assert SessionStore(str(temp_env), "parent").exists()
     assert not SessionStore(str(temp_env), "child").exists()
 

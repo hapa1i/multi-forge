@@ -16,7 +16,7 @@ from forge.session.store import SessionStore
 from forge.session.workers import (
     SESSION_INSTANCE_ENV,
     capture_session_instance,
-    find_active_session_workers,
+    inspect_session_workers,
 )
 from tests.fixtures.session_state import delete_published_session, publish_session
 
@@ -70,7 +70,7 @@ def test_capture_registers_a_live_worker_until_files_and_manifest_finish(
     seen = []
 
     def checked_copy(src, dst, *, overwrite=False):
-        seen.extend(find_active_session_workers(tmp_path, "subject", owner))
+        seen.extend(inspect_session_workers(tmp_path, "subject", owner))
         return original(src, dst, overwrite=overwrite)
 
     monkeypatch.setattr(commands, "safe_copy_file", checked_copy)
@@ -86,8 +86,8 @@ def test_capture_registers_a_live_worker_until_files_and_manifest_finish(
         fail_on_copy_error=True,
         expected_instance_id=owner,
     )
-    assert seen and "Stop" in seen[0]
-    assert not find_active_session_workers(tmp_path, "subject", owner)
+    assert seen and "Stop" in seen[0].refusal
+    assert not inspect_session_workers(tmp_path, "subject", owner)
 
 
 @pytest.mark.parametrize(

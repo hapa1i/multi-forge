@@ -196,10 +196,11 @@ forge session fork <parent> [--name <name>] [--proxy <proxy_id>] [--no-proxy] [-
 
 # Delete
 forge session delete <name>... [--yes] [--keep-worktree] [--delete-branch] [--force]
+forge session delete --all [--verbose] [--yes]
 
 # Purge (preview native-file removal; --yes to apply)
 forge session purge <name>... [--json] [--yes] [--keep-worktree] [--delete-branch] [--force]
-forge session purge --all [--json] [--yes]
+forge session purge --all [--verbose] [--json | --yes]
 
 # Clean (age-based bulk delete; previews by default, --yes to delete)
 forge session clean --older-than DAYS [--yes] [--force] [--delete-worktree] [--delete-branch]
@@ -266,17 +267,28 @@ exclusions, then use `--yes` to apply. `--json` emits a read-only preview. Adopt
 labelled as created outside Forge. Purge supports the verified Claude 2.1.245 and Codex 0.162.1 layouts; unsupported or
 ambiguous files refuse removal.
 
-Both verbs refuse existing dependent sessions, including inactive children, borrowed plans and supervisor bindings. They
-also refuse active sessions or workers; `--force` bypasses dirty-worktree protection only. Purge additionally requires a
-successful native process census and refuses while any client of the selected runtime is observed. Claude Code CLIs,
-including Desktop's bundled copy, count; the Desktop chat app does not. This check cannot prevent an external client
-from starting afterward. Exit native clients before applying purge. Codex purge checks supported rollout headers for
-descendants regardless of filename age; unknown layouts and uncharacterized archived entries refuse removal.
+Both verbs refuse existing dependent sessions, including inactive children, borrowed plans and supervisor bindings.
+Active sessions and live workers also block cleanup. Purge additionally requires a successful native process census and
+refuses while any client of the selected runtime is observed. Claude Code CLIs, including Desktop's bundled copy, count;
+the Desktop chat app does not. This check cannot prevent an external client from starting afterward. Exit native clients
+before applying purge. Codex purge checks supported rollout headers for descendants regardless of filename age; unknown
+layouts and uncharacterized archived entries refuse removal.
 
-`delete --all` and `purge --all` select only the current Forge project, including incognito sessions. They cannot be
-combined with names or `--forge-root`. Every target is admitted before deletion starts; dependent targets stay refused
-for that batch even if another selected session is removed. Eligible targets are processed and any refusal or failure
-produces a nonzero exit. An empty project succeeds.
+`delete --all` and `purge --all` select sessions owned by the current Forge project, including incognito sessions. From
+a sibling Git worktree, `session list` defaults to the whole repository. Use `session list --scope project` inside a
+Forge project to see its sessions. Both bulk cleanup commands require a local `.forge/` and accept no names or
+`--forge-root`. Every target is admitted before cleanup starts. Dependent targets stay refused for that batch even if
+another selected session is removed. Any refusal or failure produces a nonzero exit. An empty project succeeds.
+
+Both bulk previews name the sessions selected for removal and explain each refusal. They summarize routine Forge files
+and list worktrees, branches, user-authored transfer notes and external files. `purge --all` also shows each native
+path, including which conversations were created outside Forge. Add `--verbose` to either command for each session's
+full inventory and exclusions.
+
+You can run `session list` while another project is cleaning up. When the shared index is busy, Forge shows a snapshot
+of confirmed sessions and prints a hint on stderr, including with `--json`. Sessions being created and older records
+whose ownership Forge has yet to verify can be missing from that snapshot. Rerun the listing after cleanup for the full
+result.
 
 Worktrees are removed by default for explicit delete/purge when owned and unshared; `--keep-worktree` preserves them,
 and `--delete-branch` additionally removes their branch. Cleanup refuses worktree removal when it overlaps the selected
@@ -285,11 +297,14 @@ a Forge-home symlink inside the checkout whose target is elsewhere. Retaining a 
 original working directory. For an explicit name, `--forge-root /absolute/project` selects its owner without requiring
 that checkout to exist.
 
-An interrupted cleanup exits nonzero and retains its private inventory under `$FORGE_HOME/session-cleanup/`. Retry the
-printed command with its original options; it names `--forge-root` so it still works after checkout removal. The name
-stays reserved until that inventory completes. Changed files, new content or replacement ownership refuse instead of
-expanding the approved set. A crashed worker may leave a lease under `$FORGE_HOME/session-workers/`; inspect its native
-subprocesses before explicitly removing an abandoned lease. `--force` does not bypass these checks.
+If a file changes between preview and confirmation, review a fresh preview before applying cleanup. Once Forge saves the
+approved inventory under `$FORGE_HOME/session-cleanup/`, an interruption prints a retry command with the original
+options and `--forge-root`. It works even after checkout removal. The name stays reserved until that inventory
+completes. Changed files, new content or replacement ownership refuse instead of expanding the approved set. A crashed
+worker may leave a lease under `$FORGE_HOME/session-workers/`. Use `forge session delete --all --force` to preview
+abandoned leases and confirm their removal with the sessions. A recorded launcher that has exited may have left a native
+child running. `--force` accepts that risk and also permits removal of dirty worktrees. Add `--keep-worktree` to
+preserve those checkouts. For a delegated sidecar, Forge checks that the container has stopped.
 
 Purge cannot remove provider-side copies, Git history, global telemetry, project memory documents, unrecorded copies,
 Claude history/file-history or unverified native indexes. Unknown historical QA/reviewer copies are listed as
@@ -302,11 +317,13 @@ forge session clean --older-than 30 --yes   # Apply; native conversations remain
 forge config set session_retention_days=90
 ```
 
-Clean and automatic retention use delete semantics and keep worktrees unless explicitly requested by manual clean. They
-skip active sessions and refuse dependencies, worker leases, incompatible projects or unreadable state. Cleanup previews
-and cancelled confirmation do not drain queued work or repair indexes. Starting incognito authorizes its automatic purge
-attempt after runtime exit. Incomplete cleanup offers recovery only when the original ownership is verified; an initial
-refusal offers a new preview, while an interrupted inventory offers its exact retry command.
+Clean and automatic retention use delete semantics and keep worktrees unless explicitly requested by manual clean. Only
+an explicit `--force` on session delete, purge or clean can clear abandoned worker leases. Automatic retention and
+incognito cleanup keep them. Active sessions, dependencies, incompatible projects and unreadable state still block
+cleanup. Cleanup previews and cancelled confirmation do not drain queued work or repair indexes. Starting incognito
+authorizes its automatic purge attempt after runtime exit. Incomplete cleanup offers recovery only when the original
+ownership is verified; an initial refusal offers a new preview, while an interrupted inventory offers its exact retry
+command.
 
 ### Repairing invisible sessions
 
@@ -376,19 +393,23 @@ common worktree cases are:
 Most session commands resolve sessions **workspace-wide** — if `list` shows a session, you can interact with it
 regardless of which Forge project you're currently in (within the same git repo):
 
-| Command                                | Scope                | Notes                                             |
-| :------------------------------------- | :------------------- | :------------------------------------------------ |
-| `session list`                         | Workspace (default)  | `--scope project` / `--scope all`                 |
-| `session show`                         | Workspace-wide       | Prefers current project; shows cross-project note |
-| `session delete` / `purge` (named)     | Workspace-wide       | Prefers current project; shows cross-project note |
-| `session delete --all` / `purge --all` | Current project only | Requires being inside a Forge project             |
-| `session set` / `reset`                | Workspace-wide       | Via `--session` flag                              |
-| Claude `session resume` / `fork`       | Current project only | CWD-dependent (Claude Code constraint)            |
-| Codex `session resume`                 | Resolved session     | Cross-CWD; runs in the recorded worktree          |
-| `session clean`                        | Global               | All projects regardless of CWD                    |
+| Command                                | Scope                                 | Notes                                             |
+| :------------------------------------- | :------------------------------------ | :------------------------------------------------ |
+| `session list`                         | Workspace (default)                   | `--scope project` / `--scope all`                 |
+| `session show`                         | Workspace-wide                        | Prefers current project; shows cross-project note |
+| `session delete` / `purge` (named)     | Workspace-wide inside a Forge project | Prefers current project, prints the owning root   |
+| `session delete --all` / `purge --all` | Current project only                  | Requires being inside a Forge project             |
+| `session set` / `reset`                | Workspace-wide                        | Via `--session` flag                              |
+| Claude `session resume` / `fork`       | Current project only                  | CWD-dependent (Claude Code constraint)            |
+| Codex `session resume`                 | Resolved session                      | Cross-CWD; runs in the recorded worktree          |
+| `session clean`                        | Global                                | All projects regardless of CWD                    |
 
 When the same session name exists in multiple Forge projects within the repo, the current project wins. If you're not in
 any of them, you'll see an error listing the locations.
+
+From a worktree without a Forge project, `list --scope project` falls back to workspace scope. A named `delete` or
+`purge` there looks for a unique name in the global index, which can resolve to a different repository. Pass
+`--forge-root /absolute/project` with the name to select its owner explicitly.
 
 ### Inspect the workspace's worktrees
 

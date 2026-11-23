@@ -10,7 +10,7 @@ from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
-from forge.cli.output import err_console, print_error
+from forge.cli.output import err_console, print_error, print_tip
 from forge.core.ops import ForgeOpError, list_workspace_worktrees
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.workspace import WorkspaceWorktreeSummary
@@ -37,6 +37,8 @@ def worktrees(as_json: bool) -> None:
         print_error(str(exc), console=err_console)
         sys.exit(1)
 
+    if result.hint:
+        print_tip(result.hint, blank_before=False, console=err_console)
     if as_json:
         payload = {
             "primary_root": str(result.primary_root),
