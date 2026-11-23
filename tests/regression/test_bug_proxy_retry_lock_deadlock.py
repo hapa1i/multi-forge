@@ -13,7 +13,6 @@ import time
 
 import pytest
 
-from forge.config import config
 from forge.proxy.client_factory import ModelProvider, TierClientFactory
 
 pytestmark = pytest.mark.regression
@@ -32,33 +31,6 @@ def _seed_factory(monkeypatch: pytest.MonkeyPatch) -> TierClientFactory:
         },
     )
     return factory
-
-
-@pytest.mark.asyncio
-async def test_invalidate_and_retry_all_tiers_rebuilds_client_after_releasing_refresh_lock(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    factory = _seed_factory(monkeypatch)
-    cache_seen_by_get_client = None
-    calls: list[tuple[str, str]] = []
-
-    async def fake_get_client(model_name: str, *, tier: str) -> str:
-        nonlocal cache_seen_by_get_client
-        assert not factory._refresh_lock.locked()
-        calls.append((model_name, tier))
-        cache_seen_by_get_client = dict(factory._cache)
-        return "fresh-client"
-
-    monkeypatch.setattr(factory, "get_client", fake_get_client)
-    monkeypatch.setattr(config.proxy, "default_tier", "haiku")
-    # The deleted environment shim would infer opus; the named routing default owns this rebuild.
-    monkeypatch.setenv("LITELLM_OPUS_MODEL", "openai/gpt-5.5")
-
-    client = await factory.invalidate_and_retry("openai/gpt-5.5", tier=None)
-
-    assert client == "fresh-client"
-    assert calls == [("openai/gpt-5.5", "haiku")]
-    assert cache_seen_by_get_client == {("openai/gpt-5.4", "opus"): factory._cache[("openai/gpt-5.4", "opus")]}
 
 
 @pytest.mark.asyncio

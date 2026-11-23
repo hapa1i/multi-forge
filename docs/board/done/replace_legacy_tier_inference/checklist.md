@@ -30,8 +30,8 @@ Current focus: complete -- order 16 shipped in PR #195 (`aca65c7f`); order 17 re
 - [x] Run full pre-commit, diff, design-size, and board-integrity checks: both living design documents remain below 30k
   tokens, all 886 local links across 349 board documents resolve, and Wave 7 is 15 `done` / 1 `doing` / 19 `todo`.
 - [x] Verify the post-PR auth-invalidation review and record the provider-scoped decision separately in
-  [`resolve_proxy_auth_invalidation_scope`](../../proposed/resolve_proxy_auth_invalidation_scope/card.md), without
-  changing order 16's invalidation breadth.
+  [`resolve_proxy_auth_invalidation_scope`](../../doing/resolve_proxy_auth_invalidation_scope/card.md), without changing
+  order 16's invalidation breadth.
 - [x] Open draft PR #195 for order 16.
 - [x] Close the member after PR #195 merged as `aca65c7f` with all five GitHub checks passing.
 - [x] Complete the post-merge audit: all 887 local links across 350 board documents resolve, the Wave 7 graph is 16

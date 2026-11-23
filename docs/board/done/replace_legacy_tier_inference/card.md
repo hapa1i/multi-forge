@@ -47,8 +47,8 @@ unchanged.
 
 Post-PR review confirmed that the `tier=None` branch is test-only and that the production auth-failure path evicts only
 the failed `(model, tier)` adapter. The underlying credential cache is provider-scoped, so the intended invalidation
-domain may be wider than either one tier or all tiers for one model. The proposed
-[`resolve_proxy_auth_invalidation_scope`](../../proposed/resolve_proxy_auth_invalidation_scope/card.md) card owns the
+domain may be wider than either one tier or all tiers for one model. The
+[`resolve_proxy_auth_invalidation_scope`](../../doing/resolve_proxy_auth_invalidation_scope/card.md) card owns the
 explicit decision; this card does not broaden invalidation or change retry hyperparameters.
 
 PR #195 merged as `aca65c7f` after 50 focused tests, 794 proxy unit tests, 9,200 full unit tests (one skip, 122

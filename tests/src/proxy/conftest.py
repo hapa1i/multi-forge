@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 import forge.proxy.proxy_orchestrator as _orchestrator_module
+from forge.proxy.client_factory import TierClientFactory
 from forge.proxy.proxies import ProxyRegistryStore
 from tests.fixtures.proxy_transport import ProxyTransportFake
 
@@ -169,3 +170,30 @@ def proxy_runtime_ready(monkeypatch: pytest.MonkeyPatch, server_stubs):
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server, "cost_tracker", None)
     return server
+
+
+# ---------------------------------------------------------------------------
+# Client factory fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def tier_client_factory(monkeypatch: pytest.MonkeyPatch) -> TierClientFactory:
+    """Return a fresh ``TierClientFactory`` in place of the process-wide singleton.
+
+    Other tests write adapter classes straight into the singleton, so a new instance is built
+    and the original is restored afterwards.
+    Dotenv loading is disabled and provider-selection variables are cleared so ``openai/`` models
+    route to remote LiteLLM whatever the developer's shell or ``.env`` sets.
+    Used by: test_client_factory.py, test_client_factory_integration.py.
+    """
+    # load_config() reloads .env without overriding, which would restore any variable deleted below.
+    monkeypatch.setenv("PYTHON_DOTENV_DISABLED", "1")
+    for name in ("PREFERRED_PROVIDER", "MODEL_FAMILY", "FORGE_PROXY_ID"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(TierClientFactory, "_instance", None)
+    factory = TierClientFactory()
+    # The constructor reads TTLs from the environment. Pin them so cached clients never expire mid-test.
+    factory._default_ttl = 3600.0
+    factory._litellm_ttl = 3600.0
+    return factory
