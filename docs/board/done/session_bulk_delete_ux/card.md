@@ -1,5 +1,7 @@
 # Make session index contention and bulk deletion readable
 
+Shipped on `main` on 2026-11-23. [Completed checklist](checklist.md)
+
 A concurrent delete held the global session index lock long enough for `forge sess list` to print a Python traceback.
 The delete preview printed the same nine QA and walkthrough exclusions for each of 105 sessions. Thirteen worker lease
 refusals were interleaved with that inventory.

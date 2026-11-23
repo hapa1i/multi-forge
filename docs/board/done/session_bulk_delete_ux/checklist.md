@@ -1,6 +1,7 @@
 # Session cleanup CLI verification
 
-The implementation is on `codex/session-bulk-delete-ux`, based on `main` at `3e62973f`.
+Merged into `main` on 2026-11-23 as `3e88e270`. Its tree matches the tested PR head `1745b04f`.
+[PR #305](https://github.com/hapa1i/multi-forge/pull/305)
 
 | Fixture                                    | Expected result                                                                           |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
@@ -45,4 +46,8 @@ The implementation is on `codex/session-bulk-delete-ux`, based on `main` at `3e6
   All passed.
 - [x] Reproduce the CI failure at 40 columns. Delete, purge and age-based clean now print each refused lease path and
   its `--force` hint on one copyable line.
-- [ ] Record the merge and changelog entry and close the card after it ships.
+- [x] Verify the merged change. Python 3.11 and 3.13 each passed 12,060 unit tests and the same 2,732 regressions. All
+  636 standard integration tests passed locally.
+  [CI run](https://github.com/hapa1i/multi-forge/actions/runs/45132880620)
+- [x] Move the card to `done` and record the outcome in the
+  [change log](../../change_log.md#keep-session-listings-available-during-bulk-cleanup).

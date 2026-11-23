@@ -10,6 +10,21 @@ Older entries are retained verbatim in [2026-08-23 through 2026-08-24](archive/c
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-11-23
+
+### Keep session listings available during bulk cleanup
+
+`forge session list` now shows confirmed sessions while cleanup in another project holds the shared index lock. A hint
+on stderr explains which sessions the snapshot may omit.
+
+- `delete --all` and `purge --all` summarize routine Forge files and name each refused session. Purge lists the native
+  paths it would remove. `--verbose` shows the full inventory for each session.
+- Manual cleanup can clear an abandoned worker lease with `--force`. A live worker still blocks removal. If a file
+  changes before confirmation, Forge asks for a fresh preview. A `--yes` retry requires a saved, approved inventory.
+
+Python 3.11 and 3.13 each passed 12,060 unit tests and 2,732 regressions. All 636 standard integration tests passed.
+[Completed checklist](done/session_bulk_delete_ux/checklist.md)
+
 ## 2026-11-21
 
 ### Serve Claude Code and Codex on one OpenRouter proxy
