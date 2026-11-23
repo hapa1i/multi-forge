@@ -79,8 +79,13 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
     base_url = proxy.get_provider().base_url
     try:
         source = resolve_responses_source(proxy.backend, proxy.preferred_provider, proxy.wire_shape, base_url)
-    except ValueError as exc:
-        return openrouter_responses.refusal("configuration_error", str(exc), request_id)
+    except ValueError:
+        logger.warning("[%s] Responses source configuration is invalid", request_id)
+        return openrouter_responses.refusal(
+            "configuration_error",
+            "Check the Responses backend and its base URL. Remote OpenRouter bases require HTTPS.",
+            request_id,
+        )
     if source is None:
         return _error(501, "not_implemented", "This proxy does not serve the Responses API.")
 
@@ -126,8 +131,15 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
     if direct:
         try:
             body = openrouter_responses.prepare_request(body or {}, config.proxy.get_provider())
-        except ValueError as exc:
-            return openrouter_responses.refusal("invalid_request", str(exc), request_id)
+        except openrouter_responses.RequestPolicyError as exc:
+            return openrouter_responses.refusal("invalid_request", exc.public_message, request_id)
+        except ValueError:
+            logger.warning("[%s] Responses request preparation failed", request_id)
+            return openrouter_responses.refusal(
+                "invalid_request",
+                "The proxy could not prepare this Responses request.",
+                request_id,
+            )
     model = str(body["model"]) if direct and body else requested_model
     resolved_tier = getattr(config.proxy, "default_tier", None) or "sonnet"
     streaming = body is not None and bool(body.get("stream"))

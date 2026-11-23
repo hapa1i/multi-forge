@@ -23,6 +23,48 @@ from forge.proxy.server import _cap_result_message
 pytestmark = pytest.mark.regression
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "operation,expected_code",
+    [
+        ("forge.backend.responses.resolve_responses_source", "configuration_error"),
+        ("forge.proxy.openrouter_responses.prepare_request", "invalid_request"),
+    ],
+)
+async def test_responses_ingress_hides_unexpected_validation_details(
+    monkeypatch: pytest.MonkeyPatch, operation: str, expected_code: str
+) -> None:
+    from starlette.requests import Request
+
+    from forge.config import load_config
+    from forge.proxy import responses_ingress, server
+
+    internal_detail = "responses-internal-fixture-detail"
+    monkeypatch.setattr(server, "config", load_config(template="codex-responses-openrouter"))
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    failing_operation = MagicMock(side_effect=ValueError(internal_detail))
+    monkeypatch.setattr(operation, failing_operation)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda _: "fixture-key")
+    forward = AsyncMock(side_effect=AssertionError("Rejected requests must not reach the upstream"))
+    monkeypatch.setattr("forge.proxy.responses_passthrough.forward", forward)
+    request = Request(
+        {"type": "http", "state": {"request_id": "req_safe_error"}},
+        receive=AsyncMock(return_value={"type": "http.request", "body": b""}),
+    )
+
+    response = await responses_ingress.handle_responses_passthrough(request, method="POST", url_path="/v1/responses")
+
+    assert response.status_code == 400
+    assert response.headers["X-Request-ID"] == "req_safe_error"
+    body = json.loads(bytes(response.body))
+    assert body["error"]["type"] == "invalid_request_error"
+    assert body["error"]["code"] == expected_code
+    assert body["error"]["message"]
+    assert internal_detail not in json.dumps(body)
+    failing_operation.assert_called_once()
+    forward.assert_not_awaited()
+
+
 def test_bug_cap_message_format() -> None:
     result = CapResult(exceeded=True, cap_type="daily", current_micros=5_500_000, limit_micros=5_000_000)
     msg = _cap_result_message(result)
