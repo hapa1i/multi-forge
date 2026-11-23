@@ -7,7 +7,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
+from typing import Any, LiteralString
 
 from fastapi.responses import JSONResponse
 
@@ -89,14 +89,23 @@ class OpenRouterResponseEvidence:
         }
 
 
+class RequestPolicyError(ValueError):
+    """A request-policy refusal with a fixed message suitable for the client."""
+
+    def __init__(self, public_message: LiteralString) -> None:
+        super().__init__(public_message)
+        self.public_message = public_message
+
+
 def _validate_tools(tools: Any) -> None:
     if not isinstance(tools, list):
-        raise ValueError("Expected a list of Responses tools.")
+        raise RequestPolicyError("Expected a list of Responses tools.")
     for tool in tools:
         kind = tool.get("type") if isinstance(tool, dict) else None
         if kind not in ("function", "custom", "namespace"):
-            raise ValueError(
-                f"Tool type {kind!r} is unavailable under required ZDR. Remove it or set allow_non_zdr=true."
+            raise RequestPolicyError(
+                "Required ZDR allows only function, custom, and namespace tools. "
+                "Remove unsupported tools or set allow_non_zdr=true."
             )
         if kind == "namespace" or "tools" in tool:
             _validate_tools(tool.get("tools"))
@@ -109,9 +118,11 @@ def prepare_request(body: dict[str, Any], provider: Any) -> dict[str, Any]:
     result.pop("prompt_cache_key", None)
     model = result.get("model")
     if not isinstance(model, str) or not model.strip():
-        raise ValueError("Supply an OpenRouter model slug.")
+        raise RequestPolicyError("Supply an OpenRouter model slug.")
     if body.get("background"):
-        raise ValueError("Background Responses require polling. This proxy supports synchronous creates and streaming.")
+        raise RequestPolicyError(
+            "Background Responses require polling. This proxy supports synchronous creates and streaming."
+        )
     if provider.allow_non_zdr:
         return result
     if "tools" in body:
@@ -123,25 +134,27 @@ def prepare_request(body: dict[str, Any], provider: Any) -> dict[str, Any]:
                 _validate_tools(item.get("tools"))
     routing = result.get("provider", {})
     if not isinstance(routing, dict):
-        raise ValueError("The OpenRouter provider field must be an object.")
+        raise RequestPolicyError("The OpenRouter provider field must be an object.")
     result["provider"] = {**routing, "zdr": True}
     result["model"] = model_for_zdr_policy(model, provider="openrouter", provider_config=provider)
     alternatives = body.get("models", [])
     if not isinstance(alternatives, list) or any(not isinstance(slug, str) for slug in alternatives):
-        raise ValueError("Expected a list of alternative OpenRouter model slugs.")
+        raise RequestPolicyError("Expected a list of alternative OpenRouter model slugs.")
     if any("online" in slug.strip().lower().split(":")[1:] for slug in (model, result["model"], *alternatives)):
-        raise ValueError("Online model variants enable hosted search. Remove the variant or set allow_non_zdr=true.")
+        raise RequestPolicyError(
+            "Online model variants enable hosted search. Remove the variant or set allow_non_zdr=true."
+        )
     result["plugins"] = _disabled_plugins(body.get("plugins", []))
     return result
 
 
 def _disabled_plugins(plugins: Any) -> list[dict]:
     if not isinstance(plugins, list):
-        raise ValueError("Expected a list of OpenRouter plugins.")
+        raise RequestPolicyError("Expected a list of OpenRouter plugins.")
     disabled = []
     for plugin in plugins:
         if not isinstance(plugin, dict) or not isinstance(plugin.get("id"), str) or plugin.get("enabled") is not False:
-            raise ValueError(
+            raise RequestPolicyError(
                 "Hosted plugins are unavailable under required ZDR. Disable them or set allow_non_zdr=true."
             )
         disabled.append({"id": plugin["id"], "enabled": False})

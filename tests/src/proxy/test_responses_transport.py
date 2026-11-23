@@ -1280,7 +1280,9 @@ async def test_responses_catalog_error_does_not_leak_exception_text(monkeypatch,
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("reason,status", [("base", 400), ("missing_key", 401), ("declared_cost_gap", 400)])
+@pytest.mark.parametrize(
+    "reason,status", [("base", 400), ("missing_key", 401), ("declared_cost_gap", 400), ("tool", 400)]
+)
 async def test_direct_openrouter_refuses_before_dispatch(monkeypatch, proxy_runtime_ready, reason, status):
     from dataclasses import replace
 
@@ -1310,9 +1312,17 @@ async def test_direct_openrouter_refuses_before_dispatch(monkeypatch, proxy_runt
         pytest.fail("A local refusal reached dispatch")
 
     monkeypatch.setattr(rp, "forward", unexpected)
+    body: dict[str, object] = {"model": "fixture"}
+    if reason == "tool":
+        body["tools"] = [{"type": "fixture_tool"}]
     resp = await ri.handle_responses_passthrough(
-        _RawReq(body=b'{"model":"fixture"}'), method="POST", url_path="/v1/responses"
+        _RawReq(body=json.dumps(body).encode()), method="POST", url_path="/v1/responses"
     )
     assert resp.status_code == status
     if reason == "declared_cost_gap":
         assert b"costs.on_unreported_cost=allow" in resp.body
+    if reason == "tool":
+        error = json.loads(resp.body)["error"]
+        assert error["code"] == "invalid_request"
+        assert "allow_non_zdr=true" in error["message"] and "fixture_tool" not in error["message"]
+        assert resp.headers["X-Request-ID"] == "req_gate"

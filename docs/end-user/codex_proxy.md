@@ -60,6 +60,10 @@ credential profile or the project's `.env`. Set `PYTHON_DOTENV_DISABLED=1` to di
 
 ## Spend and diagnostics
 
+For a local HTTP 400 refusal, check the error code. `configuration_error` points to the Responses backend or its base
+URL. A request-policy refusal uses `invalid_request` and explains which field or setting to change. If preparation fails
+unexpectedly, use the `X-Request-ID` response header to find the event in the proxy log.
+
 Messages and Responses share the proxy’s daily and monthly spend caps. Direct Responses uses the OpenRouter account
 charge in `usage.cost`, rounded per request to integer microdollars. A zero account charge on BYOK counts as zero. A
 separate bill from the BYOK provider falls outside this cap. A stream that ends before its terminal usage can also leave
