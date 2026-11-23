@@ -21,6 +21,7 @@ Sol. The bundled deployments include 12-hour cache-write prices for receipts tha
 Offline pricing tests covered both sides of the 272,000-token threshold. Eleven Docker cases passed across Ultrafast,
 OpenAI routing and streamed LiteLLM cost. With mixed 30-minute and 12-hour writes, the Responses fixture confirmed that
 each model's gateway amount reached telemetry and both spend caps, and the next request was rejected.
+[Completed checklist](done/gpt_62_ultrafast_long_context_cost/checklist.md)
 
 ### Keep session listings available during bulk cleanup
 

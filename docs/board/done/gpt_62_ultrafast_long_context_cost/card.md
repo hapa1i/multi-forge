@@ -1,5 +1,7 @@
 # Count the full GPT-6.2 Ultrafast cost above 272,000 input tokens
 
+Shipped on `main` on 2026-11-23. [Completed checklist](checklist.md)
+
 During launch, OpenAI prices Ultrafast at three times the Standard rate for the request's context length. Forge's
 bundled Astra and Sol deployments specify the short- and long-context prices. LiteLLM 1.102.2 drops the long-context
 Ultrafast fields from its pricing lookup. At 272,001 input tokens the gateway reports the Standard amount, and Forge

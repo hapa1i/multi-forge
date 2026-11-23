@@ -5,7 +5,7 @@ Standard through February 28 and 6 times Standard beginning March 1. This applie
 context length. [OpenAI pricing](https://developers.openai.com/api/docs/pricing)
 
 Forge ships explicit prices for both deployments in `src/forge/config/defaults/backends/litellm.yaml`. The
-[long-context accounting fix](../../doing/gpt_62_ultrafast_long_context_cost/card.md) covers the launch period.
+[long-context accounting fix](../../done/gpt_62_ultrafast_long_context_cost/card.md) covers the launch period.
 
 - Recheck OpenAI's effective prices and the locked LiteLLM cost map before the change takes effect. Update the bundled
   inputs, outputs and cache rates for both models wherever a deployment override is still required.

@@ -30,9 +30,9 @@ check in place, supervisor setup refused both IDs on 0.149.1 and accepted them o
 0.166.0 boundary and the exact `-m` argument for each model at dispatch.
 [Codex model requirements](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex)
 
-The March 1, 2027 rate change and gateway verification are tracked on the
-[March Ultrafast pricing card](../../todo/gpt_62_ultrafast_pricing/card.md) and
-[long-context accounting fix](../../doing/gpt_62_ultrafast_long_context_cost/card.md).
+The managed gateway passed verification for the Ultrafast launch rates. The March 1, 2027 rate change has its own card.
+[Long-context accounting fix](../gpt_62_ultrafast_long_context_cost/card.md) ·
+[March Ultrafast pricing card](../../todo/gpt_62_ultrafast_pricing/card.md)
 
 The initial 32 integration cases covered local and remote LiteLLM templates against a disposable gateway, retained
 backend configurations, shared-proxy routing, and direct Codex and mixed Claude/Codex panels. The follow-up passed 15
