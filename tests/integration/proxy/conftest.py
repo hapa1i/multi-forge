@@ -60,6 +60,7 @@ class FakeOpenAIUpstream:
 
     base_url: str
     requests: list[dict[str, Any]]
+    response_usage: dict[str, Any] | None = None
 
 
 @dataclass
@@ -421,6 +422,7 @@ def fake_litellm_openai() -> Generator[FakeOpenAIUpstream, None, None]:
     """Serve a hermetic Responses API endpoint and capture its request bodies."""
     port = allocate_ephemeral_port()
     requests: list[dict[str, Any]] = []
+    upstream = FakeOpenAIUpstream(base_url=f"http://127.0.0.1:{port}/v1", requests=requests)
 
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self) -> None:  # noqa: N802
@@ -457,6 +459,8 @@ def fake_litellm_openai() -> Generator[FakeOpenAIUpstream, None, None]:
                     "tool_choice": "auto",
                     "tools": [],
                     "status": "completed",
+                    **({"usage": upstream.response_usage} if upstream.response_usage is not None else {}),
+                    **({"service_tier": request_body["service_tier"]} if "service_tier" in request_body else {}),
                 }
             ).encode()
             self.send_response(200)
@@ -473,7 +477,7 @@ def fake_litellm_openai() -> Generator[FakeOpenAIUpstream, None, None]:
     thread.start()
 
     try:
-        yield FakeOpenAIUpstream(base_url=f"http://127.0.0.1:{port}/v1", requests=requests)
+        yield upstream
     finally:
         server.shutdown()
         server.server_close()

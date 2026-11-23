@@ -91,12 +91,8 @@ class LiteLLMAdapter(BackendAdapter):
             already be in os.environ - validation happens before this method
             is called. We pass through the full environment to the subprocess.
         """
-        # Build command — resolve the litellm binary from the same venv as
-        # sys.executable, rather than relying on a bare 'litellm' on PATH.
-        # Console scripts (pip, litellm, etc.) are always siblings of python
-        # in the venv's bin/ directory.
-        litellm_bin = str(Path(sys.executable).parent / "litellm")
-        cmd = [litellm_bin, "--config", str(config_path), "--port", str(port)]
+        # Run the stock gateway CLI with Forge's billing backport in its own interpreter.
+        cmd = [sys.executable, "-m", "forge.backend.litellm_pricing", "--config", str(config_path), "--port", str(port)]
 
         # Pass through current environment (includes API keys loaded by load_config)
         log_file = get_forge_home() / "logs" / "backend" / f"litellm-{port}.log"

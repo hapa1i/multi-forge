@@ -353,11 +353,25 @@ names with the correct upstream credentials. Start the updated backend, then run
 
 Standard short-context prices per million tokens are $8 input, $0.40 cached input, and $40 output for Astra. Sol costs
 $2, $0.10, and $10 respectively. Above 272,000 input tokens, input and cache rates double and output costs 1.5 times the
-short-context rate for the whole request. LiteLLM 1.102.2 reports the Standard long-context cost for an Ultrafast
-request above that threshold. A Forge cap therefore counts one third of the published Ultrafast launch price. The
-Ultrafast rate is 3 times Standard through February 28, 2027 and 6 times Standard from March 1 (Pacific time). Operators
-using Ultrafast should refresh the saved backend pricing when the rate changes.
+short-context rate for the whole request. Ultrafast costs 3 times the applicable Standard rate through February 28,
+2027, and 6 times Standard from March 1 (Pacific time). Update the saved prices at the cutover.
 [OpenAI pricing](https://developers.openai.com/api/docs/pricing)
+
+The stock LiteLLM 1.102.2 gateway falls back to Standard pricing above 272,000 input tokens on Ultrafast. Forge's
+managed gateway includes a pricing backport for Astra and Sol. Upgrade Forge and restart the **backend** to pick up the
+correction if your saved deployment already has the long-context Ultrafast rates. For 12-hour cache writes, or if those
+rates are missing, merge the pricing fields from the model's bundled `model_info` into your saved deployment before
+restarting. Earlier Forge snapshots supplied only the 30-minute write rates. The gateway charges the 12-hour rate when
+the upstream response reports how many writes had that retention. If OpenAI serves a different tier from the one
+explicitly requested, LiteLLM 1.102.2 uses the requested tier to calculate the cost. In that case, Forge's telemetry and
+caps can differ from the provider's bill.
+[Saved backend upgrade procedure](proxy.md#updating-saved-proxy-and-backend-configurations)
+
+For an independently operated gateway, run `python -m forge.backend.litellm_pricing` in the updated Forge environment
+with the gateway's usual `--config` and `--port` arguments. The launcher also installs the correction in each Uvicorn
+worker when using `--num_workers`. The stock `litellm` command bypasses the backport. If you use another launcher,
+verify its reported price on both sides of the threshold. Earlier telemetry and cap totals retain the amounts originally
+reported. Direct OpenRouter routes use the cost in OpenRouter's response.
 
 ### Picking up current model defaults and alternatives after an upgrade
 

@@ -210,7 +210,9 @@ def test_native_pricing_without_remote_model_metadata(model: str, cases: list[tu
         import json
         import sys
         import litellm
+        from forge.backend.litellm_pricing import install_pricing_backport
 
+        install_pricing_backport()
         data = json.load(sys.stdin)
         entry = data["entry"]
         provider = entry["model_name"].split("/", 1)[0]
@@ -268,14 +270,11 @@ def test_native_pricing_without_remote_model_metadata(model: str, cases: list[tu
             assert info[f"{long_rate}_ultrafast"] == pytest.approx(info[long_rate] * 3)
     actual = _run_offline(script, {"entry": entry, "cases": cases, "tiers": list(tiers)})
 
-    for tier_result, (tier, multiplier) in zip(actual["tiers"], tiers.items(), strict=True):
+    for tier_result, multiplier in zip(actual["tiers"], tiers.values(), strict=True):
         for costs, response_cost, case in zip(tier_result["costs"], tier_result["response_costs"], cases, strict=True):
-            prompt, _, _, expected_input, expected_output = case
-            # LiteLLM 1.102 drops long-context Ultrafast keys from get_model_info().
-            # When upstream fixes this, remove the exception and update the upgrade guide.
-            applied = 1.0 if tier == "ultrafast" and prompt > 272_000 else multiplier
-            assert costs == pytest.approx((expected_input * applied, expected_output * applied))
-            assert response_cost == pytest.approx((expected_input + expected_output) * applied)
+            _, _, _, expected_input, expected_output = case
+            assert costs == pytest.approx((expected_input * multiplier, expected_output * multiplier))
+            assert response_cost == pytest.approx((expected_input + expected_output) * multiplier)
     if model == "anthropic/claude-opus-5-5":
         assert actual["hour_cache_cost"] == pytest.approx((0.0008, 0.0002))
     elif model == "anthropic/claude-sonnet-5-5":

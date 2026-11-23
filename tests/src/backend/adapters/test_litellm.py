@@ -6,6 +6,7 @@ BackendDependency.required_env_vars before calling the adapter.
 """
 
 import signal
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -160,10 +161,10 @@ class TestLiteLLMAdapterStart:
         assert result.pid == 12345
         assert result.status == "healthy"
 
-        # Verify command (litellm binary resolved from venv, not bare "litellm")
+        # Use the same interpreter as Forge and preserve the original gateway arguments.
         call_args = mock_popen.call_args
         cmd = call_args[0][0]
-        assert cmd[0].endswith("/litellm")
+        assert cmd[:3] == [sys.executable, "-m", "forge.backend.litellm_pricing"]
         assert "--config" in cmd
         assert str(config_path) in cmd
         assert "--port" in cmd
