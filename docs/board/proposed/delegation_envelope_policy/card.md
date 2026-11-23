@@ -4,8 +4,9 @@
 
 **Lane**: `proposed/`. Depends on M1's Claude identity rules. Worker restrictions ship independently in
 [M0](../../done/worker_native_controls/card.md); this card owns the managed-session envelope. Codex pre-tool
-origin/capability verification belongs here and does not require Codex transcript capture or transfer support.
-[epic_budgeted_review_guards](../epic_budgeted_review_guards/card.md), Seam 5, owns counters and spend caps.
+origin/capability verification belongs here and does not require Codex transcript capture or transfer support. Counters
+and spend caps have no live owner: [epic_budgeted_review_guards](../../retired/epic_budgeted_review_guards/card.md),
+Seam 5, was retired on 2026-11-23 with no replacement.
 
 ## Problem (verified 2026-09-06)
 

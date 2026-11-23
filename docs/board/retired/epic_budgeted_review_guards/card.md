@@ -1,7 +1,14 @@
-# Epic: Budgeted review guards
+# Retired epic: Budgeted review guards
 
-**Epic** -- coordinating card for the member cards below (see `board_contract.md` "Epics"). Lane: `proposed/` --
-incident-driven guardrail design, not yet accepted for execution.
+Status: **retired**. Outcome: **cancelled** by owner decision on 2026-11-23. No replacement is selected. The epic and
+members M0-M3 were never accepted for execution; nothing shipped and no checklist existed. The [closeout](#closeout)
+records the evidence at retirement and the gaps no card now owns.
+
+This is a terminal reference, not an executable roadmap. Reconsideration requires a new `proposed/` card that links
+here.
+
+**Epic** -- coordinating card for the member cards below (see `board_contract.md` "Epics"). Lane: `retired/`, moved from
+`proposed/` -- incident-driven guardrail design, never accepted for execution.
 
 **Origin**: a session incident on 2026-07-08. The user intended to exercise Forge's conservative review path but
 accidentally approved Claude Code's native/built-in code review behavior. Letting it run showed the failure mode: a
@@ -234,4 +241,24 @@ rejoins the tracks: Seam 5 unblocks `budget-required`, gated on the correlation 
 
 ## Closeout
 
-(pending)
+Retired on 2026-11-23, outcome `cancelled`, by owner decision after a review of the `proposed/` lane. No replacement is
+selected. Members M0-M3 in the [table above](#members) are retired with the epic.
+
+Evidence at retirement:
+
+- The design had not changed since the 2026-07-26 posture revision, and both v1-blocking probes under
+  [Decisions owed](#decisions-owed) were still listed as owed.
+- [worker_native_controls](../../done/worker_native_controls/card.md) (PR #282) launches Forge-owned review workers with
+  `Agent`, `Workflow` and `SendMessage` disallowed, and `run_grouped_parallel` runs at most five workers at a time.
+  Workflow fan-out, the target of M2's v1 admission, can no longer multiply beyond the workers Forge launches.
+
+No card owns these after retirement:
+
+- The two failure modes the posture revision called untouched: the native approval prompt carries no cost information,
+  and direct-runtime spend does not reach Forge's cost ledger. Neither was re-verified at retirement.
+- Policy coverage of native review launches. In the Claude hook preset, `policy-check` is registered for `Write` and
+  `Edit` only; the all-tools `authority-check` hook enforces session authority tiers, not policies.
+- Agent counters and spend caps (Seam 5). [epic_native_multiagent](../../proposed/epic_native_multiagent/card.md) D6
+  keeps them outside that epic.
+- The item the posture revision called independently retainable. `run_sidecar_session` adds the read-only
+  `~/.forge/config.yaml` bind only when a proxy is attached.

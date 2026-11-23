@@ -75,8 +75,9 @@ This gate does not block independent M0 worker controls, M2 fidelity, M8a postur
 - **D5 -- bounded curation.** M4 maps bounded windows and caches bounded reduction nodes. Cost follows changed windows
   and affected reduction nodes; no unbounded final reducer or tail-only guarantee.
 - **D6 -- separate worker restrictions from policy.** M0 owns worker launch restrictions. M7 owns the managed-session
-  per-call envelope, scoped activation and verified hook delivery. Counters/spend caps stay with
-  [epic_budgeted_review_guards](../epic_budgeted_review_guards/card.md), Seam 5.
+  per-call envelope, scoped activation and verified hook delivery. Counters/spend caps stay outside this epic and have
+  no live owner: [epic_budgeted_review_guards](../../retired/epic_budgeted_review_guards/card.md), Seam 5, was retired
+  on 2026-11-23 with no replacement.
 - **D7 -- separate posture from import.** M8a records emitted native-memory controls and launch posture. M8b captures
   opt-in provenance-tagged text after curation; Forge's memory writer does not ingest it.
 - **D8 -- search precedes its invocation.** M6 owns root-qualified lineage query/results; M5 prints that shipped

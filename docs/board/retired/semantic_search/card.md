@@ -1,7 +1,13 @@
 # Semantic Search — Design Sketch
 
-**Status**: Reference only. Extracted from the deleted `search-history` skill before removal. Not implemented in
-`forge search` yet.
+Status: **retired**. Outcome: **cancelled** by owner decision on 2026-11-23. No replacement is selected. Semantic search
+did not ship; this sketch was never accepted for execution and had no checklist. `forge search` (BM25) remains shipped
+and is unaffected; [lineage_search_retrofit](../../proposed/lineage_search_retrofit/card.md) lists embeddings as a
+non-goal. This is a terminal reference, not an executable roadmap. Reconsideration starts a new `proposed/` card linked
+here.
+
+**Original status**: Reference only. Extracted from the deleted `search-history` skill before removal. Not implemented
+in `forge search` yet.
 
 **Context**: Forge has BM25 keyword search (`forge search`). The `search-history` skill had a working semantic search
 prototype using vector embeddings + RRF fusion. This doc preserves the architectural approach for when semantic search

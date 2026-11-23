@@ -1,10 +1,14 @@
 # Review budget envelope -- bounded admission for review-shaped work
 
+Status: **retired**. Outcome: **cancelled** by owner decision on 2026-11-23, with its
+[epic](../epic_budgeted_review_guards/card.md#closeout). No replacement exists. The budget envelope did not ship; this
+card was never accepted for execution and had no checklist. Reconsideration starts a new `proposed/` card linked here.
+
 **Epic**: [epic_budgeted_review_guards](../epic_budgeted_review_guards/card.md) (M2 -- shared schema; workflow
 enforcement).
 
-**Lane**: `proposed/`. Depends on M0's normalized Claude fan-out lifecycle. This member owns the schema and state
-contract M1 consumes; M1 does not ship `budget-required` before M2.
+**Lane**: `retired/`, moved from `proposed/`. Depends on M0's normalized Claude fan-out lifecycle. This member owns the
+schema and state contract M1 consumes; M1 does not ship `budget-required` before M2.
 
 **Scope split (epic posture revision, 2026-07-26).** v1 ships Seam 2 (the envelope schema, read by M3) plus workflow
 preflight admission for `forge workflow` fan-out -- Forge-core work that no upstream Claude Code setting can govern.

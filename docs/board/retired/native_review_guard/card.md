@@ -1,11 +1,16 @@
 # Native review guard -- block or budget Claude Code's built-in review paths
 
+Status: **retired**. Outcome: **cancelled** by owner decision on 2026-11-23, with its
+[epic](../epic_budgeted_review_guards/card.md#closeout). No replacement exists. The native review guard did not ship;
+this card was never accepted for execution and had no checklist. Reconsideration starts a new `proposed/` card linked
+here.
+
 **Epic**: [epic_budgeted_review_guards](../epic_budgeted_review_guards/card.md) (M1 -- first guard on the M0 substrate).
 
-**Lane**: `proposed/`. **v1 depends on [ambient_policy_scope](../ambient_policy_scope/card.md) (M0) only.** The
-schema/state dependency on [review_budget_envelope](../review_budget_envelope/card.md) (M2) applies to the v2
-`budget-required` mode, not to the v1 `block` default -- refusing a launch requires no agent counter (epic posture
-revision, 2026-07-26).
+**Lane**: `retired/`, moved from `proposed/`. **v1 depends on [ambient_policy_scope](../ambient_policy_scope/card.md)
+(M0) only.** The schema/state dependency on [review_budget_envelope](../review_budget_envelope/card.md) (M2) applies to
+the v2 `budget-required` mode, not to the v1 `block` default -- refusing a launch requires no agent counter (epic
+posture revision, 2026-07-26).
 
 ## Goal
 

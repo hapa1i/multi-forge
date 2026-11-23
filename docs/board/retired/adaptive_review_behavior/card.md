@@ -1,9 +1,14 @@
 # Adaptive review behavior -- useful work inside the cap
 
+Status: **retired**. Outcome: **cancelled** by owner decision on 2026-11-23, with its
+[epic](../epic_budgeted_review_guards/card.md#closeout). No replacement exists. The review adaptations did not ship;
+this card was never accepted for execution and had no checklist. Reconsideration starts a new `proposed/` card linked
+here.
+
 **Epic**: [epic_budgeted_review_guards](../epic_budgeted_review_guards/card.md) (M3 -- Forge-owned review adaptation).
 
-**Lane**: `proposed/`. Depends on M2's envelope and workflow admission implementation; independent of M1's native-review
-policy.
+**Lane**: `retired/`, moved from `proposed/`. Depends on M2's envelope and workflow admission implementation;
+independent of M1's native-review policy.
 
 ## Goal
 

@@ -1,8 +1,13 @@
 # Ambient policy scope -- global default-on policies with session opt-out
 
+Status: **retired**. Outcome: **cancelled** by owner decision on 2026-11-23, with its
+[epic](../epic_budgeted_review_guards/card.md#closeout). No replacement exists. The ambient activation scope did not
+ship; this card was never accepted for execution and had no checklist. Reconsideration starts a new `proposed/` card
+linked here.
+
 **Epic**: [epic_budgeted_review_guards](../epic_budgeted_review_guards/card.md) (M0 -- shared substrate).
 
-**Lane**: `proposed/`.
+**Lane**: `retired/`, moved from `proposed/`.
 
 ## Goal
 

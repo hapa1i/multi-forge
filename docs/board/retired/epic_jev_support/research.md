@@ -313,8 +313,8 @@ production caller; changing it alone would not improve a live path.
 Forge's [search engine](../../../../src/forge/search/engine.py) ranks transcript documents with local BM25. Jev could
 score a bounded shortlist for relevance while retaining document identity and the original search results as fallback.
 This adds remote disclosure, latency, and cost to a currently local operation. The
-[semantic-search proposal](../../proposed/semantic_search/card.md) already considers local retrieval and optional
-reranking; its scope should be reconciled before choosing another search direction.
+[semantic-search proposal](../semantic_search/card.md) (retired 2026-11-23) already considers local retrieval and
+optional reranking; its scope should be reconciled before choosing another search direction.
 
 For transfer and memory, judgments could select relevant source excerpts or flag candidate decisions for review. The
 existing [transfer curation](../../../../src/forge/session/transfer.py) and [memory writer](../../../design_memory.md)
@@ -327,8 +327,8 @@ not shipped infrastructure that this research can assume.
 
 Judgments could help prioritize review questions or select specialist attention. They should operate within the caller's
 requested coverage and deterministic budget rather than silently deciding that requested review is unnecessary. The
-[adaptive-review proposal](../../proposed/adaptive_review_behavior/card.md) already covers budgeted review behavior. An
-integration would need to distinguish prioritization from permission to omit a check.
+[adaptive-review proposal](../adaptive_review_behavior/card.md) (retired 2026-11-23) already covers budgeted review
+behavior. An integration would need to distinguish prioritization from permission to omit a check.
 
 ### Jev Router: separate card
 

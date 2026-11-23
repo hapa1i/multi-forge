@@ -64,7 +64,9 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - `make test` runs unit and integration tests; run `make test-regression` separately.
 - `make pre-commit` runs the full hook suite (ruff, black, isort, mypy, pyright, mdformat, gitleaks); run it before
   committing. Pyright requires a reviewed Node.js release on `PATH`.
-- `make pre-commit-md` runs the Markdown-only hook subset for docs-only changes.
+- `make pre-commit-md` runs applicable hooks on all tracked Markdown files plus untracked, non-ignored Markdown.
+- For a focused docs check after `make deps`, use `uv run --locked pre-commit run --files <file.md>...`. The Markdown
+  link hook still audits all tracked Markdown, including references to moved or deleted files.
 - For targeted reruns, use direct `pytest` only after `make` has prepared prerequisites; integration flows depend on the
   setup performed by `make test-integration`.
 
@@ -104,7 +106,7 @@ requires `forge extension enable --profile full`, and its installed driver must 
 
 Before changing or testing a feature, read the sections for every affected domain in the
 [verification guide](docs/developer/verification.md). Follow each procedure's fixture, credential, and approval
-requirements before running its commands.
+requirements before running its commands. Keep feature-specific verification procedures in that guide.
 
 ## Coding Style & Naming Conventions
 
