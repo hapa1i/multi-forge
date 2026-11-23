@@ -40,20 +40,28 @@ Option 2, chosen on 2026-11-23. `TierClientFactory.invalidate_and_retry` evicts 
 
 - **Eviction scope.** Sibling adapters recover at the core-client layer. `LiteLLMClient` and `OpenRouterClient`
   invalidate their credential-provider entry and discard their own HTTP client whenever they classify a failure as
-  authentication, in `complete()` and in `stream()`. A stale sibling makes one rejected upstream request. A
-  non-streaming request is then retried once inside the same proxy request. A streaming request returns the error, and
-  the adapter recovers on its next request.
+  authentication, in `complete()` and in `stream()`. With sequential requests and a valid replacement credential, a
+  stale sibling makes one rejected upstream request. A non-streaming request is then retried once inside the same proxy
+  request. A streaming request returns the error, and the adapter recovers on its next request. Requests already in
+  flight on the stale HTTP client are each rejected or aborted.
 - **What eviction does.** It is not what recovers the failed request. With the eviction removed, a retry on the same
   adapter still succeeds, because the core client has already dropped the rejected key. Eviction only guarantees a newly
   built adapter.
-- **Why not option 1.** Wider eviction would spare each sibling its rejected request only when the first failure arrives
-  on the non-streaming Messages path, the factory's only caller. A streaming authentication failure reaches the caller
-  as an `authentication_error` chunk without a retry or a factory call, so siblings would still fail one by one after
-  it. Each cache entry would also have to record its credential provider, which the collapsed `ModelProvider` value does
-  not identify.
-- **Residual cost.** Each stale sibling still makes one rejected upstream request, and a streaming caller sees that
-  error. Removing it on both paths would need the core clients to detect a credential that another client invalidated.
-  That is outside this card.
+- **What option 1 would buy.** Provider-wide eviction would refresh every still-stale sibling whenever a non-streaming
+  request fails authentication. It is cheap, because each cached adapter already holds its credential provider. With
+  three stale adapters, a stream on the first and non-streaming requests on the other two, a prototype cut rejected
+  upstream requests from three to two. It does nothing for traffic that only streams, because a streaming failure never
+  calls the factory.
+- **Classification gap.** Recovery starts only when a core client classifies a failure as authentication. It decides
+  that from the error text (`authentication` or `unauthorized`), not the HTTP status. LiteLLM gateway rejections match.
+  OpenRouter's documented messages for a deleted, disabled, or expired key (`Invalid API key`, `User not found.`,
+  `API key expired`) do not. In a loopback replay of `User not found.`, requests failed as provider errors and kept
+  sending the old key. The classifier predates this card.
+- **Why option 2 anyway.** Stale siblings, the classification gap, and the in-flight abort all sit in the core clients.
+  A fix there would apply to streaming and non-streaming traffic alike: classify on the SDK's typed 401, and let a
+  client notice a credential that another client invalidated. That would leave factory eviction with nothing to add, so
+  this card keeps reachable behavior unchanged and records the gaps. If that core-client work is not taken up, option 1
+  is a worthwhile partial improvement.
 - **Retry tier.** The rebuild uses the failed request's resolved tier, with no default-tier fallback. Another tier would
   apply that tier's hyperparameters to the retry (finding O015 in the
   [whole-repo maintenance findings](../../reviews/whole_repo_maintenance_findings.md)) and can return a cached adapter

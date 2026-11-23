@@ -116,6 +116,8 @@ def upstream(monkeypatch: pytest.MonkeyPatch) -> _Upstream:
 def secrets(monkeypatch: pytest.MonkeyPatch) -> _Secrets:
     """Install a credential manager whose LiteLLM key the test can replace."""
     store = _Secrets("key-1")
+    # A zero TTL from the shell would re-read the key on every request and hide a missing invalidation.
+    monkeypatch.setenv("CREDENTIAL_CACHE_TTL", "3600")
     monkeypatch.setattr(CredentialManager, "_default_instance", CredentialManager(secrets=store))
     monkeypatch.setenv("LITELLM_BASE_URL", "https://litellm.invalid")
     # A configured CA bundle would make the core client open a real HTTP transport.

@@ -6,7 +6,6 @@ and reduce monkeypatch boilerplate for orchestrator/identity/routing tests.
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 
 import pytest
@@ -180,18 +179,21 @@ def proxy_runtime_ready(monkeypatch: pytest.MonkeyPatch, server_stubs):
 
 @pytest.fixture
 def tier_client_factory(monkeypatch: pytest.MonkeyPatch) -> TierClientFactory:
-    """Return the ``TierClientFactory`` singleton with an empty cache and default TTLs.
+    """Return a fresh ``TierClientFactory`` in place of the process-wide singleton.
 
-    The factory is process-wide, so its cache, refresh lock, and TTLs are replaced for the test.
-    Provider-selection variables are cleared so ``openai/`` models route to remote LiteLLM
-    whatever the developer's shell or ``.env`` sets.
+    Other tests write adapter classes straight into the singleton, so a new instance is built
+    and the original is restored afterwards.
+    Dotenv loading is disabled and provider-selection variables are cleared so ``openai/`` models
+    route to remote LiteLLM whatever the developer's shell or ``.env`` sets.
     Used by: test_client_factory.py, test_client_factory_integration.py.
     """
-    factory = TierClientFactory()
-    monkeypatch.setattr(factory, "_cache", {})
-    monkeypatch.setattr(factory, "_refresh_lock", asyncio.Lock())
-    monkeypatch.setattr(factory, "_default_ttl", 3600.0)
-    monkeypatch.setattr(factory, "_litellm_ttl", 3600.0)
+    # load_config() reloads .env without overriding, which would restore any variable deleted below.
+    monkeypatch.setenv("PYTHON_DOTENV_DISABLED", "1")
     for name in ("PREFERRED_PROVIDER", "MODEL_FAMILY", "FORGE_PROXY_ID"):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(TierClientFactory, "_instance", None)
+    factory = TierClientFactory()
+    # The constructor reads TTLs from the environment. Pin them so cached clients never expire mid-test.
+    factory._default_ttl = 3600.0
+    factory._litellm_ttl = 3600.0
     return factory

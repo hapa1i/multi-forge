@@ -4,7 +4,7 @@
 
 ## Current focus
 
-Option 2 is implemented and verified on the branch. Review, merge, and closeout remain.
+PR #310 is open with the review follow-up applied. Merge and closeout remain.
 
 ## Evidence required by the card
 
@@ -70,12 +70,16 @@ Each mutation below was applied alone, tested, and reverted.
 
 ## Verification
 
+Results are from the head with the review follow-up applied.
+
 - [x] Focused auth/cache tests: 42 passed across the two new files, the deadlock and stale-client regressions, the three
   handler auth-retry regressions, and `tests/src/proxy/test_metrics_integration.py`.
 - [x] `make test-unit`: 12,062 passed.
 - [x] `make test-regression`: 2,738 passed.
 - [x] Targeted integration with synthetic credentials: 55 passed, with one slow live-credential test deselected.
 - [x] `make pre-commit`: every hook passed.
+- [x] Unfiltered serial run of `tests/regression` and `tests/src/proxy` in one process: 3,821 passed.
+- [x] Python 3.11: the focused tests and the `tests/src/proxy` unit selection passed in an isolated environment.
 
 ```bash
 PYTHON_DOTENV_DISABLED=1 GEMINI_API_KEY= OPENROUTER_API_KEY= ./scripts/test-integration.sh \
@@ -93,15 +97,30 @@ PYTHON_DOTENV_DISABLED=1 GEMINI_API_KEY= OPENROUTER_API_KEY= ./scripts/test-inte
 Not run: `forge proxy start <proxy_id> --smoke-test`. It sends a paid upstream request and would need the proxy
 restarted from this checkout.
 
+## Review follow-up
+
+Six review comments on PR #310 at `79aadff3` were reproduced and addressed.
+
+- [x] **Fresh factory.** `tier_client_factory` builds a new `TierClientFactory` and restores the singleton afterwards.
+  Running `test_litellm_default_config_consistent` first no longer breaks the cross-layer tests.
+- [x] **Dotenv.** The fixture sets `PYTHON_DOTENV_DISABLED=1`. A `.env` with `PREFERRED_PROVIDER=openrouter` no longer
+  switches providers mid-test.
+- [x] **Credential TTL.** The cross-layer fixture pins `CREDENTIAL_CACHE_TTL`. With credential invalidation disabled,
+  both cross-layer tests fail at TTL 0, 3600, and unset.
+- [x] **Recovery wording.** The design doc, the factory docstring, and the card state the limits: textual
+  classification, concurrent requests, and a valid replacement credential. The card's option 1 trade-off covers mixed
+  streaming and non-streaming traffic.
+
 ## Not changed by this card
 
-- **Stale siblings.** Each stale sibling adapter makes one rejected upstream request, which a streaming caller sees as
-  an error. The card's [Decision](card.md#decision) records why the factory does not address it.
+- **Stale siblings.** Each stale sibling adapter makes at least one rejected upstream request, which a streaming caller
+  sees as an error. The card's [Decision](card.md#decision) records why the factory does not address it.
 - **In-flight abort.** A core client's `_close_client()` closes the HTTP client that other requests on the same adapter
   are still using.
 - **Text-based classification.** Core clients classify a failure as authentication by the words `authentication` or
   `unauthorized` in the error text. LiteLLM 1.102.2 words gateway rejections as `Authentication Error, ...`.
-  OpenRouter's wording is unverified.
+  OpenRouter's documented messages for a deleted, disabled, or expired key do not match, so those adapters keep the old
+  key.
 - **No end-to-end 401 coverage.** No test under `tests/integration/proxy/` drives a real proxy through an upstream 401.
 
 ## Closeout

@@ -65,9 +65,18 @@ credential entry and discards its own HTTP client, so its next request resolves 
 Messages request also retries once through `TierClientFactory.invalidate_and_retry`, which evicts and rebuilds only the
 failed `(model, tier)` adapter with that tier's hyperparameters. A streaming failure reaches the caller as an
 `authentication_error` chunk without a retry. Other cached adapters sharing the credential stay cached, and each
-recovers after its own first authentication failure. Resolution follows the precedence in
-[design_installation.md §A.6](design_installation.md#a6-credentials-and-connection-values-369): the credential file is
-read on every resolution, but a key in the proxy process's environment cannot change until the proxy restarts.
+recovers after its own first classified failure. Recovery has three limits:
+
+- **Classification is textual.** A failure counts as authentication only when its error text contains `authentication`
+  or `unauthorized`; the HTTP status is not consulted. LiteLLM gateway rejections (`Authentication Error, ...`) match.
+  OpenRouter's documented messages for a deleted, disabled, or expired key (`Invalid API key`, `User not found.`,
+  `API key expired`) do not. Those requests fail as provider errors, and the adapter keeps its key until the factory and
+  credential cache TTLs expire or the proxy restarts.
+- **Concurrent requests.** Requests already in flight on a stale HTTP client when the first failure discards it are each
+  rejected or aborted.
+- **Credential source.** Resolution follows the precedence in
+  [design_installation.md §A.6](design_installation.md#a6-credentials-and-connection-values-369). The credential file is
+  read on every resolution, but a key in the proxy process's environment cannot change until the proxy restarts.
 
 **Launch-time auto-start (lookup-or-start).** `--proxy` (session start/resume/fork, `forge claude`) and
 `--supervisor-proxy` (session start/fork, `forge policy supervisor set`) accept a template name. When the name is a

@@ -321,11 +321,11 @@ class TierClientFactory:
         ``(model_name, tier)`` entry, so the rebuilt client keeps the tier hyperparameters
         of the failed request.
 
-        Other cached clients that share the credential stay cached. Each core client
-        discards its own HTTP client and invalidates the shared credential entry when its
-        own request fails authentication. A stale client therefore recovers after its
-        first failure. Streaming failures never reach this method, so wider eviction
-        here could not cover them.
+        Other cached clients that share the credential stay cached. A core client that
+        classifies its own failure as authentication invalidates the shared credential
+        entry and discards its HTTP client, so a stale client recovers after its first
+        classified failure. Classification matches the error text, not the HTTP status.
+        Streaming failures recover the same way and never reach this method.
         """
         logger.warning(f"Invalidating cached credentials for {model_name} (tier={tier}) due to auth failure")
 
