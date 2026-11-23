@@ -1,6 +1,8 @@
 # Verify shadow discovery during index contention
 
-Branch `codex/complete-shadow-discovery`, based on `main` at `14db060e`.
+Merged as `6962a697`. Its tree matches the tested PR head `95b22ffc`. Both
+[Tests](https://github.com/hapa1i/multi-forge/actions/runs/45153756635) and
+[Pre-commit Checks](https://github.com/hapa1i/multi-forge/actions/runs/45153756551) passed.
 
 | Fixture                                                                    | Expected CLI behavior                                                            |
 | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
@@ -14,4 +16,5 @@ Branch `codex/complete-shadow-discovery`, based on `main` at `14db060e`.
 - [x] All 217 focused tests and the Docker session listing test passed. In an offline Docker check, a separate process
   held the index lock while `shadows list` and `shadows show` exercised all three scopes. Both commands found the
   sibling proposal again after release. The index bytes stayed unchanged.
-- [ ] After merge, record the shipped fix in the board change log and close the card.
+- [x] Moved the card to `done/` and recorded the fix in the
+  [change log](../../change_log.md#refuse-incomplete-shadow-discovery).

@@ -12,6 +12,13 @@ Older entries are retained verbatim in [2026-08-23 through 2026-08-24](archive/c
 
 ## 2026-11-23
 
+### Refuse incomplete shadow discovery
+
+When the session index is busy, workspace and global shadow discovery now exit with a retry message. Previously, a
+sibling project's proposals could disappear from a successful listing. Project-scoped discovery remains available during
+contention. Docker checks confirmed that both `shadows list` and `shadows show` find the sibling proposals again after
+the lock is released. [Completed checklist](done/shadow_discovery_contention/checklist.md)
+
 ### Charge GPT-6.2 Ultrafast at its long-context rate
 
 Forge's managed LiteLLM 1.102.2 gateway now applies the Ultrafast launch price above 272,000 input tokens on Astra and
