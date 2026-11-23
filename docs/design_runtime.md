@@ -725,7 +725,12 @@ catalog even when gateway metadata does not yet recognize the model.
 LiteLLM 1.102 packages original GPT-6 Astra and Gemini 3.8 Flash metadata. Bundled GPT-6.2 Astra/Sol, GPT-6.1 Sol, GPT-6
 Sol/Luna, Gemini 4, Claude 5.5, and Fable 5.2 deployments supply capability and token/cache pricing in `model_info`.
 GPT-6.2 and 6.1 Sol cache reads cost 5% of uncached input. The GPT-6.2 deployments include the premium above 272K
-tokens. LiteLLM 1.102 omits the long-context Ultrafast pricing fields when calculating reported cost.
+tokens. The managed adapter launches LiteLLM 1.102.2 through `forge.backend.litellm_pricing`. At billing time, the
+calculator reads the long-context Ultrafast and 12-hour cache-write rates from the selected GPT-6.2 deployment's
+registered pricing row, so separately priced deployments of the same model use their own rates. LiteLLM still serves its
+native public model metadata. The launcher installs the backport in the server and in Uvicorn's spawned workers. When
+the Responses receipt reports write counts by retention, the gateway applies the corresponding 30-minute and 12-hour
+rates. Forge records the gateway's reported amount for telemetry and caps.
 [GPT-6.2 upgrade guide](end-user/model_selection.md#gpt-62-astra-and-sol). Boundary tests require removing overrides
 when packaged support arrives. Pricing belongs to backend configuration, outside the intrinsic catalog. Sonnet 5.5's
 `thinking_always_on: false` prevents LiteLLM from silently deleting invalid `disabled` requests and enabling adaptive

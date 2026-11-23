@@ -12,6 +12,16 @@ Older entries are retained verbatim in [2026-08-23 through 2026-08-24](archive/c
 
 ## 2026-11-23
 
+### Charge GPT-6.2 Ultrafast at its long-context rate
+
+Forge's managed LiteLLM 1.102.2 gateway now applies the Ultrafast launch price above 272,000 input tokens on Astra and
+Sol. The bundled deployments include 12-hour cache-write prices for receipts that report those counts. The
+[upgrade guide](../end-user/model_selection.md#gpt-62-astra-and-sol) covers saved deployments and remote gateways.
+
+Offline pricing tests covered both sides of the 272,000-token threshold. Eleven Docker cases passed across Ultrafast,
+OpenAI routing and streamed LiteLLM cost. With mixed 30-minute and 12-hour writes, the Responses fixture confirmed that
+each model's gateway amount reached telemetry and both spend caps, and the next request was rejected.
+
 ### Keep session listings available during bulk cleanup
 
 `forge session list` now shows confirmed sessions while cleanup in another project holds the shared index lock. A hint

@@ -652,7 +652,7 @@ model_list:
       api_key: os.environ/OPENAI_API_KEY
 
   # GPT-6.2 pricing and capabilities for the pinned LiteLLM offline map.
-  # LiteLLM 1.102 reads only the short-context Ultrafast rates. See the GPT-6.2 section in the model selection guide.
+  # The managed gateway reads both Ultrafast context bands and both cache-write retention rates.
   # Ultrafast uses the launch rates through 2027-02-28. Recheck these deployments before 2027-03-01.
   # https://developers.openai.com/api/docs/pricing (verified 2026-11-18)
   - model_name: openai/gpt-6.2-astra
@@ -670,34 +670,42 @@ model_list:
       output_cost_per_token: 0.00004
       cache_read_input_token_cost: 0.0000004
       cache_creation_input_token_cost: 0.00001
+      cache_creation_input_token_cost_above_12hr: 0.00002
       input_cost_per_token_above_272k_tokens: 0.000016
       output_cost_per_token_above_272k_tokens: 0.00006
       cache_read_input_token_cost_above_272k_tokens: 0.0000008
       cache_creation_input_token_cost_above_272k_tokens: 0.00002
+      cache_creation_input_token_cost_above_12hr_above_272k_tokens: 0.00004
       input_cost_per_token_flex: 0.000004
       output_cost_per_token_flex: 0.00002
       cache_read_input_token_cost_flex: 0.0000002
       cache_creation_input_token_cost_flex: 0.000005
+      cache_creation_input_token_cost_above_12hr_flex: 0.00001
       input_cost_per_token_above_272k_tokens_flex: 0.000008
       output_cost_per_token_above_272k_tokens_flex: 0.00003
       cache_read_input_token_cost_above_272k_tokens_flex: 0.0000004
       cache_creation_input_token_cost_above_272k_tokens_flex: 0.00001
+      cache_creation_input_token_cost_above_12hr_above_272k_tokens_flex: 0.00002
       input_cost_per_token_priority: 0.000016
       output_cost_per_token_priority: 0.00008
       cache_read_input_token_cost_priority: 0.0000008
       cache_creation_input_token_cost_priority: 0.00002
+      cache_creation_input_token_cost_above_12hr_priority: 0.00004
       input_cost_per_token_above_272k_tokens_priority: 0.000032
       output_cost_per_token_above_272k_tokens_priority: 0.00012
       cache_read_input_token_cost_above_272k_tokens_priority: 0.0000016
       cache_creation_input_token_cost_above_272k_tokens_priority: 0.00004
+      cache_creation_input_token_cost_above_12hr_above_272k_tokens_priority: 0.00008
       input_cost_per_token_ultrafast: 0.000024
       output_cost_per_token_ultrafast: 0.00012
       cache_read_input_token_cost_ultrafast: 0.0000012
       cache_creation_input_token_cost_ultrafast: 0.00003
+      cache_creation_input_token_cost_above_12hr_ultrafast: 0.00006
       input_cost_per_token_above_272k_tokens_ultrafast: 0.000048
       output_cost_per_token_above_272k_tokens_ultrafast: 0.00018
       cache_read_input_token_cost_above_272k_tokens_ultrafast: 0.0000024
       cache_creation_input_token_cost_above_272k_tokens_ultrafast: 0.00006
+      cache_creation_input_token_cost_above_12hr_above_272k_tokens_ultrafast: 0.00012
       supports_vision: true
       supports_function_calling: true
       supports_parallel_function_calling: true
@@ -727,34 +735,42 @@ model_list:
       output_cost_per_token: 0.00001
       cache_read_input_token_cost: 0.0000001
       cache_creation_input_token_cost: 0.0000025
+      cache_creation_input_token_cost_above_12hr: 0.000005
       input_cost_per_token_above_272k_tokens: 0.000004
       output_cost_per_token_above_272k_tokens: 0.000015
       cache_read_input_token_cost_above_272k_tokens: 0.0000002
       cache_creation_input_token_cost_above_272k_tokens: 0.000005
+      cache_creation_input_token_cost_above_12hr_above_272k_tokens: 0.00001
       input_cost_per_token_flex: 0.000001
       output_cost_per_token_flex: 0.000005
       cache_read_input_token_cost_flex: 0.00000005
       cache_creation_input_token_cost_flex: 0.00000125
+      cache_creation_input_token_cost_above_12hr_flex: 0.0000025
       input_cost_per_token_above_272k_tokens_flex: 0.000002
       output_cost_per_token_above_272k_tokens_flex: 0.0000075
       cache_read_input_token_cost_above_272k_tokens_flex: 0.0000001
       cache_creation_input_token_cost_above_272k_tokens_flex: 0.0000025
+      cache_creation_input_token_cost_above_12hr_above_272k_tokens_flex: 0.000005
       input_cost_per_token_priority: 0.000004
       output_cost_per_token_priority: 0.00002
       cache_read_input_token_cost_priority: 0.0000002
       cache_creation_input_token_cost_priority: 0.000005
+      cache_creation_input_token_cost_above_12hr_priority: 0.00001
       input_cost_per_token_above_272k_tokens_priority: 0.000008
       output_cost_per_token_above_272k_tokens_priority: 0.00003
       cache_read_input_token_cost_above_272k_tokens_priority: 0.0000004
       cache_creation_input_token_cost_above_272k_tokens_priority: 0.00001
+      cache_creation_input_token_cost_above_12hr_above_272k_tokens_priority: 0.00002
       input_cost_per_token_ultrafast: 0.000006
       output_cost_per_token_ultrafast: 0.00003
       cache_read_input_token_cost_ultrafast: 0.0000003
       cache_creation_input_token_cost_ultrafast: 0.0000075
+      cache_creation_input_token_cost_above_12hr_ultrafast: 0.000015
       input_cost_per_token_above_272k_tokens_ultrafast: 0.000012
       output_cost_per_token_above_272k_tokens_ultrafast: 0.000045
       cache_read_input_token_cost_above_272k_tokens_ultrafast: 0.0000006
       cache_creation_input_token_cost_above_272k_tokens_ultrafast: 0.000015
+      cache_creation_input_token_cost_above_12hr_above_272k_tokens_ultrafast: 0.00003
       supports_vision: true
       supports_function_calling: true
       supports_parallel_function_calling: true

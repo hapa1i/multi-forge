@@ -38,6 +38,13 @@ proxies can forward explicit Astra workflow workers without changing their tier 
 the Astra route. Before recreating the local LiteLLM adapter, back up its config outside `~/.forge/backends/litellm/`;
 see the saved-configuration upgrade procedure in `docs/end-user/proxy.md`.
 
+For GPT-6.2 pricing changes, run the offline deployment tests in `tests/src/backend/test_litellm_model_metadata.py`.
+Compare Astra and Sol at 272,000 and 272,001 prompt tokens with the same output length. Include cache reads and
+30-minute and 12-hour writes, check the gateway's response cost, and compare Ultrafast with Standard at each length. The
+expected launch multiplier is three through February 28, 2027 (Pacific time). Run
+`tests/integration/proxy/test_gpt_62_ultrafast_cost_e2e.py` against its local fixture to check that the
+gateway-calculated amount reaches the request's telemetry record and both proxy caps.
+
 For Sonnet 5.5 thinking or translation changes, run
 `./scripts/test-integration.sh tests/integration/proxy/test_sonnet_55_e2e.py` and exercise the direct worker with
 `forge workflow panel -p "<review prompt>" -m claude-sonnet`. The integration gate requires `ANTHROPIC_API_KEY` and
