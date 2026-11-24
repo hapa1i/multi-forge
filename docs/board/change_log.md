@@ -10,6 +10,21 @@ Older entries are retained verbatim in [2026-08-23 through 2026-08-24](archive/c
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-11-24
+
+### Scope proxy authentication retries to the failed client
+
+After an upstream authentication failure, a translated proxy rebuilds only the cached client for the failed request's
+model and tier. The unused branch that evicted every tier of a model is removed, and proxy behavior is unchanged. The
+[runtime design](../design_runtime.md#363-proxy-lifecycle-ux) now states how cached clients pick up a replaced
+credential and where that stops. OpenRouter's messages for a deleted, disabled, or expired key are not recognized, so an
+OpenRouter proxy keeps the old key until its caches expire or it restarts. The proposed
+[`core_client_credential_recovery`](proposed/core_client_credential_recovery/card.md) card records that gap.
+
+With a key replaced under real adapters on an in-memory gateway, each stale client made one rejected request and then
+used the new key. Python 3.11 and 3.13 each passed the unit and regression suites in CI, and 55 targeted integration
+tests passed with synthetic credentials. [Completed checklist](done/resolve_proxy_auth_invalidation_scope/checklist.md)
+
 ## 2026-11-23
 
 ### Start LiteLLM from projects with a local litellm.py

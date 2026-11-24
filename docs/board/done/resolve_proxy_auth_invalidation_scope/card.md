@@ -1,8 +1,8 @@
 # Resolve proxy authentication invalidation scope
 
-**Status**: In progress on `refactor/proxy-auth-invalidation-scope`. Option 2 was chosen on 2026-11-23; see
-[Decision](#decision) and the [checklist](checklist.md). Recorded on 2026-08-16 from review of Wave 7 order 16,
-[`replace_legacy_tier_inference`](../../done/replace_legacy_tier_inference/card.md), which shipped in PR #195.
+**Status**: Done. Merged into `main` on 2026-11-24 as `701b74d5` (PR #310). Option 2 was chosen on 2026-11-23; see
+[Decision](#decision) and the [completed checklist](checklist.md). Recorded on 2026-08-16 from review of Wave 7 order
+16, [`replace_legacy_tier_inference`](../replace_legacy_tier_inference/card.md), which shipped in PR #195.
 
 ## Problem
 
@@ -60,8 +60,9 @@ Option 2, chosen on 2026-11-23. `TierClientFactory.invalidate_and_retry` evicts 
 - **Why option 2 anyway.** Stale siblings, the classification gap, and the in-flight abort all sit in the core clients.
   A fix there would apply to streaming and non-streaming traffic alike: classify on the SDK's typed 401, and let a
   client notice a credential that another client invalidated. That would leave factory eviction with nothing to add, so
-  this card keeps reachable behavior unchanged and records the gaps. If that core-client work is not taken up, option 1
-  is a worthwhile partial improvement.
+  this card keeps reachable behavior unchanged and records the gaps. The proposed
+  [`core_client_credential_recovery`](../../proposed/core_client_credential_recovery/card.md) card holds that work. If
+  it is not taken up, option 1 is a worthwhile partial improvement.
 - **Retry tier.** The rebuild uses the failed request's resolved tier, with no default-tier fallback. Another tier would
   apply that tier's hyperparameters to the retry (finding O015 in the
   [whole-repo maintenance findings](../../reviews/whole_repo_maintenance_findings.md)) and can return a cached adapter

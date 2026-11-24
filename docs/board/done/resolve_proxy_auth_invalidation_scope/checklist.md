@@ -1,10 +1,8 @@
 # Checklist: resolve proxy authentication invalidation scope
 
-[Card](card.md). Branch `refactor/proxy-auth-invalidation-scope`, based on `main` at `450c05eb`.
-
-## Current focus
-
-PR #310 is open with the review follow-up applied. Merge and closeout remain.
+[Card](card.md). Merged into `main` on 2026-11-24 as `701b74d5` (PR #310). Its tree matches PR head `987d83f8`. Both
+Python test lanes, the test-selection comparison, pre-commit and CodeQL passed.
+[PR #310 checks](https://github.com/hapa1i/multi-forge/pull/310/checks)
 
 ## Evidence required by the card
 
@@ -47,7 +45,6 @@ Recorded for [coding standards](../../../developer/coding_standards.md#compatibi
   all-tier branch and its default-tier fallback are deleted. The docstring states the eviction contract.
 - [x] `tier_client_factory` in `tests/src/proxy/conftest.py` isolates the process-wide factory for both new test files.
 - [x] `docs/design_runtime.md` §3.6.3 states the translated authentication-refresh contract.
-- [x] Both `replace_legacy_tier_inference` links point at this card's `doing/` path.
 
 ## Acceptance tests
 
@@ -125,8 +122,11 @@ Six review comments on PR #310 at `79aadff3` were reproduced and addressed.
 
 ## Closeout
 
-- [ ] Merge to `main`.
-- [ ] Add the change-log entry.
-- [ ] Decide whether the items under "Not changed by this card" need cards.
-- [ ] Review whether core-client recovery belongs in `docs/board/impl_notes/runtime_telemetry.md`.
-- [ ] Move the card to `done/` and repoint the two `replace_legacy_tier_inference` links.
+- [x] Merged to `main` as `701b74d5`.
+- [x] Recorded in the [change log](../../change_log.md#scope-proxy-authentication-retries-to-the-failed-client).
+- [x] The three core-client gaps under "Not changed by this card" are recorded in the proposed
+  [`core_client_credential_recovery`](../../proposed/core_client_credential_recovery/card.md) card, which also asks for
+  the end-to-end 401 test.
+- [x] Reviewed for implementation notes on 2026-11-24. Nothing was promoted, because `docs/design_runtime.md` §3.6.3
+  already states the recovery contract.
+- [x] Moved the card to `done/` and repointed both `replace_legacy_tier_inference` links.
