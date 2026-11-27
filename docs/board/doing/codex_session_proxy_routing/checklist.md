@@ -62,12 +62,15 @@ live verification dependency is a 0.162.1 home with operator-enrolled turn and S
 
 ## Closeout
 
-The managed CLI, reports, Responses proxy and transfer fixtures passed all 51 Docker-harness tests. The metered
-headless fixture also verified two cost records for one tool turn, per-launch JSONL tokens, and a rejected create
-after reaching the shared cap.
+[PR #311](https://github.com/hapa1i/multi-forge/pull/311) is open for review. The final unit suite passed 12,110 tests,
+the regression suite passed 2,740, and `make pre-commit` passed all hooks.
 
-The separate Claude 2.1.245 adoption control missed its second Stop artifact on both this branch and unchanged
-`main` at `455412ca`. The native client returned its second answer on both revisions.
+The managed CLI, reports, Responses proxy and transfer fixtures passed all 51 Docker-harness tests. The metered headless
+fixture also verified two cost records for one tool turn, per-launch JSONL tokens, and a rejected create after reaching
+the shared cap.
+
+The separate Claude 2.1.245 adoption control missed its second Stop artifact on both this branch and unchanged `main` at
+`455412ca`. The native client returned its second answer on both revisions.
 
 - [x] Run the relevant Docker-backed integration fixtures through Forge and retain native receipts.
 - [x] Sync the design and operator guides with the implementation and verification procedure.
