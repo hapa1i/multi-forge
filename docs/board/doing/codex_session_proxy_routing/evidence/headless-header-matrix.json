@@ -1,0 +1,314 @@
+{
+  "probe": "Native Codex headless start and resume with per-launch provider headers",
+  "date": "2026-11-27",
+  "source_revision": "455412ca",
+  "scope": "Pre-implementation native control through a running Forge proxy. Managed Forge entry points and TUI are separate cases.",
+  "fixture": {
+    "upstream": "Loopback synthetic SSE answering with distinct text on each turn. Resume input was checked for the first answer.",
+    "environment": "Fresh Codex home, worktree directory and Forge home per case. Dummy loopback bearer. The fake upstream received the synthetic proxy credential.",
+    "provider_config": "model_providers.forge_proxy.http_headers={\"X-Forge-Run-ID\"=\"<run>\",\"X-Forge-Root-Run-ID\"=\"<root>\"}",
+    "traffic": "Both the Forge proxy and fixture upstream were bound to 127.0.0.1."
+  },
+  "cases": [
+    {
+      "binary": "codex-cli 0.141.0",
+      "binary_sha256": "51f848c212ee24e8da923a7175813a74c113d47e01f0d40f1fea46b12644c363",
+      "template": "codex-responses-local",
+      "isolated_codex_home": true,
+      "upstream": "loopback synthetic Responses SSE",
+      "launches": [
+        {
+          "form": "exec --json",
+          "expected_run_id": "run_111111111111",
+          "exit_code": 0,
+          "event_types": [
+            "thread.started",
+            "item.completed",
+            "turn.started",
+            "item.completed",
+            "turn.completed"
+          ],
+          "completed": true,
+          "fixture_answer_seen": true,
+          "same_thread": true
+        },
+        {
+          "form": "exec resume --json",
+          "expected_run_id": "run_222222222222",
+          "exit_code": 0,
+          "event_types": [
+            "thread.started",
+            "item.completed",
+            "turn.started",
+            "item.completed",
+            "turn.completed"
+          ],
+          "completed": true,
+          "fixture_answer_seen": true,
+          "same_thread": true
+        }
+      ],
+      "passed": true,
+      "recorded_proxy_attempts": [
+        {
+          "source_id": "header-probe",
+          "backend_id": "codex-responses-local",
+          "forge_run_id": "run_111111111111",
+          "forge_root_run_id": "run_111111111111",
+          "model": "openai/gpt-6.2-astra",
+          "mapped_model": "openai/gpt-6.2-astra",
+          "cost_micros": 10000,
+          "failed": false
+        },
+        {
+          "source_id": "header-probe",
+          "backend_id": "codex-responses-local",
+          "forge_run_id": "run_222222222222",
+          "forge_root_run_id": "run_222222222222",
+          "model": "openai/gpt-6.2-astra",
+          "mapped_model": "openai/gpt-6.2-astra",
+          "cost_micros": 10000,
+          "failed": false
+        }
+      ],
+      "upstream_creates": [
+        {
+          "path": "/v1/responses",
+          "model": "openai/gpt-6.2-astra",
+          "forge_headers": [],
+          "contains_start_answer": false
+        },
+        {
+          "path": "/v1/responses",
+          "model": "openai/gpt-6.2-astra",
+          "forge_headers": [],
+          "contains_start_answer": true
+        }
+      ]
+    },
+    {
+      "binary": "codex-cli 0.141.0",
+      "binary_sha256": "51f848c212ee24e8da923a7175813a74c113d47e01f0d40f1fea46b12644c363",
+      "template": "codex-responses-openrouter",
+      "isolated_codex_home": true,
+      "upstream": "loopback synthetic Responses SSE",
+      "launches": [
+        {
+          "form": "exec --json",
+          "expected_run_id": "run_111111111111",
+          "exit_code": 0,
+          "event_types": [
+            "thread.started",
+            "item.completed",
+            "turn.started",
+            "item.completed",
+            "turn.completed"
+          ],
+          "completed": true,
+          "fixture_answer_seen": true,
+          "same_thread": true
+        },
+        {
+          "form": "exec resume --json",
+          "expected_run_id": "run_222222222222",
+          "exit_code": 0,
+          "event_types": [
+            "thread.started",
+            "item.completed",
+            "turn.started",
+            "item.completed",
+            "turn.completed"
+          ],
+          "completed": true,
+          "fixture_answer_seen": true,
+          "same_thread": true
+        }
+      ],
+      "passed": true,
+      "recorded_proxy_attempts": [
+        {
+          "source_id": "header-probe",
+          "backend_id": "openrouter",
+          "forge_run_id": "run_111111111111",
+          "forge_root_run_id": "run_111111111111",
+          "model": "openai/gpt-6.2-astra",
+          "mapped_model": "openai/gpt-6.2-astra",
+          "cost_micros": 10000,
+          "failed": false
+        },
+        {
+          "source_id": "header-probe",
+          "backend_id": "openrouter",
+          "forge_run_id": "run_222222222222",
+          "forge_root_run_id": "run_222222222222",
+          "model": "openai/gpt-6.2-astra",
+          "mapped_model": "openai/gpt-6.2-astra",
+          "cost_micros": 10000,
+          "failed": false
+        }
+      ],
+      "upstream_creates": [
+        {
+          "path": "/v1/responses",
+          "model": "openai/gpt-6.2-astra",
+          "forge_headers": [],
+          "contains_start_answer": false
+        },
+        {
+          "path": "/v1/responses",
+          "model": "openai/gpt-6.2-astra",
+          "forge_headers": [],
+          "contains_start_answer": true
+        }
+      ]
+    },
+    {
+      "binary": "codex-cli 0.172.0",
+      "binary_sha256": "f30a99714dc984876864239ef60563949b1e21421a7c9180422f51fd39186bc6",
+      "template": "codex-responses-local",
+      "isolated_codex_home": true,
+      "upstream": "loopback synthetic Responses SSE",
+      "launches": [
+        {
+          "form": "exec --json",
+          "expected_run_id": "run_111111111111",
+          "exit_code": 0,
+          "event_types": [
+            "thread.started",
+            "turn.started",
+            "item.completed",
+            "turn.completed"
+          ],
+          "completed": true,
+          "fixture_answer_seen": true,
+          "same_thread": true
+        },
+        {
+          "form": "exec resume --json",
+          "expected_run_id": "run_222222222222",
+          "exit_code": 0,
+          "event_types": [
+            "thread.started",
+            "turn.started",
+            "item.completed",
+            "turn.completed"
+          ],
+          "completed": true,
+          "fixture_answer_seen": true,
+          "same_thread": true
+        }
+      ],
+      "passed": true,
+      "recorded_proxy_attempts": [
+        {
+          "source_id": "header-probe",
+          "backend_id": "codex-responses-local",
+          "forge_run_id": "run_111111111111",
+          "forge_root_run_id": "run_111111111111",
+          "model": "openai/gpt-6.2-astra",
+          "mapped_model": "openai/gpt-6.2-astra",
+          "cost_micros": 10000,
+          "failed": false
+        },
+        {
+          "source_id": "header-probe",
+          "backend_id": "codex-responses-local",
+          "forge_run_id": "run_222222222222",
+          "forge_root_run_id": "run_222222222222",
+          "model": "openai/gpt-6.2-astra",
+          "mapped_model": "openai/gpt-6.2-astra",
+          "cost_micros": 10000,
+          "failed": false
+        }
+      ],
+      "upstream_creates": [
+        {
+          "path": "/v1/responses",
+          "model": "openai/gpt-6.2-astra",
+          "forge_headers": [],
+          "contains_start_answer": false
+        },
+        {
+          "path": "/v1/responses",
+          "model": "openai/gpt-6.2-astra",
+          "forge_headers": [],
+          "contains_start_answer": true
+        }
+      ]
+    },
+    {
+      "binary": "codex-cli 0.172.0",
+      "binary_sha256": "f30a99714dc984876864239ef60563949b1e21421a7c9180422f51fd39186bc6",
+      "template": "codex-responses-openrouter",
+      "isolated_codex_home": true,
+      "upstream": "loopback synthetic Responses SSE",
+      "launches": [
+        {
+          "form": "exec --json",
+          "expected_run_id": "run_111111111111",
+          "exit_code": 0,
+          "event_types": [
+            "thread.started",
+            "turn.started",
+            "item.completed",
+            "turn.completed"
+          ],
+          "completed": true,
+          "fixture_answer_seen": true,
+          "same_thread": true
+        },
+        {
+          "form": "exec resume --json",
+          "expected_run_id": "run_222222222222",
+          "exit_code": 0,
+          "event_types": [
+            "thread.started",
+            "turn.started",
+            "item.completed",
+            "turn.completed"
+          ],
+          "completed": true,
+          "fixture_answer_seen": true,
+          "same_thread": true
+        }
+      ],
+      "passed": true,
+      "recorded_proxy_attempts": [
+        {
+          "source_id": "header-probe",
+          "backend_id": "openrouter",
+          "forge_run_id": "run_111111111111",
+          "forge_root_run_id": "run_111111111111",
+          "model": "openai/gpt-6.2-astra",
+          "mapped_model": "openai/gpt-6.2-astra",
+          "cost_micros": 10000,
+          "failed": false
+        },
+        {
+          "source_id": "header-probe",
+          "backend_id": "openrouter",
+          "forge_run_id": "run_222222222222",
+          "forge_root_run_id": "run_222222222222",
+          "model": "openai/gpt-6.2-astra",
+          "mapped_model": "openai/gpt-6.2-astra",
+          "cost_micros": 10000,
+          "failed": false
+        }
+      ],
+      "upstream_creates": [
+        {
+          "path": "/v1/responses",
+          "model": "openai/gpt-6.2-astra",
+          "forge_headers": [],
+          "contains_start_answer": false
+        },
+        {
+          "path": "/v1/responses",
+          "model": "openai/gpt-6.2-astra",
+          "forge_headers": [],
+          "contains_start_answer": true
+        }
+      ]
+    }
+  ]
+}

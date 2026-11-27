@@ -1,0 +1,145 @@
+{
+  "date": "2026-11-27",
+  "source_revision": "455412ca",
+  "template": "codex-responses-openrouter",
+  "scope": "Two native Codex PTY processes per case. The second ran codex resume on the first thread. The proposed Forge managed entry points were not exercised.",
+  "cases": [
+    {
+      "version": "codex-cli 0.141.0",
+      "binary_sha256": "51f848c212ee24e8da923a7175813a74c113d47e01f0d40f1fea46b12644c363",
+      "driver": "native TUI, real Forge loopback Responses proxy and synthetic text-only upstream",
+      "auth": "synthetic loopback only",
+      "client": [
+        {
+          "phase": "start",
+          "code": 0,
+          "deadline": false,
+          "task_complete_seen": 1,
+          "expected_run": "run_aaaaaaaaaaaa"
+        },
+        {
+          "phase": "reattach",
+          "code": 0,
+          "deadline": false,
+          "task_complete_seen": 2,
+          "expected_run": "run_bbbbbbbbbbbb"
+        }
+      ],
+      "upstream": [
+        {
+          "model": "openai/gpt-6.2-astra",
+          "first_prompt": true,
+          "second_prompt": false,
+          "first_answer": false,
+          "title": false,
+          "forge_headers": []
+        },
+        {
+          "model": "openai/gpt-6.2-astra",
+          "first_prompt": true,
+          "second_prompt": true,
+          "first_answer": true,
+          "title": false,
+          "forge_headers": []
+        }
+      ],
+      "same_rollout": true,
+      "turn_context_models": [
+        "openai/gpt-6.2-astra",
+        "openai/gpt-6.2-astra"
+      ],
+      "forge_attempts": [
+        {
+          "forge_run_id": "run_aaaaaaaaaaaa",
+          "forge_root_run_id": "run_aaaaaaaaaaaa",
+          "model": "openai/gpt-6.2-astra",
+          "mapped_model": "openai/gpt-6.2-astra",
+          "cost_micros": 1000
+        },
+        {
+          "forge_run_id": "run_bbbbbbbbbbbb",
+          "forge_root_run_id": "run_bbbbbbbbbbbb",
+          "model": "openai/gpt-6.2-astra",
+          "mapped_model": "openai/gpt-6.2-astra",
+          "cost_micros": 1000
+        }
+      ]
+    },
+    {
+      "version": "codex-cli 0.172.0",
+      "binary_sha256": "f30a99714dc984876864239ef60563949b1e21421a7c9180422f51fd39186bc6",
+      "driver": "native TUI, real Forge loopback Responses proxy and synthetic text-only upstream",
+      "auth": "synthetic loopback only",
+      "client": [
+        {
+          "phase": "start",
+          "code": 0,
+          "deadline": false,
+          "task_complete_seen": 1,
+          "expected_run": "run_aaaaaaaaaaaa"
+        },
+        {
+          "phase": "reattach",
+          "code": 0,
+          "deadline": false,
+          "task_complete_seen": 2,
+          "expected_run": "run_bbbbbbbbbbbb"
+        }
+      ],
+      "upstream": [
+        {
+          "model": "openai/gpt-6.2-astra",
+          "first_prompt": true,
+          "second_prompt": false,
+          "first_answer": false,
+          "title": false,
+          "forge_headers": []
+        },
+        {
+          "model": "openai/gpt-6.2-astra",
+          "first_prompt": true,
+          "second_prompt": false,
+          "first_answer": false,
+          "title": true,
+          "forge_headers": []
+        },
+        {
+          "model": "openai/gpt-6.2-astra",
+          "first_prompt": true,
+          "second_prompt": true,
+          "first_answer": true,
+          "title": false,
+          "forge_headers": []
+        }
+      ],
+      "same_rollout": true,
+      "turn_context_models": [
+        "openai/gpt-6.2-astra",
+        "openai/gpt-6.2-astra"
+      ],
+      "forge_attempts": [
+        {
+          "forge_run_id": "run_aaaaaaaaaaaa",
+          "forge_root_run_id": "run_aaaaaaaaaaaa",
+          "model": "openai/gpt-6.2-astra",
+          "mapped_model": "openai/gpt-6.2-astra",
+          "cost_micros": 1000
+        },
+        {
+          "forge_run_id": "run_aaaaaaaaaaaa",
+          "forge_root_run_id": "run_aaaaaaaaaaaa",
+          "model": "openai/gpt-6.2-astra",
+          "mapped_model": "openai/gpt-6.2-astra",
+          "cost_micros": 1000
+        },
+        {
+          "forge_run_id": "run_bbbbbbbbbbbb",
+          "forge_root_run_id": "run_bbbbbbbbbbbb",
+          "model": "openai/gpt-6.2-astra",
+          "mapped_model": "openai/gpt-6.2-astra",
+          "cost_micros": 1000
+        }
+      ]
+    }
+  ]
+}
