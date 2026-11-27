@@ -66,9 +66,9 @@ The session file has three sections:
 Before strict decoding, a no-write allowlist migration strips legacy `intent.memory.generated_file` only at that path;
 new writes omit it.
 
-Session manifests write schema v2 when representable without the new supervisor fields, otherwise v3.
-`forge.session.store::manifest_for_write` owns that compatibility projection;
-`forge.session.store::_SUPPORTED_SCHEMA_VERSIONS` admits v1, v2, and v3 on read. Strict legacy validation precedes
+Session manifests use the oldest compatible write format, starting at v2. Supervisor fields can require v3, v4 or v5. A
+managed Codex proxy binding requires v6. `forge.session.store::manifest_for_write` owns this projection.
+`forge.session.store::_SUPPORTED_SCHEMA_VERSIONS` admits v1 through v6 on read. Strict legacy validation precedes
 in-memory projection: v1 gains `intent.launch.model_route=null` when launch exists; v1/v2 supervisors gain
 `auth_mode="inherit"` and `supervisor_model=null`. Legacy positive timeouts above 45 seconds clamp to 45 in both intent
 and overrides; Codex bindings discard formerly ignored Claude proxy/base-URL fields. No read rewrites a manifest. These
@@ -124,6 +124,10 @@ is distinct from Claude's `resume_id`; dispatch revalidates both native evidence
 encodings omit the new field entirely. Native source/auth/model/effort are frozen with the reviewer lane; effective
 set/reset, reload/on, inheritance and dispatch validate the same cross-field restrictions. Policy inheritance checks the
 child's copied intent and lane as well as the parent's effective state. No reader rewrites on inspection.
+
+Managed proxy-backed Codex sessions write schema v6. The binding in `intent.proxy` freezes the resolved ID, template and
+loopback address. The recorded foreground turn stores its native thread ID and verbatim requested and dispatched slugs.
+Readers predating v6 reject these sessions. Direct Codex and Claude sessions keep their compatible formats.
 
 Generic set/reset performs structural validation only, without source/auth reads or reviewer preflight under the session
 lock. Native source bindings must be created through supervisor setup; generic overrides cannot rewrite them. Explicit

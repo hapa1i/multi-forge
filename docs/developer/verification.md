@@ -228,7 +228,19 @@ applicable restart or reroute commands, preserve the exact resume target and com
 (including explicit lifecycle options), and add `--model-tier` only when disambiguation is needed. If a fresh child
 already exists, recovery must target that child rather than create another from the parent. Verify that historical and
 non-Claude alternatives preserve the requested model and selected tier's hyperparameters through launch. A non-Claude
-`--model` may start a paid proxy even with `--no-launch`; Codex sessions reject these route-selection flags.
+`--model` may start a paid proxy even with `--no-launch`. Codex rejects catalog `--model` and accepts `--proxy` or
+`--no-proxy` only at creation.
+
+For managed Codex proxy verification, use a disposable Codex home, an isolated Forge project, a loopback Responses stub
+and a synthetic backend credential. Run the headless start and resume and the TUI start and reattach commands in the
+[managed proxy guide](../end-user/codex_proxy.md#managed-sessions). Compare requested and dispatched slugs, thread ID
+and run IDs with the rollout, routing journal and proxy attempts. Swap the listener ID at the same URL and verify both
+resume forms refuse before the stub receives history. A changed fallback for the recorded slug must also refuse. Use a
+separately trust-enrolled fixture for hook-dependent supervision. Run the managed CLI and reporting fixtures together:
+
+```bash
+./scripts/test-integration.sh tests/integration/core/test_managed_codex_proxy.py tests/integration/cli/test_codex_proxy_session_reports.py
+```
 
 When several registered proxies share a base URL, check `forge session show <name> --field context.proxy.proxy_id` after
 SessionStart. The field prints an ID when exactly one matching entry is `healthy` or `starting`. Otherwise it prints an

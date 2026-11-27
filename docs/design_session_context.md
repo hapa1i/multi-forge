@@ -136,6 +136,11 @@ behaviors pinned live by a standing E2E. `forge session transfer regenerate <par
 remains the sessionless surface (re-stamps a cache, defaulting the runtime from the existing frontmatter so a regenerate
 never silently flips it back).
 
+For a proxy-backed session, both resume forms verify the original listener and replay the last proven foreground
+selection. A failed switch leaves the previous completed model in effect. An unresolved completion blocks replay. A
+change to the live fallback for the same requested slug blocks even an explicit repeat of that slug.
+[Managed proxy sessions](end-user/codex_proxy.md#managed-sessions)
+
 **Interactive Codex sessions** (`core/ops/codex_interactive.py`): omitting `--task` launches the foreground `codex` TUI
 as a managed session — bare (no parent, no transfer, `context_delivery` stays `None`) or an interactive bridge
 (`--resume-from` without `--task`; `--task` alone is rejected — headless turns need a parent). The bridge default rides

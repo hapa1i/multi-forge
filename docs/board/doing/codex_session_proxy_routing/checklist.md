@@ -4,10 +4,8 @@
 
 ## Current focus
 
-Verify model selection across an in-TUI switch and identify the last completed foreground turn after a failed switch.
-The native header probes below cover start and resume in disposable homes. The managed CLI floor also depends on the
-remaining model and enrollment evidence.
-[Predecessor probes](../../done/codex_openrouter_responses/probe-results.md#tool-use-and-compaction)
+The managed CLI matrix passed on Codex 0.141.0 and 0.172.0 using disposable homes and loopback upstreams. The remaining
+live verification dependency is a 0.162.1 home with operator-enrolled turn and Stop hooks.
 
 ## Native evidence
 
@@ -15,25 +13,41 @@ remaining model and enrollment evidence.
   turns across the local and OpenRouter Responses templates with a synthetic upstream. Each resume kept its thread and
   sent the first answer in its history. The proxy recorded the expected run/root pair and a 10,000-micro-USD fixture
   charge for each create. No Forge header reached the upstream. [Headless receipt](evidence/headless-header-matrix.json)
+
 - [x] Verify TUI start and reattach in separate PTY processes on 0.141.0 and 0.172.0 through the OpenRouter Responses
   template. Each reattach sent the first answer and recorded the second completion in the original rollout. Forge
   recorded distinct launch IDs and stripped its headers upstream. On 0.172.0 an extra title request produced three proxy
   attempts for two completed user turns. [TUI receipt](evidence/tui-header-matrix.json)
-- [ ] Capture completed, failed and ambiguous turns after explicit headless and in-TUI model changes. Distinguish a
-  completed user turn from title and tool requests. Record the requested and dispatched slugs on each route.
-- [ ] Probe executor hooks, proxy-only advisory enrollment and the admitted feedback and Stop-review versions.
+
+- [x] Confirm successful and rejected model switches through bare reattach on the original thread. A native completion
+  marker alone also appeared on rejected turns. Matching the foreground thread and turn to the proxy dispatch excludes
+  title requests. Ambiguous evidence refuses replay. [Native TUI receipt](evidence/managed-tui-model-replay.json)
+
+- [x] Verify proxy-only advisory enrollment, hook denial, PreToolUse feedback on the next native request, and an
+  independently authenticated Messages reviewer on 0.161.0 and 0.162.1. The Docker sandbox refused the underlying file
+  write after the permissive hook. [Enrollment and reviewer receipt](evidence/managed-proxy-hook-enrollment.json)
+
+- [ ] Verify successful Stop review on an operator-enrolled 0.162.1 fixture. The available fixture correctly refused
+  configuration before dispatch because its trust covered only SessionStart and PreToolUse.
+
+- [x] Run headless and TUI start and resume through the ordinary Forge CLI on the floor and newer binary. Each
+  continuation kept the original thread and verified listener. [Managed CLI matrix](evidence/managed-cli-matrix.json)
+
+- [x] Replay opaque reasoning after an explicit cross-model failure. Both versions surfaced the synthetic upstream's
+  HTTP 400 and reused the original model on the next bare resume.
+  [Cross-model receipt](evidence/managed-headless-cross-model.json)
 
 ## Implementation
 
-- [ ] Refuse alias-only adoption before binding, including the recheck after planning. Preserve ordinary direct adoption
+- [x] Refuse alias-only adoption before binding, including the recheck after planning. Preserve ordinary direct adoption
   and cover the existing misclassification with a regression.
-- [ ] Select native or proxy preflight on all four launch paths. Verify the recorded listener, apply its live policy,
+- [x] Select native or proxy preflight on all four launch paths. Verify the recorded listener, apply its live policy,
   scrub credentials and stamp managed identity. Keep direct as the default and route flags creation-only.
-- [ ] Version the proxy-backed manifest and journal payload. Record exact slugs and update the completed-turn model only
+- [x] Version the proxy-backed manifest and journal payload. Record exact slugs and update the completed-turn model only
   for the bound thread and current session instance. Exercise old formats and downgrade refusal.
-- [ ] Replay the last proven selection. Refuse drift in the ZDR mapping before sending history. Surface these facts in
+- [x] Replay the last proven selection. Refuse drift in the ZDR mapping before sending history. Surface these facts in
   launch banners, session details, model reports and journal history.
-- [ ] Attribute headless tokens and proxy charges once and resolve TUI spend through the instance's own launches.
+- [x] Attribute headless tokens and proxy charges once and resolve TUI spend through the instance's own launches.
   Exercise identically named sessions across projects and after recreation.
 
 ## Acceptance fixtures
@@ -48,11 +62,13 @@ remaining model and enrollment evidence.
 
 ## Closeout
 
-The activation baseline on `455412ca` passed 132 existing tests covering Codex session operations, interactive launches,
-adoption and routing journals.
+The managed CLI, reports, Responses proxy and transfer fixtures passed all 51 Docker-harness tests. The metered
+headless fixture also verified two cost records for one tool turn, per-launch JSONL tokens, and a rejected create
+after reaching the shared cap.
 
-- [ ] Run the relevant Docker-backed integration files as each slice lands. Verify through the normal Forge entry points
-  and retain the native evidence required by the [card](card.md#integration-acceptance).
-- [ ] Sync the [design and user docs](card.md#scope) and the verification guide with shipped behavior.
-- [ ] Run unit, regression, pre-commit and Markdown link checks on the integrated branch. Record the shipped outcome and
-  move the card to `done/` when verified.
+The separate Claude 2.1.245 adoption control missed its second Stop artifact on both this branch and unchanged
+`main` at `455412ca`. The native client returned its second answer on both revisions.
+
+- [x] Run the relevant Docker-backed integration fixtures through Forge and retain native receipts.
+- [x] Sync the design and operator guides with the implementation and verification procedure.
+- [ ] Complete live Stop-review acceptance and record shipment before moving the card to `done/`.

@@ -406,8 +406,10 @@ empirically with `forge runtime preflight codex --verify-enrollment`.
 Responses passthrough profile. It is **sessionless and scrubbed** — the proxy owns upstream auth, so no native
 codex/OpenAI login is required or leaked. It hard-blocks a codex older than the proxy-contract-validated version
 (≥0.141.0) before starting a proxy, auto-defaults `-m` from the proxy's default tier (override with `-- -m <model>`),
-and accepts `--sandbox read-only|workspace-write|danger-full-access` (default `workspace-write`). For direct use without
-a proxy, run native `codex`.
+and accepts `--sandbox read-only|workspace-write|danger-full-access` (default `workspace-write`). For a managed session,
+use `forge session start <name> --runtime codex --proxy <id-or-template>`. Use `--no-proxy` or omit both flags to select
+native auth. Both forms of `forge session resume <name>` use the saved route and reject route-selection flags.
+[Managed sessions](end-user/codex_proxy.md#managed-sessions)
 
 ### Runtime management
 

@@ -169,7 +169,9 @@ When reachable, live proxy `GET /` is authoritative for tier→model mappings an
   Responses preserves opaque reasoning and bypasses body audit. Direct OpenRouter strips native identifiers, enforces
   model and tool policy, and refuses background creates. The explicit Responses profile keeps its historical bare smoke
   target. For a verified direct OpenRouter route the launcher defaults Codex to the standard service tier and selects
-  the embedded server when the CLI supports `--no-daemon`. Explicit launch options take precedence.
+  the embedded server when the CLI supports `--no-daemon`. Explicit launch options take precedence. Managed Codex checks
+  the recorded ID and template at its loopback address on every resume. Forge passes run and root IDs as provider
+  headers to that listener. The listener consumes the headers before forwarding the request.
   [Operator contract](end-user/codex_proxy.md)
 
 **Marking-practice separation.** Runtime truth identifies effective routes; it does not classify provider practices. The

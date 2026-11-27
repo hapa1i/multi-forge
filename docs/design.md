@@ -627,10 +627,10 @@ proxy-owned routing properties. (Proxy requests do not carry a stable session id
 
 **Codex-runtime sessions** (`forge session start --runtime codex`, see
 [session design §3.9](design_session_context.md#39-session-resume-context-management)) use the same session-managed
-path, but every entry point dispatches on `intent.launch.runtime` **before** any Claude machinery: the session runs
-`codex` turns direct to OpenAI (no proxy, no `ANTHROPIC_BASE_URL`) — headless `codex exec` with `--task`, the foreground
-`codex` TUI without it — Claude-only flags are rejected rather than ignored, and `_launch_claude_for_session` refuses
-codex manifests as a backstop. The CLI accepts `--runtime claude|codex` but manifests persist registry ids only
+path. The session runs headless `codex exec` with `--task` or the foreground TUI without it. Creation defaults to native
+OpenAI auth. An explicit `--proxy <id-or-template>` binds both frontends to a Forge Responses listener for the life of
+the session. Resume verifies that listener before Codex receives the thread history. `_launch_claude_for_session`
+rejects Codex manifests. The CLI accepts `--runtime claude|codex` but manifests persist registry ids only
 (`claude_code`/`codex`), mapped at the CLI boundary.
 
 **Bare launch** (`forge claude start`):

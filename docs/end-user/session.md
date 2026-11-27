@@ -773,13 +773,11 @@ forge session show impl      # Runtime, Codex thread id, rollout path, auth post
 forge telemetry activity impl          # transfer-curate + codex turns under one run tree
 ```
 
-Requires `codex` installed and authenticated (`forge runtime preflight codex` → `Ready YES`). The start command curates
-the parent's context (default `--strategy ai-curated`), prepends it to your `--task` as the initial `codex exec`
-message, and records the Codex **thread id** so each `resume --task` continues the same conversation — from any
-directory; the turn always runs in the session's recorded worktree. Codex sessions go direct to OpenAI: proxy,
-supervision, memory, and other Claude-only flags are rejected. `--task` selects the headless form, requires
-`--resume-from`, and is only valid for Codex sessions; omitting it opens the interactive TUI (next section). If the
-first turn fails before Codex opens a thread, resume refuses with guidance — delete the session and start again.
+The default route uses native Codex auth. Check it with `forge runtime preflight codex`. To use a Responses proxy,
+supply `--proxy <id-or-template>` at creation. The proxy supplies the upstream credential. The headless start requires a
+Claude parent, curates its context (default `--strategy ai-curated`), and prepends it to the task. Resume uses the
+recorded thread and worktree from any directory. If the first turn never opens a thread, delete the session and start
+again. [Managed proxy sessions](codex_proxy.md#managed-sessions)
 
 Delete and purge refuse while a Codex launch is registered as active. If state is removed outside the supported cleanup
 commands while a turn is running, deletion wins. Forge returns the completed turn result with a warning but does not
@@ -827,8 +825,9 @@ installs), a smaller `--strategy`, or `--task`, which sends the context on stdin
 Thread capture is automatic. In trust-enrolled homes the `codex-session-start` hook reports the thread directly; without
 enrollment Forge discovers the rollout file Codex wrote during the run. Discovery refuses to guess: if several Codex
 sessions were started concurrently in the same directory, the thread may stay unrecorded — the command warns, and
-`forge session delete <name>` plus a fresh start is the recovery. Interactive turns do not appear in the usage ledger
-(Codex reports no attributable usage for TUI turns); a bridge's transfer curation still does.
+`forge session delete <name>` plus a fresh start is the recovery. A proxy-backed TUI contributes its attributed
+Responses requests and charges to `forge telemetry activity <session>`. Native TUI turns have no usage event. Transfer
+curation reports separately.
 
 ### Fork an existing Claude session
 

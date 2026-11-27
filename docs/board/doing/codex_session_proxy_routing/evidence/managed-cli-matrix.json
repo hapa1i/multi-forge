@@ -1,0 +1,338 @@
+{
+  "fixture": "forge session start/resume; real native PTYs and executables, disposable Git projects and empty native login stores; real Forge listener and synthetic loopback Responses SSE. Headless start used a structured transfer from a Claude planner fixture.",
+  "binary_sha256": {
+    "0.172.0": "f30a99714dc984876864239ef60563949b1e21421a7c9180422f51fd39186bc6",
+    "0.141.0": "51f848c212ee24e8da923a7175813a74c113d47e01f0d40f1fea46b12644c363"
+  },
+  "checks": {
+    "auth": [
+      "proxy_token",
+      "forge_proxy",
+      "unknown"
+    ],
+    "run": "Journal ID equals reconciled launch, ingress run and root, and any usage event run and root.",
+    "model": "Exact requested and dispatched slugs agree across journal, completed native turn, proxy attempt, upstream body and any usage event.",
+    "history": "Every continuation sent the original answer and opaque reasoning item back to its own listener.",
+    "cost": "Each reported create cost 10000 micro-USD. No Forge header reached the synthetic upstream.",
+    "tokens": "Each headless event reports only this launch’s 16 input and 2 output tokens, including a headless turn after two TUI launches. Each TUI launch emits zero usage events.",
+    "forms": "Headless start and bare resume used Gemini; model-switch passed -m with the GPT slug; replay-switch used a bare resume. TUI resume reattached after exit; headless-after-tui used --task on the same thread."
+  },
+  "cases": [
+    {
+      "version": "0.141.0",
+      "template": "codex-responses-local",
+      "frontend": "headless",
+      "thread": "01a21e05-4bb6-7f53-b539-22a79e511184",
+      "launches": [
+        {
+          "form": "start",
+          "run": "run_9cd163148cbf",
+          "turn": "01a21e05-4c2e-7a70-af03-832c90a369d0",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": false,
+          "usage_events": 1
+        },
+        {
+          "form": "resume",
+          "run": "run_57116ea6c9ab",
+          "turn": "01a21e05-5173-7012-bd92-79af82d088f0",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        },
+        {
+          "form": "model-switch",
+          "run": "run_ce2e115513f0",
+          "turn": "01a21e05-56c0-7013-addf-c505199bd30a",
+          "model": "openai/gpt-6.2-astra",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        },
+        {
+          "form": "replay-switch",
+          "run": "run_87c59e82eb71",
+          "turn": "01a21e05-5bf9-70d2-9c2b-ef12858c0feb",
+          "model": "openai/gpt-6.2-astra",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        }
+      ]
+    },
+    {
+      "version": "0.141.0",
+      "template": "codex-responses-local",
+      "frontend": "tui",
+      "thread": "01a21e05-f1c1-7043-8283-c27b5590cb17",
+      "launches": [
+        {
+          "form": "start",
+          "run": "run_aaa60d3f85f0",
+          "turn": "01a21e05-fba0-7143-a058-bda4876f7300",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": false,
+          "usage_events": 0
+        },
+        {
+          "form": "resume",
+          "run": "run_e51f5cf08b04",
+          "turn": "01a21e06-1411-74e1-ac5b-d31627079823",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": true,
+          "usage_events": 0
+        },
+        {
+          "form": "headless-after-tui",
+          "run": "run_b58fe9e7403c",
+          "turn": "01a21e06-22b7-7352-9432-d19b57a3dd18",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        }
+      ]
+    },
+    {
+      "version": "0.141.0",
+      "template": "codex-responses-openrouter",
+      "frontend": "headless",
+      "thread": "01a21e05-4be4-7763-9e29-12b3061f05aa",
+      "launches": [
+        {
+          "form": "start",
+          "run": "run_c80290a5d764",
+          "turn": "01a21e05-4c5c-7d41-9030-198876743beb",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": false,
+          "usage_events": 1
+        },
+        {
+          "form": "resume",
+          "run": "run_d297c5bfefe5",
+          "turn": "01a21e05-51b9-7b81-9256-55d79b6d4230",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        },
+        {
+          "form": "model-switch",
+          "run": "run_26d5e6ad4799",
+          "turn": "01a21e05-574f-7c81-96cc-4fd2887dae4f",
+          "model": "openai/gpt-6.2-astra",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        },
+        {
+          "form": "replay-switch",
+          "run": "run_bf7f25eb121d",
+          "turn": "01a21e05-5cb4-7953-979e-8ffc0863d57f",
+          "model": "openai/gpt-6.2-astra",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        }
+      ]
+    },
+    {
+      "version": "0.141.0",
+      "template": "codex-responses-openrouter",
+      "frontend": "tui",
+      "thread": "01a21e05-f1ed-7db2-9d0d-e4e24c3ddfa4",
+      "launches": [
+        {
+          "form": "start",
+          "run": "run_d4a7f6260e6e",
+          "turn": "01a21e05-fbc1-7951-bcc0-3b75991f50c8",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": false,
+          "usage_events": 0
+        },
+        {
+          "form": "resume",
+          "run": "run_ed744fc239c0",
+          "turn": "01a21e06-1452-77f1-a936-faea099a73b2",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": true,
+          "usage_events": 0
+        },
+        {
+          "form": "headless-after-tui",
+          "run": "run_a8f02917e402",
+          "turn": "01a21e06-234f-7a11-9e6c-82aac0e816eb",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        }
+      ]
+    },
+    {
+      "version": "0.172.0",
+      "template": "codex-responses-local",
+      "frontend": "headless",
+      "thread": "01a21e05-4c0a-7321-9355-1d3652a9b1fa",
+      "launches": [
+        {
+          "form": "start",
+          "run": "run_9ec4f5c787e4",
+          "turn": "01a21e05-4c36-7830-ae50-19c95f546eb5",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": false,
+          "usage_events": 1
+        },
+        {
+          "form": "resume",
+          "run": "run_48ae19cf3b09",
+          "turn": "01a21e05-5129-7472-8061-27712b4e413d",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        },
+        {
+          "form": "model-switch",
+          "run": "run_64d05e27f196",
+          "turn": "01a21e05-5629-7f53-ab3d-973d3935e8ec",
+          "model": "openai/gpt-6.2-astra",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        },
+        {
+          "form": "replay-switch",
+          "run": "run_873fa354b2ef",
+          "turn": "01a21e05-5b5c-7983-8404-30f244abc0fa",
+          "model": "openai/gpt-6.2-astra",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        }
+      ]
+    },
+    {
+      "version": "0.172.0",
+      "template": "codex-responses-local",
+      "frontend": "tui",
+      "thread": "01a21e05-f342-7d01-b648-63d252b42c4b",
+      "launches": [
+        {
+          "form": "start",
+          "run": "run_b3933a7ccfe7",
+          "turn": "01a21e05-fb0f-7732-987d-feb7547f07ec",
+          "model": "google/gemini-4-carbon",
+          "creates": 2,
+          "history": false,
+          "usage_events": 0
+        },
+        {
+          "form": "resume",
+          "run": "run_d206beb86390",
+          "turn": "01a21e06-1317-7d01-b34a-d8c48bcef96f",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": true,
+          "usage_events": 0
+        },
+        {
+          "form": "headless-after-tui",
+          "run": "run_47d8b452cd8c",
+          "turn": "01a21e06-210f-7112-8385-5d79908603c3",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        }
+      ]
+    },
+    {
+      "version": "0.172.0",
+      "template": "codex-responses-openrouter",
+      "frontend": "headless",
+      "thread": "01a21e05-4b91-7ee2-bd5e-0cd2f8ce703d",
+      "launches": [
+        {
+          "form": "start",
+          "run": "run_a8944834a7e4",
+          "turn": "01a21e05-4bdf-7f80-8156-aa415edbaa58",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": false,
+          "usage_events": 1
+        },
+        {
+          "form": "resume",
+          "run": "run_4d854de2cb9c",
+          "turn": "01a21e05-515f-7fe1-8ede-ee1987fc573f",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        },
+        {
+          "form": "model-switch",
+          "run": "run_e014e10cf0c5",
+          "turn": "01a21e05-567e-7be0-8824-5e36f247d9ca",
+          "model": "openai/gpt-6.2-astra",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        },
+        {
+          "form": "replay-switch",
+          "run": "run_b7f37302d33e",
+          "turn": "01a21e05-5b92-7a73-8bec-dbd547025456",
+          "model": "openai/gpt-6.2-astra",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        }
+      ]
+    },
+    {
+      "version": "0.172.0",
+      "template": "codex-responses-openrouter",
+      "frontend": "tui",
+      "thread": "01a21e05-f342-7212-9fd6-674e84dd1949",
+      "launches": [
+        {
+          "form": "start",
+          "run": "run_f1f2e12fb0ac",
+          "turn": "01a21e05-fb1a-7911-aa89-c4e6d3535e63",
+          "model": "google/gemini-4-carbon",
+          "creates": 2,
+          "history": false,
+          "usage_events": 0
+        },
+        {
+          "form": "resume",
+          "run": "run_9cdff66dbba9",
+          "turn": "01a21e06-12f3-7d41-9052-843243f2a765",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": true,
+          "usage_events": 0
+        },
+        {
+          "form": "headless-after-tui",
+          "run": "run_3d0e2db6c74f",
+          "turn": "01a21e06-2120-79c3-a2a1-a9b80e8d38da",
+          "model": "google/gemini-4-carbon",
+          "creates": 1,
+          "history": true,
+          "usage_events": 1
+        }
+      ]
+    }
+  ]
+}
