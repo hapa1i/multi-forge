@@ -22,6 +22,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
+from forge.core.runtime.codex_turn import request_turn_reference
 from forge.core.wire_shapes import (
     OPENAI_RESPONSES_PASSTHROUGH,
     PASSTHROUGH_WIRE_SHAPES,
@@ -128,6 +129,8 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
             body = parsed
 
     requested_model = str(body.get("model")) if body and body.get("model") else "unknown"
+    forge_run_id, forge_root_run_id = server._forge_run_ids(raw_request)
+    turn_ref = request_turn_reference(body, forge_run_id) if forge_run_id == forge_root_run_id else None
     if direct:
         try:
             body = openrouter_responses.prepare_request(body or {}, config.proxy.get_provider())
@@ -143,7 +146,6 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
     model = str(body["model"]) if direct and body else requested_model
     resolved_tier = getattr(config.proxy, "default_tier", None) or "sonnet"
     streaming = body is not None and bool(body.get("stream"))
-    forge_run_id, forge_root_run_id = server._forge_run_ids(raw_request)
     forge_session, forge_command = server._forge_session_command(raw_request)
     downstream_event_id = getattr(raw_request.state, "downstream_event_id", None)
 
@@ -192,6 +194,7 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
             cached_tokens=cache_tok,
             latency_ms=elapsed,
             failed=failed,
+            codex_turn_ref=turn_ref,
             request_id=request_id,
             reported_cost_micros=reported_cost_micros,
             forge_run_id=forge_run_id,

@@ -34,6 +34,7 @@ from forge.core.runtime.codex_preflight import (
     CodexPreflight,
     preflight_codex,
 )
+from forge.core.runtime.codex_proxy_launch import CodexProxyLaunch
 
 # The probe-turn machinery (invoker, bridge, session store) is imported lazily inside
 # _run_probe_turn so importing this module stays cheap -- cli/runtime.py top-level imports
@@ -67,6 +68,7 @@ class CodexEnrollmentVerification:
 def verify_codex_enrollment(
     *,
     preflight: CodexPreflight | None = None,
+    proxy_launch: CodexProxyLaunch | None = None,
     timeout_seconds: int = 120,
 ) -> CodexEnrollmentVerification:
     """Confirm (or refute) that Forge's user-scope Codex hooks are trust-enrolled.
@@ -80,7 +82,7 @@ def verify_codex_enrollment(
     config, a preflight error) degrades to an UNVERIFIED result instead of a traceback.
     """
     try:
-        return _run_enrollment_checks(preflight=preflight, timeout_seconds=timeout_seconds)
+        return _run_enrollment_checks(preflight=preflight, proxy_launch=proxy_launch, timeout_seconds=timeout_seconds)
     except Exception as exc:  # noqa: BLE001 - diagnostic must never traceback (docstring contract)
         logger.debug("Codex enrollment verification failed unexpectedly", exc_info=True)
         return CodexEnrollmentVerification(
@@ -102,6 +104,7 @@ def verify_codex_enrollment(
 def _run_enrollment_checks(
     *,
     preflight: CodexPreflight | None,
+    proxy_launch: CodexProxyLaunch | None,
     timeout_seconds: int,
 ) -> CodexEnrollmentVerification:
     """Gate sequence behind :func:`verify_codex_enrollment` (may raise; the caller guards)."""
@@ -134,7 +137,7 @@ def _run_enrollment_checks(
             ),
         )
 
-    codex_succeeded, enrolled_seen = _run_probe_turn(pf, timeout_seconds=timeout_seconds)
+    codex_succeeded, enrolled_seen = _run_probe_turn(pf, timeout_seconds=timeout_seconds, proxy_launch=proxy_launch)
 
     if enrolled_seen:
         reason = "codex-session-start fired: user-scope Codex hooks are trust-enrolled and active."
@@ -197,7 +200,9 @@ def _user_scope_config_path_safe() -> str:
         return "<unknown>"
 
 
-def _run_probe_turn(preflight: CodexPreflight, *, timeout_seconds: int) -> tuple[bool, bool]:
+def _run_probe_turn(
+    preflight: CodexPreflight, *, timeout_seconds: int, proxy_launch: CodexProxyLaunch | None = None
+) -> tuple[bool, bool]:
     """Run one managed ``codex exec`` turn in a throwaway repo; return (succeeded, receipt_seen).
 
     The turn runs against the REAL ``$CODEX_HOME`` (that is where trust lives), but a
@@ -235,6 +240,7 @@ def _run_probe_turn(preflight: CodexPreflight, *, timeout_seconds: int) -> tuple
             request = prepare_codex_request(
                 prompt=_PROBE_PROMPT,
                 preflight=preflight,
+                proxy_launch=proxy_launch,
                 # session left untagged: a throwaway probe must not pollute `forge telemetry activity`.
                 attribution=Attribution(command="codex-enroll-verify"),
                 cwd=str(repo),

@@ -457,7 +457,10 @@ def set_session_override(
         # The mutate callback receives the fresh state from disk, avoiding TOCTOU.
         def _mutate(m: SessionState) -> None:
             from forge.policy.semantic.identity import snapshot_supervisor_options
+            from forge.session.models import session_runtime
 
+            if key.split(".", 1)[0] == "proxy" and session_runtime(m) == "codex":
+                raise InvalidOverrideKeyError(key, "the Codex route is bound at session creation")
             old = snapshot_supervisor_options(m)
             set_override(m.overrides, key, parsed_value)
             effective = compute_effective_intent(m, strict=True, override_key=key)

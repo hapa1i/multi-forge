@@ -14,6 +14,7 @@ from forge.core.models.model_practices import (
 from forge.core.models.model_reference import normalize_model_reference
 from forge.core.models.model_routes import resolve_model_alternative
 from forge.core.reactive.env import RunIdentity
+from forge.core.runtime.codex_proxy_launch import CodexProxyLaunch
 from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE
 from forge.proxy.model_routes import effective_proxy_model_maps
 from forge.session.models import RouteCommitConfirmed, SessionState
@@ -32,6 +33,24 @@ from .session_model_routing import (
     SessionModelRoutingError,
     resolve_proxy_selected_model,
 )
+
+
+def build_codex_proxy_routing_payload(launch: CodexProxyLaunch, instance_id: str) -> dict[str, Any]:
+    """Snapshot the verified listener and wire slugs before Codex receives thread history."""
+    payload = _payload(
+        kind="proxy",
+        backend_id=launch.backend_id,
+        proxy_id=launch.proxy_id,
+        template=launch.template,
+        wire_shape=launch.wire_shape,
+        route_scope_tags=sorted([f"backend:{launch.backend_id}", "route:proxy", "runtime:codex"]),
+    )
+    payload["codex_proxy"] = {
+        "instance_id": instance_id,
+        "requested_model": launch.requested_model,
+        "dispatched_model": launch.dispatched_model,
+    }
+    return payload
 
 
 def build_runtime_native_routing_payload() -> dict[str, Any]:
@@ -234,6 +253,7 @@ def commit_launch_routing(
         store.update(
             timeout_s=5.0,
             mutate=lambda manifest: setattr(manifest.confirmed, "route_commit", projection),
+            expected_instance_id=immutable_payload.get("codex_proxy", {}).get("instance_id"),
         )
     except Exception as primary:
         compensation_errors: list[str] = []

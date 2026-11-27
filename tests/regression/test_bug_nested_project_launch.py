@@ -240,7 +240,8 @@ class TestPersistedClaudeProjectRoot:
         lock_error = FileLockTimeoutError(lock_path=checkout / ".forge" / "sessions" / "executor.lock", timeout_s=5.0)
         real_update = store.update
 
-        def fail_best_effort_updates(*, timeout_s, mutate):
+        def fail_best_effort_updates(*, timeout_s, mutate, expected_instance_id=None):
+            assert expected_instance_id is None  # This Claude launch has no Codex proxy binding.
             current = store.read()
             candidate = deepcopy(current)
             mutate(candidate)

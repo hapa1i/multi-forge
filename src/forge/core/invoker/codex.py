@@ -9,8 +9,8 @@ three ways the hooks capture:
   launcher just before spawn; worker/reviewer jobs retain the caller's argv.
 - **result**: the output is a JSONL *event stream*, reduced by
   :func:`parse_codex_jsonl_stream`, not a single envelope.
-- **emit**: a ``runtime_native`` usage event (route ``codex_exec``) with tokens but no
-  cost -- Codex runs DIRECT to OpenAI, so there is no proxy cost record to join.
+- **emit**: a ``codex_exec`` usage event with JSONL tokens. On managed Responses
+  routes the proxy records charges for its individual creates.
 
 Codex never enters the format-retry branch: it inherits the base
 ``_is_recoverable_format_rejection`` (always ``False``), so ``_on_format_rejection`` is
@@ -22,7 +22,9 @@ from __future__ import annotations
 import os
 from collections.abc import Sequence
 from dataclasses import replace
+from functools import partial
 from typing import Literal
+from urllib.parse import urlsplit
 
 from forge.core.invoker._lifecycle import (
     ParseHints,
@@ -31,16 +33,22 @@ from forge.core.invoker._lifecycle import (
     _record_worker_upstream,
     _status,
 )
-from forge.core.invoker.codex_fork import CodexForkRequest, fork_usage_delta
+from forge.core.invoker.codex_fork import CodexContinuationRequest
 from forge.core.invoker.codex_stream import parse_codex_jsonl_stream
 from forge.core.invoker.types import Attribution, HeadlessRequest, HeadlessResult
 from forge.core.reactive.env import (
+    FORGE_AUTHORITY_MARKER_VAR,
     FORGE_DEPTH_VAR,
+    FORGE_PARENT_RUN_ID_VAR,
+    FORGE_PROXY_WIRE_SHAPE_VAR,
+    FORGE_ROOT_RUN_ID_VAR,
+    FORGE_RUN_ID_VAR,
     FORGE_SUBPROCESS_BASE_URL_VAR,
     FORGE_SUBPROCESS_PROXY_ID_VAR,
     FORGE_SUBPROCESS_PROXY_VAR,
     FORGE_SUBPROCESS_TEMPLATE_VAR,
     get_forge_depth,
+    get_run_identity,
     stamp_run_identity,
 )
 from forge.core.runtime.codex_feedback import (
@@ -51,6 +59,11 @@ from forge.core.runtime.codex_preflight import (
     CodexPreflight,
     codex_api_key_for_subprocess,
 )
+from forge.core.runtime.codex_proxy_launch import (
+    CODEX_PROXY_TOKEN_VAR,
+    CodexProxyLaunch,
+)
+from forge.core.runtime.codex_usage import continued_usage_delta
 from forge.core.runtime.registry import get_runtime
 from forge.core.worker_controls import CODEX_WORKER_PROFILE
 
@@ -62,6 +75,7 @@ CodexSandbox = Literal["read-only", "workspace-write", "danger-full-access"]
 # only the preflight-resolved auth is re-established.
 _CODEX_CHILD_STRIP_VARS = (
     CODEX_EXECUTOR_IDENTITY_VAR,
+    CODEX_PROXY_TOKEN_VAR,
     "CODEX_API_KEY",
     "CODEX_ACCESS_TOKEN",
     "ANTHROPIC_API_KEY",
@@ -72,6 +86,40 @@ _CODEX_CHILD_STRIP_VARS = (
     FORGE_SUBPROCESS_PROXY_ID_VAR,
     FORGE_SUBPROCESS_TEMPLATE_VAR,
 )
+
+
+# These hook variables are captured under _temporary_run_env, scoped to the child session.
+_MANAGED_IDENTITY_VARS = (
+    "FORGE_SESSION",
+    "FORGE_FORGE_ROOT",
+    "FORGE_SESSION_INSTANCE",
+    FORGE_RUN_ID_VAR,
+    FORGE_ROOT_RUN_ID_VAR,
+    FORGE_PARENT_RUN_ID_VAR,
+    FORGE_AUTHORITY_MARKER_VAR,
+)
+
+
+def _build_codex_proxy_env() -> dict[str, str]:
+    """Give the client a synthetic bearer and leave upstream auth with the proxy."""
+    env = os.environ.copy()
+    for var in (
+        *_CODEX_CHILD_STRIP_VARS,
+        *_MANAGED_IDENTITY_VARS,
+        "FORGE_FORK_NAME",
+        "FORGE_PARENT_SESSION",
+        FORGE_PROXY_WIRE_SHAPE_VAR,
+        "OPENAI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "OPENAI_ORGANIZATION",
+        "OPENAI_ORG_ID",
+        "OPENAI_PROJECT",
+        "OPENAI_BASE_URL",
+    ):
+        env.pop(var, None)
+    env[FORGE_DEPTH_VAR] = str(get_forge_depth(env) + 1)
+    env[CODEX_PROXY_TOKEN_VAR] = "forge-loopback"
+    return env
 
 
 class CodexHeadlessInvoker(_HeadlessLifecycleBase):
@@ -102,7 +150,7 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
         ident: _Identity,
         hints: ParseHints,
     ) -> HeadlessResult:
-        stream = parse_codex_jsonl_stream(stdout, strict_usage=isinstance(request, CodexForkRequest))
+        stream = parse_codex_jsonl_stream(stdout, strict_usage=isinstance(request, CodexContinuationRequest))
         # Codex reports a failed turn in the JSONL stream, usually with EMPTY stderr; surface
         # the provider reason on stderr so a caller inspecting it sees why the turn failed.
         # Fall back to a generic line when the stream carried no (or an empty) error message,
@@ -113,25 +161,28 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
         terminal = dict(
             input_tokens=stream.input_tokens, output_tokens=stream.output_tokens, cached_tokens=stream.cached_tokens
         )
-        fork = request if isinstance(request, CodexForkRequest) else None
-        usage = fork_usage_delta(fork.usage_baseline, terminal) if fork else terminal
+        continuation = request if isinstance(request, CodexContinuationRequest) else None
+        usage = continued_usage_delta(continuation.usage_baseline, terminal) if continuation else terminal
         return HeadlessResult(
             label=request.label,
             stdout=stream.final_text,
             stderr=effective_stderr,
             returncode=returncode,
             duration_seconds=duration_seconds,
-            cost_micro_usd=None,  # native runtime: no $ figure (direct to OpenAI)
+            cost_micro_usd=None,  # The native JSONL stream reports tokens only.
             input_tokens=usage["input_tokens"],
             output_tokens=usage["output_tokens"],
             cached_tokens=usage["cached_tokens"],
-            terminal_usage=terminal if fork else None,
-            inherited_usage=fork.usage_baseline.as_dict() if fork and fork.usage_baseline else None,
+            terminal_usage=terminal if continuation else None,
+            inherited_usage=(
+                continuation.usage_baseline.as_dict() if continuation and continuation.usage_baseline else None
+            ),
             # Parsed iff the stream yielded recognizable terminal events; a failed turn
             # (is_error) still parsed. An empty/garbage stream -> False, stdout "".
             envelope_parsed=bool(stream.final_text) or stream.input_tokens is not None or stream.is_error,
             runtime_is_error=stream.is_error,
             runtime_session_id=stream.thread_id,
+            codex_turn_completed=stream.turn_completed,
             **ident,
         )
 
@@ -142,19 +193,26 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
         return "codex CLI not found in PATH"
 
 
-def sanitize_codex_child_env(preflight: CodexPreflight) -> dict[str, str]:
-    """Build a sanitized env for any ``codex`` child (headless exec or interactive TUI).
+def sanitize_codex_child_env(
+    preflight: CodexPreflight, *, proxy_launch: CodexProxyLaunch | None = None
+) -> dict[str, str]:
+    """Prepare the child environment for a preflighted Codex route.
 
-    Strips inherited Codex/Anthropic/proxy vars so the child cannot contradict the
-    preflight's resolved auth posture, advances the ``FORGE_DEPTH`` recursion guard
-    (Codex can run shell commands that invoke ``forge``), then re-establishes exactly the preflight-resolved auth:
-    ``CODEX_API_KEY`` for an api-key login the ``codex`` binary can't otherwise see
-    (``env``/``credential_file``), the inherited ``CODEX_ACCESS_TOKEN`` for an
-    enterprise login, or **nothing** for ``codex_store`` (Codex reads its own
-    ``~/.codex`` auth). Other ambient context (including ``FORGE_SESSION``) is kept;
-    run-tree identity is the caller's concern (derive for headless children, an
-    explicit fresh root for interactive launches).
+    Native children receive the resolved API key or enterprise token when their login needs one.
+    Codex-store logins read their own auth. Proxy children use the synthetic loopback bearer.
+    Both advance the Forge depth guard; managed launchers stamp the session and run identity.
     """
+    if (preflight.auth_method == "proxy_token") != (proxy_launch is not None):
+        raise ValueError("Codex preflight authentication and selected launch route disagree.")
+    if proxy_launch is not None:
+        env = _build_codex_proxy_env()
+        # Codex honors ambient HTTP proxies. Keep this listener's headers and thread history on loopback.
+        host = urlsplit(proxy_launch.base_url).hostname
+        if host is None:
+            raise ValueError("Codex proxy launch requires a loopback host.")
+        bypass = ",".join(filter(None, (env.get("no_proxy"), env.get("NO_PROXY"), host)))
+        env["no_proxy"] = env["NO_PROXY"] = bypass
+        return env
     env = os.environ.copy()
     for var in _CODEX_CHILD_STRIP_VARS:
         env.pop(var, None)
@@ -187,6 +245,7 @@ def prepare_codex_request(
     resume_thread_id: str | None = None,
     extra_args: Sequence[str] = (),
     worker: bool = False,
+    proxy_launch: CodexProxyLaunch | None = None,
 ) -> HeadlessRequest:
     """Shape one ``codex exec --json`` job into a :class:`HeadlessRequest`.
 
@@ -202,44 +261,49 @@ def prepare_codex_request(
     Explicit ``worker=True`` applies native delegation/memory restrictions after
     those overrides. Managed root callers keep their normal configuration.
 
-    Codex runs DIRECT to OpenAI: no Forge proxy, no ``ANTHROPIC_*`` env, ``base_url`` is
-    ``None``. The child env is **sanitized** so it cannot contradict the preflight: all
-    inherited Codex/Anthropic/proxy vars are stripped, then exactly the preflight-resolved
-    auth is re-established -- ``CODEX_API_KEY`` for an api-key login the ``codex`` binary
-    can't otherwise see (``env``/``credential_file``), the inherited ``CODEX_ACCESS_TOKEN``
-    for an enterprise login, or **nothing** for ``codex_store`` (ChatGPT/enterprise reads
-    its own store). ``cwd`` is expected to be a git worktree; callers that intentionally
-    target a non-git directory must opt into Codex's own bypass themselves rather than
-    Forge silently weakening the check. The run-tree triple is stamped so the run shares
-    its parent's root.
+    The managed proxy path restores the session identity established by the caller and
+    passes that launch's run IDs to Responses ingress. A direct child derives its own
+    run under the caller's root.
     """
-    argv = [*get_runtime("codex").headless_cmd, "--json", "--sandbox", sandbox]
-    if model:
+    env = sanitize_codex_child_env(preflight, proxy_launch=proxy_launch)
+    argv = list(get_runtime("codex").headless_cmd)
+    if proxy_launch is not None:
+        # The routing commitment records this root. Use the same identity for ingress
+        # and the worker's JSONL event so its exact cost joins to the event-backed row.
+        run = get_run_identity()
+        if run is None:
+            raise ValueError("Managed Codex proxy launch requires an active Forge run.")
+        env.update({key: os.environ[key] for key in _MANAGED_IDENTITY_VARS if key in os.environ})
+        argv[1:1] = proxy_launch.provider_args(run, extra_args, env=env, cwd=cwd or os.getcwd())
+    else:
+        stamp_run_identity(env, derive=True)
+    argv += ["--json", "--sandbox", sandbox]
+    if model and proxy_launch is None:
         argv += ["-m", model]
     argv += extra_args
 
-    env = sanitize_codex_child_env(preflight)
-    stamp_run_identity(env, derive=True)
     if worker:
         CODEX_WORKER_PROFILE.apply(argv, env)
     if resume_thread_id:
         argv += ["resume", resume_thread_id]
 
-    return HeadlessRequest(
+    request = (
+        partial(CodexContinuationRequest, usage_baseline=proxy_launch.usage_baseline)
+        if proxy_launch and resume_thread_id
+        else HeadlessRequest
+    )
+    return request(
         argv=argv,
         prompt=prompt,
         env=env,
         cwd=cwd,
         timeout_seconds=timeout_seconds,
         label=label,
-        model=model,
-        provider="openai",
-        proxy_id=None,
-        # Codex's --json is already in argv; the Claude format-injection path is never
-        # reached (executor preparation does not inject format flags). base_url=None
-        # because Codex is direct -- the cost-precedence "proxied" branch must not fire.
-        output_format=None,
-        base_url=None,
+        model=proxy_launch.dispatched_model if proxy_launch else model,
+        provider=proxy_launch.provider if proxy_launch else "openai",
+        proxy_id=proxy_launch.proxy_id if proxy_launch else None,
+        output_format=None,  # Codex --json is already in argv.
+        base_url=proxy_launch.base_url if proxy_launch else None,
         # Stamp the runtime + resolved billing posture onto the attribution so the emitted
         # event's billing_mode always matches the preflight that gated this spawn.
         attribution=(
@@ -273,6 +337,7 @@ def _emit_codex(request: HeadlessRequest, result: HeadlessResult) -> None:
         runtime=attribution.runtime,
         model=request.model,
         provider=request.provider,
+        proxy_id=request.proxy_id,
         billing_mode=attribution.billing_mode,
         status=status,
         latency_ms=round(result.duration_seconds * 1000, 1) if result.duration_seconds else None,

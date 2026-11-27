@@ -61,6 +61,7 @@ def get_valid_intent_paths() -> set[str]:
 
     paths: set[str] = set()
     _collect_paths(SessionIntent, "", paths)
+    paths.discard("proxy.proxy_id")  # Only a verified Codex launch may bind an instance.
     _valid_paths_cache = paths
     return paths
 
@@ -327,6 +328,8 @@ def set_override(overrides: dict[str, Any], key: str, value: Any) -> None:
         return
 
     parts = validate_key(key)
+    if key == "proxy" and isinstance(value, dict) and "proxy_id" in value:
+        raise InvalidOverrideKeyError(key, "a Codex proxy ID is bound at session creation")
     if key == "launch" and isinstance(value, dict):
         if "runtime" in value:
             _reject_launch_runtime_override(key)

@@ -118,6 +118,7 @@ class HeadlessResult:
     # the public usage fields carry only a verified new-review delta.
     inherited_usage: dict[str, int | None] | None = None
     terminal_usage: dict[str, int | None] | None = None
+    codex_turn_completed: bool = False
 
     @property
     def success(self) -> bool:

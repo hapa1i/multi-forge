@@ -241,10 +241,22 @@ def preflight_cmd(runtime_name: str, proxy_id: str | None, verify_enrollment: bo
         # lane's cache. --verify-enrollment is the most thorough readiness command; an operator who
         # treats it as THE check must not still get fail-open supervision until they separately run
         # the plain preflight. Proxied runs answer a different question -> never touch the direct cache.
-        enrollment_preflight = preflight_codex(proxy_id=proxy_id)
         if proxy_id is None:
+            enrollment_preflight = preflight_codex()
             _write_direct_preflight_cache(enrollment_preflight)
-        enrollment = verify_codex_enrollment(preflight=enrollment_preflight)
+            enrollment = verify_codex_enrollment(preflight=enrollment_preflight)
+        else:
+            from dataclasses import replace
+
+            from forge.core.runtime.codex_proxy_launch import resolve_codex_proxy_launch
+
+            try:
+                enrollment_preflight, launch = resolve_codex_proxy_launch(proxy_name=proxy_id, existing_only=True)
+            except ValueError as exc:
+                unavailable = replace(preflight_codex(loopback_auth=True), ready=False, blocking_reason=str(exc))
+                enrollment = verify_codex_enrollment(preflight=unavailable)
+            else:
+                enrollment = verify_codex_enrollment(preflight=enrollment_preflight, proxy_launch=launch)
         if as_json:
             import json
             from dataclasses import asdict

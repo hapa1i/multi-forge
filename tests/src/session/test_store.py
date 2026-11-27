@@ -1103,3 +1103,54 @@ class TestSchemaStrictness:
         with pytest.raises(ManifestCorruptedError) as exc_info:
             store.read()
         assert "overrides.custom" in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://example.org:1234",
+        "http://localhost:1234?",
+        "http://127.0.0.1:1234#",
+        "http://user@localhost:1234",
+        "http://[::1]evil:1234",
+        "http://[::1%eth0]:1234",
+        "http://localhost:0",
+    ],
+)
+def test_bound_codex_proxy_rejects_non_origin_url(url: str) -> None:
+    with pytest.raises(ValueError):
+        create_session_state(
+            "test",
+            runtime="codex",
+            proxy_id="edge",
+            proxy_template="responses",
+            proxy_base_url=url,
+        )
+
+
+def test_v6_proxy_roundtrip_and_older_reader_fail_closed(store: SessionStore, monkeypatch: pytest.MonkeyPatch) -> None:
+    from forge.session.models import CodexCompletedTurn, CodexConfirmed
+    from forge.session.store import manifest_for_write
+
+    state = create_session_state(
+        store.session_name,
+        runtime="codex",
+        proxy_id="edge",
+        proxy_template="responses",
+        proxy_base_url="http://[::1]:1234",
+    )
+    state.confirmed.codex = CodexConfirmed(
+        thread_id="thread",
+        completed_turn=CodexCompletedTurn("thread", "uncatalogued/Case:exact", "fallback:v2", "turn"),
+    )
+    store.write(state)
+    assert store.read().confirmed.codex == state.confirmed.codex
+    raw = json.loads(store.manifest_path.read_text())
+    assert raw["schema_version"] == 6
+    assert raw["intent"]["proxy"]["proxy_id"] == "edge"
+    assert manifest_for_write(create_session_state("direct", runtime="codex"))["schema_version"] == 2
+
+    monkeypatch.setattr("forge.session.store._SUPPORTED_SCHEMA_VERSIONS", {1, 2, 3, 4, 5})
+    with pytest.raises(ManifestCorruptedError, match="incompatible schema"):
+        store.read()
+    assert json.loads(store.manifest_path.read_text()) == raw

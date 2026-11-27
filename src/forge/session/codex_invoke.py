@@ -16,58 +16,31 @@ import os
 import struct
 import subprocess
 import sys
-import tomllib
 from collections.abc import Mapping, Sequence
 
-from forge.core.invoker.codex import (
-    _CODEX_CHILD_STRIP_VARS,
-    CodexSandbox,
-    sanitize_codex_child_env,
-)
+from forge.core.invoker.codex import CodexSandbox
+from forge.core.invoker.codex import _build_codex_proxy_env as _build_codex_proxy_env
+from forge.core.invoker.codex import sanitize_codex_child_env
 from forge.core.reactive.env import (
     FORGE_AUTHORITY_MARKER_VAR,
-    FORGE_DEPTH_VAR,
     FORGE_PARENT_RUN_ID_VAR,
-    FORGE_PROXY_WIRE_SHAPE_VAR,
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_RUN_ID_VAR,
     RunIdentity,
-    get_forge_depth,
 )
 from forge.core.runtime.codex_feedback import prepare_executor_launch
 from forge.core.runtime.codex_preflight import CodexPreflight
+from forge.core.runtime.codex_proxy_launch import (
+    CodexProxyLaunch,
+    openrouter_launch_defaults,
+)
+from forge.core.runtime.codex_proxy_launch import passthrough_model as passthrough_model
+from forge.core.runtime.codex_proxy_launch import provider_overrides
 
 logger = logging.getLogger(__name__)
 
 _FORGE_SESSION_VAR = "FORGE_SESSION"
 _FORGE_FORGE_ROOT_VAR = "FORGE_FORGE_ROOT"
-# The sessionless child authenticates to the loopback proxy. Upstream authentication
-# belongs to the proxy process.
-_CODEX_BARE_PROXY_STRIP_VARS: tuple[str, ...] = (
-    *_CODEX_CHILD_STRIP_VARS,  # CODEX_*/ANTHROPIC_*/FORGE_SUBPROCESS_* (shared core)
-    _FORGE_SESSION_VAR,
-    _FORGE_FORGE_ROOT_VAR,
-    "FORGE_FORK_NAME",
-    "FORGE_PARENT_SESSION",
-    FORGE_RUN_ID_VAR,
-    FORGE_PARENT_RUN_ID_VAR,
-    FORGE_ROOT_RUN_ID_VAR,
-    FORGE_PROXY_WIRE_SHAPE_VAR,
-    FORGE_AUTHORITY_MARKER_VAR,
-    "OPENAI_API_KEY",
-    "OPENROUTER_API_KEY",
-    "OPENAI_ORGANIZATION",
-    "OPENAI_ORG_ID",
-    "OPENAI_PROJECT",
-    "OPENAI_BASE_URL",
-)
-
-# Codex reads the loopback bearer from this env var (-c ...env_key="FORGE_CODEX_PROXY_TOKEN").
-# Any non-empty value works: the proxy owns the real upstream credential and does not validate
-# this inbound token; codex just needs *a* token to populate the Authorization header.
-_FORGE_CODEX_PROXY_TOKEN_VAR = "FORGE_CODEX_PROXY_TOKEN"
-_FORGE_CODEX_PROXY_TOKEN_VALUE = "forge-loopback"
-
 # Linux rejects any single exec argument longer than MAX_ARG_STRLEN: 32 pages, counting its NUL.
 _MAX_ARG_STRLEN_PAGES = 32
 # Room for the selected executable path, executor identity and authority marker added at launch.
@@ -106,6 +79,7 @@ def invoke_codex_interactive(
     initial_prompt: str | None = None,
     authority_marker: str | None = None,
     extra_args: Sequence[str] = (),
+    proxy_launch: CodexProxyLaunch | None = None,
 ) -> int:
     """Run the ``codex`` TUI in the foreground; return its exit code.
 
@@ -131,6 +105,8 @@ def invoke_codex_interactive(
         initial_prompt=initial_prompt,
         authority_marker=authority_marker,
         extra_args=extra_args,
+        proxy_launch=proxy_launch,
+        cwd=cwd,
     )
     logger.debug("Launching interactive codex (cwd=%s, resume=%s)", cwd, resume_thread_id)
     argv = prepare_executor_launch(argv, env, cwd=cwd)
@@ -149,6 +125,8 @@ def build_codex_interactive_launch(
     initial_prompt: str | None = None,
     authority_marker: str | None = None,
     extra_args: Sequence[str] = (),
+    proxy_launch: CodexProxyLaunch | None = None,
+    cwd: str | None = None,
 ) -> tuple[list[str], dict[str, str]]:
     """Build the same arguments and child environment for pre-launch sizing and invocation."""
     if resume_thread_id is not None and initial_prompt is not None:
@@ -157,7 +135,10 @@ def build_codex_interactive_launch(
     # --sandbox placement is per-form: `codex resume` declares its own -s/--sandbox
     # (codex 0.139.0 `codex resume --help`), and a root-level flag is not guaranteed to
     # propagate into the subcommand's flow -- pass it where each form documents it.
+    env = sanitize_codex_child_env(preflight, proxy_launch=proxy_launch)
     argv: list[str] = ["codex"]
+    if proxy_launch is not None:
+        argv.extend(proxy_launch.provider_args(run_identity, extra_args, env=env, cwd=cwd or os.getcwd()))
     if resume_thread_id is not None:
         argv += ["resume", "--sandbox", sandbox, *extra_args, resume_thread_id]
     else:
@@ -169,7 +150,6 @@ def build_codex_interactive_launch(
             # Callers check max_initial_prompt_bytes() first: exec rejects larger prompts with E2BIG.
             argv.append(initial_prompt)
 
-    env = sanitize_codex_child_env(preflight)
     env[_FORGE_SESSION_VAR] = session_name
     env[_FORGE_FORGE_ROOT_VAR] = forge_root
     from forge.session.store import SessionStore
@@ -208,7 +188,10 @@ def invoke_codex_bare_proxy(
     cwd = cwd or os.getcwd()
     env = _build_codex_proxy_env()
     if direct_openrouter:
-        passthrough = [*_openrouter_launch_defaults(passthrough, env=env, cwd=cwd), *passthrough]
+        passthrough = [
+            *openrouter_launch_defaults(passthrough, env=env, cwd=cwd),
+            *passthrough,
+        ]
     argv = _build_codex_proxy_argv(base_url=base_url, sandbox=sandbox, model=model, passthrough=passthrough)
     logger.debug(
         "Launching proxy-backed codex (base_url=%s, sandbox=%s, model=%s)",
@@ -218,48 +201,6 @@ def invoke_codex_bare_proxy(
     )
     result = subprocess.run(argv, env=env, cwd=cwd, stdin=None, stdout=None, stderr=None)
     return result.returncode
-
-
-def _openrouter_launch_defaults(passthrough: Sequence[str], *, env: Mapping[str, str], cwd: str) -> list[str]:
-    """Set standard service for this launch and opt into embedded mode on CLIs that support it."""
-    defaults = ["-c", 'service_tier="default"']
-    for arg in passthrough:
-        if arg == "--":
-            break
-        if arg in ("--no-daemon", "--remote") or arg.startswith("--remote="):
-            return defaults
-
-    # Older supported Codex binaries already run embedded and reject --no-daemon.
-    try:
-        help_result = subprocess.run(
-            ["codex", "--help"],
-            env=env,
-            cwd=cwd,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return defaults
-    if help_result.returncode == 0 and b"--no-daemon" in help_result.stdout.split():
-        defaults.append("--no-daemon")
-    return defaults
-
-
-def _build_codex_proxy_env() -> dict[str, str]:
-    """Build the scrubbed env for a sessionless proxy-backed codex launch.
-
-    Strips the session/run-tree identity, upstream credentials and OpenAI routing vars, advances
-    FORGE_DEPTH (codex can shell out to ``forge``), and sets the loopback proxy token.
-    Establishes NO native codex auth -- that is the session-managed path's job.
-    """
-    env = os.environ.copy()
-    for var in _CODEX_BARE_PROXY_STRIP_VARS:
-        env.pop(var, None)
-    env[FORGE_DEPTH_VAR] = str(get_forge_depth(env) + 1)
-    env[_FORGE_CODEX_PROXY_TOKEN_VAR] = _FORGE_CODEX_PROXY_TOKEN_VALUE
-    return env
 
 
 def _build_codex_proxy_argv(
@@ -277,54 +218,8 @@ def _build_codex_proxy_argv(
     ``--strict-config``. ``model`` auto-defaults ``-m`` only when the user did not already
     select a model with a model flag or a top-level model config override.
     """
-    proxy_v1 = f"{base_url.rstrip('/')}/v1"
-    argv: list[str] = [
-        "codex",
-        "--sandbox",
-        sandbox,
-        "-c",
-        "model_provider=forge_proxy",
-        "-c",
-        'model_providers.forge_proxy.name="Forge Proxy"',
-        "-c",
-        f'model_providers.forge_proxy.base_url="{proxy_v1}"',
-        "-c",
-        'model_providers.forge_proxy.wire_api="responses"',
-        "-c",
-        f'model_providers.forge_proxy.env_key="{_FORGE_CODEX_PROXY_TOKEN_VAR}"',
-    ]
+    argv = ["codex", "--sandbox", sandbox, *provider_overrides(base_url)]
     if model and passthrough_model(passthrough) is None:
         argv += ["-m", model]
     argv += list(passthrough)
     return argv
-
-
-def passthrough_model(passthrough: Sequence[str]) -> str | None:
-    """Codex gives the model flag precedence over the last top-level model override."""
-    config_model = None
-    args = iter(passthrough)
-    for arg in args:
-        if arg == "--":
-            break
-        if arg in ("-m", "--model"):
-            return next(args, "")
-        if arg.startswith("--model="):
-            return arg.removeprefix("--model=")
-        if arg.startswith("-m") and len(arg) > 2:
-            return arg[2:].removeprefix("=")
-        if arg in ("-c", "--config"):
-            override = next(args, "")
-        elif arg.startswith("--config="):
-            override = arg.removeprefix("--config=")
-        elif arg.startswith("-c"):
-            override = arg[2:].removeprefix("=")
-        else:
-            continue
-        name, sep, value = override.partition("=")
-        if sep and name.strip() == "model":
-            try:
-                parsed = tomllib.loads(f"value = {value}")["value"]
-            except tomllib.TOMLDecodeError:
-                parsed = value.strip()
-            config_model = parsed if isinstance(parsed, str) else value.strip()
-    return config_model

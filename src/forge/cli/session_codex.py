@@ -40,6 +40,7 @@ from forge.core.ops.codex_session import (
 )
 from forge.core.ops.context import ExecutionContext, _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
+from forge.core.runtime.codex_proxy_launch import CodexProxyLaunch
 from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.session import SessionManager, SessionState
 from forge.session.models import AuthorityIntent
@@ -162,11 +163,10 @@ def run_codex_start(ctx: click.Context) -> int:
             if p[key] is not None:
                 print_error(f"{flag} requires --resume-from <parent>")
                 return 1
-    # Codex runs direct-to-OpenAI with no hooks: Claude routing, sidecar,
-    # supervision, memory, and prompt-injection flags have no Codex meaning.
+    if p["direct"] and p["proxy_name"]:
+        print_error("--no-proxy and --proxy are mutually exclusive")
+        return 1
     rejected_for_codex: list[tuple[object, str]] = [
-        (p["proxy_name"], "--proxy"),
-        (p["direct"], "--no-proxy"),
         (p["sidecar"], "--sidecar"),
         (p["host_proxy"], "--host-proxy"),
         (p["subprocess_proxy"], "--subprocess-proxy"),
@@ -225,6 +225,7 @@ def run_codex_start(ctx: click.Context) -> int:
             sandbox=p["sandbox"] or "workspace-write",
             worktree=p["worktree"],
             branch=p["branch"],
+            proxy_name=p["proxy_name"],
             context_delivery=p["context_delivery"] or "initial-message",
             launch_args=launch_args,
             **authority_kwargs,
@@ -238,6 +239,7 @@ def run_codex_start(ctx: click.Context) -> int:
         sandbox=p["sandbox"] or "workspace-write",
         worktree=p["worktree"],
         branch=p["branch"],
+        proxy_name=p["proxy_name"],
         context_delivery=p["context_delivery"] or "initial-message",
         launch_args=launch_args,
         **authority_kwargs,
@@ -268,9 +270,11 @@ def run_codex_resume(ctx: click.Context, name: str, task: str | None, manifest: 
     Claude-only flags are rejected on explicit use (defaults pass through):
     silently ignoring them would hide a real user mistake.
     """
+    for param, flag in (("proxy_name", "--proxy"), ("direct", "--no-proxy")):
+        if ctx.get_parameter_source(param) == click.core.ParameterSource.COMMANDLINE:
+            print_error(f"{flag} is only available at creation for Codex sessions. Resume uses the recorded route.")
+            return 1
     claude_only_flags = [
-        ("proxy_name", "--proxy"),
-        ("direct", "--no-proxy"),
         ("direct_model", "--model"),
         ("model_tier", "--model-tier"),
         ("fresh", "--fresh"),
@@ -321,6 +325,7 @@ def launch_codex_session(
     sandbox: CodexSandbox,
     worktree: bool,
     branch: str | None,
+    proxy_name: str | None = None,
     context_delivery: ContextDeliveryMode = "initial-message",
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
@@ -337,11 +342,13 @@ def launch_codex_session(
             depth=depth,
             sandbox=sandbox,
             create_worktree=worktree,
+            proxy_name=proxy_name,
             branch=branch,
             context_delivery=context_delivery,
             authority=authority,
             authority_explicit=authority_explicit,
             launch_args=launch_args,
+            announce_proxy=_render_route,
         )
     except ForgeOpError as e:
         print_error(f"{e}")
@@ -373,6 +380,7 @@ def resume_codex_session(
             task=task,
             sandbox=sandbox,
             launch_args=launch_args,
+            announce_proxy=_render_route,
         )
     except ForgeOpError as e:
         print_error(f"{e}")
@@ -391,6 +399,7 @@ def launch_interactive_codex_session(
     sandbox: CodexSandbox,
     worktree: bool,
     branch: str | None,
+    proxy_name: str | None = None,
     context_delivery: ContextDeliveryMode = "initial-message",
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
@@ -406,6 +415,7 @@ def launch_interactive_codex_session(
             depth=depth,
             sandbox=sandbox,
             create_worktree=worktree,
+            proxy_name=proxy_name,
             branch=branch,
             context_delivery=context_delivery,
             authority=authority,
@@ -447,13 +457,26 @@ def _render_interactive_launch(launch: CodexInteractiveLaunch) -> None:
         console.print(f"[green]Created Codex session:[/green] {launch.session} (from '{launch.parent}')")
     else:
         console.print(f"[green]Created Codex session:[/green] {launch.session}")
-    console.print("[dim]Routing: direct (OpenAI via codex CLI)[/dim]")
+    _render_route(launch.proxy_launch)
     if launch.worktree_path:
         console.print(f"[dim]Worktree: {launch.worktree_path}[/dim]")
     if launch.transfer_path:
         console.print(f"[dim]Transfer: {launch.transfer_path}[/dim]")
     if launch.context_delivery == "hook":
         console.print("[dim]Context delivery: SessionStart hook (receipt reconciled)[/dim]")
+
+
+def _render_route(launch: CodexProxyLaunch | None) -> None:
+    if launch is None:
+        console.print("[dim]Routing: direct (OpenAI via codex CLI)[/dim]")
+        return
+    console.print(f"Routing: {launch.proxy_id} ({launch.template}) at {launch.base_url}", markup=False)
+    model = launch.requested_model
+    if model != launch.dispatched_model:
+        model += f" -> {launch.dispatched_model}"
+    console.print(f"Model: {model}", markup=False)
+    for notice in launch.notices:
+        console.print(notice, markup=False)
 
 
 def _finish_interactive(result: CodexInteractiveResult) -> int:
@@ -498,7 +521,8 @@ def _render_interactive_post_exit(result: CodexInteractiveResult) -> None:
 
 def _render_start(result: CodexSessionStartResult) -> None:
     console.print(f"[green]Created Codex session:[/green] {result.session} (from '{result.parent}')")
-    console.print("[dim]Routing: direct (OpenAI via codex CLI)[/dim]")
+    if result.proxy_launch is None:
+        _render_route(None)
     if result.worktree_path:
         console.print(f"[dim]Worktree: {result.worktree_path}[/dim]")
     console.print(f"[dim]Transfer: {result.transfer_path}[/dim]")

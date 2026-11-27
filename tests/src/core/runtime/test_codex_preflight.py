@@ -649,3 +649,12 @@ class TestHappyPathAndAssert:
         assert sentinel["called"] is False
         assert result.auth_method == "none"
         assert result.ready is False
+
+
+def test_proxy_only_preflight_does_not_probe_or_resolve_native_credentials(monkeypatch):
+    _stub_probes(monkeypatch, version="0.141.0")
+    monkeypatch.setattr(cp, "_probe_doctor_json", lambda *_: pytest.fail("probed native credentials"))
+    monkeypatch.setattr(cp, "_resolve_codex_auth", lambda *_: pytest.fail("resolved native credentials"))
+    pf = preflight_codex(loopback_auth=True)
+    assert pf.ready
+    assert (pf.auth_method, pf.auth_source, pf.billing_mode) == ("proxy_token", "forge_proxy", "unknown")

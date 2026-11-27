@@ -942,8 +942,8 @@ class TestConstants:
     """Test module constants."""
 
     def test_schema_version(self) -> None:
-        """SCHEMA_VERSION should be 4 for non-default review triggers."""
-        assert SCHEMA_VERSION == 5
+        """Pinned Codex proxy manifests use version six."""
+        assert SCHEMA_VERSION == 6
 
     def test_index_version(self) -> None:
         """INDEX_VERSION includes persistent session generations."""

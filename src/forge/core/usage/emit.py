@@ -349,6 +349,7 @@ def emit_codex_usage(
     session: str | None = None,
     model: str | None = None,
     provider: str | None = "openai",
+    proxy_id: str | None = None,
     billing_mode: BillingMode | None = None,
     latency_ms: float | None = None,
     input_tokens: int | None = None,
@@ -356,21 +357,7 @@ def emit_codex_usage(
     cached_tokens: int | None = None,
     runtime: str = "codex",
 ) -> None:
-    """Emit a per-run UsageEvent for a native ``codex exec --json`` run.
-
-    Codex runs DIRECT to OpenAI -- there is no Forge proxy in the path, so there is no
-    proxy cost record to join (``source_refs=None``) and no dollar figure
-    (``cost_micro_usd=None``). The JSONL stream still reports exact tokens, so:
-
-    - ``reporter="codex_jsonl"`` / ``measurement_source="runtime_native"`` with the
-      stream's exact tokens (the *tokens* are attributed);
-    - ``confidence="unavailable"`` -- the ledger's ``confidence`` is a **cost** signal,
-      and Codex reports no cost (mirrors the tokens-only direct branch in
-      ``direct_cost_provenance``. Honest absence, never a fabricated $0.
-
-    ``billing_mode`` is the resolved Codex posture (from ``CodexPreflight``); the
-    invoker can't infer it. Best-effort; no-ops without a ``run_id``.
-    """
+    """Record JSONL tokens once. A verified proxy owns any downstream attempts and reported charges."""
     try:
         if not run_id:
             return
@@ -379,27 +366,28 @@ def emit_codex_usage(
             output_tokens=output_tokens,
             cached_tokens=cached_tokens,
         )
-        write_downstream_record(
-            DownstreamRecord(
-                kind="attempt",
-                downstream_event_id=mint_downstream_event_id(event_key=f"codex:{run_id}:{command}"),
-                forge_run_id=run_id,
-                forge_root_run_id=root_run_id or run_id,
-                provider=provider,
-                source_id=provider,
-                source_kind="provider",
-                backend_id=_backend_id_for_direct_usage(provider=provider, reporter=measurement.reporter),
-                model=model,
-                input_tokens=measurement.input_tokens,
-                output_tokens=measurement.output_tokens,
-                cached_tokens=measurement.cached_tokens,
-                cost_micros=measurement.cost_micro_usd,
-                reporter=measurement.reporter,
-                confidence=measurement.confidence,
-                latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
-                failed=status != "success",
+        if proxy_id is None:
+            write_downstream_record(
+                DownstreamRecord(
+                    kind="attempt",
+                    downstream_event_id=mint_downstream_event_id(event_key=f"codex:{run_id}:{command}"),
+                    forge_run_id=run_id,
+                    forge_root_run_id=root_run_id or run_id,
+                    provider=provider,
+                    source_id=provider,
+                    source_kind="provider",
+                    backend_id=_backend_id_for_direct_usage(provider=provider, reporter=measurement.reporter),
+                    model=model,
+                    input_tokens=measurement.input_tokens,
+                    output_tokens=measurement.output_tokens,
+                    cached_tokens=measurement.cached_tokens,
+                    cost_micros=measurement.cost_micro_usd,
+                    reporter=measurement.reporter,
+                    confidence=measurement.confidence,
+                    latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
+                    failed=status != "success",
+                )
             )
-        )
         event = UsageEvent(
             run_id=run_id,
             parent_run_id=parent_run_id,
@@ -410,6 +398,7 @@ def emit_codex_usage(
             session=session,
             workflow=workflow,
             provider=provider,
+            proxy_id=proxy_id,
             model=model,
             billing_mode=billing_mode or "unknown",
             route="codex_exec",
@@ -420,9 +409,9 @@ def emit_codex_usage(
             input_tokens=measurement.input_tokens,
             output_tokens=measurement.output_tokens,
             cached_tokens=measurement.cached_tokens,
-            cost_micro_usd=measurement.cost_micro_usd,  # native runtime: no $ figure (no proxy record to join)
+            cost_micro_usd=measurement.cost_micro_usd,
             latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
-            source_refs=None,  # direct to OpenAI: no Forge proxy request_id exists
+            source_refs=None,
         )
         log_usage_event(event)
     except Exception as e:  # best-effort: telemetry must not break the run

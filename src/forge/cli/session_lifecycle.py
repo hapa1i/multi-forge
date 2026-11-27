@@ -1038,7 +1038,7 @@ def launch_new_session(
     "--no-proxy",
     "direct",
     is_flag=True,
-    help="Bypass the proxy and talk to Anthropic directly",
+    help="Use the runtime’s native provider directly (Anthropic for Claude, OpenAI for Codex)",
 )
 @click.option("--incognito", "-i", is_flag=True, help="Attempt guarded purge after runtime exit")
 @click.option("--system-prompt", "-s", help="Append system prompt text")

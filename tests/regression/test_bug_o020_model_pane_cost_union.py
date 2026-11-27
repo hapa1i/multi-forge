@@ -24,7 +24,6 @@ def test_o020_model_pane_keeps_non_proxy_event_cost_with_downstream_rows(monkeyp
         cost_estimated=False,
     )
 
-    monkeypatch.setattr(usage_summary, "read_upstream_outcomes", lambda **_kwargs: [])
     monkeypatch.setattr(
         usage_summary,
         "read_downstream_records_with_stats",
@@ -41,7 +40,7 @@ def test_o020_model_pane_keeps_non_proxy_event_cost_with_downstream_rows(monkeyp
         ),
     )
 
-    usage_summary._build_activity_panes(summary, "planner", since=None, events=[])
+    usage_summary._build_activity_panes(summary, "planner", since=None, events=[], outcomes=[], owned_roots=None)
 
     assert {row.command for row in summary.downstream.rows} == {
         "direct-supervisor",

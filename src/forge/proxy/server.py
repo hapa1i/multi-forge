@@ -526,6 +526,7 @@ def _calc_and_log_cost(
     forge_root_run_id: str | None = None,
     downstream_event_id: str | None = None,
     requested_model: str | None = None,
+    codex_turn_ref: str | None = None,
     backend_id: str | None = None,
     cache_write_tokens: int = 0,
 ) -> int | None:
@@ -551,6 +552,7 @@ def _calc_and_log_cost(
                 backend_id=backend_id or _backend_instance_id(),
                 model=model,
                 requested_model=requested_model,
+                codex_turn_ref=codex_turn_ref,
                 tier=tier,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,

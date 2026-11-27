@@ -20,11 +20,10 @@ from forge.core.telemetry.downstream import (
 )
 from forge.core.telemetry.jsonl_io import append_jsonl_record, iter_jsonl_records
 from forge.core.telemetry.upstream import (
-    UPSTREAM_SCHEMA_VERSION,
     UpstreamOutcome,
     write_upstream_outcome,
 )
-from forge.core.usage.ledger import USAGE_SCHEMA_VERSION, UsageEvent, log_usage_event
+from forge.core.usage.ledger import UsageEvent, log_usage_event
 
 
 def _jsonl_lines(root: Path, relative_dir: str) -> list[str]:
@@ -162,7 +161,7 @@ def test_plane_writers_preserve_compact_record_bytes(tmp_path: Path, monkeypatch
         "status": "error",
         "event_id": "up_1",
         "cached": False,
-        "schema_version": UPSTREAM_SCHEMA_VERSION,
+        "schema_version": 1,
         "ts": ts,
     }
     assert _jsonl_lines(tmp_path, "telemetry/upstream") == [json.dumps(expected_upstream, separators=(",", ":"))]
@@ -178,5 +177,6 @@ def test_plane_writers_preserve_compact_record_bytes(tmp_path: Path, monkeypatch
     )
     log_usage_event(usage)
     expected_usage = asdict(usage)
-    expected_usage["schema_version"] = USAGE_SCHEMA_VERSION
+    expected_usage.pop("session_instance_id")
+    expected_usage["schema_version"] = 1
     assert _jsonl_lines(tmp_path, "usage/events") == [json.dumps(expected_usage, separators=(",", ":"), default=str)]

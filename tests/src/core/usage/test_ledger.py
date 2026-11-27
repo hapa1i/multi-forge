@@ -16,7 +16,6 @@ from pathlib import Path
 import forge.core.usage.ledger as usage_ledger
 from forge.core.paths import get_forge_home
 from forge.core.usage.ledger import (
-    USAGE_SCHEMA_VERSION,
     SourceRefs,
     UsageEvent,
     log_usage_event,
@@ -63,7 +62,7 @@ class TestRoundtrip:
     def test_schema_version_stamped(self) -> None:
         log_usage_event(_event())
         rec = json.loads(_shard_path().read_text().strip())
-        assert rec["schema_version"] == USAGE_SCHEMA_VERSION
+        assert rec["schema_version"] == 1
 
     def test_event_id_and_provenance_defaults(self) -> None:
         log_usage_event(_event())

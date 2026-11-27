@@ -38,7 +38,7 @@ def test_reserved_control_refused_before_session_or_runtime_creation(
         patch("forge.cli.guards.require_repo_root"),
         patch("forge.cli.session_lifecycle.launch_new_session", return_value=0) as claude_launch,
         patch(
-            "forge.core.ops.codex_interactive.assert_codex_ready",
+            "forge.core.ops.codex_session.assert_codex_ready",
             side_effect=AssertionError("refusal must precede Codex preflight"),
         ) as codex_preflight,
     ):

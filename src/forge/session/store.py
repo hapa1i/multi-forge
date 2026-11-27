@@ -48,7 +48,7 @@ from .exceptions import (
 from .models import SCHEMA_VERSION, SessionState, session_state_to_dict
 from .validation import validate_name
 
-_SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, 4, 5}
+_SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, 4, 5, 6}
 
 MANIFEST_FILENAME = "forge.session.json"
 MANIFEST_DIR = ".forge"
@@ -173,8 +173,11 @@ def upgrade_manifest_for_read(data: dict[str, Any]) -> None:
 
 
 def manifest_for_write(manifest: SessionState) -> dict[str, Any]:
-    """Use v5 for native input, retaining v2/v3 ordinary and v4 Stop compatibility."""
+    """Select the oldest manifest schema that can represent the stored facts."""
     data = session_state_to_dict(manifest)
+    if manifest.intent.proxy and manifest.intent.proxy.proxy_id is not None:
+        data["schema_version"] = SCHEMA_VERSION
+        return data
     supervisor = (data["intent"].get("policy") or {}).get("supervisor")
     override_sup = (data["overrides"].get("policy") or {}).get("supervisor")
     new_override = isinstance(override_sup, dict) and bool({"auth_mode", "supervisor_model"} & override_sup.keys())
@@ -195,9 +198,7 @@ def manifest_for_write(manifest: SessionState) -> dict[str, Any]:
         for config in (supervisor, override_sup):
             if isinstance(config, dict):
                 config.pop("review_trigger", None)
-    data["schema_version"] = (
-        SCHEMA_VERSION if native_required else 4 if stop_required else 2 if legacy and not new_override else 3
-    )
+    data["schema_version"] = 5 if native_required else 4 if stop_required else 2 if legacy and not new_override else 3
     if data["schema_version"] == 2 and supervisor:
         del supervisor["auth_mode"]
         del supervisor["supervisor_model"]
@@ -712,13 +713,23 @@ class SessionStore:
 
         launch = intent.get("launch")
         schema_version = data.get("schema_version")
+        if schema_version == 6:
+            if (
+                not isinstance(launch, dict)
+                or launch.get("runtime") != "codex"
+                or not proxy
+                or not proxy.get("proxy_id")
+            ):
+                raise ManifestCorruptedError(str(self._manifest_path), "schema v6 requires a pinned Codex proxy")
+        elif proxy and "proxy_id" in proxy:
+            raise ManifestCorruptedError(str(self._manifest_path), "pinned Codex proxy requires schema v6")
         if isinstance(launch, dict):
             if schema_version == 1 and "model_route" in launch:
                 raise ManifestCorruptedError(
                     str(self._manifest_path),
                     "schema v1 intent.launch cannot contain model_route",
                 )
-            if schema_version in {2, 3, 4, 5} and "model_route" not in launch:
+            if schema_version in {2, 3, 4, 5, 6} and "model_route" not in launch:
                 missing.append("intent.launch.model_route")
 
         policy = intent.get("policy") if isinstance(intent, dict) else None
@@ -730,7 +741,7 @@ class SessionStore:
                         str(self._manifest_path),
                         f"schema v{schema_version} cannot contain supervisor.{field_name}",
                     )
-                if schema_version in {3, 4, 5} and field_name not in supervisor:
+                if schema_version in {3, 4, 5, 6} and field_name not in supervisor:
                     raise ManifestCorruptedError(
                         str(self._manifest_path),
                         f"schema v{schema_version} requires supervisor.{field_name}",
@@ -741,10 +752,16 @@ class SessionStore:
         override_policy = overrides.get("policy") if isinstance(overrides, dict) else None
         override_supervisor = override_policy.get("supervisor") if isinstance(override_policy, dict) else None
         for config in (supervisor, override_supervisor):
-            if schema_version != 5 and isinstance(config, dict) and "native_source" in config:
-                raise ManifestCorruptedError(str(self._manifest_path), "Native supervisor source requires schema v5")
-        if schema_version == 5 and isinstance(supervisor, dict) and "native_source" not in supervisor:
-            raise ManifestCorruptedError(str(self._manifest_path), "schema v5 requires supervisor.native_source")
+            if schema_version not in {5, 6} and isinstance(config, dict) and "native_source" in config:
+                raise ManifestCorruptedError(
+                    str(self._manifest_path),
+                    "Native supervisor source requires schema v5",
+                )
+        if schema_version in {5, 6} and isinstance(supervisor, dict) and "native_source" not in supervisor:
+            raise ManifestCorruptedError(
+                str(self._manifest_path),
+                f"schema v{schema_version} requires supervisor.native_source",
+            )
         if schema_version in {1, 2, 3}:
             for config in (supervisor, override_supervisor):
                 if isinstance(config, dict) and "review_trigger" in config:
@@ -752,9 +769,10 @@ class SessionStore:
                         str(self._manifest_path),
                         f"schema v{schema_version} cannot contain supervisor.review_trigger",
                     )
-        elif schema_version in {4, 5} and isinstance(supervisor, dict) and "review_trigger" not in supervisor:
+        elif schema_version in {4, 5, 6} and isinstance(supervisor, dict) and "review_trigger" not in supervisor:
             raise ManifestCorruptedError(
-                str(self._manifest_path), f"schema v{schema_version} requires supervisor.review_trigger"
+                str(self._manifest_path),
+                f"schema v{schema_version} requires supervisor.review_trigger",
             )
         if isinstance(overrides, dict):
             _validate_overrides_schema(overrides, str(self._manifest_path))
@@ -763,6 +781,9 @@ class SessionStore:
         confirmed = data.get("confirmed", {})
         if not isinstance(confirmed, dict):
             raise ManifestCorruptedError(str(self._manifest_path), "confirmed must be an object")
+        codex = confirmed.get("codex")
+        if isinstance(codex, dict) and schema_version != 6 and {"completed_turn", "reconciled_run_id"} & codex.keys():
+            raise ManifestCorruptedError(str(self._manifest_path), "Codex proxy replay facts require schema v6")
         started_with_proxy = confirmed.get("started_with_proxy")
         if started_with_proxy is not None:
             if not isinstance(started_with_proxy, dict):

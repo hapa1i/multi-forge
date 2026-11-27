@@ -15,11 +15,15 @@ import dacite
 
 from forge.core.paths import get_forge_home
 from forge.core.state import utc_timestamp_z
-from forge.core.telemetry.jsonl_io import append_jsonl_record, iter_jsonl_records
+from forge.core.telemetry.jsonl_io import (
+    append_jsonl_record,
+    iter_jsonl_records,
+    stamp_session_instance,
+)
 
 logger = logging.getLogger(__name__)
 
-UPSTREAM_SCHEMA_VERSION = 1
+UPSTREAM_SCHEMA_VERSION = 2
 
 UpstreamStatus = Literal["success", "warning", "fail_open", "deny", "needs_review", "error", "timeout", "skipped"]
 
@@ -60,8 +64,9 @@ class UpstreamOutcome:
     message: str | None = None
     cached: bool = False
     latency_ms: float | None = None
-    schema_version: int = UPSTREAM_SCHEMA_VERSION
+    schema_version: int = 1
     ts: str = field(default_factory=utc_timestamp_z)
+    session_instance_id: str | None = None
 
 
 def should_record_upstream_outcome(status: str, *, cached: bool = False) -> bool:
@@ -84,6 +89,7 @@ def write_upstream_outcome(outcome: UpstreamOutcome) -> None:
     if not should_record_upstream_outcome(outcome.status, cached=outcome.cached):
         return
     data = {k: v for k, v in asdict(outcome).items() if v is not None}
+    stamp_session_instance(data, version=UPSTREAM_SCHEMA_VERSION)
     log_path = _current_log_path()
     append_jsonl_record(
         log_path,

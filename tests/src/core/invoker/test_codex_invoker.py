@@ -416,3 +416,64 @@ class TestPrepareCodexRequest:
         monkeypatch.setenv("FORGE_DEPTH", "1")
         req = prepare_codex_request(prompt="hi", preflight=_preflight(), attribution=Attribution(command="bridge"))
         assert req.env["FORGE_DEPTH"] == "2"
+
+
+@patch("forge.core.invoker._lifecycle.subprocess.Popen")
+def test_managed_proxy_headers_match_event_and_only_loopback_auth_reaches_child(mock_popen, monkeypatch):
+    from forge.core.reactive.env import new_root_run_identity
+    from forge.core.runtime.codex_proxy_launch import CodexProxyLaunch
+    from forge.core.telemetry.downstream import read_downstream_records
+    from forge.core.usage.ledger import read_usage_events
+
+    launch = CodexProxyLaunch(
+        "fixture",
+        "codex-responses-local",
+        "http://127.0.0.1:8901",
+        "local",
+        "litellm",
+        "uncatalogued/raw",
+        "uncatalogued/mapped",
+        None,
+    )
+    root = new_root_run_identity()
+    scoped = {
+        "FORGE_SESSION": "managed",
+        "FORGE_FORGE_ROOT": "/project",
+        "FORGE_SESSION_INSTANCE": "current",
+        "FORGE_RUN_ID": root.run_id,
+        "FORGE_ROOT_RUN_ID": root.root_run_id,
+        "FORGE_AUTHORITY_MARKER": "role",
+    }
+    secrets = ["CODEX_ACCESS_TOKEN", "CODEX_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"]
+    monkeypatch.setenv("no_proxy", "internal.example")
+    monkeypatch.setenv("NO_PROXY", "example.org")
+    for key in secrets:
+        monkeypatch.setenv(key, "stale")
+    for key, val in scoped.items():
+        monkeypatch.setenv(key, val)
+    request = prepare_codex_request(
+        prompt="ping",
+        preflight=_preflight(auth_method="proxy_token", auth_source="forge_proxy", billing_mode="unknown"),
+        attribution=Attribution(command="test", session="managed"),
+        proxy_launch=launch,
+    )
+    assert request.env["FORGE_CODEX_PROXY_TOKEN"] == "forge-loopback"
+    assert request.env["no_proxy"] == request.env["NO_PROXY"] == "internal.example,example.org,127.0.0.1"
+    assert all(key not in request.env for key in secrets)
+    assert {key: request.env[key] for key in scoped} == scoped
+    headers = next(arg for arg in request.argv if arg.startswith("model_providers.forge_proxy.http_headers="))
+    assert f'"X-Forge-Run-ID"="{root.run_id}"' in headers
+    assert f'"X-Forge-Root-Run-ID"="{root.root_run_id}"' in headers
+    assert request.argv.index(headers) < request.argv.index("exec")
+    assert request.argv[request.argv.index("-m") + 1] == "uncatalogued/raw"
+    mock_popen.return_value = _mock_proc()
+    CodexHeadlessInvoker().run_parallel([request])
+    (event,) = read_usage_events(root_run_id=root.run_id)
+    assert (event.model, event.provider, event.proxy_id, event.run_id) == (
+        "uncatalogued/mapped",
+        "litellm",
+        "fixture",
+        root.run_id,
+    )
+    assert event.input_tokens == 14936 and event.output_tokens == 22
+    assert read_downstream_records(forge_root_run_id=root.run_id) == []

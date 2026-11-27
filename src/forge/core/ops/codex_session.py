@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
 
@@ -42,6 +42,10 @@ from forge.core.runtime.codex_preflight import (
     CodexPreflight,
     CodexPreflightError,
     assert_codex_ready,
+)
+from forge.core.runtime.codex_proxy_launch import (
+    CodexProxyLaunch,
+    resolve_codex_proxy_launch,
 )
 from forge.core.runtime.codex_rollouts import find_rollout_path
 from forge.core.runtime.launch_args import RuntimeLaunchArgs
@@ -77,8 +81,13 @@ from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.store import SessionStore
 from forge.session.transfer import parse_transfer_context_strategy
 
+from .codex_replay import reconcile_proxy_turn, replay_snapshot
 from .session_authority_launch import authority_launch_transaction, require_launch_args
-from .session_routing import build_runtime_native_routing_payload, commit_launch_routing
+from .session_routing import (
+    build_codex_proxy_routing_payload,
+    build_runtime_native_routing_payload,
+    commit_launch_routing,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +124,7 @@ class CodexSessionStartResult:
     worktree_path: str | None
     context_delivery: str = CONTEXT_DELIVERY_INITIAL
     warnings: tuple[str, ...] = ()
+    proxy_launch: CodexProxyLaunch | None = None
 
 
 @dataclass(frozen=True)
@@ -127,6 +137,7 @@ class CodexSessionResumeResult:
     codex: HeadlessResult
     rollout_path: str | None
     warnings: tuple[str, ...] = ()
+    proxy_launch: CodexProxyLaunch | None = None
 
 
 def resolve_codex_session(
@@ -193,6 +204,43 @@ def require_codex_thread_id(state: SessionState, name: str) -> str:
     return codex_state.thread_id
 
 
+def codex_start_preflight(
+    proxy_name: str | None, launch_args: RuntimeLaunchArgs
+) -> tuple[CodexPreflight, CodexProxyLaunch | None]:
+    try:
+        if proxy_name is None:
+            return assert_codex_ready(), None
+        return resolve_codex_proxy_launch(proxy_name=proxy_name, extra_args=launch_args.runtime_argv("codex"))
+    except (CodexPreflightError, ValueError) as exc:
+        raise ForgeOpError(f"Codex runtime not ready: {exc}") from exc
+
+
+def codex_resume_preflight(
+    state: SessionState, entry: SessionIndexEntry, instance_id: str, launch_args: RuntimeLaunchArgs
+) -> tuple[CodexPreflight, CodexProxyLaunch | None]:
+    if state.intent.proxy is None:
+        return codex_start_preflight(None, launch_args)
+    replay, baseline = replay_snapshot(state, entry.forge_root or entry.worktree_path, instance_id)
+    try:
+        pf, launch = resolve_codex_proxy_launch(
+            binding=state.intent.proxy, extra_args=launch_args.runtime_argv("codex"), replay=replay
+        )
+        return pf, replace(launch, usage_baseline=baseline)
+    except (CodexPreflightError, ValueError) as exc:
+        raise ForgeOpError(f"Cannot resume Codex session '{state.name}': {exc}") from exc
+
+
+def require_current_codex_route(store: SessionStore, state: SessionState) -> None:
+    """A second resume can finish between the initial read and the launch reservation."""
+    current = store.read()
+    if (
+        current.confirmed.route_commit != state.confirmed.route_commit
+        or current.intent.proxy != state.intent.proxy
+        or current.confirmed.codex != state.confirmed.codex
+    ):
+        raise ForgeOpError(f"Route for '{state.name}' changed during preflight. Retry the resume.")
+
+
 def start_codex_session(
     *,
     ctx: ExecutionContext,
@@ -202,6 +250,7 @@ def start_codex_session(
     strategy: str = "ai-curated",
     depth: int = 1,
     sandbox: CodexSandbox = "workspace-write",
+    proxy_name: str | None = None,
     create_worktree: bool = False,
     branch: str | None = None,
     timeout_seconds: int = 600,
@@ -209,6 +258,7 @@ def start_codex_session(
     authority: AuthorityIntent | None = None,
     authority_explicit: bool = False,
     launch_args: RuntimeLaunchArgs | None = None,
+    announce_proxy: Callable[[CodexProxyLaunch], None] | None = None,
 ) -> CodexSessionStartResult:
     """Create a Codex-runtime session derived from ``parent`` and run its first turn.
 
@@ -256,11 +306,9 @@ def start_codex_session(
         authority=(authority if authority_explicit else inherited_authority(parent_state.intent.authority)),
     )
 
-    # Fail closed before any state exists (runs `codex doctor` ~20s, once).
-    try:
-        preflight = assert_codex_ready()
-    except CodexPreflightError as e:
-        raise ForgeOpError(f"Codex runtime not ready: {e}") from e
+    preflight, proxy_launch = codex_start_preflight(proxy_name, launch_args)
+    if proxy_launch is not None and announce_proxy is not None:
+        announce_proxy(proxy_launch)
 
     if context_delivery == "hook" and preflight.hook_seam in _HOOK_INCAPABLE_SEAMS:
         raise ForgeOpError(
@@ -275,7 +323,10 @@ def start_codex_session(
             name,
             create_worktree=create_worktree,
             branch=branch,
-            direct=True,
+            direct=proxy_launch is None,
+            proxy_id=proxy_launch.proxy_id if proxy_launch else None,
+            proxy_template=proxy_launch.template if proxy_launch else None,
+            proxy_base_url=proxy_launch.base_url if proxy_launch else None,
             runtime=CODEX_RUNTIME,
             parent_session=parent,
             authority=authority,
@@ -345,6 +396,7 @@ def start_codex_session(
             sandbox=sandbox,
             timeout_seconds=timeout_seconds,
             preflight=preflight,
+            proxy_launch=proxy_launch,
             child_forge_root=child_forge_root,
             output_root=output_root,
             warnings=warnings,
@@ -399,6 +451,7 @@ def _run_first_codex_turn(
     sandbox: CodexSandbox,
     timeout_seconds: int,
     preflight: CodexPreflight,
+    proxy_launch: CodexProxyLaunch | None,
     child_forge_root: Path,
     output_root: Path | None,
     warnings: list[str],
@@ -421,9 +474,14 @@ def _run_first_codex_turn(
         launch_mode="host",
         worktree_path=Path(cwd),
         codex_preflight=preflight,
+        codex_proxy_launch=proxy_launch,
         expected_instance_id=expected_instance_id,
     ) as authority_attempt:
-        routing_payload = build_runtime_native_routing_payload()
+        routing_payload = (
+            build_codex_proxy_routing_payload(proxy_launch, expected_instance_id)
+            if proxy_launch
+            else build_runtime_native_routing_payload()
+        )
 
         def commit_routing_before_invoke() -> None:
             commit_launch_routing(
@@ -448,6 +506,7 @@ def _run_first_codex_turn(
             timeout_seconds=timeout_seconds,
             child=name,
             preflight=preflight,
+            proxy_launch=proxy_launch,
             output_root=output_root,
             staged_context_path=staged_context_path,
             run_identity=root,
@@ -501,20 +560,22 @@ def _run_first_codex_turn(
         parent_forge_root=parent_entry_forge_root,
         parent_project_root=parent_project_root,
     )
-    codex_confirmed = CodexConfirmed(
-        thread_id=effective_thread_id,
-        rollout_path=rollout_path,
-        rollout_source=rollout_source,
-        auth_method=preflight.auth_method,
-        auth_source=preflight.auth_source,
-        billing_mode=preflight.billing_mode,
-        last_run_at=timestamp,
-        context_delivery=delivery_fact,
-    )
 
     def _mutate(m: SessionState) -> None:
         m.confirmed.derivation = derivation
-        m.confirmed.codex = codex_confirmed
+        m.confirmed.codex = replace(
+            m.confirmed.codex or CodexConfirmed(),
+            thread_id=effective_thread_id,
+            rollout_path=rollout_path,
+            rollout_source=rollout_source,
+            auth_method=preflight.auth_method,
+            auth_source=preflight.auth_source,
+            billing_mode=preflight.billing_mode,
+            last_run_at=timestamp,
+            context_delivery=delivery_fact,
+        )
+        if proxy_launch is not None:
+            reconcile_proxy_turn(m, run_id=root.run_id, launch=proxy_launch, headless=bridge.codex)
         m.confirmed.confirmed_at = timestamp
         m.confirmed.confirmed_by = "cli:codex-start"
 
@@ -524,6 +585,7 @@ def _run_first_codex_turn(
         warnings=warnings,
         session=name,
         expected_instance_id=expected_instance_id,
+        expected_proxy_run_id=root.run_id if proxy_launch is not None else None,
     ):
         sync_codex_thread_to_index(
             name,
@@ -541,6 +603,7 @@ def _run_first_codex_turn(
 
     return CodexSessionStartResult(
         session=name,
+        proxy_launch=proxy_launch,
         parent=parent,
         transfer_path=bridge.transfer_path,
         root_run_id=bridge.root_run_id,
@@ -609,6 +672,7 @@ def continue_codex_session(
     sandbox: CodexSandbox = "workspace-write",
     timeout_seconds: int = 600,
     launch_args: RuntimeLaunchArgs | None = None,
+    announce_proxy: Callable[[CodexProxyLaunch], None] | None = None,
 ) -> CodexSessionResumeResult:
     """Run one more ``codex exec resume <thread_id>`` turn on an existing Codex session.
 
@@ -627,10 +691,9 @@ def continue_codex_session(
     thread_id = require_codex_thread_id(state, name)
     launch_args = require_launch_args(launch_args, runtime="codex", authority=state.intent.authority)
 
-    try:
-        preflight = assert_codex_ready()
-    except CodexPreflightError as e:
-        raise ForgeOpError(f"Codex runtime not ready: {e}") from e
+    preflight, proxy_launch = codex_resume_preflight(state, entry, instance_id, launch_args)
+    if proxy_launch is not None and announce_proxy is not None:
+        announce_proxy(proxy_launch)
 
     warnings: list[str] = []
     store = manager.get_session_store(name, forge_root=entry.forge_root)
@@ -644,8 +707,11 @@ def continue_codex_session(
         launch_mode="host",
         worktree_path=Path(cwd),
         codex_preflight=preflight,
+        codex_proxy_launch=proxy_launch,
         expected_instance_id=instance_id,
     ) as authority_attempt:
+        if proxy_launch:
+            require_current_codex_route(store, state)
         # A surviving staged handoff belongs to this admitted instance only.
         if clear_pending_context(store.session_dir):
             warnings.append("Cleared a stale staged handoff (its start turn never delivered it).")
@@ -672,13 +738,18 @@ def continue_codex_session(
                 label="codex-resume",
                 resume_thread_id=thread_id,
                 extra_args=launch_args.runtime_argv("codex"),
+                proxy_launch=proxy_launch,
             )
             commit_launch_routing(
                 store=store,
                 state=state,
                 root=root,
                 operation="resume",
-                payload=build_runtime_native_routing_payload(),
+                payload=(
+                    build_codex_proxy_routing_payload(proxy_launch, instance_id)
+                    if proxy_launch
+                    else build_runtime_native_routing_payload()
+                ),
                 authority_attempt=authority_attempt,
             )
             result = CodexHeadlessInvoker().run(request)
@@ -686,11 +757,13 @@ def continue_codex_session(
             authority_attempt.complete(result.returncode)
 
     effective_thread_id = thread_id
-    if result.runtime_session_id and result.runtime_session_id != thread_id:
-        # Probe 60b pinned id stability across resume; drift means Codex re-bound the
-        # thread. Record the live id (resume must keep working) and surface the drift.
-        warnings.append(f"Codex thread_id drifted: {thread_id} -> {result.runtime_session_id} (recorded the new id).")
-        effective_thread_id = result.runtime_session_id
+    thread_drift = bool(result.runtime_session_id and result.runtime_session_id != thread_id)
+    if thread_drift and result.runtime_session_id:
+        if proxy_launch is None:
+            effective_thread_id = result.runtime_session_id
+            warnings.append(f"Codex thread_id drifted: {thread_id} -> {effective_thread_id} (recorded the new id).")
+        else:
+            warnings.append("Codex reported a different thread. Model replay requires a fresh session.")
 
     rollout = find_rollout_path(effective_thread_id)
     timestamp = now_iso()
@@ -708,6 +781,8 @@ def continue_codex_session(
         codex.billing_mode = preflight.billing_mode
         codex.last_run_at = timestamp
         m.confirmed.codex = codex
+        if proxy_launch is not None and not thread_drift:
+            reconcile_proxy_turn(m, run_id=root.run_id, launch=proxy_launch, headless=result)
 
     if _update_manifest_if_present(
         store,
@@ -715,6 +790,7 @@ def continue_codex_session(
         warnings=warnings,
         session=name,
         expected_instance_id=instance_id,
+        expected_proxy_run_id=root.run_id if proxy_launch is not None else None,
     ):
         sync_codex_thread_to_index(
             name,
@@ -725,6 +801,7 @@ def continue_codex_session(
         )
 
     return CodexSessionResumeResult(
+        proxy_launch=proxy_launch,
         session=name,
         thread_id=effective_thread_id,
         root_run_id=root.root_run_id,
@@ -767,14 +844,25 @@ def _update_manifest_if_present(
     warnings: list[str],
     session: str,
     expected_instance_id: str,
+    expected_proxy_run_id: str | None = None,
 ) -> bool:
     """Publish post-turn state only to the instance admitted before launch."""
     if not store.exists():
         warnings.append(f"Session '{session}' was deleted while Codex was running; skipped post-exit manifest update.")
         return False
 
+    superseded = False
+
+    def apply_current(current: SessionState) -> None:
+        nonlocal superseded
+        commit = current.confirmed.route_commit
+        if expected_proxy_run_id is not None and (commit is None or commit.run_id != expected_proxy_run_id):
+            superseded = True
+            return
+        mutate(current)
+
     def persist() -> None:
-        store.update(timeout_s=5.0, mutate=mutate, expected_instance_id=expected_instance_id)
+        store.update(timeout_s=5.0, mutate=apply_current, expected_instance_id=expected_instance_id)
 
     try:
         updated = IndexStore().run_session_instance_txn(
@@ -789,6 +877,9 @@ def _update_manifest_if_present(
         # The publication guard prevents supported deletion from racing persist().
         # If files disappeared independently, this handler no longer owns their path.
         warnings.append(f"Session '{session}' was deleted while Codex was running; skipped post-exit manifest update.")
+        return False
+    if superseded:
+        warnings.append(f"A newer launch owns session '{session}'. Skipped this turn's manifest and index updates.")
         return False
     if not updated:
         warnings.append(

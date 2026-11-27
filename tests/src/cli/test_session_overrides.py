@@ -37,6 +37,22 @@ def _seed_cross_project_session(*, caller_root: Path, target_root: Path, name: s
 class TestSessionSetOverride:
     """Tests for 'forge session set' command."""
 
+    @pytest.mark.parametrize("field", ["proxy", "proxy.base_url", "proxy.template", "proxy.*"])
+    def test_set_cannot_change_bound_codex_route(self, runner, temp_env, field) -> None:
+        state = create_session_state(
+            "bound",
+            worktree_path=str(temp_env),
+            runtime="codex",
+            proxy_id="original",
+            proxy_template="local",
+            proxy_base_url="http://127.0.0.1:8080",
+        )
+        publish_session(IndexStore(), state, temp_env, forge_root=str(temp_env))
+        result = runner.invoke(main, ["session", "set", "--session", "bound", field, "replacement"])
+        assert result.exit_code == 1, result.output
+        assert "route is bound at session creation" in result.output
+        assert SessionStore(str(temp_env), "bound").read().overrides == {}
+
     def test_set_updates_overrides(self, runner: CliRunner, temp_env: Path) -> None:
         """Should set an override value."""
         with successful_claude_launch():

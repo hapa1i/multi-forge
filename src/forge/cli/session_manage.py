@@ -464,6 +464,11 @@ def _build_show_json(
             "claude_project_root": state.confirmed.claude_project_root,
             "policy": (dataclasses.asdict(state.confirmed.policy) if state.confirmed.policy else None),
         }
+        if session_runtime(state) == "codex" and state.intent.proxy:
+            from forge.core.ops.session_model import codex_proxy_commit
+
+            data["intent"]["proxy"]["proxy_id"] = state.intent.proxy.proxy_id
+            data["confirmed"]["route_commit"] = codex_proxy_commit(state, state.forge_root or ctx.project_root)
         data["overrides"] = dict(state.overrides)
         data["worktree"] = {"path": state.worktree.path, "branch": state.worktree.branch} if state.worktree else None
     else:
@@ -773,7 +778,17 @@ def _print_session_detail(
         # says "claude-code", which would misread on non-Claude runtimes.
         console.print(f"  Agent:        {state.intent.agent}")
     console.print(f"  Runtime:      {runtime}")
-    if runtime == "codex":
+    if runtime == "codex" and state.intent.proxy:
+        from forge.core.ops.session_model import codex_proxy_commit
+
+        binding = state.intent.proxy
+        console.print(f"  Routing:      Responses proxy {binding.proxy_id} ({binding.template})", markup=False)
+        console.print(f"  Base URL:     {binding.base_url}", markup=False)
+        commit = codex_proxy_commit(state, entry.forge_root or state.forge_root)
+        if commit and (facts := commit.get("codex_proxy")):
+            console.print(f"  Launch request:  {facts['requested_model']}", markup=False)
+            console.print(f"  Launch dispatch: {facts['dispatched_model']}", markup=False)
+    elif runtime == "codex":
         console.print("  Routing:      direct (OpenAI via codex CLI)")
     elif state.intent.proxy:
         console.print(f"  Routing:      {_template_display_label(state.intent.proxy.template)}")
@@ -786,6 +801,9 @@ def _print_session_detail(
     if state.confirmed.codex:
         codex = state.confirmed.codex
         console.print("[bold]Codex[/bold]")
+        if codex.completed_turn:
+            console.print(f"  Completed request:  {codex.completed_turn.requested_model}", markup=False)
+            console.print(f"  Completed dispatch: {codex.completed_turn.dispatched_model}", markup=False)
         if codex.thread_id:
             console.print(f"  Thread:       {codex.thread_id}")
         if codex.rollout_path:

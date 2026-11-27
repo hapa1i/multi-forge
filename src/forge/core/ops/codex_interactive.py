@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -54,14 +54,17 @@ from forge.core.ops.codex_session import (
     _clear_stale_child_snapshot,
     _rollback_created_session,
     _update_manifest_if_present,
+    codex_resume_preflight,
+    codex_start_preflight,
     require_codex_thread_id,
+    require_current_codex_route,
     resolve_codex_session,
 )
 from forge.core.ops.codex_thread_index import sync_codex_thread_to_index
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import new_root_run_identity
-from forge.core.runtime.codex_preflight import CodexPreflightError, assert_codex_ready
+from forge.core.runtime.codex_proxy_launch import CodexProxyLaunch
 from forge.core.runtime.codex_rollouts import find_rollout_path, find_rollouts_since
 from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.core.state import now_iso
@@ -95,8 +98,13 @@ from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.transfer import parse_transfer_context_strategy
 from forge.session.workers import capture_session_instance, session_worker_lease
 
+from .codex_replay import reconcile_proxy_turn
 from .session_authority_launch import authority_launch_transaction, require_launch_args
-from .session_routing import build_runtime_native_routing_payload, commit_launch_routing
+from .session_routing import (
+    build_codex_proxy_routing_payload,
+    build_runtime_native_routing_payload,
+    commit_launch_routing,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +127,7 @@ class CodexInteractiveLaunch:
     transfer_path: Path | None
     context_delivery: str | None  # requested mode for bridge starts; None for bare/reattach
     reattach_thread_id: str | None = None
+    proxy_launch: CodexProxyLaunch | None = None
 
 
 @dataclass(frozen=True)
@@ -145,6 +154,7 @@ def start_interactive_codex_session(
     strategy: str = "ai-curated",
     depth: int = 1,
     sandbox: CodexSandbox = "workspace-write",
+    proxy_name: str | None = None,
     create_worktree: bool = False,
     branch: str | None = None,
     context_delivery: ContextDeliveryMode = "initial-message",
@@ -200,11 +210,7 @@ def start_interactive_codex_session(
             launched_authority = inherited_authority(parent_state.intent.authority)
     launch_args = require_launch_args(launch_args, runtime="codex", authority=launched_authority)
 
-    # Fail closed before any state exists (runs `codex doctor` ~20s, once).
-    try:
-        preflight = assert_codex_ready()
-    except CodexPreflightError as e:
-        raise ForgeOpError(f"Codex runtime not ready: {e}") from e
+    preflight, proxy_launch = codex_start_preflight(proxy_name, launch_args)
 
     if parent is not None and context_delivery == "hook" and preflight.hook_seam in _HOOK_INCAPABLE_SEAMS:
         raise ForgeOpError(
@@ -220,7 +226,10 @@ def start_interactive_codex_session(
             instance_sink=created_instances.append,
             create_worktree=create_worktree,
             branch=branch,
-            direct=True,
+            direct=proxy_launch is None,
+            proxy_id=proxy_launch.proxy_id if proxy_launch else None,
+            proxy_template=proxy_launch.template if proxy_launch else None,
+            proxy_base_url=proxy_launch.base_url if proxy_launch else None,
             runtime=CODEX_RUNTIME,
             parent_session=parent,
             authority=authority,
@@ -286,6 +295,8 @@ def start_interactive_codex_session(
                 else:
                     initial_prompt = compose_codex_interactive_context(assembly.body)
                     argv, env = build_codex_interactive_launch(
+                        proxy_launch=proxy_launch,
+                        cwd=cwd,
                         preflight=preflight,
                         session_name=name,
                         forge_root=str(child_forge_root),
@@ -307,6 +318,7 @@ def start_interactive_codex_session(
             if announce is not None:
                 announce(
                     CodexInteractiveLaunch(
+                        proxy_launch=proxy_launch,
                         session=name,
                         parent=parent,
                         worktree_path=state.worktree.path if state.worktree else None,
@@ -337,10 +349,12 @@ def start_interactive_codex_session(
         launch_mode=LAUNCH_MODE_HOST,
         worktree_path=Path(cwd),
         codex_preflight=preflight,
+        codex_proxy_launch=proxy_launch,
     ) as authority_attempt:
 
         def runner() -> int:
             return invoke(
+                proxy_launch=proxy_launch,
                 preflight=preflight,
                 session_name=name,
                 forge_root=str(child_forge_root),
@@ -357,7 +371,11 @@ def start_interactive_codex_session(
             state=state,
             root=root,
             operation="start",
-            payload=build_runtime_native_routing_payload(),
+            payload=(
+                build_codex_proxy_routing_payload(proxy_launch, created_instances[0])
+                if proxy_launch
+                else build_runtime_native_routing_payload()
+            ),
             authority_attempt=authority_attempt,
         )
 
@@ -427,26 +445,33 @@ def start_interactive_codex_session(
             parent_forge_root=parent_entry.forge_root or parent_entry.worktree_path,
             parent_project_root=parent_entry.project_root,
         )
-    codex_confirmed = CodexConfirmed(
-        thread_id=thread_id,
-        rollout_path=rollout_path,
-        rollout_source=rollout_source,
-        auth_method=preflight.auth_method,
-        auth_source=preflight.auth_source,
-        billing_mode=preflight.billing_mode,
-        last_run_at=timestamp,
-        context_delivery=delivery_fact,
-    )
 
     def _mutate(m: SessionState) -> None:
         if derivation is not None:
             m.confirmed.derivation = derivation
-        m.confirmed.codex = codex_confirmed
+        m.confirmed.codex = replace(
+            m.confirmed.codex or CodexConfirmed(),
+            thread_id=thread_id,
+            rollout_path=rollout_path,
+            rollout_source=rollout_source,
+            auth_method=preflight.auth_method,
+            auth_source=preflight.auth_source,
+            billing_mode=preflight.billing_mode,
+            last_run_at=timestamp,
+            context_delivery=delivery_fact,
+        )
+        if proxy_launch is not None:
+            reconcile_proxy_turn(m, run_id=root.run_id, launch=proxy_launch, headless=None)
         m.confirmed.confirmed_at = timestamp
         m.confirmed.confirmed_by = "cli:codex-interactive-start"
 
     if _update_manifest_if_present(
-        store, mutate=_mutate, warnings=warnings, session=name, expected_instance_id=created_instances[0]
+        store,
+        mutate=_mutate,
+        warnings=warnings,
+        session=name,
+        expected_instance_id=created_instances[0],
+        expected_proxy_run_id=root.run_id if proxy_launch is not None else None,
     ):
         sync_codex_thread_to_index(
             name, thread_id, str(store.forge_root), expected_instance_id=created_instances[0], warnings=warnings
@@ -495,10 +520,7 @@ def reattach_codex_session(
     thread_id = require_codex_thread_id(state, name)
     launch_args = require_launch_args(launch_args, runtime="codex", authority=state.intent.authority)
 
-    try:
-        preflight = assert_codex_ready()
-    except CodexPreflightError as e:
-        raise ForgeOpError(f"Codex runtime not ready: {e}") from e
+    preflight, proxy_launch = codex_resume_preflight(state, entry, instance_id, launch_args)
 
     warnings: list[str] = []
     session_forge_root = entry.forge_root or entry.worktree_path
@@ -517,6 +539,7 @@ def reattach_codex_session(
     if announce is not None:
         announce(
             CodexInteractiveLaunch(
+                proxy_launch=proxy_launch,
                 session=name,
                 parent=None,
                 worktree_path=state.worktree.path if state.worktree else None,
@@ -535,10 +558,15 @@ def reattach_codex_session(
         launch_mode=LAUNCH_MODE_HOST,
         worktree_path=Path(cwd),
         codex_preflight=preflight,
+        codex_proxy_launch=proxy_launch,
     ) as authority_attempt:
+
+        if proxy_launch:
+            require_current_codex_route(store, state)
 
         def runner() -> int:
             return invoke(
+                proxy_launch=proxy_launch,
                 preflight=preflight,
                 session_name=name,
                 forge_root=session_forge_root,
@@ -555,7 +583,11 @@ def reattach_codex_session(
             state=state,
             root=root,
             operation="resume",
-            payload=build_runtime_native_routing_payload(),
+            payload=(
+                build_codex_proxy_routing_payload(proxy_launch, instance_id)
+                if proxy_launch
+                else build_runtime_native_routing_payload()
+            ),
             authority_attempt=authority_attempt,
         )
 
@@ -587,7 +619,10 @@ def reattach_codex_session(
     manager.index_store.run_session_instance_txn(
         name, str(store.forge_root), expected_instance_id=instance_id, callback=read_turn_observation
     )
-    if observation is not None:
+    thread_drift = observation is not None and observation.session_id != thread_id
+    if thread_drift and proxy_launch is not None:
+        warnings.append("Codex reported a different thread. Model replay requires a fresh session.")
+    elif observation is not None:
         if observation.session_id != thread_id:
             warnings.append(f"Codex thread_id drifted: {thread_id} -> {observation.session_id} (recorded the new id).")
             effective_thread = observation.session_id
@@ -615,9 +650,16 @@ def reattach_codex_session(
         codex.billing_mode = preflight.billing_mode
         codex.last_run_at = timestamp
         m.confirmed.codex = codex
+        if proxy_launch is not None and not thread_drift:
+            reconcile_proxy_turn(m, run_id=root.run_id, launch=proxy_launch, headless=None)
 
     if _update_manifest_if_present(
-        store, mutate=_mutate, warnings=warnings, session=name, expected_instance_id=instance_id
+        store,
+        mutate=_mutate,
+        warnings=warnings,
+        session=name,
+        expected_instance_id=instance_id,
+        expected_proxy_run_id=root.run_id if proxy_launch is not None else None,
     ):
         sync_codex_thread_to_index(
             name, effective_thread, str(store.forge_root), expected_instance_id=instance_id, warnings=warnings

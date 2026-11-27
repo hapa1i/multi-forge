@@ -47,6 +47,7 @@ def build_request_cost_record(
     downstream_event_id: str | None = None,
     backend_id: str | None = None,
     requested_model: str | None = None,
+    codex_turn_ref: str | None = None,
     cache_write_tokens: int = 0,
 ) -> DownstreamRecord:
     """Build detached request-cost evidence for direct or queued persistence.
@@ -70,6 +71,7 @@ def build_request_cost_record(
         backend_id=backend_id,
         model=requested_model or model,
         mapped_model=model,
+        codex_turn_ref=codex_turn_ref,
         tier=tier,
         input_tokens=input_tokens,
         output_tokens=output_tokens,

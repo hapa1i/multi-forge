@@ -87,6 +87,7 @@ class DownstreamRecord:
     forge_root_run_id: str | None = None
     provider_session_id: str | None = None
     provider_command: str | None = None
+    codex_turn_ref: str | None = None
 
     # Model attempt metrics.
     provider: str | None = None

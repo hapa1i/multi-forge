@@ -12,6 +12,7 @@ from typing import Iterator, cast
 
 from forge.core.reactive.env import RunIdentity
 from forge.core.runtime.codex_preflight import CodexPreflight
+from forge.core.runtime.codex_proxy_launch import CodexProxyLaunch
 from forge.core.runtime.launch_args import (
     LaunchArgsError,
     LaunchRuntime,
@@ -120,6 +121,7 @@ def authority_launch_transaction(
     launch_args: RuntimeLaunchArgs,
     claude_session_id: str | None = None,
     codex_preflight: CodexPreflight | None = None,
+    codex_proxy_launch: CodexProxyLaunch | None = None,
     active_store: ActiveSessionStore | None = None,
     expected_instance_id: str | None = None,
 ) -> Iterator[AuthorityLaunchAttempt | None]:
@@ -139,6 +141,7 @@ def authority_launch_transaction(
             launch_args=launch_args,
             claude_session_id=claude_session_id,
             codex_preflight=codex_preflight,
+            codex_proxy_launch=codex_proxy_launch,
             active_store=active_store,
         ) as attempt:
             yield attempt
@@ -155,6 +158,7 @@ def _authority_launch_transaction(
     launch_args: RuntimeLaunchArgs,
     claude_session_id: str | None = None,
     codex_preflight: CodexPreflight | None = None,
+    codex_proxy_launch: CodexProxyLaunch | None = None,
     active_store: ActiveSessionStore | None = None,
 ) -> Iterator[AuthorityLaunchAttempt | None]:
     """Serialize authority posture and preflight and journal a marked launch.
@@ -222,6 +226,7 @@ def _authority_launch_transaction(
                     worktree_path=worktree_path,
                     claude_session_id=claude_session_id,
                     codex_preflight=codex_preflight,
+                    codex_proxy_launch=codex_proxy_launch,
                     active_store=active,
                 )
                 if state.intent.authority is not None
@@ -290,6 +295,7 @@ def _begin_marked_authority_launch(
     worktree_path: Path,
     claude_session_id: str | None,
     codex_preflight: CodexPreflight | None,
+    codex_proxy_launch: CodexProxyLaunch | None = None,
     active_store: ActiveSessionStore,
 ) -> AuthorityLaunchAttempt:
     authority = state.intent.authority
@@ -305,6 +311,7 @@ def _begin_marked_authority_launch(
             launch_mode=launch_mode,
             worktree_path=worktree_path,
             codex_preflight=codex_preflight,
+            codex_proxy_launch=codex_proxy_launch,
         )
     except AuthoritySeamPreflightError as exc:
         _append_failed_preflight(
@@ -448,6 +455,7 @@ def _preflight_authority_seam(
     launch_mode: str,
     worktree_path: Path,
     codex_preflight: CodexPreflight | None,
+    codex_proxy_launch: CodexProxyLaunch | None = None,
 ) -> str | None:
     if authority.role == "producer":
         return None
@@ -516,7 +524,7 @@ def _preflight_authority_seam(
                 reason_code="codex_policy_registration_invalid",
             )
 
-        verification = verify_codex_enrollment(preflight=codex_preflight)
+        verification = verify_codex_enrollment(preflight=codex_preflight, proxy_launch=codex_proxy_launch)
         if not (
             verification.ready
             and verification.registered

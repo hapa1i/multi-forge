@@ -53,11 +53,13 @@ class CodexStreamResult:
     is_error: bool
     error_message: str | None
     thread_id: str | None = None
+    turn_completed: bool = False
 
 
 def parse_codex_jsonl_stream(stdout: str, *, strict_usage: bool = False) -> CodexStreamResult:
     """Reduce a ``codex exec --json`` JSONL event stream to a :class:`CodexStreamResult`."""
     texts: list[str] = []
+    completed = False
     input_tokens: int | None = None
     output_tokens: int | None = None
     cached_tokens: int | None = None
@@ -84,6 +86,7 @@ def parse_codex_jsonl_stream(stdout: str, *, strict_usage: bool = False) -> Code
             if text is not None:
                 texts.append(text)
         elif etype == _TURN_COMPLETED:
+            completed = True
             usage = event.get("usage")
             if isinstance(usage, dict):
                 # Last-wins: a one-shot `codex exec` emits exactly one terminal
@@ -116,6 +119,7 @@ def parse_codex_jsonl_stream(stdout: str, *, strict_usage: bool = False) -> Code
         is_error=is_error,
         error_message=error_message,
         thread_id=thread_id,
+        turn_completed=completed,
     )
 
 

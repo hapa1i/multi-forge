@@ -9,6 +9,7 @@ builders and proxy ingress without dragging in the heavier ``core.reactive`` pac
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import uuid
 
@@ -65,6 +66,14 @@ PROVIDER_SESSION_ID_RE = re.compile(rf"^forge_(?:sess|run)_[0-9a-f]{{12}}(?:_[a-
 def mint_run_id() -> str:
     """Mint a fresh run id (``run_`` + 12 hex; mirrors the proxy's ``req_`` style)."""
     return f"run_{uuid.uuid4().hex[:12]}"
+
+
+def ambient_session_instance(session: str | None) -> str | None:
+    """Identify a managed producer only when the event belongs to its launch session."""
+    if not session or session != os.environ.get("FORGE_SESSION"):
+        return None
+    token = os.environ.get("FORGE_SESSION_INSTANCE", "")
+    return token if re.fullmatch(r"[0-9a-f]{32}", token) else None
 
 
 def is_valid_run_id(value: str | None) -> bool:

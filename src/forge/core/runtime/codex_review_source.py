@@ -17,9 +17,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
-from forge.core.invoker.codex_fork import CodexUsageBaseline
 from forge.core.native_review_types import NativeReviewBoundary
 from forge.core.runtime.codex_rollouts import codex_home, find_rollouts_by_thread_id
+from forge.core.runtime.codex_usage import CodexUsageBaseline
 from forge.session.models import NativeSupervisorSource
 
 MAX_PREFIX_BYTES = 1_827_328
@@ -288,15 +288,7 @@ def select_source(
     active = boundary and source.thread_id == boundary.thread_id
     if (large or active) and (models != {"gpt-6.1-sol"} or model != "gpt-6.1-sol" or auth_mode != "subscription-only"):
         raise ValueError("Long, compacted and active sources require subscription gpt-6.1-sol")
-    usage = info.get("total_token_usage", {})
-    if not isinstance(usage, dict):
-        usage = {}
-    values = [
-        value
-        for key in ("input_tokens", "output_tokens", "cached_input_tokens")
-        if type(value := usage.get(key)) is int and value >= 0
-    ]
-    baseline = CodexUsageBaseline(values[0], values[1], values[2]) if len(values) == 3 else None
+    baseline = CodexUsageBaseline.from_total_usage(info.get("total_token_usage"))
     return NativeSelection(prefixes, baseline, independence, maximum_input)
 
 

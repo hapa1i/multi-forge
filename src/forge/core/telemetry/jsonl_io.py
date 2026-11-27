@@ -11,7 +11,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from forge.core.run_id import ambient_session_instance
 from forge.core.state import decode_json_object, try_parse_iso
+
+
+def stamp_session_instance(record: dict[str, Any], *, version: int) -> None:
+    """Use the extended record shape only for operations with a known session generation."""
+    instance = record.get("session_instance_id") or ambient_session_instance(record.get("session"))
+    if instance:
+        record.update(session_instance_id=instance, schema_version=version)
+    else:
+        record.pop("session_instance_id", None)
 
 
 @dataclass(frozen=True)

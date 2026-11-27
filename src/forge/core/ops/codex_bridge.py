@@ -53,6 +53,7 @@ from forge.core.runtime.codex_preflight import (
     CodexPreflightError,
     assert_codex_ready,
 )
+from forge.core.runtime.codex_proxy_launch import CodexProxyLaunch
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.core.state.io import atomic_write_text
 from forge.session import ForgeSessionError, SessionManager, SessionState
@@ -328,6 +329,7 @@ def bridge_session_to_codex(
     timeout_seconds: int = 600,
     child: str | None = None,
     preflight: CodexPreflight | None = None,
+    proxy_launch: CodexProxyLaunch | None = None,
     output_root: Path | None = None,
     staged_context_path: Path | None = None,
     run_identity: RunIdentity | None = None,
@@ -434,6 +436,7 @@ def bridge_session_to_codex(
             timeout_seconds=timeout_seconds,
             label="codex-bridge",
             extra_args=extra_args,
+            proxy_launch=proxy_launch,
         )
         if before_invoke is not None:
             before_invoke()

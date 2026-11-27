@@ -28,6 +28,7 @@ from forge.session.exceptions import AmbiguousSessionError
 from forge.session.identity import session_name_from_key
 from forge.session.index import IndexStore
 from forge.session.launchability import Launchability, derive_launchability
+from forge.session.models import session_runtime
 from forge.session.store import get_sessions_dir
 
 _log = logging.getLogger(__name__)
@@ -243,7 +244,7 @@ def detect_model_family(template: str | None) -> str:
         return "anthropic"
 
 
-def _model_to_family(model_name: str) -> str:
+def _model_to_family(model_name: str, *, fallback: str = "anthropic") -> str:
     """Extract normalized family from a model name (possibly vendor-prefixed).
 
     Examples:
@@ -279,7 +280,7 @@ def _model_to_family(model_name: str) -> str:
     if bare.startswith("kimi-"):
         return "kimi"
 
-    return "anthropic"
+    return fallback
 
 
 def get_session_context(session: str | None = None) -> SessionContext:
@@ -374,7 +375,7 @@ def _build_env_context() -> SessionContext:
 def _build_proxy_context(state: SessionState) -> ProxyContext:
     """Extract proxy info from confirmed (preferred) or intent."""
     confirmed = state.confirmed.started_with_proxy
-    if confirmed:
+    if confirmed and session_runtime(state) != "codex":
         return ProxyContext(
             template=confirmed.template,
             base_url=confirmed.base_url,
@@ -387,7 +388,7 @@ def _build_proxy_context(state: SessionState) -> ProxyContext:
         return ProxyContext(
             template=intent.template,
             base_url=intent.base_url,
-            proxy_id=None,
+            proxy_id=intent.proxy_id,
             is_direct=False,
         )
 
@@ -641,6 +642,12 @@ def scan_manifests_for_uuid(session_uuid: str) -> tuple[str, str] | None:
 
 def _build_model_context(proxy_ctx: ProxyContext, state: SessionState | None) -> tuple[str, dict[str, str], str | None]:
     """Return model family plus tier mappings using the best available proxy truth."""
+    if state is not None and session_runtime(state) == "codex":
+        if proxy_ctx.is_direct:
+            return "openai", {}, None
+        completed = state.confirmed.codex.completed_turn if state.confirmed.codex else None
+        model = completed.dispatched_model if completed else None
+        return _model_to_family(model, fallback="unknown") if model else "unknown", {}, model
     if proxy_ctx.is_direct:
         main_model = None
         if state is not None and state.intent.launch is not None:
