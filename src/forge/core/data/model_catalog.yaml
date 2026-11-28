@@ -2580,6 +2580,12 @@ aliases:
   openai/o3-mini: o3-mini
   openai/o1: o1
 
+  # Gemini 4 family aliases
+  gemini-neon: gemini-4-neon
+  gemini-hydrogen: gemini-4-hydrogen
+  gemini-carbon: gemini-4-carbon
+  gemini-argon: gemini-4-argon
+
   # Vertex AI provider prefix (LiteLLM style)
   vertex_ai/gemini-4-neon: gemini-4-neon
   vertex_ai/gemini-4-hydrogen: gemini-4-hydrogen

@@ -9,7 +9,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
+from forge.core.models.catalog import model_exists
 from forge.core.models.model_reference import strip_transport_model_suffix
+from forge.core.models.model_routes import get_model_route_candidates
 from forge.core.reactive.env import RunIdentity
 from forge.core.run_id import (
     FORGE_ROOT_RUN_ID_HEADER,
@@ -249,30 +251,58 @@ def openrouter_launch_defaults(passthrough: Sequence[str], *, env: Mapping[str, 
 
 def passthrough_model(passthrough: Sequence[str]) -> str | None:
     """Codex gives the model flag precedence over the last top-level model override."""
+    option = _model_option(passthrough)
+    return option.value if option is not None else None
+
+
+def expand_openrouter_model_arg(args: tuple[str, ...]) -> tuple[str, ...]:
+    """Give the sessionless Codex client the catalog's OpenRouter slug for a short model name."""
+    option = _model_option(args)
+    if option is None or "/" in option.value or not model_exists(option.value):
+        return args
+    routes = get_model_route_candidates(option.value)
+    slug = next((route.model_ref for route in routes if route.source_id == "openrouter"), None)
+    if slug is None:
+        return args
+    value = f"model={json.dumps(slug)}" if option.flag == "-c" else slug
+    result = list(args)
+    result[option.span] = [option.flag, value]
+    return tuple(result)
+
+
+@dataclass(frozen=True)
+class _ModelOption:
+    value: str
+    flag: str
+    span: slice
+
+
+def _model_option(passthrough: Sequence[str]) -> _ModelOption | None:
     config_model = None
-    args = iter(passthrough)
-    for arg in args:
+    args = iter(enumerate(passthrough))
+    for start, arg in args:
         if arg == "--":
             break
-        if arg in ("-m", "--model"):
-            return next(args, "")
-        if arg.startswith("--model="):
-            return arg.removeprefix("--model=")
-        if arg.startswith("-m") and len(arg) > 2:
-            return arg[2:].removeprefix("=")
-        if arg in ("-c", "--config"):
-            override = next(args, "")
-        elif arg.startswith("--config="):
-            override = arg.removeprefix("--config=")
-        elif arg.startswith("-c"):
-            override = arg[2:].removeprefix("=")
+        end = start
+        if arg in ("-m", "--model", "-c", "--config"):
+            flag = arg
+            end, value = next(args, (start, ""))
+        elif arg.startswith(("--model=", "--config=")):
+            flag, _, value = arg.partition("=")
+        elif arg.startswith(("-m", "-c")) and len(arg) > 2:
+            flag, value = arg[:2], arg[2:].removeprefix("=")
         else:
             continue
-        name, sep, value = override.partition("=")
+        span = slice(start, end + 1)
+        if flag in ("-m", "--model"):
+            return _ModelOption(value, "-m", span)
+        if end > start and value == "--":
+            break
+        name, sep, value = value.partition("=")
         if sep and name.strip() == "model":
             try:
                 parsed = tomllib.loads(f"value = {value}")["value"]
             except tomllib.TOMLDecodeError:
                 parsed = value.strip()
-            config_model = parsed if isinstance(parsed, str) else value.strip()
+            config_model = _ModelOption(parsed if isinstance(parsed, str) else value.strip(), "-c", span)
     return config_model

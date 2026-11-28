@@ -316,13 +316,13 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
 
     Sessionless and scrubbed: the proxy owns upstream auth, so no native codex/OpenAI
     login is required or leaked. Pass extra codex args after `--` (e.g. `-m` to override
-    the proxy's default model).
+    the proxy's default model). Direct OpenRouter proxies accept catalog names or full slugs.
 
     \b
     Examples:
         forge codex start --proxy codex-responses-local
         forge codex start --proxy my-proxy --sandbox read-only
-        forge codex start --proxy my-proxy -- -m gpt-5.5
+        forge codex start --proxy openrouter-gemini -- -m gemini-neon
     """
     # 1. codex installed? FIRST -- cheap, no side effects, so we never start a proxy the
     #    user can't use.
@@ -345,6 +345,7 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
 
     # Heavy proxy/invoke imports are deferred so `forge codex status` stays light.
     from forge.core.runtime.codex_proxy_launch import (
+        expand_openrouter_model_arg,
         responses_model_selection,
         responses_policy_args,
     )
@@ -416,8 +417,10 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
         )
         sys.exit(1)
 
-    selection = responses_model_selection(default_model, policy, codex_args)
     direct_openrouter = "required_zdr" in policy
+    if direct_openrouter:
+        codex_args = expand_openrouter_model_arg(codex_args)
+    selection = responses_model_selection(default_model, policy, codex_args)
     if direct_openrouter and not selection.requested:
         print_error_with_tip(
             "The OpenRouter proxy has no model configured for its default tier.",

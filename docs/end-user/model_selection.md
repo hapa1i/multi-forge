@@ -396,6 +396,9 @@ and Flash-template default. Select them explicitly with `--model gemini-4-neon` 
 Argon, Gemini 3.8 Flash, and prior Pro models remain explicit selections. Google positions Hydrogen as its everyday
 default and the upgrade from Gemini 3.8 Flash, Neon between Hydrogen and Carbon, and Carbon for the hardest problems.
 
+The catalog aliases `gemini-neon`, `gemini-hydrogen`, `gemini-carbon`, and `gemini-argon` select the corresponding
+Gemini 4 models.
+
 Both share Carbon's unified 1,048,576-token context, 65,536-token synchronous output, ignored sampling parameters, and
 implicit-only caching with a 4,096-token minimum. They differ from Carbon in three ways:
 
