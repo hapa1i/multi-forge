@@ -88,7 +88,10 @@ def capture_native_resume(thread_id: str, bound_path: str | None) -> NativeResum
                 return NativeUsageUnavailable("the rollout does not identify the expected native OpenAI thread")
             if header.get("session_id", thread_id) != thread_id:
                 return NativeUsageUnavailable("the rollout belongs to a subagent session")
-            if header.get("history_base") is not None:
+            if any(
+                header.get(key) is not None
+                for key in ("history_base", "forked_from_id", "forked_from_ordinal_exclusive")
+            ):
                 return NativeUsageUnavailable("the thread was forked")
             baseline, turn = _samples(rows, thread_id)
             if baseline is None:
