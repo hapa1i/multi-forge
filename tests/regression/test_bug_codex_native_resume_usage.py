@@ -74,7 +74,9 @@ def _turn(total: _TokenCounts, request: _TokenCounts, *, failed: bool = False) -
 
 
 @pytest.fixture
-def adopted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[ExecutionContext, Path]:
+def adopted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> tuple[ExecutionContext, Path]:
     project = _make_project(tmp_path)
     monkeypatch.chdir(project)
     ctx = ExecutionContext(cwd=project, worktree_root=project, project_root=project, forge_root=project)
@@ -91,6 +93,7 @@ def adopted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[ExecutionC
         originator="Codex Desktop",
         source="vscode",
         model_provider="openai",
+        **getattr(request, "param", {}),
     )
     # An adopted Desktop history can have usage samples without the proxy's task lifecycle.
     path.write_text(header + _sample(_BASE, _BASE), encoding="utf-8")
@@ -195,6 +198,23 @@ def test_new_zero_delta_requires_a_fresh_sample(adopted, monkeypatch):
         _resume(ctx, path, monkeypatch, append=_turn(_BASE, (0, 0, 0)), terminal=_BASE),
         (0, 0, 0),
     )
+
+
+@pytest.mark.parametrize(
+    "adopted",
+    [
+        pytest.param({"forked_from_id": "01a12b5c-ce1a-72c2-ad3f-05d75f3fba00"}, id="parent-id"),
+        pytest.param({"forked_from_ordinal_exclusive": 15}, id="parent-ordinal"),
+    ],
+    indirect=True,
+)
+def test_fork_marker_without_history_base_leaves_usage_unknown(adopted, monkeypatch):
+    ctx, path = adopted
+    total = (130, 25, 12)
+    result = _resume(ctx, path, monkeypatch, append=_turn(total, (30, 5, 2)), terminal=total)
+
+    _assert_accounting(result, _UNKNOWN)
+    assert any("the thread was forked" in warning for warning in result.warnings)
 
 
 @pytest.mark.parametrize("condition", ["missing", "corrupt", "per-launch", "drift"])
