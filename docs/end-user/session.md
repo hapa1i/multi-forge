@@ -779,6 +779,11 @@ Claude parent, curates its context (default `--strategy ai-curated`), and prepen
 recorded thread and worktree from any directory. If the first turn never opens a thread, delete the session and start
 again. [Managed proxy sessions](codex_proxy.md#managed-sessions)
 
+On a direct headless resume, Forge records the new turn's tokens when it can verify them against the native rollout. A
+missing or ambiguous rollout, a forked thread, or any earlier compaction leaves usage unknown. The resume can still
+succeed. Forge warns with the reason, and `forge telemetry activity` shows how many direct Codex launches have unknown
+tokens alongside the sum for measured launches. Older totals can include earlier turns more than once.
+
 Delete and purge refuse while a Codex launch is registered as active. If state is removed outside the supported cleanup
 commands while a turn is running, deletion wins. Forge returns the completed turn result with a warning but does not
 recreate the manifest, index entry, or a lock-only session directory; the post-turn Codex facts have nowhere to be

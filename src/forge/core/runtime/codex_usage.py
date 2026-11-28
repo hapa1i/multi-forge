@@ -14,6 +14,11 @@ class CodexUsageBaseline:
     cached_tokens: int
 
     @classmethod
+    def from_token_info(cls, info: object) -> CodexUsageBaseline | None:
+        """Read the cumulative total in an event_msg token_count, across native clients."""
+        return cls.from_total_usage(info.get("total_token_usage")) if isinstance(info, dict) else None
+
+    @classmethod
     def from_total_usage(cls, usage: object) -> CodexUsageBaseline | None:
         if not isinstance(usage, dict):
             return None

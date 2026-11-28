@@ -150,6 +150,16 @@ class TestReducerRobustness:
         )
         assert parse_codex_jsonl_stream(stream).thread_id == "first-id"
 
+    @pytest.mark.parametrize(
+        "additional_event",
+        ['{"type":"thread.started","thread_id":"other"}', '{"type":"turn.started"}', '{"type":"turn.completed"}'],
+    )
+    def test_extra_turn_or_conflicting_thread_invalidates_launch_accounting(self, additional_event: str) -> None:
+        stream = _read("exec_json_success.jsonl")
+        assert parse_codex_jsonl_stream(stream).single_completed_turn
+        result = parse_codex_jsonl_stream(stream + "\n" + additional_event)
+        assert result.turn_completed and not result.single_completed_turn
+
     def test_non_string_or_empty_thread_id_ignored(self) -> None:
         stream = '{"type":"thread.started","thread_id":""}\n{"type":"thread.started","thread_id":42}\n'
         assert parse_codex_jsonl_stream(stream).thread_id is None

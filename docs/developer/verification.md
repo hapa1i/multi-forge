@@ -275,6 +275,13 @@ reviewer timeouts within 1–45 seconds and preserve the registered 60-second ho
 on the old supported CLI and after an executable update; auth-only user/sidecar helpers must still work. Check stale
 sidecar-image refusal, v2-compatible ordinary writes, and separation of live review evidence from shadow audits.
 
+For direct Codex resume accounting, set `CODEX_HOME` to a disposable home with `cli_auth_credentials_store = "file"` in
+its `config.toml` and sign in there with `codex login --device-auth`. Use an isolated `FORGE_HOME` and verify the
+preflight reports `codex_store` and `subscription_quota`. Export the same `CODEX_HOME` before running
+`./scripts/test-integration.sh tests/integration/core/test_codex_session_start.py --basetemp=<new-test-directory>`. The
+fixture writes `native-resume-usage.json` beneath that directory. Compare the terminal counts with the independent
+rollout samples, request totals and session activity for the start and each resume.
+
 For Codex Stop-review changes, run `forge extension sync` and trust the updated user hooks, then verify
 `forge runtime preflight codex --verify-enrollment --json` reports `stop_review_enrolled: true`. Configure an idle
 managed host Codex executor with `forge policy supervisor set --session <session> --plan <path> --trigger stop`, then

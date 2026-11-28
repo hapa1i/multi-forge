@@ -89,6 +89,8 @@ class CommandUsage:
     # -> rendered without the `~` estimate marker. Defaults True: the safe caveat for
     # hand-built summaries (see SessionActivitySummary.cost_estimated).
     cost_estimated: bool = True
+    unknown_token_launches: int | None = None
+    codex_io_reported: bool = False
 
 
 @dataclass
@@ -203,6 +205,9 @@ class ModelCallActivity:
     # here -- UsageEvent carries no backend id; the full lane is on `policy supervisor status`.
     runtime: str | None = None
     billing_mode: str | None = None
+    # Only direct Codex launches have their token coverage counted here.
+    unknown_token_launches: int | None = None
+    codex_io_reported: bool = False
 
 
 @dataclass
@@ -775,6 +780,11 @@ def _aggregate_ledger(summary: SessionActivitySummary, events: list[UsageEvent],
             summary.total_output_tokens += event.output_tokens
         if event.cached_tokens:
             cu.cached_tokens += event.cached_tokens
+        if event.route == "codex_exec" and event.proxy_id is None:
+            missing_tokens = None in (event.input_tokens, event.output_tokens, event.cached_tokens)
+            cu.unknown_token_launches = (cu.unknown_token_launches or 0) + int(missing_tokens)
+            if event.input_tokens is not None and event.output_tokens is not None:
+                cu.codex_io_reported = True
 
     cost = _join_session_cost(events, since, exclude_interactive=True, trusted_only=False)
     for cmd, micros in cost.by_command.items():
@@ -1034,6 +1044,8 @@ def _build_model_call_pane(
                 root_run_ids=roots,
                 runtime=_rollup_lane_value(runtimes_by_command.get(command.command, set())),
                 billing_mode=_rollup_lane_value(billing_by_command.get(command.command, set())),
+                unknown_token_launches=command.unknown_token_launches,
+                codex_io_reported=command.codex_io_reported,
             )
         )
 

@@ -25,10 +25,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-# Event ``type`` values we react to. Others (``turn.started``, reasoning items,
-# tool items) carry no data the invoker needs and are ignored.
 _AGENT_MESSAGE = "agent_message"
 _ITEM_COMPLETED = "item.completed"
+_TURN_STARTED = "turn.started"
 _TURN_COMPLETED = "turn.completed"
 _THREAD_STARTED = "thread.started"
 _ERROR_EVENTS = ("error", "turn.failed")
@@ -54,12 +53,15 @@ class CodexStreamResult:
     error_message: str | None
     thread_id: str | None = None
     turn_completed: bool = False
+    single_completed_turn: bool = False
 
 
 def parse_codex_jsonl_stream(stdout: str, *, strict_usage: bool = False) -> CodexStreamResult:
     """Reduce a ``codex exec --json`` JSONL event stream to a :class:`CodexStreamResult`."""
     texts: list[str] = []
     completed = False
+    started = False
+    ambiguous = False
     input_tokens: int | None = None
     output_tokens: int | None = None
     cached_tokens: int | None = None
@@ -85,7 +87,11 @@ def parse_codex_jsonl_stream(stdout: str, *, strict_usage: bool = False) -> Code
             text = _agent_message_text(event.get("item"))
             if text is not None:
                 texts.append(text)
+        elif etype == _TURN_STARTED:
+            ambiguous |= started or completed
+            started = True
         elif etype == _TURN_COMPLETED:
+            ambiguous |= completed
             completed = True
             usage = event.get("usage")
             if isinstance(usage, dict):
@@ -100,12 +106,13 @@ def parse_codex_jsonl_stream(stdout: str, *, strict_usage: bool = False) -> Code
                 # usage is inclusive), so it is deliberately NOT lifted -- adding it would
                 # double-count. There is no HeadlessResult field for it.
         elif etype == _THREAD_STARTED:
-            # First-wins: one stream opens one thread; a resumed stream re-announces
-            # the SAME id (probe 60b), so later events could only confirm the first.
-            if thread_id is None:
-                candidate = event.get("thread_id")
-                if isinstance(candidate, str) and candidate:
+            # Keep the first binding for session continuity. A conflicting ID invalidates launch accounting.
+            candidate = event.get("thread_id")
+            if isinstance(candidate, str) and candidate:
+                if thread_id is None:
                     thread_id = candidate
+                elif thread_id != candidate:
+                    ambiguous = True
         elif etype in _ERROR_EVENTS:
             is_error = True
             if error_message is None:
@@ -120,6 +127,7 @@ def parse_codex_jsonl_stream(stdout: str, *, strict_usage: bool = False) -> Code
         error_message=error_message,
         thread_id=thread_id,
         turn_completed=completed,
+        single_completed_turn=completed and not ambiguous and not is_error,
     )
 
 

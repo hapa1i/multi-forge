@@ -756,6 +756,7 @@ def continue_codex_session(
                 timeout_seconds=timeout_seconds,
                 label="codex-resume",
                 resume_thread_id=thread_id,
+                resume_rollout_path=state.confirmed.codex.rollout_path if state.confirmed.codex else None,
                 extra_args=launch_args.runtime_argv("codex"),
                 proxy_launch=proxy_launch,
             )
@@ -776,6 +777,8 @@ def continue_codex_session(
             authority_attempt.complete(result.returncode)
 
     effective_thread_id = thread_id
+    if result.usage_warning:
+        warnings.append(result.usage_warning)
     thread_drift = bool(result.runtime_session_id and result.runtime_session_id != thread_id)
     if thread_drift and result.runtime_session_id:
         if proxy_launch is None:

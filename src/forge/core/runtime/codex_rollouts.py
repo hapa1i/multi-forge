@@ -22,9 +22,14 @@ import json
 import logging
 import os
 import re
+import stat
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any, BinaryIO
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +46,10 @@ _MTIME_SKEW_SECONDS = 2.0
 _HEAD_READ_LIMIT = 65536
 
 _CWD_SEARCH_MAX_DEPTH = 4
+
+
+class RolloutEvidenceError(ValueError):
+    """A fixed diagnostic suitable for display without revealing native paths or contents."""
 
 
 def codex_home() -> Path:
@@ -75,6 +84,58 @@ def find_rollouts_by_thread_id(thread_id: str, *, home: Path | None = None) -> l
     return [
         p for p in candidates if (parsed := parse_rollout_filename(p)) is not None and parsed.thread_id == thread_id
     ]
+
+
+@contextmanager
+def directory_fd(path: Path) -> Iterator[int]:
+    """Pin each directory component, including the owned home itself."""
+    if not path.is_absolute() or ".." in path.parts:
+        raise RolloutEvidenceError("Expected an absolute native-store path")
+    descriptor = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in path.parts[1:]:
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+        yield descriptor
+    finally:
+        os.close(descriptor)
+
+
+@contextmanager
+def open_bound_rollout(thread: str, bound_path: str | None) -> Iterator[tuple[Path, BinaryIO, os.stat_result]]:
+    """Open the unique bound rollout and verify that its contents stayed stable during the read."""
+    UUID(thread)
+    home = codex_home().expanduser().resolve(strict=True)
+    if (home / "sessions").is_symlink():
+        raise RolloutEvidenceError("the Codex sessions directory is a symbolic link")
+    paths = find_rollouts_by_thread_id(thread, home=home)
+    if len(paths) != 1 or (bound_path and paths[0] != Path(bound_path).resolve(strict=True)):
+        raise RolloutEvidenceError("the bound rollout is missing or ambiguous")
+    path = paths[0]
+    with directory_fd(path.parent) as parent:
+        fd = os.open(path.name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=parent)
+        with os.fdopen(fd, "rb") as stream:
+            before = os.fstat(fd)
+            if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+                raise RolloutEvidenceError("the bound rollout is not an ordinary file")
+            yield path, stream, before
+            after = os.fstat(fd)
+            if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            ):
+                raise RolloutEvidenceError("the bound rollout changed during reconciliation")
+
+
+def decode_rollout_row(line: bytes) -> tuple[str, dict[str, Any]]:
+    if not line.endswith(b"\n"):
+        raise RolloutEvidenceError("the native rollout is incomplete")
+    row = json.loads(line)
+    if not isinstance(row, dict) or not isinstance(row.get("payload"), dict) or not isinstance(row.get("type"), str):
+        raise RolloutEvidenceError("unrecognized native rollout record")
+    return row["type"], row["payload"]
 
 
 def find_rollout_path(thread_id: str, *, home: Path | None = None) -> Path | None:
