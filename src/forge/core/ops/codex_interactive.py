@@ -54,6 +54,7 @@ from forge.core.ops.codex_session import (
     _clear_stale_child_snapshot,
     _rollback_created_session,
     _update_manifest_if_present,
+    check_codex_proxy_start_name,
     codex_resume_preflight,
     codex_start_preflight,
     require_codex_thread_id,
@@ -98,7 +99,7 @@ from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.transfer import parse_transfer_context_strategy
 from forge.session.workers import capture_session_instance, session_worker_lease
 
-from .codex_replay import reconcile_proxy_turn
+from .codex_replay import record_proxy_exit
 from .session_authority_launch import authority_launch_transaction, require_launch_args
 from .session_routing import (
     build_codex_proxy_routing_payload,
@@ -210,6 +211,8 @@ def start_interactive_codex_session(
             launched_authority = inherited_authority(parent_state.intent.authority)
     launch_args = require_launch_args(launch_args, runtime="codex", authority=launched_authority)
 
+    if proxy_name is not None:
+        check_codex_proxy_start_name(manager, ctx, name, create_worktree=create_worktree)
     preflight, proxy_launch = codex_start_preflight(proxy_name, launch_args)
 
     if parent is not None and context_delivery == "hook" and preflight.hook_seam in _HOOK_INCAPABLE_SEAMS:
@@ -461,7 +464,7 @@ def start_interactive_codex_session(
             context_delivery=delivery_fact,
         )
         if proxy_launch is not None:
-            reconcile_proxy_turn(m, run_id=root.run_id, launch=proxy_launch, headless=None)
+            record_proxy_exit(m.confirmed.codex, root.run_id, headless=None)
         m.confirmed.confirmed_at = timestamp
         m.confirmed.confirmed_by = "cli:codex-interactive-start"
 
@@ -650,8 +653,8 @@ def reattach_codex_session(
         codex.billing_mode = preflight.billing_mode
         codex.last_run_at = timestamp
         m.confirmed.codex = codex
-        if proxy_launch is not None and not thread_drift:
-            reconcile_proxy_turn(m, run_id=root.run_id, launch=proxy_launch, headless=None)
+        if proxy_launch is not None:
+            record_proxy_exit(codex, root.run_id, headless=None, thread_drift=thread_drift)
 
     if _update_manifest_if_present(
         store,

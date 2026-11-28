@@ -276,3 +276,35 @@ class TestVerifyEnrollment:
         result = CliRunner().invoke(runtime, ["preflight", "codex", "--verify-enrollment", "--proxy", "local"])
         assert result.exit_code == 0, result.output
         assert read_fresh_codex_preflight() is None
+
+    def test_verify_enrollment_refuses_missing_listener_without_probe_or_cache_change(self, monkeypatch) -> None:
+        from forge.core.runtime.codex_preflight_cache import (
+            read_fresh_codex_preflight,
+            write_codex_preflight_cache,
+        )
+
+        write_codex_preflight_cache(_READY)
+        monkeypatch.setattr(
+            "forge.core.runtime.codex_proxy_launch.preflight_codex",
+            lambda **kw: replace(_READY, version="0.141.0"),
+        )
+        monkeypatch.setattr(
+            "forge.core.ops.codex_enrollment._run_probe_turn",
+            lambda *a, **kw: pytest.fail("unexpected enrollment turn"),
+        )
+        result = CliRunner().invoke(
+            runtime,
+            [
+                "preflight",
+                "codex",
+                "--verify-enrollment",
+                "--proxy",
+                "missing",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 1, (result.output, result.exception)
+        verdict = json.loads(result.output)
+        assert verdict["ready"] is False and verdict["attempted"] is False and verdict["enrolled"] is None
+        assert "Proxy 'missing' is not registered" in verdict["reason"]
+        assert read_fresh_codex_preflight() == _READY

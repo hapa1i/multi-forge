@@ -220,6 +220,16 @@ def build_claude_routing_payload(
     )
 
 
+def require_matching_codex_route(current: SessionState, planned: SessionState) -> None:
+    """Reject a proxy resume whose preflight belongs to an older launch or binding."""
+    if (
+        current.confirmed.route_commit != planned.confirmed.route_commit
+        or current.confirmed.codex != planned.confirmed.codex
+        or current.intent.proxy != planned.intent.proxy
+    ):
+        raise ForgeOpError(f"Route for '{planned.name}' changed during preflight. Retry the resume.")
+
+
 def commit_launch_routing(
     *,
     store: SessionStore,
@@ -242,20 +252,32 @@ def commit_launch_routing(
     except Exception as primary:
         authority_errors = _compensate_authority(authority_attempt, "routing_commit_failed")
         raise _routing_failure("routing commit validation", primary, authority_errors) from primary
-    try:
-        append_routing_event(store.forge_root, commit)
-    except Exception as primary:
-        authority_errors = _compensate_authority(authority_attempt, "routing_commit_failed")
-        raise _routing_failure("required routing commit append", primary, authority_errors) from primary
-
     projection = RouteCommitConfirmed(event_id=commit.event_id, run_id=root.run_id)
+    instance_id = immutable_payload.get("codex_proxy", {}).get("instance_id")
+    compare_before_append = instance_id is not None and operation == "resume"
+    stage = "routing precondition"
+
+    def append_commit() -> None:
+        nonlocal stage
+        stage = "required routing commit append"
+        append_routing_event(store.forge_root, commit)
+        stage = "route projection"
+
+    def project(manifest: SessionState) -> None:
+        if compare_before_append:
+            require_matching_codex_route(manifest, state)
+            # Two resumes may have read the same predecessor. Only the winner publishes its commitment.
+            append_commit()
+        manifest.confirmed.route_commit = projection
+
     try:
-        store.update(
-            timeout_s=5.0,
-            mutate=lambda manifest: setattr(manifest.confirmed, "route_commit", projection),
-            expected_instance_id=immutable_payload.get("codex_proxy", {}).get("instance_id"),
-        )
+        if not compare_before_append:
+            append_commit()
+        store.update(timeout_s=5.0, mutate=project, expected_instance_id=instance_id)
     except Exception as primary:
+        if stage != "route projection":
+            authority_errors = _compensate_authority(authority_attempt, "routing_commit_failed")
+            raise _routing_failure(stage, primary, authority_errors) from primary
         compensation_errors: list[str] = []
         try:
             abort = new_routing_event(
@@ -269,7 +291,7 @@ def commit_launch_routing(
         except Exception as compensation:
             compensation_errors.append(f"routing abort failed: {compensation}")
         compensation_errors.extend(_compensate_authority(authority_attempt, "route_projection_failed"))
-        raise _routing_failure("route projection", primary, compensation_errors) from primary
+        raise _routing_failure(stage, primary, compensation_errors) from primary
     return projection
 
 

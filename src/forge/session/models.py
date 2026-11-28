@@ -697,6 +697,21 @@ class CodexCompletedTurn:
             raise ValueError("Codex completed turn needs a thread, requested model and dispatched model")
 
 
+CodexExitOutcome = Literal["interactive", "completed", "incomplete", "conflict"]
+
+
+@dataclass(frozen=True)
+class CodexProxyExit:
+    """Exit evidence for one launch whose native/dispatch join is still pending."""
+
+    run_id: str
+    outcome: CodexExitOutcome
+
+    def __post_init__(self) -> None:
+        if not is_valid_run_id(self.run_id):
+            raise ValueError("Invalid Codex proxy exit run ID")
+
+
 @dataclass
 class CodexConfirmed:
     """Codex runtime facts captured by the CLI (hook-free), refreshed per run.
@@ -736,6 +751,7 @@ class CodexConfirmed:
     context_delivery: str | None = None
     completed_turn: CodexCompletedTurn | None = None
     reconciled_run_id: str | None = None
+    pending_exit: CodexProxyExit | None = None
 
 
 @dataclass
@@ -1028,15 +1044,21 @@ def session_state_to_dict(state: SessionState) -> dict[str, Any]:
 
     data = asdict(state)
     proxy = data["intent"]["proxy"]
+    codex = data["confirmed"]["codex"]
+    if codex and codex["pending_exit"] is None:
+        del codex["pending_exit"]
     if proxy and proxy["proxy_id"] is not None:
         if session_runtime(state) != "codex":
             raise ValueError("a pinned proxy instance requires Codex proxy intent")
     else:
         if proxy:
             del proxy["proxy_id"]
-        codex = data["confirmed"]["codex"]
         if codex:
-            if codex.pop("completed_turn") is not None or codex.pop("reconciled_run_id") is not None:
+            if (
+                codex.pop("completed_turn") is not None
+                or codex.pop("reconciled_run_id") is not None
+                or "pending_exit" in codex
+            ):
                 raise ValueError("Codex proxy replay facts require a pinned proxy")
         if data["schema_version"] == 6:
             data["schema_version"] = 5

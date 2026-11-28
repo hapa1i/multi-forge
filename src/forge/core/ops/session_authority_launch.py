@@ -532,9 +532,12 @@ def _preflight_authority_seam(
             and verification.codex_succeeded
             and verification.enrolled is True
         ):
+            verify_command = "forge runtime preflight codex --verify-enrollment"
+            if codex_proxy_launch is not None:
+                verify_command += f" --proxy {shlex.quote(codex_proxy_launch.proxy_id)}"
             raise AuthoritySeamPreflightError(
                 "advisory authority requires empirically verified Codex hook enrollment for this launch attempt: "
-                f"{verification.reason} Run 'forge runtime preflight codex --verify-enrollment' after fixing trust.",
+                f"{verification.reason} Run '{verify_command}' after fixing trust.",
                 reason_code="codex_enrollment_unverified",
             )
         return authority_hook_contract_sha256(runtime)

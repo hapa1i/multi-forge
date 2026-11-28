@@ -49,8 +49,13 @@ stops. A replacement on the same port cannot receive the session's history.
 The first launch uses the proxy's default model unless you pass `-- -m <slug>`. A bare resume uses the requested model
 from the last verified, completed user turn, including a model selected in the TUI. With no completed turn, Forge uses
 the initial launch selection. If the listener would map that slug to a different model, restore the original fallback or
-start a fresh session. An explicit switch to a different requested model uses its current mapping. When Forge cannot
-verify a completed turn's model, start a fresh session.
+start a fresh session. An explicit switch to a different requested model uses its current mapping.
+
+If a completed turn is waiting for the proxy's accounting record, retry the same resume command after the record
+arrives. Forge checks the original thread and launch again before sending history. A timed-out resume or a clean abort
+that leaves the last completed foreground turn unchanged retains the previous model. If the rollout is incomplete or the
+model evidence disagrees, restore the original evidence or start a fresh session. If the first launch never established
+a thread, start a fresh session.
 
 Use `forge session model show <name>` for saved and live routing facts, `forge session model history <name> --json` for
 launch commitments, and `forge telemetry activity <name>` for this session's recorded spend. A sessionless `forge_proxy`

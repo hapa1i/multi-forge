@@ -65,6 +65,7 @@ from forge.session.codex_handoff import (
 )
 from forge.session.exceptions import (
     ManifestChangedError,
+    SessionExistsError,
     SessionFileNotFoundError,
     SessionWorktreeMissingError,
 )
@@ -80,13 +81,15 @@ from forge.session.models import (
 from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.store import SessionStore
 from forge.session.transfer import parse_transfer_context_strategy
+from forge.session.validation import validate_name
 
-from .codex_replay import reconcile_proxy_turn, replay_snapshot
+from .codex_replay import record_proxy_exit, replay_snapshot
 from .session_authority_launch import authority_launch_transaction, require_launch_args
 from .session_routing import (
     build_codex_proxy_routing_payload,
     build_runtime_native_routing_payload,
     commit_launch_routing,
+    require_matching_codex_route,
 )
 
 logger = logging.getLogger(__name__)
@@ -204,6 +207,26 @@ def require_codex_thread_id(state: SessionState, name: str) -> str:
     return codex_state.thread_id
 
 
+def check_codex_proxy_start_name(
+    manager: SessionManager, ctx: ExecutionContext, name: str, *, create_worktree: bool
+) -> None:
+    """Refuse an occupied name before resolving a template can start a listener."""
+    assert ctx.forge_root is not None
+    root = str(ctx.forge_root)
+    try:
+        validate_name(name)
+        # Nested managed worktrees publish into the new checkout. An unindexed
+        # manifest in the launching project is a collision only for an in-place birth.
+        if create_worktree and ctx.project_root in ctx.forge_root.parents:
+            occupied = manager.index_store.live_session_exists(name, forge_root=root)
+        else:
+            occupied = SessionStore(root, name).exists()
+        if occupied:
+            raise SessionExistsError(name)
+    except ForgeSessionError as exc:
+        raise ForgeOpError(str(exc)) from exc
+
+
 def codex_start_preflight(
     proxy_name: str | None, launch_args: RuntimeLaunchArgs
 ) -> tuple[CodexPreflight, CodexProxyLaunch | None]:
@@ -232,13 +255,7 @@ def codex_resume_preflight(
 
 def require_current_codex_route(store: SessionStore, state: SessionState) -> None:
     """A second resume can finish between the initial read and the launch reservation."""
-    current = store.read()
-    if (
-        current.confirmed.route_commit != state.confirmed.route_commit
-        or current.intent.proxy != state.intent.proxy
-        or current.confirmed.codex != state.confirmed.codex
-    ):
-        raise ForgeOpError(f"Route for '{state.name}' changed during preflight. Retry the resume.")
+    require_matching_codex_route(store.read(), state)
 
 
 def start_codex_session(
@@ -306,6 +323,8 @@ def start_codex_session(
         authority=(authority if authority_explicit else inherited_authority(parent_state.intent.authority)),
     )
 
+    if proxy_name is not None:
+        check_codex_proxy_start_name(manager, ctx, name, create_worktree=create_worktree)
     preflight, proxy_launch = codex_start_preflight(proxy_name, launch_args)
     if proxy_launch is not None and announce_proxy is not None:
         announce_proxy(proxy_launch)
@@ -575,7 +594,7 @@ def _run_first_codex_turn(
             context_delivery=delivery_fact,
         )
         if proxy_launch is not None:
-            reconcile_proxy_turn(m, run_id=root.run_id, launch=proxy_launch, headless=bridge.codex)
+            record_proxy_exit(m.confirmed.codex, root.run_id, headless=bridge.codex)
         m.confirmed.confirmed_at = timestamp
         m.confirmed.confirmed_by = "cli:codex-start"
 
@@ -781,8 +800,8 @@ def continue_codex_session(
         codex.billing_mode = preflight.billing_mode
         codex.last_run_at = timestamp
         m.confirmed.codex = codex
-        if proxy_launch is not None and not thread_drift:
-            reconcile_proxy_turn(m, run_id=root.run_id, launch=proxy_launch, headless=result)
+        if proxy_launch is not None:
+            record_proxy_exit(codex, root.run_id, headless=result, thread_drift=thread_drift)
 
     if _update_manifest_if_present(
         store,
@@ -861,8 +880,15 @@ def _update_manifest_if_present(
             return
         mutate(current)
 
+    saved: SessionState | None = None
+
     def persist() -> None:
-        store.update(timeout_s=5.0, mutate=apply_current, expected_instance_id=expected_instance_id)
+        nonlocal saved
+        saved = store.update(
+            timeout_s=5.0,
+            mutate=apply_current,
+            expected_instance_id=expected_instance_id,
+        )
 
     try:
         updated = IndexStore().run_session_instance_txn(
@@ -886,6 +912,11 @@ def _update_manifest_if_present(
             f"Session '{session}' was deleted, replaced, or entered cleanup after Codex ran; "
             "skipped post-exit manifest update."
         )
+    if updated and saved is not None and expected_proxy_run_id is not None:
+        try:
+            replay_snapshot(saved, store.forge_root, expected_instance_id)
+        except ForgeOpError as exc:
+            warnings.append(str(exc))
     return updated
 
 

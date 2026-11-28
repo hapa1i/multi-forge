@@ -224,3 +224,60 @@ def test_both_resume_forms_check_bound_listener_and_live_fallback_before_commit(
     assert resumed.confirmed.codex and resumed.confirmed.codex.thread_id == state.confirmed.codex.thread_id
     assert len(read_routing_events(Path.cwd(), resumed)) == len(history) + 1
     assert upstream.records[-1]["sent"] == "followup"
+
+
+def test_resume_recovers_after_foreground_accounting_becomes_visible(start_responses_proxy, monkeypatch):
+    from forge.session.routing import read_routing_events
+
+    serve, upstream = start_responses_proxy
+    runner = CliRunner()
+    project = Path.cwd()
+    store = SessionStore(str(project), "delayed")
+    model = "google/gemini-4-carbon"
+    followup = ["session", "resume", "delayed", "--task", "FORGE_FOLLOWUP: repeat your prior answer."]
+    with serve("bound"):
+        # The real listener writes normal attempt records. Hide them from Forge's first two evidence reads.
+        with monkeypatch.context() as delayed:
+            delayed.setattr("forge.core.ops.codex_replay.read_downstream_records", lambda *args, **kwargs: [])
+            first = runner.invoke(
+                main,
+                [
+                    "session",
+                    "start",
+                    "delayed",
+                    "--runtime",
+                    "codex",
+                    "--resume-from",
+                    "planner",
+                    "--strategy",
+                    "structured",
+                    "--proxy",
+                    "bound",
+                    "--task",
+                    "Read fixture.txt and reply.",
+                    "--",
+                    "-m",
+                    model,
+                ],
+            )
+            assert first.exit_code == 0, (first.output, first.exception)
+            state = store.read()
+            assert state.confirmed.codex and state.confirmed.codex.thread_id
+            thread = state.confirmed.codex.thread_id
+            journal = read_routing_events(project, state)
+            requests = len(upstream.records)
+            assert requests > 0
+            early = runner.invoke(main, followup)
+            assert early.exit_code == 1, (early.output, early.exception)
+            assert read_routing_events(project, store.read()) == journal
+            assert len(upstream.records) == requests
+
+        recovered = runner.invoke(main, followup)
+        assert recovered.exit_code == 0, (recovered.output, recovered.exception)
+    state = store.read()
+    facts = state.confirmed.codex
+    assert facts and facts.completed_turn and state.confirmed.route_commit
+    assert facts.thread_id == thread and facts.completed_turn.requested_model == model
+    assert facts.reconciled_run_id == state.confirmed.route_commit.run_id
+    assert len(read_routing_events(project, state)) == len(journal) + 1
+    assert upstream.records[-1]["sent"] == "followup"

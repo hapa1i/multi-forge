@@ -782,7 +782,11 @@ class SessionStore:
         if not isinstance(confirmed, dict):
             raise ManifestCorruptedError(str(self._manifest_path), "confirmed must be an object")
         codex = confirmed.get("codex")
-        if isinstance(codex, dict) and schema_version != 6 and {"completed_turn", "reconciled_run_id"} & codex.keys():
+        if (
+            isinstance(codex, dict)
+            and schema_version != 6
+            and {"completed_turn", "reconciled_run_id", "pending_exit"} & codex.keys()
+        ):
             raise ManifestCorruptedError(str(self._manifest_path), "Codex proxy replay facts require schema v6")
         started_with_proxy = confirmed.get("started_with_proxy")
         if started_with_proxy is not None:

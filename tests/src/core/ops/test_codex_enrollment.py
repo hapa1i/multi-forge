@@ -97,15 +97,21 @@ class TestVerifyVerdictLogic:
         assert "not trust-enrolled" in res.reason
         assert "grant trust" in res.reason
 
-    def test_failed_turn_is_unverified_not_refuted(self, monkeypatch) -> None:
+    @pytest.mark.parametrize("proxied", [False, True])
+    def test_failed_turn_is_unverified_not_refuted(self, monkeypatch, proxied: bool) -> None:
         monkeypatch.setattr(ce, "_read_user_scope_registration", lambda: ("/cfg.toml", True))
         monkeypatch.setattr(ce, "_run_probe_turn", lambda *a, **k: (False, False))
-
-        res = verify_codex_enrollment(preflight=_preflight())
+        proxy = None
+        pf = _preflight()
+        if proxied:
+            proxy = CodexProxyLaunch("bound", "local", "http://127.0.0.1:7000", "local", "litellm", "m", "m", None)
+            pf = _preflight(auth_method="proxy_token", auth_source="forge_proxy", billing_mode="unknown")
+        res = verify_codex_enrollment(preflight=pf, proxy_launch=proxy)
 
         # A turn that did not complete proves nothing about enrollment.
         assert res.enrolled is None
         assert "did not complete" in res.reason
+        assert ("Responses listener for proxy 'bound'" if proxied else "check codex auth/connectivity") in res.reason
 
     def test_managed_suppressed_sharpens_reason(self, monkeypatch) -> None:
         monkeypatch.setattr(ce, "_read_user_scope_registration", lambda: ("/cfg.toml", True))

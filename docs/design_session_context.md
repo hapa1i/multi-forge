@@ -137,8 +137,9 @@ remains the sessionless surface (re-stamps a cache, defaulting the runtime from 
 never silently flips it back).
 
 For a proxy-backed session, both resume forms verify the original listener and replay the last proven foreground
-selection. A failed switch leaves the previous completed model in effect. An unresolved completion blocks replay. A
-change to the live fallback for the same requested slug blocks even an explicit repeat of that slug.
+selection. A failed switch leaves the previous completed model in effect. Resume rechecks pending exit evidence before
+sending history. A missing dispatch can recover when the proxy writes its record. Contradictory evidence blocks replay.
+A change to the live fallback for the same requested slug blocks even an explicit repeat of that slug.
 [Managed proxy sessions](end-user/codex_proxy.md#managed-sessions)
 
 **Interactive Codex sessions** (`core/ops/codex_interactive.py`): omitting `--task` launches the foreground `codex` TUI

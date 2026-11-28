@@ -16,6 +16,7 @@ from forge.core.ops.claude_session import launch_claude_session
 from forge.core.ops.codex_enrollment import CodexEnrollmentVerification
 from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import RunIdentity, new_root_run_identity
+from forge.core.runtime.codex_proxy_launch import CodexProxyLaunch
 from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.install.codex_hooks import get_builtin_codex_entries, render_codex_block
 from forge.install.hooks import ForgeHookRegistration
@@ -768,6 +769,46 @@ def test_codex_advisory_rejects_missing_policy_row_before_empirical_probe(
         )
 
     assert error.value.reason_code == "codex_policy_registration_invalid"
+
+
+@pytest.mark.parametrize("proxied", [True, False])
+def test_codex_advisory_enrollment_hint_repeats_the_attempted_route(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, proxied: bool
+) -> None:
+    (tmp_path / "config.toml").write_text(render_codex_block(get_builtin_codex_entries()), encoding="utf-8")
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    proxy = (
+        CodexProxyLaunch(
+            "bound",
+            "codex-responses-local",
+            "http://127.0.0.1:7070",
+            "local",
+            "litellm",
+            "m",
+            "m",
+            None,
+        )
+        if proxied
+        else None
+    )
+
+    def unverified(*, preflight, proxy_launch):
+        assert proxy_launch is proxy
+        return SimpleNamespace(ready=False, reason="No receipt.")
+
+    monkeypatch.setattr("forge.core.ops.codex_enrollment.verify_codex_enrollment", unverified)
+    with pytest.raises(launch.AuthoritySeamPreflightError) as failure:
+        launch._preflight_authority_seam(
+            AuthorityIntent("advisory"),
+            runtime="codex",
+            launch_mode="host",
+            worktree_path=tmp_path,
+            codex_preflight=None,
+            codex_proxy_launch=proxy,
+        )
+    command = "forge runtime preflight codex --verify-enrollment" + (" --proxy bound" if proxied else "")
+    assert f"Run '{command}'" in str(failure.value)
+    assert failure.value.reason_code == "codex_enrollment_unverified"
 
 
 def test_unmarked_launch_holds_authority_lock_without_using_active_registry(

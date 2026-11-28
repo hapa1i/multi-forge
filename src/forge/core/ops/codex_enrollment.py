@@ -145,10 +145,11 @@ def _run_enrollment_checks(
     elif not codex_succeeded:
         # The turn never completed, so receipt-absence proves nothing about enrollment.
         enrolled = None
-        reason = (
-            "The verification 'codex exec' turn did not complete, so enrollment could not be "
-            "confirmed. Re-run 'forge runtime preflight codex' and check codex auth/connectivity."
-        )
+        reason = "The verification 'codex exec' turn did not complete, so enrollment could not be confirmed. "
+        if proxy_launch is None:
+            reason += "Re-run 'forge runtime preflight codex' and check codex auth/connectivity."
+        else:
+            reason += f"Check the Responses listener for proxy {proxy_launch.proxy_id!r} and its upstream connection."
     else:
         enrolled = False
         reason = _not_enrolled_reason(pf, config_path)
