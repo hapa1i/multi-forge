@@ -90,6 +90,14 @@ def _period_start(period: str, *, now: datetime | None = None) -> datetime | Non
     return start
 
 
+_SCOPE_NOTES = {
+    "session_identity_unavailable": "Session identity could not be verified. Activity requiring that identity is omitted.",
+    "routing_journal_unavailable": (
+        "Launch ownership could not be verified from the routing journal. Foreground proxy activity is omitted."
+    ),
+}
+
+
 def _render(summary: SessionActivitySummary, *, period: str) -> None:
     scope = {
         "today": "today",
@@ -97,8 +105,12 @@ def _render(summary: SessionActivitySummary, *, period: str) -> None:
         "month": "this month",
         "all": "all time",
     }[period]
+    scope_notes = [_SCOPE_NOTES[key] for key in summary.notes if key in _SCOPE_NOTES]
+    for scope_note in scope_notes:
+        console.print(scope_note, style="yellow")
     if summary.is_empty:
-        console.print(f"[dim]No Forge activity for session '{summary.session}' ({scope}).[/dim]")
+        label = "No verified Forge activity" if scope_notes else "No Forge activity"
+        console.print(f"[dim]{label} for session '{summary.session}' ({scope}).[/dim]")
         if note := _legacy_schema_note(summary.downstream.skipped_legacy_schema):
             console.print(f"[dim]{note}[/dim]")
         return

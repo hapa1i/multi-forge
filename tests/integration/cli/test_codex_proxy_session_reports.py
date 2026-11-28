@@ -24,6 +24,7 @@ from forge.core.usage.emit import emit_codex_usage
 from forge.proxy.cost_logger import build_request_cost_record
 from forge.proxy.proxy_orchestrator import ResponsesListener
 from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session.events import get_session_event_journal_path
 from tests.fixtures.session_state import delete_published_session, publish_session
 
 pytestmark = pytest.mark.integration
@@ -103,6 +104,35 @@ def _cli(*args: str) -> str:
 
 def _activity() -> dict:
     return json.loads(_cli("telemetry", "activity", _NAME, "--period", "all", "--json"))
+
+
+def test_damaged_routing_journal_preserves_session_show_and_marks_activity_partial(tmp_path, monkeypatch):
+    project = tmp_path / "project"
+    instance = _publish(project)
+    _commit(project, instance, "start")
+    monkeypatch.chdir(project)
+    path = get_session_event_journal_path(project, _NAME, "routing")
+    path.write_text('{"broken": true}\n', encoding="utf-8")
+
+    detail = json.loads(_cli("session", "show", _NAME, "--json"))
+    assert detail["intent"]["proxy"]["proxy_id"] == _PROXY.proxy_id
+    commit = detail["confirmed"]["route_commit"]
+    assert commit["evidence_source"] == "unavailable"
+    assert commit["reason"]
+    assert (
+        _cli(
+            "session",
+            "show",
+            _NAME,
+            "--field",
+            "confirmed.route_commit.evidence_source",
+        ).strip()
+        == "unavailable"
+    )
+    human = _cli("session", "show", _NAME)
+    assert "Launch commitment unavailable" in human and _PROXY.proxy_id in human
+    assert "routing_journal_unavailable" in _activity()["notes"]
+    assert "Launch ownership could not be verified" in _cli("telemetry", "activity", _NAME)
 
 
 def test_same_name_tui_headless_worker_and_recreation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

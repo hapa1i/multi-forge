@@ -102,6 +102,33 @@ def test_cache_write_tokens_omitted_when_absent_and_round_trips(_isolated_downst
     assert by_id["ds_writes"].cache_write_tokens == 5
 
 
+def test_codex_turn_reference_uses_v2_payload_and_reads_earlier_top_level_field(
+    _isolated_downstream,
+):
+    write_downstream_record(
+        DownstreamRecord(
+            kind="attempt",
+            downstream_event_id="new",
+            codex_turn_ref="ref",
+            cost_micros=100,
+        )
+    )
+    [path] = _isolated_downstream.glob("*.jsonl")
+    raw = json.loads(path.read_text())
+    assert raw["schema_version"] == 2
+    assert raw["payload"] == {"codex_turn_ref": "ref"}
+    assert "codex_turn_ref" not in raw
+    legacy = {**raw, "downstream_event_id": "early-pr", "codex_turn_ref": "ref"}
+    del legacy["payload"]
+    with path.open("a", encoding="utf-8") as shard:
+        shard.write(json.dumps(legacy) + "\n")
+    records = read_downstream_records()
+    assert [(r.codex_turn_ref, r.cost_micros) for r in records] == [
+        ("ref", 100),
+        ("ref", 100),
+    ]
+
+
 def test_backend_id_survives_later_null_merge_and_can_filter() -> None:
     write_downstream_record(
         DownstreamRecord(

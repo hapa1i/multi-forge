@@ -151,12 +151,16 @@ the resolved `billing_mode` from `CodexPreflight`. Because the Codex child share
 **Proxy-backed Codex usage.** A headless launch emits one `codex_exec` usage event. Codex reports cumulative JSONL
 tokens on resume, so Forge subtracts the bound rollout's pre-launch total. An unavailable baseline leaves the turn's
 tokens unknown. Each Responses create records its own downstream attempt and reported charge under the launch run ID.
-Activity joins those charges to the headless event. TUI launches have only the proxy attempts. Session activity selects
-launches owned by the current project and session instance, including after deleting and recreating a name. Only
-supported, non-aborted journal commitments establish foreground ownership. A matching provider-session label cannot
-establish ownership. Usage events and upstream outcomes from managed consumers carry `session_instance_id` (schema v2)
-when their session matches the launch environment. This lets the activity reader include independently rooted workers
-for that session. Untagged legacy events and outcomes retain their v1 wire shape.
+The v2 attempt stores its run-scoped foreground turn reference in `payload.codex_turn_ref`, so earlier v2 readers can
+still aggregate the charge. Current readers also accept the initial top-level encoding. Activity joins those charges to
+the headless event. TUI launches have only the proxy attempts. Session activity selects launches owned by the current
+project and session instance, including after deleting and recreating a name. Only supported, non-aborted journal
+commitments establish foreground ownership. A matching provider-session label cannot establish ownership. Activity
+reports `session_identity_unavailable` when it cannot verify which session instance owns the records, and
+`routing_journal_unavailable` when the foreground launch history cannot be verified. Usage events and upstream outcomes
+from managed consumers carry `session_instance_id` (schema v2) when their session matches the launch environment. This
+lets the activity reader include independently rooted workers for that session. Untagged legacy events and outcomes
+retain their v1 wire shape.
 
 **Transfer curation usage.** The `ai-curated` transfer's curation step makes a `core.llm` call (an Anthropic model via
 OpenRouter) that is now attributed: it emits `route=core_llm`/`reporter=provider`/`runtime=forge_cli`/

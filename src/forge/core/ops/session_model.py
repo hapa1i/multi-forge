@@ -16,6 +16,7 @@ from forge.core.models.model_reference import normalize_model_reference
 from forge.core.run_id import is_valid_run_id
 from forge.proxy.model_routes import effective_proxy_model_maps
 from forge.proxy.runtime_truth import ProxyRuntimeTruth
+from forge.session.exceptions import ForgeSessionError
 from forge.session.models import ProxyIntent, SessionState, session_runtime
 from forge.session.routing import (
     RoutingHistory,
@@ -151,7 +152,10 @@ def codex_proxy_commit(state: SessionState, forge_root: str | None) -> dict[str,
     """Read the launch evidence for the Codex binding shown in session detail."""
     if session_runtime(state) != "codex" or state.intent.proxy is None or not forge_root:
         return None
-    history = derive_routing_history(forge_root, state)
+    try:
+        history = derive_routing_history(forge_root, state)
+    except ForgeSessionError as exc:
+        return {"evidence_source": "unavailable", "reason": str(exc)}
     return _route_commit(state, history)
 
 

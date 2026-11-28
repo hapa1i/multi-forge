@@ -291,7 +291,7 @@ def build_session_activity_summary(
     except Exception as exc:
         logger.debug("activity: upstream read failed for %s: %s", session_name, exc)
         outcomes = []
-    events, outcomes, owned_roots = _scope_activity(session_name, manifest, forge_root, events, outcomes)
+    events, outcomes, owned_roots = _scope_activity(summary, manifest, forge_root, events, outcomes)
     _aggregate_ledger(summary, events, since)
     summary.policy = _policy_activity(manifest, since, outcomes)
     if manifest is not None:
@@ -323,7 +323,7 @@ def build_session_activity_summary(
     # view can undercount -- but only flag that once the session has activity to
     # contextualize it; claiming partial coverage of an empty summary is noise.
     summary.session_tagging_partial = not summary.is_empty
-    summary.notes = _activity_notes(summary)
+    summary.notes.extend(_activity_notes(summary))
     return summary
 
 
@@ -789,7 +789,7 @@ def _aggregate_ledger(summary: SessionActivitySummary, events: list[UsageEvent],
 
 
 def _scope_activity(
-    session_name: str,
+    summary: SessionActivitySummary,
     manifest: SessionState | None,
     forge_root: str | None,
     events: list[UsageEvent],
@@ -801,15 +801,25 @@ def _scope_activity(
 
     proxied_codex = manifest is not None and session_runtime(manifest) == "codex" and manifest.intent.proxy is not None
     root = forge_root or (manifest.forge_root if manifest else None)
-    instance_id = None
+    entry = None
+    identity_read_failed = False
     if root:
         try:
-            entry = IndexStore().peek_session(session_name, root)
-            if entry and manifest is None:
-                return [], [], set()
-            instance_id = entry.instance_id if entry else None
+            entry = IndexStore().peek_session(summary.session, root)
         except (OSError, ValueError, ForgeSessionError, StateError) as exc:
             logger.debug("activity: session identity unavailable: %s", exc)
+            identity_read_failed = True
+    if manifest is None and (entry is not None or identity_read_failed):
+        summary.notes.append("session_identity_unavailable")
+        return [], [], set()
+    instance_id = entry.instance_id if entry else None
+    if instance_id is None and (
+        identity_read_failed
+        or proxied_codex
+        or any(event.session_instance_id for event in events)
+        or any(outcome.session_instance_id for outcome in outcomes)
+    ):
+        summary.notes.append("session_identity_unavailable")
     events = [event for event in events if event.session_instance_id in (None, instance_id)]
     outcomes = [outcome for outcome in outcomes if outcome.session_instance_id in (None, instance_id)]
     if not proxied_codex or manifest is None:
@@ -820,7 +830,12 @@ def _scope_activity(
         commits = codex_proxy_commits(root, manifest, instance_id)
         launches = {commit.run_id for commit in commits if commit.run_id}
     except (OSError, ValueError, ForgeSessionError, StateError) as exc:
-        logger.debug("activity: proxy launch ownership unavailable for %s: %s", manifest.name, exc)
+        logger.debug(
+            "activity: proxy launch ownership unavailable for %s: %s",
+            manifest.name,
+            exc,
+        )
+        summary.notes.append("routing_journal_unavailable")
         launches = set()
 
     roots = launches.copy()
@@ -1102,7 +1117,7 @@ def _load_manifest(session_name: str, forge_root: str | None) -> SessionState | 
         if forge_root:
             return SessionStore(forge_root, session_name).read()
         return SessionManager().get_session(session_name)
-    except Exception as e:  # best-effort: a missing/locked manifest just drops the policy half
+    except Exception as e:  # An unavailable manifest limits policy and session ownership evidence.
         logger.debug("usage summary: manifest load failed for %s: %s", session_name, e)
         return None
 
