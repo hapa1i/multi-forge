@@ -12,7 +12,8 @@ the lifecycle while their callers keep runtime-specific request shaping.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from forge.core.usage.ledger import BillingMode
@@ -75,6 +76,8 @@ class HeadlessRequest:
     cancel_before_kill: bool = False
     # Reviewer attribution stays in the parent, outside the isolated child env.
     run_identity: tuple[str, str | None, str] | None = None
+    # Single-shot launch evidence. An interrupted launch may stop before a result was parsed.
+    on_confirmed_exit: Callable[[HeadlessResult | None], None] | None = field(default=None, kw_only=True)
 
 
 @dataclass

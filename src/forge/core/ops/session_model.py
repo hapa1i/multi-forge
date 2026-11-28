@@ -79,7 +79,7 @@ def get_session_model_report(*, ctx: ExecutionContext, session_name: str | None 
             "current_request_source": "unavailable",
             "history_status": history.status,
             "marking": marking,
-            "effort": _effort_report(route_commit, proxy_runtime),
+            "effort": _effort_report(route_commit, proxy_runtime, proxy_reachable=live_proxy["reachable"]),
             "limitations": [
                 *MODEL_REPORT_LIMITATIONS,
                 "effort describes Forge's outbound parameter, not provider-side execution",
@@ -374,7 +374,9 @@ def _effort_launch_id(route_commit: dict[str, Any] | None) -> str | None:
     return launch_id if isinstance(launch_id, str) and is_valid_run_id(launch_id) else None
 
 
-def _effort_report(route_commit: dict[str, Any] | None, runtime: ProxyRuntimeTruth | None) -> dict[str, Any]:
+def _effort_report(
+    route_commit: dict[str, Any] | None, runtime: ProxyRuntimeTruth | None, *, proxy_reachable: bool = False
+) -> dict[str, Any]:
     launch_id = _effort_launch_id(route_commit)
     observations: dict[str, Any] = {}
     if route_commit is None:
@@ -386,7 +388,7 @@ def _effort_report(route_commit: dict[str, Any] | None, runtime: ProxyRuntimeTru
     elif launch_id is None:
         reason = "invalid_launch_id"
     elif runtime is None:
-        reason = "proxy_unavailable"
+        reason = "proxy_effort_unavailable" if proxy_reachable else "proxy_unavailable"
     elif not runtime.has_effort_observations:
         reason = "proxy_effort_unavailable"
     else:

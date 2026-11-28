@@ -146,6 +146,13 @@ def test_proxy_only_managed_start_and_resume(proxy):
     attempts = read_downstream_records(kind="attempt", forge_root_run_id=first)
     assert len(attempts) == 2
     assert all(r.forge_run_id == first and r.cost_micros == 10000 and r.source_id == "bound" for r in attempts)
+    activity = CliRunner().invoke(main, ["telemetry", "activity", "impl", "--period", "all", "--json"])
+    assert activity.exit_code == 0, activity.output
+    downstream = json.loads(activity.output)["downstream"]
+    bridge = next(row for row in downstream["rows"] if row["command"] == "codex-bridge")
+    assert (bridge["workers"], bridge["attempts"], bridge["cost_micro_usd"]) == (1, 2, 20000)
+    assert bridge["cost_partial"] is False
+    assert (bridge["input_tokens"], bridge["output_tokens"]) == (20, 4)
     costs = CliRunner().invoke(main, ["telemetry", "costs", "show", "bound", "--json"])
     assert costs.exit_code == 0, costs.output
     assert json.loads(costs.output)["total_requests"] == 2

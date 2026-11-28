@@ -177,6 +177,18 @@ def _signal_process_group(process_group_id: int, sig: signal.Signals) -> bool:
     return True
 
 
+def _report_child_exit(
+    request: HeadlessRequest, child: subprocess.Popen[str] | None, result: HeadlessResult | None = None
+) -> None:
+    if (
+        request.on_confirmed_exit is not None
+        and child is not None
+        and child.poll() is not None
+        and not _process_group_exists(child.pid)
+    ):
+        request.on_confirmed_exit(result)
+
+
 def _terminate_and_reap(procs: list[subprocess.Popen[str]]) -> None:
     """Terminate active owned groups under one SIGTERM -> SIGKILL deadline per phase.
 
@@ -276,8 +288,14 @@ class _HeadlessLifecycleBase:
         if request.run_identity is not None:
             run_id, parent_id, root_id = request.run_identity
             ident = _Identity(run_id=run_id, parent_run_id=parent_id, root_run_id=root_id)
-        run_argv, hints = self._prepare_argv(request)
+        try:
+            run_argv, hints = self._prepare_argv(request)
+        except KeyboardInterrupt:
+            if request.on_confirmed_exit is not None:
+                request.on_confirmed_exit(None)
+            raise
         proc: subprocess.Popen[str] | None = None
+        reaped: subprocess.Popen[str] | None = None
         try:
             if request.watchdog_deadline is not None:
                 from forge.core.reactive.watchdog import run_guarded
@@ -316,10 +334,11 @@ class _HeadlessLifecycleBase:
             returncode = proc.returncode if proc.returncode is not None else -1
             # communicate() reaped the leader. Retire the Popen ownership token
             # before format hooks or result parsing can raise cancellation.
-            proc = None
+            reaped, proc = proc, None
             # Retry-once backstop: a format flag passed the capability gate but the CLI rejected it.
             if self._is_recoverable_format_rejection(returncode, stderr, hints):
                 run_argv, hints = self._on_format_rejection(request)
+                reaped = None
                 proc = subprocess.Popen(
                     run_argv,
                     stdin=subprocess.PIPE,
@@ -332,7 +351,7 @@ class _HeadlessLifecycleBase:
                 )
                 stdout, stderr = proc.communicate(input=request.prompt, timeout=request.timeout_seconds)
                 returncode = proc.returncode if proc.returncode is not None else -1
-                proc = None
+                reaped, proc = proc, None
             result = self._build_result(
                 request,
                 stdout=stdout,
@@ -374,11 +393,16 @@ class _HeadlessLifecycleBase:
                 error=str(e),
                 **ident,
             )
-        except BaseException:
+        except BaseException as exc:
             if proc is not None:
                 _terminate_and_reap([proc])
+            if isinstance(exc, KeyboardInterrupt):
+                _report_child_exit(request, proc or reaped)
             raise
-        self._emit(request, result)
+        try:
+            self._emit(request, result)
+        finally:
+            _report_child_exit(request, proc or reaped, result)
         return result
 
     def run_parallel(self, requests: list[HeadlessRequest]) -> list[HeadlessResult]:

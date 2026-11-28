@@ -787,6 +787,8 @@ def _print_session_detail(
         commit = codex_proxy_commit(state, entry.forge_root or state.forge_root)
         if commit and commit.get("evidence_source") == "unavailable":
             console.print(f"  Launch commitment unavailable: {commit['reason']}", markup=False)
+        elif commit and commit.get("evidence_source") == "unproven_projection":
+            console.print("  Launch commitment unavailable: the routing journal does not confirm the recorded launch.")
         elif commit and (facts := commit.get("codex_proxy")):
             console.print(f"  Launch request:  {facts['requested_model']}", markup=False)
             console.print(f"  Launch dispatch: {facts['dispatched_model']}", markup=False)

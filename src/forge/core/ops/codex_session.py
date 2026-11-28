@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from functools import partial
 from pathlib import Path
 from typing import Literal
 
@@ -73,7 +74,9 @@ from forge.session.launchability import require_session_worktree
 from forge.session.models import (
     AuthorityIntent,
     CodexConfirmed,
+    CodexProxyExit,
     Derivation,
+    RouteCommitConfirmed,
     SessionIndexEntry,
     inherited_authority,
     session_runtime,
@@ -760,7 +763,7 @@ def continue_codex_session(
                 extra_args=launch_args.runtime_argv("codex"),
                 proxy_launch=proxy_launch,
             )
-            commit_launch_routing(
+            projection = commit_launch_routing(
                 store=store,
                 state=state,
                 root=root,
@@ -772,6 +775,8 @@ def continue_codex_session(
                 ),
                 authority_attempt=authority_attempt,
             )
+            if proxy_launch is not None:
+                request.on_confirmed_exit = partial(_record_proxy_resume_exit, store, instance_id, projection)
             result = CodexHeadlessInvoker().run(request)
         if authority_attempt is not None:
             authority_attempt.complete(result.returncode)
@@ -803,7 +808,7 @@ def continue_codex_session(
         codex.billing_mode = preflight.billing_mode
         codex.last_run_at = timestamp
         m.confirmed.codex = codex
-        if proxy_launch is not None:
+        if proxy_launch is not None and codex.reconciled_run_id != root.run_id:
             record_proxy_exit(codex, root.run_id, headless=result, thread_drift=thread_drift)
 
     if _update_manifest_if_present(
@@ -831,6 +836,29 @@ def continue_codex_session(
         rollout_path=str(rollout) if rollout else None,
         warnings=tuple(warnings),
     )
+
+
+def _record_proxy_resume_exit(
+    store: SessionStore, instance_id: str, projection: RouteCommitConfirmed, result: HeadlessResult | None
+) -> None:
+    """Save exit evidence under the launch lease before any post-run work can be interrupted."""
+
+    def record_exit(current: SessionState) -> None:
+        codex = current.confirmed.codex
+        if (
+            codex is not None
+            and current.confirmed.route_commit == projection
+            and codex.reconciled_run_id != projection.run_id
+        ):
+            if result is None:
+                codex.pending_exit = CodexProxyExit(run_id=projection.run_id, outcome="incomplete")
+            else:
+                record_proxy_exit(codex, projection.run_id, headless=result)
+
+    try:
+        store.update(timeout_s=5.0, mutate=record_exit, expected_instance_id=instance_id)
+    except Exception:
+        logger.exception("Could not record Codex resume exit for %s", store.session_name)
 
 
 def _clear_stale_child_snapshot(transfer_root: Path, parent: str, child: str, warnings: list[str]) -> None:
