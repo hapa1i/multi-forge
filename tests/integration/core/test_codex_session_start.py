@@ -8,11 +8,9 @@ the rollout filename ends with the stream's thread_id.
 
 Only the curation network call (``_call_llm_for_curation``) is mocked, for the same reason as
 ``test_claude_to_codex_resume.py``: ``ai-curated`` silently falls back to ``structured``
-without OpenRouter auth, which would unprove the two-event run-tree join. The test then
-continues the session live (``codex exec resume`` with the prompt on **stdin** -- the
-invoker's delivery path, which probe stage 60 never combined with ``resume``): a seed token
-planted in turn 1 must be recalled in turn 2, proving stdin-prompt + resume + thread
-identity in one 2-turn flow (probe stage 61's claims, kept verified here).
+without OpenRouter auth, which would unprove the two-event run-tree join. A rejected model
+and two successful resumes exercise thread recall and per-launch token accounting.
+The sanitized receipt in pytest's temporary project retains the independent raw counters.
 
 Never skips: fails loudly if ``codex`` is not installed/authenticated (the no-skip policy).
 Run via: ``./scripts/test-integration.sh tests/integration/core/test_codex_session_start.py -v``.
@@ -23,20 +21,26 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
+from forge.core.invoker.codex_stream import parse_codex_jsonl_stream
 from forge.core.ops.codex_session import continue_codex_session, start_codex_session
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.usage_summary import build_session_activity_summary
 from forge.core.runtime.codex_preflight import CodexPreflight, preflight_codex
+from forge.core.runtime.launch_args import RuntimeLaunchArgs
 from forge.core.usage.ledger import read_usage_events
 from forge.session.manager import SessionManager
 from forge.session.models import create_session_state
 from forge.session.routing import read_routing_events
 from forge.session.transfer import _CurationCall
 from tests.fixtures.session_state import publish_session
+from tests.integration.core.codex_resume_measurement import (
+    NativeResumeMeasurement,
+    sample_rollout,
+)
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -56,6 +60,14 @@ def _require_codex_ready() -> CodexPreflight:
     if not pf.ready:
         pytest.fail(f"codex not ready ({pf.blocking_reason}). Install + authenticate codex, then re-run.")
     return pf
+
+
+def _take_stream_stdout(spy: Mock) -> str:
+    """A child that exits before the parser runs must not inherit the previous turn's stdout."""
+    assert spy.call_count <= 1
+    stdout = spy.call_args.args[0] if spy.call_args else ""
+    spy.reset_mock()
+    return stdout
 
 
 def _init_git_repo(path: Path) -> None:
@@ -102,6 +114,10 @@ def _register_parent(forge_root: Path, transcript: Path) -> None:
 @pytest.mark.usefixtures("real_codex_home")
 def test_start_then_resume_codex_session_real_turns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     pf = _require_codex_ready()
+    assert (pf.auth_source, pf.billing_mode) == ("codex_store", "subscription_quota")
+    measurement = NativeResumeMeasurement(tmp_path, pf.version)
+    stream = Mock(wraps=parse_codex_jsonl_stream)
+    monkeypatch.setattr("forge.core.invoker.codex.parse_codex_jsonl_stream", stream)
     _init_git_repo(tmp_path)
     (tmp_path / ".forge").mkdir()  # Rule 1: sessions require an enabled Forge project
 
@@ -131,6 +147,7 @@ def test_start_then_resume_codex_session_real_turns(tmp_path: Path, monkeypatch:
             timeout_seconds=180,
         )
 
+    started = measurement.observe("start", result, _take_stream_stdout(stream))
     # The real codex run consumed the curated-transfer prompt and completed. Name the
     # codex version + the probe-validated ceiling on failure: if a codex bump broke this
     # flow, that pairing is the first thing to check (re-run scripts/experiments/codex-hooks/).
@@ -144,6 +161,7 @@ def test_start_then_resume_codex_session_real_turns(tmp_path: Path, monkeypatch:
     # Standing probe-61 guard: the real rollout file is keyed by the stream's thread_id.
     assert result.rollout_path is not None, "no rollout found in $CODEX_HOME for the live thread_id"
     assert result.rollout_path.endswith(f"-{result.thread_id}.jsonl"), result.rollout_path
+    rollout = Path(result.rollout_path)
 
     # Manifest facts (what `forge session show` renders and resume dispatches on).
     state = SessionManager().get_session("impl", forge_root=str(tmp_path))
@@ -184,17 +202,34 @@ def test_start_then_resume_codex_session_real_turns(tmp_path: Path, monkeypatch:
     commands = {c.command for c in summary.commands}
     assert {"transfer-curate", "codex-bridge"} <= commands, commands
 
-    # --- Continuation (probe 61b live): stdin prompt + `exec resume` recalls turn 1. ---
+    before = sample_rollout(rollout)
+    bad_model = "totally-invalid-model-zzz-999"
+    rejected = continue_codex_session(
+        ctx=ctx,
+        name="impl",
+        task="Reply OK.",
+        sandbox="read-only",
+        timeout_seconds=180,
+        launch_args=RuntimeLaunchArgs(passthrough=("-m", bad_model)),
+    )
+    rejection_stdout = _take_stream_stdout(stream)
+    rejection = measurement.observe("rejected-model", rejected, rejection_stdout, before)
+
+    # Continuation (probe 61b live): stdin prompt + exec resume recalls turn 1 after the rejection.
+    before = sample_rollout(rollout)
+    original_model = started["after"]["model"]
+    assert original_model, "the start rollout supplies the supported model for recovery"
     resume = continue_codex_session(
         ctx=ctx,
         name="impl",
         task="What word did I ask you to remember earlier? Reply with only that word.",
         sandbox="read-only",
         timeout_seconds=180,
+        launch_args=RuntimeLaunchArgs(passthrough=("-m", original_model)),
     )
 
+    measurement.observe("first-successful-resume", resume, _take_stream_stdout(stream), before)
     assert resume.codex.success, f"rc={resume.codex.returncode} error={resume.codex.error}"
-    assert "PERSIMMON" in resume.codex.stdout.upper(), resume.codex.stdout
     # Probe 60b pinned thread-id stability across resume; drift would warn + re-record.
     assert resume.thread_id == result.thread_id
     assert resume.warnings == ()
@@ -207,7 +242,7 @@ def test_start_then_resume_codex_session_real_turns(tmp_path: Path, monkeypatch:
     assert refreshed.confirmed.codex.last_run_at >= state.confirmed.codex.last_run_at
     assert SessionManager().get_session_entry("impl", forge_root=str(tmp_path)).codex_thread_id == resume.thread_id
     routing = read_routing_events(tmp_path, refreshed)
-    assert [event.operation for event in routing] == ["start", "resume"]
+    assert [event.operation for event in routing] == ["start", "resume", "resume"]
     assert routing[-1].run_id == resume.root_run_id
     assert refreshed.confirmed.route_commit is not None
     assert refreshed.confirmed.route_commit.event_id == routing[-1].event_id
@@ -217,3 +252,23 @@ def test_start_then_resume_codex_session_real_turns(tmp_path: Path, monkeypatch:
     assert {e.route for e in resume_events} == {"codex_exec"}, resume_events
     assert {e.session for e in resume_events} == {"impl"}
     assert {e.command for e in resume_events} == {"codex-resume"}
+
+    before = sample_rollout(rollout)
+    again = continue_codex_session(
+        ctx=ctx,
+        name="impl",
+        task="Repeat the same word.",
+        sandbox="read-only",
+        timeout_seconds=180,
+    )
+    measurement.observe("second-successful-resume", again, _take_stream_stdout(stream), before)
+    assert again.codex.success, again.codex.stderr
+    assert again.thread_id == result.thread_id
+    measurement.check_activity()
+    assert "PERSIMMON" in resume.codex.stdout.upper(), resume.codex.stdout
+    assert not rejected.codex.success and rejected.thread_id == result.thread_id
+    assert bad_model in (parse_codex_jsonl_stream(rejection_stdout).error_message or rejected.codex.stderr)
+    assert "turn.failed" in rejection["stream_events"] and rejection["terminal_usage"] is None
+    # A resume can replay historical item.completed events before turn.started.
+    assert rejection["after"]["request_usage_sum"] is None
+    assert rejection["after"]["total_token_usage"] == rejection["before"]["total_token_usage"]

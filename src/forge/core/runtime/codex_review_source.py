@@ -12,13 +12,14 @@ import json
 import os
 import re
 import stat
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from forge.core.native_review_types import NativeReviewBoundary
-from forge.core.runtime.codex_rollouts import codex_home, find_rollouts_by_thread_id
+from forge.core.runtime.codex_rollouts import codex_home
+from forge.core.runtime.codex_rollouts import directory_fd as directory_fd
+from forge.core.runtime.codex_rollouts import find_rollouts_by_thread_id
 from forge.core.runtime.codex_usage import CodexUsageBaseline
 from forge.session.models import NativeSupervisorSource
 
@@ -72,22 +73,6 @@ class NativeSelection:
             "usage_baseline": self.baseline.as_dict() if self.baseline else None,
             "baseline_origin": "event_msg.token_count.info.total_token_usage",
         }
-
-
-@contextmanager
-def directory_fd(path: Path) -> Iterator[int]:
-    """Pin each directory component, including the owned home itself."""
-    if not path.is_absolute() or ".." in path.parts:
-        raise ValueError("Expected an absolute native-store path")
-    descriptor = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
-    try:
-        for part in path.parts[1:]:
-            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor)
-            os.close(descriptor)
-            descriptor = child
-        yield descriptor
-    finally:
-        os.close(descriptor)
 
 
 def read_regular(path: Path, *, limit: int, end: int | None = None, header_only: bool = False) -> bytes:
@@ -288,7 +273,7 @@ def select_source(
     active = boundary and source.thread_id == boundary.thread_id
     if (large or active) and (models != {"gpt-6.1-sol"} or model != "gpt-6.1-sol" or auth_mode != "subscription-only"):
         raise ValueError("Long, compacted and active sources require subscription gpt-6.1-sol")
-    baseline = CodexUsageBaseline.from_total_usage(info.get("total_token_usage"))
+    baseline = CodexUsageBaseline.from_token_info(info)
     return NativeSelection(prefixes, baseline, independence, maximum_input)
 
 

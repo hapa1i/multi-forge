@@ -756,6 +756,7 @@ def continue_codex_session(
                 timeout_seconds=timeout_seconds,
                 label="codex-resume",
                 resume_thread_id=thread_id,
+                resume_rollout_path=state.confirmed.codex.rollout_path if state.confirmed.codex else None,
                 extra_args=launch_args.runtime_argv("codex"),
                 proxy_launch=proxy_launch,
             )

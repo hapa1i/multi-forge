@@ -63,6 +63,7 @@ from forge.core.runtime.codex_proxy_launch import (
     CODEX_PROXY_TOKEN_VAR,
     CodexProxyLaunch,
 )
+from forge.core.runtime.codex_resume_usage import capture_native_resume
 from forge.core.runtime.codex_usage import continued_usage_delta
 from forge.core.runtime.registry import get_runtime
 from forge.core.worker_controls import CODEX_WORKER_PROFILE
@@ -162,7 +163,10 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
             input_tokens=stream.input_tokens, output_tokens=stream.output_tokens, cached_tokens=stream.cached_tokens
         )
         continuation = request if isinstance(request, CodexContinuationRequest) else None
-        usage = continued_usage_delta(continuation.usage_baseline, terminal) if continuation else terminal
+        baseline = continuation.usage_baseline if continuation else None
+        if continuation and continuation.native_resume and returncode == 0 and stream.single_completed_turn:
+            baseline = continuation.native_resume.verified_baseline(stream.thread_id, terminal)
+        usage = continued_usage_delta(baseline, terminal) if continuation else terminal
         return HeadlessResult(
             label=request.label,
             stdout=stream.final_text,
@@ -174,9 +178,7 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
             output_tokens=usage["output_tokens"],
             cached_tokens=usage["cached_tokens"],
             terminal_usage=terminal if continuation else None,
-            inherited_usage=(
-                continuation.usage_baseline.as_dict() if continuation and continuation.usage_baseline else None
-            ),
+            inherited_usage=baseline.as_dict() if baseline else None,
             # Parsed iff the stream yielded recognizable terminal events; a failed turn
             # (is_error) still parsed. An empty/garbage stream -> False, stdout "".
             envelope_parsed=bool(stream.final_text) or stream.input_tokens is not None or stream.is_error,
@@ -243,6 +245,7 @@ def prepare_codex_request(
     timeout_seconds: int = 600,
     label: str | None = None,
     resume_thread_id: str | None = None,
+    resume_rollout_path: str | None = None,
     extra_args: Sequence[str] = (),
     worker: bool = False,
     proxy_launch: CodexProxyLaunch | None = None,
@@ -288,8 +291,12 @@ def prepare_codex_request(
         argv += ["resume", resume_thread_id]
 
     request = (
-        partial(CodexContinuationRequest, usage_baseline=proxy_launch.usage_baseline)
-        if proxy_launch and resume_thread_id
+        partial(
+            CodexContinuationRequest,
+            usage_baseline=proxy_launch.usage_baseline if proxy_launch else None,
+            native_resume=None if proxy_launch else capture_native_resume(resume_thread_id, resume_rollout_path),
+        )
+        if resume_thread_id
         else HeadlessRequest
     )
     return request(

@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-import json
-import os
-import stat
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import BinaryIO
 from uuid import UUID
 
 from forge.core.invoker.types import HeadlessResult
-from forge.core.runtime.codex_review_source import directory_fd
-from forge.core.runtime.codex_rollouts import codex_home, find_rollouts_by_thread_id
+from forge.core.runtime.codex_rollouts import decode_rollout_row, open_bound_rollout
 from forge.core.runtime.codex_turn import turn_reference
 from forge.core.runtime.codex_usage import CodexUsageBaseline
 from forge.core.state import FileLockTimeoutError, parse_iso
@@ -224,41 +220,13 @@ def _rollout_selection(
     thread = codex.thread_id
     if not thread:
         raise ValueError("the native thread is missing")
-    UUID(thread)
-    home = codex_home().expanduser().resolve(strict=True)
-    if (home / "sessions").is_symlink():
-        raise ValueError("the Codex sessions directory is a symbolic link")
-    paths = find_rollouts_by_thread_id(thread, home=home)
-    if len(paths) != 1 or (codex.rollout_path and paths[0] != Path(codex.rollout_path).resolve(strict=True)):
-        raise ValueError("the bound rollout is missing or ambiguous")
-    path = paths[0]
-    with directory_fd(path.parent) as parent:
-        fd = os.open(path.name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=parent)
-        with os.fdopen(fd, "rb") as stream:
-            before = os.fstat(fd)
-            if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
-                raise ValueError("the bound rollout is not an ordinary file")
-            latest, baseline = _read_turns(stream, thread)
-            after = os.fstat(fd)
-            if (before.st_size, before.st_mtime_ns) != (
-                after.st_size,
-                after.st_mtime_ns,
-            ):
-                raise ValueError("the bound rollout changed during reconciliation")
-            return latest, baseline, path
-
-
-def _row(line: bytes) -> tuple[str, dict[str, Any]]:
-    if not line.endswith(b"\n"):
-        raise ValueError("the native rollout is incomplete")
-    row = json.loads(line)
-    if not isinstance(row, dict) or not isinstance(row.get("payload"), dict) or not isinstance(row.get("type"), str):
-        raise ValueError("unrecognized native rollout record")
-    return row["type"], row["payload"]
+    with open_bound_rollout(thread, codex.rollout_path) as (path, stream, _):
+        latest, baseline = _read_turns(stream, thread)
+        return latest, baseline, path
 
 
 def _read_turns(stream: BinaryIO, thread: str) -> tuple[tuple[str, str] | None, CodexUsageBaseline | None]:
-    kind, header = _row(stream.readline())
+    kind, header = decode_rollout_row(stream.readline())
     if kind != "session_meta" or header.get("id") != thread or header.get("model_provider") != "forge_proxy":
         raise ValueError("native identity or provider differs from the bound proxy thread")
     active = model = None
@@ -267,7 +235,7 @@ def _read_turns(stream: BinaryIO, thread: str) -> tuple[tuple[str, str] | None, 
     baseline = None
     previous_total = None
     for line in stream:
-        kind, payload = _row(line)
+        kind, payload = decode_rollout_row(line)
         event = payload.get("type") if kind == "event_msg" else None
         turn = payload.get("turn_id")
         if event == "task_started":
@@ -278,10 +246,7 @@ def _read_turns(stream: BinaryIO, thread: str) -> tuple[tuple[str, str] | None, 
             previous_total, baseline = baseline, None
         elif event == "token_count" and payload.get("info") is not None:
             previous_total = None
-            info = payload["info"]
-            baseline = CodexUsageBaseline.from_total_usage(
-                info.get("total_token_usage") if isinstance(info, dict) else None
-            )
+            baseline = CodexUsageBaseline.from_token_info(payload["info"])
         elif kind == "turn_context":
             if (
                 not active

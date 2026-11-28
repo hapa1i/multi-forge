@@ -1,0 +1,572 @@
+{
+  "codex_version": "0.172.0",
+  "route": "runtime_native",
+  "auth_source": "codex_store",
+  "billing_mode": "subscription_quota",
+  "provider": "openai",
+  "fixture": "tests/integration/core/test_codex_session_start.py::test_start_then_resume_codex_session_real_turns",
+  "activity_command": "forge telemetry activity impl --period all --json",
+  "method": "One isolated thread per run. Before and after reference independently read rollout snapshots by EOF byte offset. The last total comes from event_msg.token_count.info.total_token_usage. Terminal usage comes from raw JSONL turn.completed.usage. Request sums use only token_usage_record.usage appended during the launch. Forge per-launch cached_tokens is shown as cached_input_tokens. The mocked transfer-curate event contributes 350 input and 80 output tokens to session activity.",
+  "reproduced_before_correction": {
+    "thread_id": "01a22299-a4be-7e10-897c-feec8de439b4",
+    "rollout_samples": [
+      {
+        "eof_bytes": 127299,
+        "sha256": "cba675f2ffddca4c649b7b0c49fdc7e8a2fd26ea285ac77a1433492d38bf48d2",
+        "last_total_at_byte": 126120,
+        "total_token_usage": {
+          "input_tokens": 16450,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "model": "gpt-6.2-sol"
+      },
+      {
+        "eof_bytes": 157621,
+        "sha256": "2ac12922f100306a9278ceef422f3d7b16fcf44a64f593ad3b11bbf5602e2be0",
+        "last_total_at_byte": 126120,
+        "total_token_usage": {
+          "input_tokens": 16450,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "model": "totally-invalid-model-zzz-999"
+      },
+      {
+        "eof_bytes": 270636,
+        "sha256": "504811ac4ff188f7fef0920e995224218d81f59fb81c013d0e5c015a033dd3df",
+        "last_total_at_byte": 269449,
+        "total_token_usage": {
+          "input_tokens": 55711,
+          "cached_input_tokens": 27904,
+          "output_tokens": 13
+        },
+        "model": "gpt-6.2-sol"
+      },
+      {
+        "eof_bytes": 277499,
+        "sha256": "84ad8dc8e08c6861988ae15974dc701966f35959d4eebf66ebb19d66ad00c974",
+        "last_total_at_byte": 276312,
+        "total_token_usage": {
+          "input_tokens": 94991,
+          "cached_input_tokens": 66944,
+          "output_tokens": 21
+        },
+        "model": "gpt-6.2-sol"
+      }
+    ],
+    "launches": [
+      {
+        "launch": "start",
+        "timestamp": "2026-11-28T14:40:28Z",
+        "run_id": "run_2f4fae50d253",
+        "root_run_id": "run_32cd96caa593",
+        "bound_thread_id": null,
+        "returned_thread_id": "01a22299-a4be-7e10-897c-feec8de439b4",
+        "turn_ids_appended": [
+          "01a22299-a938-79b2-8c41-338ee37baccf"
+        ],
+        "returncode": 0,
+        "status": "success",
+        "stream_events": [
+          "thread.started",
+          "turn.started",
+          "item.completed",
+          "turn.completed"
+        ],
+        "before_eof_bytes": null,
+        "terminal_usage": {
+          "input_tokens": 16450,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "after_eof_bytes": 127299,
+        "new_request_usage_sum": {
+          "input_tokens": 16450,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "rollout_delta_on_success": {
+          "input_tokens": 16450,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "usage_event_id": "evt_af5b0a10bb7b",
+        "observed_usage_event": {
+          "input_tokens": 16450,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "downstream_attempt_id": "ds_a7310dda741959e6918f20ce",
+        "observed_downstream_attempt": {
+          "input_tokens": 16450,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        }
+      },
+      {
+        "launch": "rejected-model",
+        "timestamp": "2026-11-28T14:40:36Z",
+        "run_id": "run_6440c0668411",
+        "root_run_id": "run_c80d3d642c41",
+        "bound_thread_id": "01a22299-a4be-7e10-897c-feec8de439b4",
+        "returned_thread_id": "01a22299-a4be-7e10-897c-feec8de439b4",
+        "turn_ids_appended": [
+          "01a22299-bee4-7f52-8dc7-9e2abf85ce06"
+        ],
+        "returncode": 1,
+        "status": "error",
+        "stream_events": [
+          "thread.started",
+          "item.completed",
+          "item.completed",
+          "turn.started",
+          "error",
+          "turn.failed"
+        ],
+        "before_eof_bytes": 127299,
+        "terminal_usage": null,
+        "after_eof_bytes": 157621,
+        "new_request_usage_sum": null,
+        "rollout_delta_on_success": null,
+        "usage_event_id": "evt_933c1a0d2e16",
+        "observed_usage_event": {
+          "input_tokens": null,
+          "cached_input_tokens": null,
+          "output_tokens": null
+        },
+        "downstream_attempt_id": "ds_79a7738d27ff5ccda061fa86",
+        "observed_downstream_attempt": {
+          "input_tokens": null,
+          "cached_input_tokens": null,
+          "output_tokens": null
+        },
+        "completion_error_code": "model_not_found"
+      },
+      {
+        "launch": "first-successful-resume",
+        "timestamp": "2026-11-28T14:41:31Z",
+        "run_id": "run_fe766b1d6be7",
+        "root_run_id": "run_3962662e7c0d",
+        "bound_thread_id": "01a22299-a4be-7e10-897c-feec8de439b4",
+        "returned_thread_id": "01a22299-a4be-7e10-897c-feec8de439b4",
+        "turn_ids_appended": [
+          "01a2229a-9ce4-7861-aa63-061858770c0a"
+        ],
+        "returncode": 0,
+        "status": "success",
+        "stream_events": [
+          "thread.started",
+          "item.completed",
+          "turn.started",
+          "item.completed",
+          "turn.completed"
+        ],
+        "before_eof_bytes": 157621,
+        "terminal_usage": {
+          "input_tokens": 55711,
+          "cached_input_tokens": 27904,
+          "output_tokens": 13
+        },
+        "after_eof_bytes": 270636,
+        "new_request_usage_sum": {
+          "input_tokens": 39261,
+          "cached_input_tokens": 13952,
+          "output_tokens": 8
+        },
+        "rollout_delta_on_success": {
+          "input_tokens": 39261,
+          "cached_input_tokens": 13952,
+          "output_tokens": 8
+        },
+        "usage_event_id": "evt_354067352aa3",
+        "observed_usage_event": {
+          "input_tokens": 55711,
+          "cached_input_tokens": 27904,
+          "output_tokens": 13
+        },
+        "downstream_attempt_id": "ds_e4c1f162d4e35f48a5225e70",
+        "observed_downstream_attempt": {
+          "input_tokens": 55711,
+          "cached_input_tokens": 27904,
+          "output_tokens": 13
+        }
+      },
+      {
+        "launch": "second-successful-resume",
+        "timestamp": "2026-11-28T14:41:39Z",
+        "run_id": "run_1f891a9ef04d",
+        "root_run_id": "run_3b7a110964e1",
+        "bound_thread_id": "01a22299-a4be-7e10-897c-feec8de439b4",
+        "returned_thread_id": "01a22299-a4be-7e10-897c-feec8de439b4",
+        "turn_ids_appended": [
+          "01a2229a-b88b-7ad0-b3cb-7e6839ffdb05"
+        ],
+        "returncode": 0,
+        "status": "success",
+        "stream_events": [
+          "thread.started",
+          "turn.started",
+          "item.completed",
+          "turn.completed"
+        ],
+        "before_eof_bytes": 270636,
+        "terminal_usage": {
+          "input_tokens": 94991,
+          "cached_input_tokens": 66944,
+          "output_tokens": 21
+        },
+        "after_eof_bytes": 277499,
+        "new_request_usage_sum": {
+          "input_tokens": 39280,
+          "cached_input_tokens": 39040,
+          "output_tokens": 8
+        },
+        "rollout_delta_on_success": {
+          "input_tokens": 39280,
+          "cached_input_tokens": 39040,
+          "output_tokens": 8
+        },
+        "usage_event_id": "evt_86df2c27bd75",
+        "observed_usage_event": {
+          "input_tokens": 94991,
+          "cached_input_tokens": 66944,
+          "output_tokens": 21
+        },
+        "downstream_attempt_id": "ds_88932b512d5b5511a425e594",
+        "observed_downstream_attempt": {
+          "input_tokens": 94991,
+          "cached_input_tokens": 66944,
+          "output_tokens": 21
+        }
+      }
+    ],
+    "session_activity": {
+      "rows": [
+        {
+          "command": "codex-resume",
+          "root_run_ids": [
+            "run_3962662e7c0d",
+            "run_3b7a110964e1",
+            "run_c80d3d642c41"
+          ],
+          "input_tokens": 150702,
+          "cached_tokens": 94848,
+          "output_tokens": 34,
+          "errors": 0,
+          "cost_micro_usd": null
+        },
+        {
+          "command": "transfer-curate",
+          "root_run_ids": [
+            "run_32cd96caa593"
+          ],
+          "input_tokens": 350,
+          "cached_tokens": 0,
+          "output_tokens": 80,
+          "errors": 0,
+          "cost_micro_usd": null
+        },
+        {
+          "command": "codex-bridge",
+          "root_run_ids": [
+            "run_32cd96caa593"
+          ],
+          "input_tokens": 16450,
+          "cached_tokens": 13952,
+          "output_tokens": 5,
+          "errors": 0,
+          "cost_micro_usd": null
+        }
+      ],
+      "reported_total_input_tokens": 167502,
+      "reported_total_output_tokens": 119,
+      "expected_known_tokens_including_curation": {
+        "input_tokens": 95341,
+        "cached_input_tokens": 66944,
+        "output_tokens": 101
+      }
+    }
+  },
+  "verified_after_correction": {
+    "thread_id": "01a2229f-916c-7590-8f23-f72708923ac2",
+    "rollout_samples": [
+      {
+        "eof_bytes": 146564,
+        "sha256": "e1f9531d0e2d307d813fc6912fbfaeaeb50d28fe22dae52b90d45cc60fc5f610",
+        "last_total_at_byte": 145385,
+        "total_token_usage": {
+          "input_tokens": 18798,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "model": "gpt-6.2-sol"
+      },
+      {
+        "eof_bytes": 181488,
+        "sha256": "c56ca393123110e3dd0e95dd5f79d9d85e5a15d230b8f04c904b5cdccfc7367b",
+        "last_total_at_byte": 145385,
+        "total_token_usage": {
+          "input_tokens": 18798,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "model": "totally-invalid-model-zzz-999"
+      },
+      {
+        "eof_bytes": 294468,
+        "sha256": "2e623e0cdb84c950e067347e2503bb5303c056f0724384ba4373dac9d2f46df2",
+        "last_total_at_byte": 293281,
+        "total_token_usage": {
+          "input_tokens": 60941,
+          "cached_input_tokens": 27904,
+          "output_tokens": 13
+        },
+        "model": "gpt-6.2-sol"
+      },
+      {
+        "eof_bytes": 301313,
+        "sha256": "9a403bc904d858546a86c303c815bbeb0d7829ca80c911f7139d18f907c8976c",
+        "last_total_at_byte": 300124,
+        "total_token_usage": {
+          "input_tokens": 103103,
+          "cached_input_tokens": 70016,
+          "output_tokens": 21
+        },
+        "model": "gpt-6.2-sol"
+      }
+    ],
+    "launches": [
+      {
+        "launch": "start",
+        "timestamp": "2026-11-28T14:46:57Z",
+        "run_id": "run_71d1dc8c9911",
+        "root_run_id": "run_730424b4b0df",
+        "bound_thread_id": null,
+        "returned_thread_id": "01a2229f-916c-7590-8f23-f72708923ac2",
+        "turn_ids_appended": [
+          "01a2229f-9534-7282-8195-7928bb3f6efe"
+        ],
+        "returncode": 0,
+        "status": "success",
+        "stream_events": [
+          "thread.started",
+          "turn.started",
+          "item.completed",
+          "turn.completed"
+        ],
+        "before_eof_bytes": null,
+        "terminal_usage": {
+          "input_tokens": 18798,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "after_eof_bytes": 146564,
+        "new_request_usage_sum": {
+          "input_tokens": 18798,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "rollout_delta_on_success": {
+          "input_tokens": 18798,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "usage_event_id": "evt_ad3564dc9e37",
+        "observed_usage_event": {
+          "input_tokens": 18798,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "downstream_attempt_id": "ds_450b11c8f34a5a9dbe2b4a6b",
+        "observed_downstream_attempt": {
+          "input_tokens": 18798,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        }
+      },
+      {
+        "launch": "rejected-model",
+        "timestamp": "2026-11-28T14:47:05Z",
+        "run_id": "run_315184b13210",
+        "root_run_id": "run_ca24de1da484",
+        "bound_thread_id": "01a2229f-916c-7590-8f23-f72708923ac2",
+        "returned_thread_id": "01a2229f-916c-7590-8f23-f72708923ac2",
+        "turn_ids_appended": [
+          "01a2229f-b2ce-77e0-9fac-02f0396bf0a8"
+        ],
+        "returncode": 1,
+        "status": "error",
+        "stream_events": [
+          "thread.started",
+          "item.completed",
+          "item.completed",
+          "turn.started",
+          "error",
+          "turn.failed"
+        ],
+        "before_eof_bytes": 146564,
+        "terminal_usage": null,
+        "after_eof_bytes": 181488,
+        "new_request_usage_sum": null,
+        "rollout_delta_on_success": null,
+        "usage_event_id": "evt_e79ccb621b91",
+        "observed_usage_event": {
+          "input_tokens": null,
+          "cached_input_tokens": null,
+          "output_tokens": null
+        },
+        "downstream_attempt_id": "ds_fd03a4fff1d252be8d97a024",
+        "observed_downstream_attempt": {
+          "input_tokens": null,
+          "cached_input_tokens": null,
+          "output_tokens": null
+        },
+        "completion_error_code": "model_not_found"
+      },
+      {
+        "launch": "first-successful-resume",
+        "timestamp": "2026-11-28T14:47:15Z",
+        "run_id": "run_3970897c88e3",
+        "root_run_id": "run_c3e4c18ca685",
+        "bound_thread_id": "01a2229f-916c-7590-8f23-f72708923ac2",
+        "returned_thread_id": "01a2229f-916c-7590-8f23-f72708923ac2",
+        "turn_ids_appended": [
+          "01a2229f-dd05-7061-921b-cc19a34397e8"
+        ],
+        "returncode": 0,
+        "status": "success",
+        "stream_events": [
+          "thread.started",
+          "item.completed",
+          "turn.started",
+          "item.completed",
+          "turn.completed"
+        ],
+        "before_eof_bytes": 181488,
+        "terminal_usage": {
+          "input_tokens": 60941,
+          "cached_input_tokens": 27904,
+          "output_tokens": 13
+        },
+        "after_eof_bytes": 294468,
+        "new_request_usage_sum": {
+          "input_tokens": 42143,
+          "cached_input_tokens": 13952,
+          "output_tokens": 8
+        },
+        "rollout_delta_on_success": {
+          "input_tokens": 42143,
+          "cached_input_tokens": 13952,
+          "output_tokens": 8
+        },
+        "usage_event_id": "evt_4af59e5d5d86",
+        "observed_usage_event": {
+          "input_tokens": 42143,
+          "cached_input_tokens": 13952,
+          "output_tokens": 8
+        },
+        "downstream_attempt_id": "ds_6757adcf1a8152b583054739",
+        "observed_downstream_attempt": {
+          "input_tokens": 42143,
+          "cached_input_tokens": 13952,
+          "output_tokens": 8
+        }
+      },
+      {
+        "launch": "second-successful-resume",
+        "timestamp": "2026-11-28T14:47:22Z",
+        "run_id": "run_77a89dc8b0d8",
+        "root_run_id": "run_e0e449f7e196",
+        "bound_thread_id": "01a2229f-916c-7590-8f23-f72708923ac2",
+        "returned_thread_id": "01a2229f-916c-7590-8f23-f72708923ac2",
+        "turn_ids_appended": [
+          "01a2229f-fb76-77d2-be98-c65baa4ce7ad"
+        ],
+        "returncode": 0,
+        "status": "success",
+        "stream_events": [
+          "thread.started",
+          "turn.started",
+          "item.completed",
+          "turn.completed"
+        ],
+        "before_eof_bytes": 294468,
+        "terminal_usage": {
+          "input_tokens": 103103,
+          "cached_input_tokens": 70016,
+          "output_tokens": 21
+        },
+        "after_eof_bytes": 301313,
+        "new_request_usage_sum": {
+          "input_tokens": 42162,
+          "cached_input_tokens": 42112,
+          "output_tokens": 8
+        },
+        "rollout_delta_on_success": {
+          "input_tokens": 42162,
+          "cached_input_tokens": 42112,
+          "output_tokens": 8
+        },
+        "usage_event_id": "evt_7a941364897f",
+        "observed_usage_event": {
+          "input_tokens": 42162,
+          "cached_input_tokens": 42112,
+          "output_tokens": 8
+        },
+        "downstream_attempt_id": "ds_388f5e7ae8315579b8d8027e",
+        "observed_downstream_attempt": {
+          "input_tokens": 42162,
+          "cached_input_tokens": 42112,
+          "output_tokens": 8
+        }
+      }
+    ],
+    "session_activity": {
+      "rows": [
+        {
+          "command": "codex-resume",
+          "root_run_ids": [
+            "run_c3e4c18ca685",
+            "run_ca24de1da484",
+            "run_e0e449f7e196"
+          ],
+          "input_tokens": 84305,
+          "cached_tokens": 56064,
+          "output_tokens": 16,
+          "errors": 0,
+          "cost_micro_usd": null
+        },
+        {
+          "command": "transfer-curate",
+          "root_run_ids": [
+            "run_730424b4b0df"
+          ],
+          "input_tokens": 350,
+          "cached_tokens": 0,
+          "output_tokens": 80,
+          "errors": 0,
+          "cost_micro_usd": null
+        },
+        {
+          "command": "codex-bridge",
+          "root_run_ids": [
+            "run_730424b4b0df"
+          ],
+          "input_tokens": 18798,
+          "cached_tokens": 13952,
+          "output_tokens": 5,
+          "errors": 0,
+          "cost_micro_usd": null
+        }
+      ],
+      "reported_total_input_tokens": 103453,
+      "reported_total_output_tokens": 101,
+      "expected_known_tokens_including_curation": {
+        "input_tokens": 103453,
+        "cached_input_tokens": 70016,
+        "output_tokens": 101
+      }
+    }
+  }
+}
