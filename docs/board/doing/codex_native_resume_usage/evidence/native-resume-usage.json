@@ -8,6 +8,7 @@
   "activity_command": "forge telemetry activity impl --period all --json",
   "method": "One isolated thread per run. Before and after reference independently read rollout snapshots by EOF byte offset. The last total comes from event_msg.token_count.info.total_token_usage. Terminal usage comes from raw JSONL turn.completed.usage. Request sums use only token_usage_record.usage appended during the launch. Forge per-launch cached_tokens is shown as cached_input_tokens. The mocked transfer-curate event contributes 350 input and 80 output tokens to session activity.",
   "reproduced_before_correction": {
+    "capture": "Runtime at b97f47b7. The lifecycle test captured the start and model rejection. A temporary driver then invoked the same Forge continuation operation twice on that saved thread after the test exposed replayed item events before turn.started.",
     "thread_id": "01a22299-a4be-7e10-897c-feec8de439b4",
     "rollout_samples": [
       {
@@ -289,6 +290,7 @@
     }
   },
   "verified_after_correction": {
+    "capture": "The complete lifecycle test on the runtime committed as b51eb1cf captured all four launches and checked their event, attempt, and CLI totals.",
     "thread_id": "01a2229f-916c-7590-8f23-f72708923ac2",
     "rollout_samples": [
       {

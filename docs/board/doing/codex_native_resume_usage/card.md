@@ -2,11 +2,13 @@
 
 **Status**: In progress on `codex/codex-native-resume-usage` from 2026-11-28. [Execution checklist](checklist.md)
 
-A native-auth `forge session resume <name> --task ...` forwards the terminal JSONL counters to the session usage event
-and downstream attempt. If those counters include earlier turns, session activity counts earlier work again.
-[Codex invoker](../../../../src/forge/core/invoker/codex.py) · [Telemetry design](../../../design_telemetry.md)
+Before this change, a native-auth `forge session resume <name> --task ...` forwarded the terminal JSONL counters to the
+session usage event and downstream attempt. On Codex 0.172.0 the terminal included earlier turns. Across two resumes,
+activity counted 167,502 input tokens for 95,341 tokens of work, including transfer curation.
+[Live measurement](evidence/native-resume-usage.json) · [Codex invoker](../../../../src/forge/core/invoker/codex.py) ·
+[Telemetry design](../../../design_telemetry.md)
 
-## What the existing measurements establish
+## Evidence before implementation
 
 - A direct Codex 0.161.0 start and resume on the same thread reported 31,522 then 63,316 input tokens. Cached input rose
   from 27,776 to 59,008 and output from 46 to 92. This supports the cumulative interpretation. The receipt lacks an
@@ -19,8 +21,8 @@ and downstream attempt. If those counters include earlier turns, session activit
   [Fork counters](../../done/codex_fork_supervisor/evidence/usage-counters.json) ·
   [Native supervision](../../../end-user/native_supervision.md)
 - The managed proxy matrix summarizes the corrected headless events as 16 input and 2 output tokens on 0.141.0 and
-  0.172.0. It omits the raw terminal counters, rollout baselines and cached counts. The open measurement is an ordinary
-  direct resume with independently comparable before, terminal and after values for each field.
+  0.172.0. It omits the raw terminal counters, rollout baselines and cached counts. The ordinary direct measurement
+  therefore needed independent before, terminal and after values for each field.
   [Proxy matrix](../../done/codex_session_proxy_routing/evidence/managed-cli-matrix.json)
 
 ## Acceptance

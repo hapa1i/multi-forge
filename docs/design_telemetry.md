@@ -141,11 +141,13 @@ becomes a recreated session's live state. `unattributed_changes` describes betwe
 scope; `excluded_work` retains gaps as unreviewed after partial reviews and operator resets. Later complete reviews do
 not approve those historical exclusions.
 
-**Native Codex usage.** Direct session starts and resumes forward JSONL `turn.completed.usage` to the usage event and
-native attempt. Forge does not establish how much of a resumed counter belongs to that launch. The event records
-`route=codex_exec`, `reporter=codex_jsonl`, `measurement_source=runtime_native` and preflight's `billing_mode`. Codex
-supplies no dollar amount (`cost_micro_usd=null`, `source_refs=null`, `confidence=unavailable`). Activity joins Codex
-and Claude events by `root_run_id`.
+**Native Codex usage.** Direct headless starts use JSONL `turn.completed.usage`. On a subscription resume, Codex 0.172.0
+reported cumulative input, cached input and output. Forge subtracts the bound rollout's pre-launch total only when the
+returned thread and fresh, single-turn rollout evidence corroborate all three terminal counters. The usage event and
+native attempt share the result. Compaction, thread drift, or insufficient evidence leaves tokens unknown and the
+session can continue. Direct `codex-resume` rows from builds before `b51eb1cf` can inflate historical activity. The
+event records `codex_exec`, `codex_jsonl`, `runtime_native` and preflight's `billing_mode`. Cost and source refs are
+null, with `confidence=unavailable`. Activity joins Codex and Claude events by `root_run_id`.
 
 **Proxy-backed Codex usage.** A headless launch emits one `codex_exec` event. On this route Forge subtracts the bound
 rollout's pre-launch total from the cumulative JSONL resume counters. An unavailable baseline leaves the turn's tokens
