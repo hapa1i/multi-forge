@@ -2,7 +2,7 @@
 
 Forge reports unknown tokens for every direct headless resume on a thread with any prior compaction. A clean turn after
 compaction can therefore finish successfully and still contribute no tokens to activity. The existing subscription
-measurement covers an uncompacted thread. [Native resume accounting](../../doing/codex_native_resume_usage/card.md)
+measurement covers an uncompacted thread. [Native resume accounting](../../done/codex_native_resume_usage/card.md)
 
 ## Measurement
 

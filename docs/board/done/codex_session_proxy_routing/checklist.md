@@ -60,8 +60,8 @@ disposable homes and loopback upstreams. Successful proxy-backed Stop review rem
 - [x] Refuse occupied session names before starting a template proxy, show the bound proxy in advisory enrollment
   guidance, and cover failure of the live enrollment probe.
 
-Direct native resume counters need a separate measurement.
-[Native resume usage card](../../doing/codex_native_resume_usage/card.md)
+A separate subscription measurement verified direct native resume counters on Codex 0.172.0.
+[Completed native resume usage card](../codex_native_resume_usage/card.md)
 
 ## Acceptance fixtures
 

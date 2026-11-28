@@ -56,10 +56,14 @@
 - [x] Verified both Python CI lanes and test-selection parity on rerun. The initial 3.11 failure expected one of two
   valid refusal messages when a session was replaced during deletion.
   [Independent test fix](https://github.com/hapa1i/multi-forge/pull/313)
-- [x] Verified the CLI activity display and signed-in native lifecycle alongside the managed proxy controls. The
-  [implementation PR](https://github.com/hapa1i/multi-forge/pull/312) records the aggregate test and hook results.
-- [ ] At merge, record the squash-merge commit or first shipped release in the [change log](../../change_log.md) and
-  [telemetry design](../../../design_telemetry.md) as the historical cutover. Move the card to `done/`.
+- [x] Verified the activity CLI, signed-in native lifecycle and managed proxy controls in five integration tests. The
+  implementation head passed 12,173 unit tests, 2,768 regressions and `make pre-commit`.
+  [Python 3.11 and 3.13 CI](https://github.com/hapa1i/multi-forge/actions/runs/46163430025) ·
+  [Pre-commit CI](https://github.com/hapa1i/multi-forge/actions/runs/46163430023)
+- [x] Re-ran the rollout reader, native resume and activity tests on the merged tree. All 54 passed. Moved the card to
+  `done/` and recorded the 2026-11-28 squash merge `0df6abb1` as the accounting cutover on `main`.
+  [Change log](../../change_log.md#count-only-new-tokens-on-direct-codex-resumes) ·
+  [Telemetry design](../../../design_telemetry.md)
 
 [delta]: ../../../../src/forge/core/runtime/codex_usage.py
 [fork-test]: ../../../../tests/regression/test_bug_codex_fork_inherited_usage.py

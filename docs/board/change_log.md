@@ -12,6 +12,17 @@ Older entries are retained verbatim in [2026-08-23 through 2026-08-24](archive/c
 
 ## 2026-11-28
 
+### Count only new tokens on direct Codex resumes
+
+Direct headless resumes report the current turn's tokens in the usage event and downstream attempt when the rollout
+corroborates input, cached input and output. A successful resume warns when usage is unknown, and activity counts
+unmeasured launches. Direct-resume records from builds before `main` commit `0df6abb1` can include earlier turns and
+lack the baseline for a reliable backfill. [PR #312](https://github.com/hapa1i/multi-forge/pull/312)
+
+On Codex 0.172.0 with a ChatGPT subscription, activity matched the independently measured 103,453 input and 101 output
+tokens, including transfer curation. Verification passed 12,173 unit tests, 2,768 regressions and five targeted
+integration tests. [Completed checklist](done/codex_native_resume_usage/checklist.md)
+
 ### Route managed Codex sessions through a Forge proxy
 
 Headless and interactive Codex sessions can start on a Forge Responses proxy without native OpenAI credentials. Resume

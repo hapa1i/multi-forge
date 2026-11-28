@@ -144,9 +144,10 @@ not approve those historical exclusions.
 **Native Codex usage.** Direct starts use JSONL `turn.completed.usage`. Codex 0.172.0 subscription resumes report
 cumulative counters. Forge subtracts the baseline for both the event and attempt when the bound thread's new turn
 corroborates input, cached input and output. A successful resume warns if usage is unknown. Activity counts unmeasured
-direct launches in `unknown_token_launches`. Older direct-resume records can overstate activity. Events carry
-`codex_exec`, `codex_jsonl`, `runtime_native` and preflight's `billing_mode`. Codex supplies no price, so cost and
-source refs are null and `confidence=unavailable`. Activity joins events by `root_run_id`.
+direct launches in `unknown_token_launches`. Direct-resume events from builds before `main` commit `0df6abb1` can count
+earlier turns again and lack the baseline for a reliable backfill. Events carry `codex_exec`, `codex_jsonl`,
+`runtime_native` and preflight's `billing_mode`. Codex supplies no price, so cost and source refs are null and
+`confidence=unavailable`. Activity joins events by `root_run_id`.
 
 **Proxy-backed Codex usage.** A headless launch emits one `codex_exec` event. On this route Forge subtracts the bound
 rollout's pre-launch total from the cumulative JSONL resume counters. An unavailable baseline leaves the turn's tokens

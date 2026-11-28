@@ -1,6 +1,7 @@
 # Verify and correct token totals on direct Codex resume
 
-**Status**: In progress on `codex/codex-native-resume-usage` from 2026-11-28. [Execution checklist](checklist.md)
+**Done.** Merged into `main` as `0df6abb1` on 2026-11-28. [PR #312](https://github.com/hapa1i/multi-forge/pull/312) ·
+[Completed checklist](checklist.md)
 
 Before this change, a native-auth `forge session resume <name> --task ...` forwarded the terminal JSONL counters to the
 session usage event and downstream attempt. On Codex 0.172.0 the terminal included earlier turns. Across two resumes,
