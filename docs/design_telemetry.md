@@ -141,19 +141,18 @@ becomes a recreated session's live state. `unattributed_changes` describes betwe
 scope; `excluded_work` retains gaps as unreviewed after partial reviews and operator resets. Later complete reviews do
 not approve those historical exclusions.
 
-**Native Codex usage.** A native-auth `codex exec` run goes direct to OpenAI, so there is no proxy cost record to join:
-`emit_codex_usage` records `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native` with the **exact** tokens from the
-JSONL `turn.completed.usage`, but `cost_micro_usd=null`/`source_refs=null` and `confidence=unavailable` (the ledger's
-`confidence` is a cost signal, and Codex reports no dollars — honest absence, not a fabricated $0). The event carries
-the resolved `billing_mode` from `CodexPreflight`. Because the Codex child shares its parent's run tree
-(`stamp_run_identity`), a Codex leaf and a Claude leaf join under the same `root_run_id` in `forge telemetry activity`.
+**Native Codex usage.** Direct session starts and resumes forward JSONL `turn.completed.usage` to the usage event and
+native attempt. Forge does not establish how much of a resumed counter belongs to that launch. The event records
+`route=codex_exec`, `reporter=codex_jsonl`, `measurement_source=runtime_native` and preflight's `billing_mode`. Codex
+supplies no dollar amount (`cost_micro_usd=null`, `source_refs=null`, `confidence=unavailable`). Activity joins Codex
+and Claude events by `root_run_id`.
 
-**Proxy-backed Codex usage.** A headless launch emits one `codex_exec` usage event. Codex reports cumulative JSONL
-tokens on resume, so Forge subtracts the bound rollout's pre-launch total. An unavailable baseline leaves the turn's
-tokens unknown. Each Responses create records its own downstream attempt and reported charge under the launch run ID.
-The v2 attempt stores its run-scoped foreground turn reference in `payload.codex_turn_ref`, so earlier v2 readers can
-still aggregate the charge. Current readers also accept the initial top-level encoding. Activity joins those charges to
-the headless event. TUI launches have only the proxy attempts. Session activity selects launches owned by the current
+**Proxy-backed Codex usage.** A headless launch emits one `codex_exec` event. On this route Forge subtracts the bound
+rollout's pre-launch total from the cumulative JSONL resume counters. An unavailable baseline leaves the turn's tokens
+unknown. Each Responses create records its own downstream attempt and reported charge under the launch run ID. The v2
+attempt stores its run-scoped foreground turn reference in `payload.codex_turn_ref`, so earlier v2 readers can still
+aggregate the charge. Current readers also accept the initial top-level encoding. Activity joins those charges to the
+headless event. TUI launches have only the proxy attempts. Session activity selects launches owned by the current
 project and session instance, including after deleting and recreating a name. Only supported, non-aborted journal
 commitments establish foreground ownership. A matching provider-session label cannot establish ownership. Activity
 reports `session_identity_unavailable` when it cannot verify which session instance owns the records, and
