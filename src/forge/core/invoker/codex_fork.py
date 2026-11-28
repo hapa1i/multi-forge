@@ -6,7 +6,10 @@ import json
 from dataclasses import dataclass
 
 from forge.core.invoker.types import Attribution, HeadlessRequest
-from forge.core.runtime.codex_resume_usage import NativeResumeSnapshot
+from forge.core.runtime.codex_resume_usage import (
+    NativeResumeSnapshot,
+    NativeUsageUnavailable,
+)
 from forge.core.runtime.codex_usage import CodexUsageBaseline
 from forge.core.worker_controls import CODEX_WORKER_PROFILE
 
@@ -17,7 +20,7 @@ class CodexContinuationRequest(HeadlessRequest):
 
     usage_baseline: CodexUsageBaseline | None = None
     # An ordinary direct resume can verify its baseline only after the native child exits.
-    native_resume: NativeResumeSnapshot | None = None
+    native_resume: NativeResumeSnapshot | NativeUsageUnavailable | None = None
 
 
 class CodexForkRequest(CodexContinuationRequest):

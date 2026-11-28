@@ -205,11 +205,11 @@ def _render(summary: SessionActivitySummary, *, period: str) -> None:
         table.add_column("Tokens in/out", justify="right", style="dim")
         table.add_column("Cost", justify="right", style="dim")
         for model_row in summary.downstream.rows:
-            tokens = (
-                f"{model_row.input_tokens}/{model_row.output_tokens}"
-                if (model_row.input_tokens or model_row.output_tokens)
-                else "-"
-            )
+            tokens = f"{model_row.input_tokens}/{model_row.output_tokens}"
+            if not (model_row.input_tokens or model_row.output_tokens or model_row.codex_io_reported):
+                tokens = "-"
+            if model_row.unknown_token_launches:
+                tokens += "*"
             if model_row.cost_micro_usd is None:
                 cost = "-"
             else:
@@ -272,6 +272,10 @@ def _render(summary: SessionActivitySummary, *, period: str) -> None:
 
 def _footnotes(summary: SessionActivitySummary) -> list[str]:
     notes: list[str] = []
+    for row in summary.downstream.rows:
+        if count := row.unknown_token_launches:
+            launches = "launch" if count == 1 else "launches"
+            notes.append(f"* Token totals omit unknown counts from {count} {row.command} {launches}.")
     if note := _legacy_schema_note(summary.downstream.skipped_legacy_schema):
         notes.append(note)
     if summary.cost_partial:

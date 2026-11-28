@@ -63,8 +63,11 @@ from forge.core.runtime.codex_proxy_launch import (
     CODEX_PROXY_TOKEN_VAR,
     CodexProxyLaunch,
 )
-from forge.core.runtime.codex_resume_usage import capture_native_resume
-from forge.core.runtime.codex_usage import continued_usage_delta
+from forge.core.runtime.codex_resume_usage import (
+    NativeUsageUnavailable,
+    capture_native_resume,
+)
+from forge.core.runtime.codex_usage import CodexUsageBaseline, continued_usage_delta
 from forge.core.runtime.registry import get_runtime
 from forge.core.worker_controls import CODEX_WORKER_PROFILE
 
@@ -163,10 +166,25 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
             input_tokens=stream.input_tokens, output_tokens=stream.output_tokens, cached_tokens=stream.cached_tokens
         )
         continuation = request if isinstance(request, CodexContinuationRequest) else None
-        baseline = continuation.usage_baseline if continuation else None
-        if continuation and continuation.native_resume and returncode == 0 and stream.single_completed_turn:
-            baseline = continuation.native_resume.verified_baseline(stream.thread_id, terminal)
+        native = continuation.native_resume if continuation else None
+        evidence: CodexUsageBaseline | NativeUsageUnavailable | None = (
+            continuation.usage_baseline if continuation else None
+        )
+        if native is not None:
+            if isinstance(native, NativeUsageUnavailable):
+                evidence = native
+            elif returncode == 0 and stream.single_completed_turn:
+                evidence = native.verified_baseline(stream.thread_id, terminal)
+            else:
+                evidence = NativeUsageUnavailable("Codex did not report exactly one completed turn")
+        baseline = evidence if isinstance(evidence, CodexUsageBaseline) else None
         usage = continued_usage_delta(baseline, terminal) if continuation else terminal
+        usage_warning = None
+        if native is not None and returncode == 0 and not stream.is_error and usage["input_tokens"] is None:
+            reason = (
+                evidence.reason if isinstance(evidence, NativeUsageUnavailable) else "invalid per-launch token delta"
+            )
+            usage_warning = f"Token usage is unknown for this resume ({reason})."
         return HeadlessResult(
             label=request.label,
             stdout=stream.final_text,
@@ -179,6 +197,7 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
             cached_tokens=usage["cached_tokens"],
             terminal_usage=terminal if continuation else None,
             inherited_usage=baseline.as_dict() if baseline else None,
+            usage_warning=usage_warning,
             # Parsed iff the stream yielded recognizable terminal events; a failed turn
             # (is_error) still parsed. An empty/garbage stream -> False, stdout "".
             envelope_parsed=bool(stream.final_text) or stream.input_tokens is not None or stream.is_error,

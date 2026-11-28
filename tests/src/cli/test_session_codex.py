@@ -896,12 +896,14 @@ class TestCodexCliRendering:
         assert "Context delivery: SessionStart hook" in out
 
     def test_resume_success_render(self, capsys: pytest.CaptureFixture[str]) -> None:
+        warning = "Token usage is unknown for this resume (the thread was forked)."
         result = CodexSessionResumeResult(
             session="impl",
             thread_id=_TID,
             root_run_id="run-2",
             codex=_headless(stdout="Done"),
             rollout_path=None,
+            warnings=(warning,),
         )
         with patch("forge.cli.session_codex.continue_codex_session", return_value=result):
             code = resume_codex_session(name="impl", task="t", sandbox="workspace-write")
@@ -909,6 +911,7 @@ class TestCodexCliRendering:
         assert code == 0
         out = capsys.readouterr().out
         assert "Resumed Codex session" in out and _TID in out and "Done" in out
+        assert warning in out
 
     def test_resume_op_error_exits_one(self, capsys: pytest.CaptureFixture[str]) -> None:
         with patch(

@@ -119,6 +119,7 @@ class HeadlessResult:
     inherited_usage: dict[str, int | None] | None = None
     terminal_usage: dict[str, int | None] | None = None
     codex_turn_completed: bool = False
+    usage_warning: str | None = None
 
     @property
     def success(self) -> bool:

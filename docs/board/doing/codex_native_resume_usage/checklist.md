@@ -9,8 +9,9 @@
   credentials. [Verification procedure](../../../developer/verification.md#codex-runtime-consumer-lanes-and-supervision)
 - [x] On one bound thread per run, started a session, rejected an unavailable model before generation, restored the
   original model, and ran two successful resumes. The rejection reported `model_not_found`, emitted no terminal usage,
-  and appended no request tokens. The first success recalled the word from the original turn. Codex can replay item
-  events before `turn.started`, so rejection evidence is scoped to the attempted turn.
+  and appended no request tokens. The follow-up run captured item types. Two `error` items preceded `turn.started` on
+  rejection, one on recovery and none on the next resume. Every `agent_message` followed the turn start, including the
+  answer that recalled the original word.
 - [x] Captured each launch's raw JSONL usage, independent rollout samples, appended request sums, matching ledger event
   and attempt, and CLI activity totals. Both successful resumes had a nonzero cached baseline. On every success the
   terminal matched the ending rollout, and the rollout delta matched the new request sum in all three fields.
@@ -26,8 +27,14 @@
   records when present. Reuse the fork reader's token-count semantics and subtract once for both telemetry writers.
   [Native resume reader][reader] · [Shared counter calculation][delta]
 - [x] Leave the entire token triplet unknown when evidence is incomplete or contradictory. Direct resume keeps its
-  existing admission, exit status and thread-drift recovery. Direct compacted histories remain launchable with unknown
-  usage. The live measurement covers the subscription route on 0.172.0.
+  existing admission, exit status and thread-drift recovery. A successful unmeasured resume reports the reason. Forked
+  threads and threads with any prior compaction remain launchable with unknown usage.
+  [Post-compaction measurement proposal](../../proposed/codex_resume_usage_after_compaction/card.md)
+- [x] `forge telemetry activity` counts unmeasured direct launches on the command row. The fresh subscription run
+  reported three resumes, one with unknown tokens. The row's `errors` counts verb and session errors, while Codex
+  records its rejection as a failed worker.
+- [x] Removed nine individual guard predicates in isolated copies. Each removal failed its intended assertion, covering
+  process exit, stream turn count, stale or overlapping turn IDs, subagent identity and impossible cached usage.
 
 | Test                            | Fixture                                                                                                       | Assertion                                                                                                           | Test file                                                           |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
@@ -46,11 +53,13 @@
 - [x] Documented per-launch and historical reporting in the [telemetry design](../../../design_telemetry.md) and
   [session guide](../../../end-user/session.md#derive-a-codex-session-from-a-claude-parent-cross-runtime). Ordinary
   historical rows lack the baseline needed for a reliable backfill.
-- [x] The two-worker runs passed all 12,166 unit tests and 2,761 regressions. The four-worker regression run missed one
-  retry in the supervisor deadline test, which also passed in isolation. `make pre-commit` passed, including the
-  repository-wide Markdown link audit.
-- [ ] At merge, record the shipped revision and historical cutover in the [change log](../../change_log.md) and move the
-  card to `done/`.
+- [x] Verified both Python CI lanes and test-selection parity on rerun. The initial 3.11 failure expected one of two
+  valid refusal messages when a session was replaced during deletion.
+  [Independent test fix](https://github.com/hapa1i/multi-forge/pull/313)
+- [x] Verified the CLI activity display and signed-in native lifecycle alongside the managed proxy controls. The
+  [implementation PR](https://github.com/hapa1i/multi-forge/pull/312) records the aggregate test and hook results.
+- [ ] At merge, record the squash-merge commit or first shipped release in the [change log](../../change_log.md) and
+  [telemetry design](../../../design_telemetry.md) as the historical cutover. Move the card to `done/`.
 
 [delta]: ../../../../src/forge/core/runtime/codex_usage.py
 [fork-test]: ../../../../tests/regression/test_bug_codex_fork_inherited_usage.py

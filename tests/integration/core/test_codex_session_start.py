@@ -265,10 +265,10 @@ def test_start_then_resume_codex_session_real_turns(tmp_path: Path, monkeypatch:
     assert again.codex.success, again.codex.stderr
     assert again.thread_id == result.thread_id
     measurement.check_activity()
+    # The receipt rules out agent messages before turn.started on this launch.
     assert "PERSIMMON" in resume.codex.stdout.upper(), resume.codex.stdout
-    assert not rejected.codex.success and rejected.thread_id == result.thread_id
+    assert rejection["status"] == "error" and rejected.thread_id == result.thread_id
     assert bad_model in (parse_codex_jsonl_stream(rejection_stdout).error_message or rejected.codex.stderr)
     assert "turn.failed" in rejection["stream_events"] and rejection["terminal_usage"] is None
-    # A resume can replay historical item.completed events before turn.started.
     assert rejection["after"]["request_usage_sum"] is None
     assert rejection["after"]["total_token_usage"] == rejection["before"]["total_token_usage"]

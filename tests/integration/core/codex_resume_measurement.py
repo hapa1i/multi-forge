@@ -102,6 +102,11 @@ class NativeResumeMeasurement:
     ) -> dict[str, Any]:
         stream = [json.loads(line) for line in stdout.splitlines() if line.strip()]
         terminals = [row["usage"] for row in stream if row.get("type") == "turn.completed" and row.get("usage")]
+        items = [
+            {"event_index": i, "item_type": entry["item"]["type"]}
+            for i, entry in enumerate(stream)
+            if isinstance(entry.get("item"), dict)
+        ]
         row = {
             "launch": label,
             "root_run_id": launch.root_run_id,
@@ -110,6 +115,7 @@ class NativeResumeMeasurement:
             "returned_thread_id": launch.codex.runtime_session_id,
             "returncode": launch.codex.returncode,
             "stream_events": [r["type"] for r in stream],
+            "stream_items": items,
             "before": before,
             "terminal_usage": ({key: terminals[-1].get(key) for key in _FIELDS} if terminals else None),
             "after": (
@@ -121,6 +127,9 @@ class NativeResumeMeasurement:
         self.receipt["launches"].append(row)
         self._save()
         assert len(terminals) <= 1
+        # A rejected request can end before a turn starts.
+        turn_start = next((i for i, entry in enumerate(stream) if entry["type"] == "turn.started"), len(stream))
+        assert all(item["event_index"] > turn_start for item in items if item["item_type"] == "agent_message")
         (event,) = (e for e in read_usage_events(root_run_id=launch.root_run_id) if e.route == "codex_exec")
         (attempt,) = read_downstream_records(forge_run_id=event.run_id, kind="attempt")
         row.update(
@@ -138,7 +147,8 @@ class NativeResumeMeasurement:
         assert attempt.reporter == event.reporter == "codex_jsonl"
         assert attempt.cost_micros is None and event.cost_micro_usd is None
         assert event.confidence == "unavailable" and event.measurement_source == "runtime_native"
-        assert attempt.failed == (not launch.codex.success)
+        assert attempt.failed == (not launch.codex.success or launch.codex.runtime_is_error)
+        assert attempt.failed == (event.status != "success")
         return row
 
     def check_activity(self) -> None:
@@ -167,7 +177,7 @@ def _check_launch_totals(launches: list[dict[str, Any]], activity: dict[str, Any
             assert row["returned_thread_id"] == post["thread_id"]
             assert post["model_provider"] == "openai"
             assert post["sample_offset"] >= (pre["bytes"] if pre else 0)
-            assert row["terminal_usage"] in (post["total_token_usage"], delta)
+            assert row["terminal_usage"] == post["total_token_usage"]
             for key, observed in (post["request_usage_sum"] or {}).items():
                 if observed is not None:
                     assert observed == delta[key], (row["launch"], key)
@@ -187,6 +197,7 @@ def _check_launch_totals(launches: list[dict[str, Any]], activity: dict[str, Any
             assert command_row["input_tokens"] == expected["input_tokens"]
             assert command_row["cached_tokens"] == expected["cached_input_tokens"]
             assert command_row["output_tokens"] == expected["output_tokens"]
+            assert command_row["unknown_token_launches"] == (1 if command_row["command"] == "codex-resume" else 0)
     assert not by_command
     assert activity["total_input_tokens"] == totals["input_tokens"]
     assert activity["total_output_tokens"] == totals["output_tokens"]

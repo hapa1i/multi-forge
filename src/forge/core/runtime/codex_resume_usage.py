@@ -8,8 +8,24 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, BinaryIO
 
-from forge.core.runtime.codex_rollouts import decode_rollout_row, open_bound_rollout
+from forge.core.runtime.codex_rollouts import (
+    RolloutEvidenceError,
+    decode_rollout_row,
+    open_bound_rollout,
+)
 from forge.core.runtime.codex_usage import CodexUsageBaseline
+
+
+@dataclass(frozen=True)
+class NativeUsageUnavailable:
+    reason: str
+
+    @classmethod
+    def from_error(cls, error: Exception) -> NativeUsageUnavailable:
+        if isinstance(error, RolloutEvidenceError):
+            return cls(str(error))
+        # OS, path-resolution and decoder exceptions can contain private paths or native output.
+        return cls("the native rollout could not be read or decoded")
 
 
 @dataclass(frozen=True)
@@ -26,38 +42,42 @@ class NativeResumeSnapshot:
 
     def verified_baseline(
         self, returned_thread: str | None, terminal: dict[str, int | None]
-    ) -> CodexUsageBaseline | None:
+    ) -> CodexUsageBaseline | NativeUsageUnavailable:
         """Return the baseline only when a new sample independently corroborates the terminal counters."""
         if returned_thread != self.thread_id:
-            return None
+            return NativeUsageUnavailable("Codex did not confirm the resumed thread ID")
         try:
             with open_bound_rollout(self.thread_id, str(self.path)) as (
                 _,
                 stream,
                 metadata,
             ):
-                if self.file_id != (metadata.st_dev, metadata.st_ino) or metadata.st_size <= self.offset:
-                    return None
+                if self.file_id != (metadata.st_dev, metadata.st_ino) or metadata.st_size < self.offset:
+                    return NativeUsageUnavailable("the bound rollout was replaced or truncated")
+                if metadata.st_size == self.offset:
+                    return NativeUsageUnavailable("the rollout has no new token sample")
                 # Use bounded chunks for the old bytes; only the suffix needs JSON decoding.
                 digest = hashlib.sha256()
                 remaining = self.offset
                 while remaining:
                     chunk = stream.read(min(remaining, 1024 * 1024))
                     if not chunk:
-                        return None
+                        return NativeUsageUnavailable("the bound rollout was truncated")
                     digest.update(chunk)
                     remaining -= len(chunk)
                 if digest.digest() != self.prefix_sha256:
-                    return None
+                    return NativeUsageUnavailable("the rollout prefix changed during the resume")
                 after, turn = _samples(_records(stream), self.thread_id, baseline=self.baseline)
-                if after is None or turn is None or turn == self.previous_turn or after.as_dict() != terminal:
-                    return None
+                if after is None or turn is None or turn == self.previous_turn:
+                    return NativeUsageUnavailable("the rollout has no verifiable token sample for a new turn")
+                if after.as_dict() != terminal:
+                    return NativeUsageUnavailable("the reported terminal counters do not match the rollout totals")
                 return self.baseline
-        except (OSError, ValueError, RuntimeError):
-            return None
+        except (OSError, ValueError, RuntimeError) as error:
+            return NativeUsageUnavailable.from_error(error)
 
 
-def capture_native_resume(thread_id: str, bound_path: str | None) -> NativeResumeSnapshot | None:
+def capture_native_resume(thread_id: str, bound_path: str | None) -> NativeResumeSnapshot | NativeUsageUnavailable:
     """Capture best-effort accounting evidence; a direct launch never depends on a readable rollout."""
     try:
         with open_bound_rollout(thread_id, bound_path) as (path, stream, metadata):
@@ -65,12 +85,14 @@ def capture_native_resume(thread_id: str, bound_path: str | None) -> NativeResum
             rows = _records(stream, digest.update)
             kind, header = next(rows, ("", {}))
             if kind != "session_meta" or header.get("id") != thread_id or header.get("model_provider") != "openai":
-                return None
-            if header.get("session_id", thread_id) != thread_id or header.get("history_base") is not None:
-                return None
+                return NativeUsageUnavailable("the rollout does not identify the expected native OpenAI thread")
+            if header.get("session_id", thread_id) != thread_id:
+                return NativeUsageUnavailable("the rollout belongs to a subagent session")
+            if header.get("history_base") is not None:
+                return NativeUsageUnavailable("the thread was forked")
             baseline, turn = _samples(rows, thread_id)
             if baseline is None:
-                return None
+                return NativeUsageUnavailable("the pre-launch rollout has no verifiable token sample")
             return NativeResumeSnapshot(
                 thread_id,
                 path,
@@ -80,8 +102,8 @@ def capture_native_resume(thread_id: str, bound_path: str | None) -> NativeResum
                 baseline,
                 turn,
             )
-    except (OSError, ValueError, RuntimeError):
-        return None
+    except (OSError, ValueError, RuntimeError) as error:
+        return NativeUsageUnavailable.from_error(error)
 
 
 def _records(
@@ -109,16 +131,15 @@ def _samples(
     for kind, payload in rows:
         event = payload.get("type") if kind == "event_msg" else None
         if kind == "event_msg" and not isinstance(event, str):
-            raise ValueError("Malformed rollout event type")
-        if kind in {"compacted", "session_meta"} or event in {
-            "thread_rolled_back",
-            "context_compacted",
-        }:
-            raise ValueError("Rollout counter history changed")
+            raise RolloutEvidenceError("malformed rollout event type")
+        if kind == "compacted" or event == "context_compacted":
+            raise RolloutEvidenceError("the thread history contains compaction")
+        if kind == "session_meta" or event == "thread_rolled_back":
+            raise RolloutEvidenceError("the rollout counter history changed")
         if event == "thread_settings_applied":
             settings = payload.get("thread_settings")
             if isinstance(settings, dict) and settings.get("model_provider_id", "openai") != "openai":
-                raise ValueError("Rollout changed provider")
+                raise RolloutEvidenceError("rollout changed provider")
         observed = _record_turn(kind, event, payload, thread)
         if baseline is None:
             # Some clients omit lifecycle records. When an explicit start is still open, its usage may arrive late.
@@ -128,22 +149,22 @@ def _samples(
                 pending_turn = None
         else:
             if event in {"turn_aborted", "error"} or (event == "task_complete" and payload.get("error") is not None):
-                raise ValueError("Native turn did not complete successfully")
+                raise RolloutEvidenceError("native turn did not complete successfully")
             if (event == "task_started" and turn is not None) or (
                 closed and (observed is not None or event == "token_count")
             ):
-                raise ValueError("More than one native turn in the launch window")
+                raise RolloutEvidenceError("more than one native turn in the launch window")
             closed |= event == "task_complete"
         if observed is not None:
             if baseline is not None and turn is not None and observed != turn:
-                raise ValueError("Ambiguous turn in rollout window")
+                raise RolloutEvidenceError("ambiguous turn in rollout window")
             turn = observed
         if kind == "token_usage_record":
             latest = None  # Wait for the corresponding total before accepting a new baseline.
             if baseline is not None:
                 usage = CodexUsageBaseline.from_total_usage(payload.get("usage"))
                 if usage is None or observed is None or usage.cached_tokens > usage.input_tokens:
-                    raise ValueError("Unverifiable request usage")
+                    raise RolloutEvidenceError("unverifiable request usage")
                 expected = expected_from_requests or baseline
                 expected_from_requests = CodexUsageBaseline(
                     expected.input_tokens + usage.input_tokens,
@@ -155,19 +176,21 @@ def _samples(
         elif event == "token_count" and payload.get("info") is not None:
             sample = CodexUsageBaseline.from_token_info(payload["info"])
             if sample is None or sample.cached_tokens > sample.input_tokens:
-                raise ValueError("Malformed native token sample")
+                raise RolloutEvidenceError("malformed native token sample")
             if baseline is not None and turn is None and sample != baseline:
-                raise ValueError("Usage changed before the resumed turn was identified")
+                raise RolloutEvidenceError("usage changed before the resumed turn was identified")
             if previous and (
                 sample.input_tokens < previous.input_tokens
                 or sample.output_tokens < previous.output_tokens
                 or sample.cached_tokens < previous.cached_tokens
             ):
-                raise ValueError("Native counter series decreased")
+                raise RolloutEvidenceError("native counter series decreased")
             previous = sample
             latest = sample if baseline is None or turn is not None else None
-    if pending_turn is not None or (expected_from_requests is not None and latest != expected_from_requests):
-        return None, turn
+    if pending_turn is not None:
+        raise RolloutEvidenceError("the preceding native turn is still open")
+    if expected_from_requests is not None and latest != expected_from_requests:
+        raise RolloutEvidenceError("the rollout total does not match its request usage")
     return latest, turn
 
 
@@ -192,10 +215,10 @@ def _record_turn(kind: str, event: str | None, payload: dict[str, Any], thread: 
     }:
         return None
     if payload.get("thread_id", thread) != thread or payload.get("session_id", thread) != thread:
-        raise ValueError("Rollout record belongs to another thread")
+        raise RolloutEvidenceError("rollout record belongs to another thread")
     observed = payload.get("turn_id")
     if observed is not None and (
         not isinstance(observed, str) or not observed or payload.get("root_turn_id", observed) != observed
     ):
-        raise ValueError("Unverifiable foreground turn identity")
+        raise RolloutEvidenceError("unverifiable foreground turn identity")
     return observed

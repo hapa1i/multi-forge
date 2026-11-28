@@ -106,6 +106,8 @@ def _resume(
     append: str,
     terminal: _TokenCounts | None,
     thread_id: str = _SUCCESS_TID,
+    returncode: int = 0,
+    repeat_terminal: bool = False,
 ) -> CodexSessionResumeResult:
     end = (
         {"type": "turn.completed", "usage": _usage(terminal)}
@@ -121,6 +123,8 @@ def _resume(
         },
         end,
     ]
+    if repeat_terminal:
+        events.append(end)
     stream = "\n".join(json.dumps(event) for event in events)
     # The child mutates the rollout only after spawn, between Forge's two observations.
     script = """
@@ -135,7 +139,7 @@ sys.exit(int(status))
 
     def scripted_launch(argv, env, *, cwd):
         assert argv[-2:] == ["resume", _SUCCESS_TID]
-        return [sys.executable, "-c", script, str(path), append, stream, str(int(terminal is None))]
+        return [sys.executable, "-c", script, str(path), append, stream, str(returncode)]
 
     monkeypatch.setattr("forge.core.invoker.codex.prepare_executor_launch", scripted_launch)
     return continue_codex_session(ctx=ctx, name="impl", task="Continue")
@@ -155,11 +159,33 @@ def _assert_accounting(
 
 def test_partial_failure_excluded_from_next_launch(adopted, monkeypatch):
     ctx, path = adopted
-    failed = _resume(ctx, path, monkeypatch, append=_turn((130, 25, 12), (30, 5, 2), failed=True), terminal=None)
+    failed = _resume(
+        ctx, path, monkeypatch, append=_turn((130, 25, 12), (30, 5, 2), failed=True), terminal=None, returncode=1
+    )
     _assert_accounting(failed, _UNKNOWN, failed=True)
 
     succeeded = _resume(ctx, path, monkeypatch, append=_turn((160, 35, 16), (30, 10, 4)), terminal=(160, 35, 16))
     _assert_accounting(succeeded, (30, 10, 4))
+    assert not any("Token usage is unknown" in message for message in succeeded.warnings)
+
+
+@pytest.mark.parametrize(
+    "returncode,repeat_terminal",
+    [pytest.param(1, False, id="nonzero-exit"), pytest.param(0, True, id="two-terminals")],
+)
+def test_corroborated_rollout_still_requires_one_successful_turn(adopted, monkeypatch, returncode, repeat_terminal):
+    ctx, path = adopted
+    total = (130, 25, 12)
+    result = _resume(
+        ctx,
+        path,
+        monkeypatch,
+        append=_turn(total, (30, 5, 2)),
+        terminal=total,
+        returncode=returncode,
+        repeat_terminal=repeat_terminal,
+    )
+    _assert_accounting(result, _UNKNOWN, failed=returncode != 0)
 
 
 def test_new_zero_delta_requires_a_fresh_sample(adopted, monkeypatch):
@@ -192,6 +218,8 @@ def test_uncertain_accounting_preserves_the_resume(adopted, monkeypatch, conditi
         thread_id=thread,
     )
     _assert_accounting(result, _UNKNOWN)
+    if condition == "per-launch":
+        assert any("terminal counters do not match the rollout totals" in message for message in result.warnings)
     if condition == "drift":
         assert any("drifted" in message for message in result.warnings)
         manager = SessionManager()

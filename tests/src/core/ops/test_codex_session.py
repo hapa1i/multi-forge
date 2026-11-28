@@ -844,6 +844,40 @@ def _seed_codex_session(proj: Path, name: str = "impl", thread_id: str | None = 
 
 
 class TestContinueCodexSession:
+    @pytest.mark.parametrize(
+        "history,reason",
+        [
+            ("forked", "the thread was forked"),
+            ("compacted", "the thread history contains compaction"),
+            ("missing-home", "the native rollout could not be read or decoded"),
+        ],
+    )
+    def test_unknown_usage_reports_reason_after_success(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, history: str, reason: str
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        _seed_codex_session(proj)
+        home = tmp_path / "private-native-store"
+        monkeypatch.setenv("CODEX_HOME", str(home))
+        if history != "missing-home":
+            day = home / "sessions/2026/06/10"
+            day.mkdir(parents=True)
+            header = {"id": _SUCCESS_TID, "model_provider": "openai"}
+            if history == "forked":
+                header["history_base"] = "private-source"
+            rows = [{"type": "session_meta", "payload": header}]
+            if history == "compacted":
+                rows.append({"type": "compacted", "payload": {"message": "private-summary"}})
+            path = day / f"rollout-2026-06-10T12-00-00-{_SUCCESS_TID}.jsonl"
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+
+        with _codex_mocks():
+            result = continue_codex_session(ctx=ctx, name="impl", task="Keep going")
+
+        assert result.codex.success and result.codex.stdout == "OK"
+        assert result.codex.input_tokens is None
+        assert result.warnings == (f"Token usage is unknown for this resume ({reason}).",)
+
     def test_missing_recorded_worktree_refuses_before_preflight_or_mutation(
         self,
         tmp_path: Path,
@@ -952,6 +986,7 @@ class TestContinueCodexSession:
         assert result.codex.success
         assert result.thread_id == _SUCCESS_TID
         assert result.warnings == (
+            "Token usage is unknown for this resume (the bound rollout is missing or ambiguous).",
             "Session 'impl' was deleted while Codex was running; skipped post-exit manifest update.",
         )
         store = SessionStore(str(proj), "impl")

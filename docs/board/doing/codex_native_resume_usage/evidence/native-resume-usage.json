@@ -8,7 +8,7 @@
   "activity_command": "forge telemetry activity impl --period all --json",
   "method": "One isolated thread per run. Before and after reference independently read rollout snapshots by EOF byte offset. The last total comes from event_msg.token_count.info.total_token_usage. Terminal usage comes from raw JSONL turn.completed.usage. Request sums use only token_usage_record.usage appended during the launch. Forge per-launch cached_tokens is shown as cached_input_tokens. The mocked transfer-curate event contributes 350 input and 80 output tokens to session activity.",
   "reproduced_before_correction": {
-    "capture": "Runtime at b97f47b7. The lifecycle test captured the start and model rejection. A temporary driver then invoked the same Forge continuation operation twice on that saved thread after the test exposed replayed item events before turn.started.",
+    "capture": "Runtime at b97f47b7. The lifecycle test captured the start and model rejection. A temporary driver invoked the same Forge continuation operation twice on that thread. This capture retained event types only, so the pre-turn items cannot be identified.",
     "thread_id": "01a22299-a4be-7e10-897c-feec8de439b4",
     "rollout_samples": [
       {
@@ -569,6 +569,192 @@
         "cached_input_tokens": 70016,
         "output_tokens": 101
       }
+    }
+  },
+  "stream_and_activity_verification": {
+    "capture": "Independent subscription run on the same Codex version. Each item points to its zero-based index in stream_events. Message text is omitted. The activity row's errors count covers verb and session errors. A failed Codex worker is visible in its launch status.",
+    "thread_id": "01a222e4-9245-7c42-8211-63697c7d6c9d",
+    "launches": [
+      {
+        "launch": "start",
+        "ts": "2026-11-28T16:02:19Z",
+        "run_id": "run_25bedb585894",
+        "status": "success",
+        "stream_events": [
+          "thread.started",
+          "turn.started",
+          "item.completed",
+          "turn.completed"
+        ],
+        "stream_items": [
+          {
+            "event_index": 2,
+            "item_type": "agent_message"
+          }
+        ],
+        "pre_launch_total": null,
+        "terminal_usage": {
+          "input_tokens": 18809,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "post_launch_total": {
+          "input_tokens": 18809,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "new_request_usage_sum": {
+          "input_tokens": 18809,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "recorded_event_and_attempt": {
+          "input_tokens": 18809,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        }
+      },
+      {
+        "launch": "rejected-model",
+        "ts": "2026-11-28T16:02:26Z",
+        "run_id": "run_d84349b3cc45",
+        "status": "error",
+        "stream_events": [
+          "thread.started",
+          "item.completed",
+          "item.completed",
+          "turn.started",
+          "error",
+          "turn.failed"
+        ],
+        "stream_items": [
+          {
+            "event_index": 1,
+            "item_type": "error"
+          },
+          {
+            "event_index": 2,
+            "item_type": "error"
+          }
+        ],
+        "pre_launch_total": {
+          "input_tokens": 18809,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "terminal_usage": null,
+        "post_launch_total": {
+          "input_tokens": 18809,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "new_request_usage_sum": null,
+        "recorded_event_and_attempt": {
+          "input_tokens": null,
+          "cached_input_tokens": null,
+          "output_tokens": null
+        }
+      },
+      {
+        "launch": "first-successful-resume",
+        "ts": "2026-11-28T16:02:35Z",
+        "run_id": "run_8236d5fb6583",
+        "status": "success",
+        "stream_events": [
+          "thread.started",
+          "item.completed",
+          "turn.started",
+          "item.completed",
+          "turn.completed"
+        ],
+        "stream_items": [
+          {
+            "event_index": 1,
+            "item_type": "error"
+          },
+          {
+            "event_index": 3,
+            "item_type": "agent_message"
+          }
+        ],
+        "pre_launch_total": {
+          "input_tokens": 18809,
+          "cached_input_tokens": 13952,
+          "output_tokens": 5
+        },
+        "terminal_usage": {
+          "input_tokens": 60974,
+          "cached_input_tokens": 32512,
+          "output_tokens": 13
+        },
+        "post_launch_total": {
+          "input_tokens": 60974,
+          "cached_input_tokens": 32512,
+          "output_tokens": 13
+        },
+        "new_request_usage_sum": {
+          "input_tokens": 42165,
+          "cached_input_tokens": 18560,
+          "output_tokens": 8
+        },
+        "recorded_event_and_attempt": {
+          "input_tokens": 42165,
+          "cached_input_tokens": 18560,
+          "output_tokens": 8
+        }
+      },
+      {
+        "launch": "second-successful-resume",
+        "ts": "2026-11-28T16:02:44Z",
+        "run_id": "run_5b80f3953a69",
+        "status": "success",
+        "stream_events": [
+          "thread.started",
+          "turn.started",
+          "item.completed",
+          "turn.completed"
+        ],
+        "stream_items": [
+          {
+            "event_index": 2,
+            "item_type": "agent_message"
+          }
+        ],
+        "pre_launch_total": {
+          "input_tokens": 60974,
+          "cached_input_tokens": 32512,
+          "output_tokens": 13
+        },
+        "terminal_usage": {
+          "input_tokens": 103158,
+          "cached_input_tokens": 74624,
+          "output_tokens": 21
+        },
+        "post_launch_total": {
+          "input_tokens": 103158,
+          "cached_input_tokens": 74624,
+          "output_tokens": 21
+        },
+        "new_request_usage_sum": {
+          "input_tokens": 42184,
+          "cached_input_tokens": 42112,
+          "output_tokens": 8
+        },
+        "recorded_event_and_attempt": {
+          "input_tokens": 42184,
+          "cached_input_tokens": 42112,
+          "output_tokens": 8
+        }
+      }
+    ],
+    "resume_activity_row": {
+      "command": "codex-resume",
+      "attempts": 3,
+      "errors": 0,
+      "input_tokens": 84349,
+      "cached_tokens": 60672,
+      "output_tokens": 16,
+      "unknown_token_launches": 1
     }
   }
 }
