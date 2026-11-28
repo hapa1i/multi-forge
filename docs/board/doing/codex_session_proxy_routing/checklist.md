@@ -49,6 +49,16 @@ live verification dependency is a 0.162.1 home with operator-enrolled turn and S
   launch banners, session details, model reports and journal history.
 - [x] Attribute headless tokens and proxy charges once and resolve TUI spend through the instance's own launches.
   Exercise identically named sessions across projects and after recreation.
+- [x] Retry a delayed dispatch through the public resume command. The first retry sent zero requests. Once the record
+  was visible, the same command continued the original thread. Verify that two resumes planned from one predecessor can
+  publish only one new commitment.
+- [x] Show unavailable routing and activity evidence in human and JSON reports. Verify that a v2 downstream reader still
+  counts charged attempts carrying the Codex turn reference.
+- [x] Refuse occupied session names before starting a template proxy, show the bound proxy in advisory enrollment
+  guidance, and cover failure of the live enrollment probe.
+
+Direct native resume counters need a separate measurement.
+[Proposed follow-up](../../proposed/codex_native_resume_usage/card.md)
 
 ## Acceptance fixtures
 
@@ -62,10 +72,10 @@ live verification dependency is a 0.162.1 home with operator-enrolled turn and S
 
 ## Closeout
 
-[PR #311](https://github.com/hapa1i/multi-forge/pull/311) is open for review. The final unit suite passed 12,110 tests,
-the regression suite passed 2,740, and `make pre-commit` passed all hooks.
+[PR #311](https://github.com/hapa1i/multi-forge/pull/311) is open for review. The unit suite passed 12,126 tests, the
+regression suite passed 2,751, and `make pre-commit` passed all hooks.
 
-The managed CLI, reports, Responses proxy and transfer fixtures passed all 51 Docker-harness tests. The metered headless
+The managed CLI, reports, Responses proxy and transfer fixtures passed all 53 Docker-harness tests. The metered headless
 fixture also verified two cost records for one tool turn, per-launch JSONL tokens, and a rejected create after reaching
 the shared cap.
 
