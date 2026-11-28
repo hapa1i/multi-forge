@@ -15,6 +15,50 @@ REQUESTED = "uncatalogued/example:latest"
 MAPPED = "uncatalogued/fallback"
 
 
+@pytest.mark.parametrize(
+    "name,slug",
+    [
+        ("gemini-neon", "google/gemini-4-neon"),
+        ("gemini-hydrogen", "google/gemini-4-hydrogen"),
+        ("gemini-carbon", "google/gemini-4-carbon"),
+        ("gemini-argon", "google/gemini-4-argon"),
+        ("gemini-4-neon", "google/gemini-4-neon"),
+        ("astra", "openai/gpt-6.2-astra"),
+    ],
+)
+def test_openrouter_catalog_model_argument(name, slug):
+    assert launch.expand_openrouter_model_arg(("-m", name)) == ("-m", slug)
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["google/gemini-4-neon", "custom/gemini-neon:free", "private-deployment", "gemini-3.1-pro-preview-customtools"],
+)
+def test_full_slugs_and_names_without_an_openrouter_route_remain_literal(name):
+    args = (f"--model={name}",)
+    assert launch.expand_openrouter_model_arg(args) == args
+
+
+def test_only_the_winning_model_option_is_expanded():
+    prior = ("-c", 'model="gemini-carbon"')
+    config = "--config=model='gemini-neon'"
+    tail = ("--", "-m", "gemini-argon")
+    assert launch.expand_openrouter_model_arg((*prior, config, *tail)) == (
+        *prior,
+        "-c",
+        'model="google/gemini-4-neon"',
+        *tail,
+    )
+    assert launch.expand_openrouter_model_arg((*prior, "-m=gemini-hydrogen", config, *tail)) == (
+        *prior,
+        "-m",
+        "google/gemini-4-hydrogen",
+        config,
+        *tail,
+    )
+    assert launch.expand_openrouter_model_arg(("gemini-neon", *tail)) == ("gemini-neon", *tail)
+
+
 @pytest.fixture
 def proxy(monkeypatch):
     pf = CodexPreflight(

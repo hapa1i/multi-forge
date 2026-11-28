@@ -651,8 +651,9 @@ rejects Codex manifests. The CLI accepts `--runtime claude|codex` but manifests 
   `-c model_providers.forge_proxy.{base_url,wire_api=responses,env_key}` overrides (never `--strict-config`); a custom
   provider means Codex needs no OpenAI login.
 - The child receives a loopback token. Forge strips Codex, OpenAI and OpenRouter credentials and session/run-tree
-  identity, and advances `FORGE_DEPTH`. Direct OpenRouter launches use the verified proxy's ZDR policy and report the
-  requested and dispatched model for a fallback. [Sessionless Codex](end-user/codex_proxy.md)
+  identity, and advances `FORGE_DEPTH`. For direct OpenRouter, the launcher expands explicit unqualified catalog names
+  with an OpenRouter route to that route's model slug. It passes the requested slug to Codex and reports the dispatched
+  slug if the verified proxy's ZDR policy selects a fallback. [Sessionless Codex](end-user/codex_proxy.md)
 - Hard-blocks a codex older than the proxy-contract-validated version (`0.141.0`) *before* starting a proxy.
 
 **Subprocess proxy launch variant** (`forge session start --subprocess-proxy <proxy_id>`):

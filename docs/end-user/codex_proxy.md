@@ -7,6 +7,7 @@ running proxy's identity and Responses capability before launching.
 ```bash
 forge codex start --proxy codex-responses-openrouter
 forge codex start --proxy <id>
+forge codex start --proxy <id> -- -m gemini-neon
 forge codex start --proxy <id> -- -m google/gemini-4-neon
 forge codex start --proxy codex-responses-local --sandbox read-only
 ```
@@ -14,9 +15,13 @@ forge codex start --proxy codex-responses-local --sandbox read-only
 Every direct OpenRouter proxy serves Claude Code on `/v1/messages` and Codex on `/v1/responses` at the same port. Claude
 keeps the saved tier mappings, alternatives and overrides. Codex defaults to the model in the proxy's default tier. For
 example, the Gemini template selects `google/gemini-4-neon`, and `codex-responses-openrouter` selects
-`openai/gpt-6.2-astra`. After `--`, use the full OpenRouter slug with `-m` or a top-level `-c model=...` override. An
-explicit `-m` takes precedence. Codex can warn about missing built-in model metadata for an unfamiliar slug. The proxy
-uses `OPENROUTER_API_KEY` from the environment or active Forge credential profile.
+`openai/gpt-6.2-astra`. To override it, pass `-m` or a top-level `-c model=...` after `--`. An explicit `-m` takes
+precedence. For a catalog name with an OpenRouter route, Forge passes that route's slug to Codex. For example,
+`gemini-neon` selects `google/gemini-4-neon` on a direct OpenRouter proxy. You can also pass a full slug verbatim,
+including one outside Forge's catalog. On local LiteLLM, use the deployment name served by the backend.
+
+Codex can warn about missing built-in model metadata for an unfamiliar slug. The OpenRouter proxy uses
+`OPENROUTER_API_KEY` from the environment or active Forge credential profile.
 
 On direct OpenRouter launches, Forge sets `service_tier="default"` for this run. Codex omits the tier from upstream
 requests even if your personal config selects `priority`. To request another tier, pass it after `--`, for example

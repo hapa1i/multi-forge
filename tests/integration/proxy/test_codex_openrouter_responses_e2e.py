@@ -341,7 +341,11 @@ def test_recorded_layouts_and_cross_family_policy(local_responses_proxy, proxy_t
     [
         (
             "codex-responses-openrouter",
-            {"zdr_fallbacks": {slug: "google/gemini-4-carbon" for slug in ("openai/gpt-6.2-astra", "qwen/qwen4-max")}},
+            {
+                "zdr_fallbacks": dict.fromkeys(
+                    ("openai/gpt-6.2-astra", "qwen/qwen4-max", "google/gemini-4-neon"), "google/gemini-4-carbon"
+                )
+            },
         ),
         ("codex-responses-local", {}),
         ("openrouter-openai-codex", {}),
@@ -368,7 +372,16 @@ def test_template_name_launch_uses_verified_proxy(
     )
     child.chmod(0o700)
     monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ["PATH"])
-    for args in ([], ["--", "-m", "qwen/qwen4-max"]):
+    direct = proxy_template != "codex-responses-local"
+    default = {
+        "openrouter-openai-codex": "openai/gpt-5.3-codex",
+        "openrouter-gemini": "google/gemini-4-neon",
+    }.get(proxy_template, "openai/gpt-6.2-astra")
+    for args, expected_model in (
+        ([], default),
+        (["--", "-m", "qwen/qwen4-max"], "qwen/qwen4-max"),
+        (["--", "-m", "gemini-neon"], "google/gemini-4-neon" if direct else "gemini-neon"),
+    ):
         result = CliRunner().invoke(main, ["codex", "start", "--proxy", proxy_template, *args])
         if proxy_settings.get("backend") == "litellm-remote":
             assert result.exit_code == 1 and "Responses-capable proxy required" in result.output
@@ -376,7 +389,6 @@ def test_template_name_launch_uses_verified_proxy(
             continue
         assert result.exit_code == 0, result.output
         argv = json.loads(captured.read_bytes())
-        direct = proxy_template != "codex-responses-local"
         assert ('service_tier="default"' in argv) == direct
         assert ("--no-daemon" in argv) == direct
         assert ('web_search="disabled"' in argv) == (direct and not proxy_settings.get("allow_non_zdr"))
@@ -385,13 +397,9 @@ def test_template_name_launch_uses_verified_proxy(
         if proxy_settings.get("allow_non_zdr"):
             assert "hosted tools and caller-supplied routing" in result.output
             assert "Codex Responses requests have no body audit" in result.output
-        default = {
-            "openrouter-openai-codex": "openai/gpt-5.3-codex",
-            "openrouter-gemini": "google/gemini-4-neon",
-        }.get(proxy_template, "openai/gpt-6.2-astra")
-        assert argv[argv.index("-m") + 1] == ("qwen/qwen4-max" if args else default)
+        assert argv[argv.index("-m") + 1] == expected_model
         if proxy_template == "codex-responses-openrouter":
-            assert "dispatching google/gemini-4-carbon" in " ".join(result.output.split())
+            assert f"requested {expected_model}, dispatching google/gemini-4-carbon" in " ".join(result.output.split())
 
 
 def _attempt(request_id, proxy_id="codex-fixture"):
