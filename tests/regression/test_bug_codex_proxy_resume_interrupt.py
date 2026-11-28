@@ -14,6 +14,7 @@ from forge.core.invoker.types import HeadlessRequest
 from forge.core.ops.codex_session import continue_codex_session
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
+from forge.session import SessionStore
 from tests.src.core.ops.test_codex_replay import INITIAL, LAUNCH, Session
 from tests.src.core.ops.test_codex_session import _preflight
 
@@ -152,3 +153,42 @@ def test_post_run_update_keeps_a_concurrent_reconciliation(
     resume = continue_codex_session(ctx=ctx, name=session.store.session_name, task="continue")
     codex = session.store.read().confirmed.codex
     assert codex and codex.reconciled_run_id == resume.root_run_id and codex.pending_exit is None
+
+
+@pytest.mark.parametrize("retry_fails", [False, True])
+def test_interrupt_during_exit_receipt_write(
+    settled_session: Session, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, retry_fails: bool
+) -> None:
+    session = settled_session
+    ctx = ExecutionContext(session.root, session.root, session.root, session.root)
+    request = HeadlessRequest(argv=[sys.executable, "-c", "pass"], prompt="continue", env=os.environ.copy())
+    monkeypatch.setattr("forge.core.ops.codex_session.prepare_codex_request", lambda **kw: request)
+    interrupt = KeyboardInterrupt()
+    writes = []
+    update = SessionStore.update
+
+    def interrupted_update(store, **kwargs):
+        writes.append((store, kwargs))
+        if len(writes) == 1:
+            raise interrupt
+        if retry_fails:
+            raise OSError("receipt unavailable")
+        return update(store, **kwargs)
+
+    with monkeypatch.context() as child:
+        # Let the launch commit normally. Interrupt its first manifest write after the native exit.
+        child.setattr(
+            "forge.core.invoker.CodexHeadlessInvoker._emit",
+            lambda *args: child.setattr(SessionStore, "update", interrupted_update),
+        )
+        with pytest.raises(KeyboardInterrupt) as caught:
+            continue_codex_session(ctx=ctx, name=session.store.session_name, task="continue")
+    assert caught.value is interrupt
+    if retry_fails:
+        assert "Could not record Codex resume exit" in caplog.text
+        with pytest.raises(ForgeOpError, match="no verified post-exit evidence"):
+            session.replay()
+    else:
+        assert session.replay() == (INITIAL, "target-a")
+    assert len(writes) == 2 and writes[0] == writes[1]
+    assert writes[0][1]["expected_instance_id"] == session.instance

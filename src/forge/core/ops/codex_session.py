@@ -855,10 +855,18 @@ def _record_proxy_resume_exit(
             else:
                 record_proxy_exit(codex, projection.run_id, headless=result)
 
+    def persist_exit() -> None:
+        try:
+            store.update(timeout_s=5.0, mutate=record_exit, expected_instance_id=instance_id)
+        except Exception:
+            logger.exception("Could not record Codex resume exit for %s", store.session_name)
+
     try:
-        store.update(timeout_s=5.0, mutate=record_exit, expected_instance_id=instance_id)
-    except Exception:
-        logger.exception("Could not record Codex resume exit for %s", store.session_name)
+        persist_exit()
+    except KeyboardInterrupt:
+        # Ctrl+C can land while waiting for the manifest lock, after the child has exited.
+        persist_exit()
+        raise
 
 
 def _clear_stale_child_snapshot(transfer_root: Path, parent: str, child: str, warnings: list[str]) -> None:
