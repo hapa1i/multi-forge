@@ -105,6 +105,7 @@ def _samples(
     previous = baseline
     expected_from_requests = None
     closed = False
+    pending_turn = None
     for kind, payload in rows:
         event = payload.get("type") if kind == "event_msg" else None
         if kind == "event_msg" and not isinstance(event, str):
@@ -119,7 +120,13 @@ def _samples(
             if isinstance(settings, dict) and settings.get("model_provider_id", "openai") != "openai":
                 raise ValueError("Rollout changed provider")
         observed = _record_turn(kind, event, payload, thread)
-        if baseline is not None:
+        if baseline is None:
+            # Some clients omit lifecycle records. When an explicit start is still open, its usage may arrive late.
+            if event == "task_started":
+                pending_turn = observed
+            elif event in {"task_complete", "turn_aborted"} and observed == pending_turn:
+                pending_turn = None
+        else:
             if event in {"turn_aborted", "error"} or (event == "task_complete" and payload.get("error") is not None):
                 raise ValueError("Native turn did not complete successfully")
             if (event == "task_started" and turn is not None) or (
@@ -149,6 +156,8 @@ def _samples(
             sample = CodexUsageBaseline.from_token_info(payload["info"])
             if sample is None or sample.cached_tokens > sample.input_tokens:
                 raise ValueError("Malformed native token sample")
+            if baseline is not None and turn is None and sample != baseline:
+                raise ValueError("Usage changed before the resumed turn was identified")
             if previous and (
                 sample.input_tokens < previous.input_tokens
                 or sample.output_tokens < previous.output_tokens
@@ -157,7 +166,7 @@ def _samples(
                 raise ValueError("Native counter series decreased")
             previous = sample
             latest = sample if baseline is None or turn is not None else None
-    if expected_from_requests is not None and latest != expected_from_requests:
+    if pending_turn is not None or (expected_from_requests is not None and latest != expected_from_requests):
         return None, turn
     return latest, turn
 

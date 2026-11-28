@@ -103,6 +103,7 @@ def test_genuine_zero_and_distinct_returned_thread(rollout):
     [
         [_row("compacted")],
         [_event("thread_rolled_back")],
+        [_event("task_started", turn_id="still-running")],
         [_row("response_item", type="message", role="assistant")],
         [
             _event("task_started", turn_id="interrupted"),
@@ -119,6 +120,19 @@ def test_genuine_zero_and_distinct_returned_thread(rollout):
 def test_incomparable_prefix(rollout, rows):
     _append(rollout, *rows)
     assert capture_native_resume(_THREAD, str(rollout)) is None
+
+
+def test_late_growth_before_the_resumed_turn_is_not_chargeable(rollout):
+    before = capture_native_resume(_THREAD, str(rollout))
+    assert before is not None
+    _append(
+        rollout,
+        _sample(CodexUsageBaseline(120, 11, 22)),
+        _event("task_started", turn_id="new"),
+        _sample(_AFTER),
+        _event("task_complete", turn_id="new"),
+    )
+    assert before.verified_baseline(_THREAD, _AFTER.as_dict()) is None
 
 
 @pytest.mark.parametrize(
