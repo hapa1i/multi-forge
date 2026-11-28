@@ -90,21 +90,35 @@ def test_unknown_target_is_refused_without_repairing_row(tmp_path: Path, monkeyp
     assert _snapshot(index.index_path) == before
 
 
-def test_replacement_during_confirmation_is_preserved(tmp_path: Path, monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("replacement_time", "refusal"),
+    [
+        ("2026-01-01T00:00:00Z", "instance changed"),
+        ("2026-01-01T00:00:01Z", "session manifest changed since it was scanned"),
+    ],
+)
+def test_replacement_during_confirmation_is_preserved(tmp_path: Path, monkeypatch, replacement_time, refusal) -> None:
     project = tmp_path / "project"
+    monkeypatch.setattr("forge.session.models.now_iso", Mock(side_effect=["2026-01-01T00:00:00Z", replacement_time]))
     index = _publish(project)
     monkeypatch.chdir(project)
+    original_id = index.get_session("target", str(project)).instance_id
+    replacement_id = None
 
     def replace_target(*args, **kwargs):
+        nonlocal replacement_id
         assert delete_published_session(index, "target", project)
         _publish(project)
+        replacement_id = index.get_session("target", str(project)).instance_id
         return True
 
     monkeypatch.setattr("forge.cli.session_delete.click.confirm", replace_target)
     result = CliRunner().invoke(main, ["session", "delete", "target"])
     assert result.exit_code == 1, result.output
-    assert "instance changed" in result.output
-    assert SessionStore(str(project), "target").exists()
+    assert refusal in result.output
+    assert replacement_id is not None and replacement_id != original_id
+    assert index.get_session("target", str(project)).instance_id == replacement_id
+    assert SessionStore(str(project), "target").read().created_at == replacement_time
 
 
 def test_same_name_nested_co_resident_keeps_shared_worktree(tmp_path: Path, monkeypatch) -> None:
