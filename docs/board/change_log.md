@@ -12,6 +12,16 @@ Older entries are retained verbatim in [2026-08-23 through 2026-08-24](archive/c
 
 ## 2026-11-28
 
+### Use model catalog aliases for sessionless Codex launches
+
+`forge codex start --proxy <id>` now expands catalog names in `-m` and top-level `-c model=...` overrides on direct
+OpenRouter proxies. The new aliases are `gemini-neon`, `gemini-hydrogen`, `gemini-carbon` and `gemini-argon`. Full slugs
+pass through verbatim, and local LiteLLM proxies keep their deployment names. The change merged into `main` as
+`a5d55284`. [PR #314](https://github.com/hapa1i/multi-forge/pull/314) · [Codex proxy guide](../end-user/codex_proxy.md)
+
+With a clean wheel and native Codex 0.170.0, the loopback upstream received `google/gemini-4-neon` for both the short
+name and the full slug. Verification passed 12,184 unit tests, 2,768 regressions and 47 targeted integration tests.
+
 ### Count only new tokens on direct Codex resumes
 
 Direct headless resumes report the current turn's tokens in the usage event and downstream attempt when the rollout
