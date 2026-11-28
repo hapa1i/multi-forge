@@ -78,11 +78,10 @@ def test_success_preserves_output_and_cleans_finished_group(tmp_path):
 
 
 def test_deadline_reports_timeout():
-    with pytest.raises(subprocess.TimeoutExpired):
-        run_guarded(
-            [sys.executable, "-c", "import time; time.sleep(100)"],
-            input="",
-            env=dict(os.environ),
-            cwd=None,
-            timeout=0.2,
-        )
+    reviewer = [sys.executable, "-c", "import time; time.sleep(100)"]
+    try:
+        result = run_guarded(reviewer, input="", env=dict(os.environ), cwd=None, timeout=0.2)
+    except subprocess.TimeoutExpired as exc:
+        assert (exc.cmd, exc.timeout) == (reviewer, 0.2)
+    else:
+        pytest.fail(f"expected the reviewer deadline, got exit {result.returncode}: {result.stderr}")
