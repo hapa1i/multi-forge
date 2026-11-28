@@ -1006,11 +1006,25 @@ def _build_model_call_pane(
     roots_by_command: dict[str, set[str]] = {}
     used_roots: set[str] = set()
     used_runs: set[str] = set()
+    proxy_attempts: dict[tuple[str, str], list[DownstreamRecord]] = {}
+    for record in records:
+        if record.forge_run_id and record.proxy_id:
+            proxy_attempts.setdefault((record.forge_run_id, record.proxy_id), []).append(record)
+    attempts_by_command: dict[str, int] = {}
+    partial_proxy_commands: set[str] = set()
     # T5/WS3: collect the distinct runtime/billing_mode per command so each event-backed row
     # renders the lane it ran on (uniform value, or "mixed" when the command's events disagree).
     runtimes_by_command: dict[str, set[str]] = {}
     billing_by_command: dict[str, set[str]] = {}
     for event in events:
+        attempts = 1
+        if event.route == "codex_exec" and event.proxy_id:
+            # The JSONL event supplies launch tokens. The proxy observes each create and its charge.
+            creates = proxy_attempts.get((event.run_id, event.proxy_id), [])
+            attempts = len(creates)
+            if not creates or any(record.cost_micros is None for record in creates):
+                partial_proxy_commands.add(event.command)
+        attempts_by_command[event.command] = attempts_by_command.get(event.command, 0) + attempts
         if event.root_run_id:
             roots_by_command.setdefault(event.command, set()).add(event.root_run_id)
             used_roots.add(event.root_run_id)
@@ -1031,7 +1045,7 @@ def _build_model_call_pane(
                 command=command.command,
                 calls=command.calls,
                 workers=command.workers,
-                attempts=command.calls + command.workers,
+                attempts=attempts_by_command.get(command.command, command.calls + command.workers),
                 errors=command.errors,
                 error_kinds=dict(command.error_kinds),
                 input_tokens=command.input_tokens,
@@ -1039,7 +1053,8 @@ def _build_model_call_pane(
                 cached_tokens=command.cached_tokens,
                 cost_micro_usd=command.cost_micro_usd,
                 cost_estimated=command.cost_estimated,
-                cost_partial=command.cost_micro_usd is None and bool(command.calls or command.workers),
+                cost_partial=command.command in partial_proxy_commands
+                or (command.cost_micro_usd is None and bool(command.calls or command.workers)),
                 join_state="matched" if set(roots) & upstream_roots else "downstream_only",
                 root_run_ids=roots,
                 runtime=_rollup_lane_value(runtimes_by_command.get(command.command, set())),

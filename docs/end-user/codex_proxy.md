@@ -58,13 +58,15 @@ start a fresh session. An explicit switch to a different requested model uses it
 
 If a completed turn is waiting for the proxy's accounting record, retry the same resume command after the record
 arrives. Forge checks the original thread and launch again before sending history. A timed-out resume or a clean abort
-that leaves the last completed foreground turn unchanged retains the previous model. If the rollout is incomplete or the
-model evidence disagrees, restore the original evidence or start a fresh session. If the first launch never established
-a thread, start a fresh session.
+that leaves the last completed foreground turn unchanged retains the previous model. This includes Ctrl+C during a
+headless resume when Forge can confirm the Codex process group has stopped. If the rollout is incomplete or the model
+evidence disagrees, restore the original evidence or start a fresh session. If the first launch never established a
+thread, start a fresh session.
 
 Use `forge session model show <name>` for saved and live routing facts, `forge session model history <name> --json` for
-launch commitments, and `forge telemetry activity <name>` for this session's recorded spend. A sessionless `forge_proxy`
-thread lacks the binding required for adoption.
+launch commitments, and `forge telemetry activity <name>` for this session's recorded spend. A headless turn can make
+several Responses requests. If one omits its charge, activity marks the sum of the reported charges as partial. A
+sessionless `forge_proxy` thread lacks the binding required for adoption.
 
 ## Privacy and routing
 
