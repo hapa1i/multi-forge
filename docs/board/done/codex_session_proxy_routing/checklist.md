@@ -61,7 +61,7 @@ disposable homes and loopback upstreams. Successful proxy-backed Stop review rem
   guidance, and cover failure of the live enrollment probe.
 
 Direct native resume counters need a separate measurement.
-[Proposed follow-up](../../proposed/codex_native_resume_usage/card.md)
+[Native resume usage card](../../doing/codex_native_resume_usage/card.md)
 
 ## Acceptance fixtures
 
