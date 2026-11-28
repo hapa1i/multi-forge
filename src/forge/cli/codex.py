@@ -344,11 +344,11 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
         sys.exit(1)
 
     # Heavy proxy/invoke imports are deferred so `forge codex status` stays light.
-    from forge.core.models.model_reference import strip_transport_model_suffix
-    from forge.proxy.proxies import (
-        ProxyNotFoundError,
-        ProxyResolutionError,
+    from forge.core.runtime.codex_proxy_launch import (
+        responses_model_selection,
+        responses_policy_args,
     )
+    from forge.proxy.proxies import ProxyNotFoundError, ProxyResolutionError
     from forge.proxy.proxy_orchestrator import (
         ProxyIdentityMismatchError,
         ProxyNotResponsesCapableError,
@@ -357,7 +357,7 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
         ensure_proxy,
         read_responses_launch,
     )
-    from forge.session.codex_invoke import invoke_codex_bare_proxy, passthrough_model
+    from forge.session.codex_invoke import invoke_codex_bare_proxy
 
     # 3. Resolve + start/adopt the proxy.
     try:
@@ -416,39 +416,29 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
         )
         sys.exit(1)
 
-    if policy.get("messages_inspected"):
-        err_console.print("Messages inspection is enabled. Codex Responses requests have no body audit.")
-    if policy.get("required_zdr") is False:
-        err_console.print("OpenRouter allow_non_zdr permits hosted tools and caller-supplied routing.")
-    if policy.get("on_unreported_cost") == "allow":
-        err_console.print("Unreported OpenRouter account charges cannot count toward this proxy's spend caps.")
-    launch_default = policy.get("requested_default_model") or default_model
-    requested = passthrough_model(codex_args) or launch_default
+    selection = responses_model_selection(default_model, policy, codex_args)
     direct_openrouter = "required_zdr" in policy
-    if direct_openrouter and not requested:
+    if direct_openrouter and not selection.requested:
         print_error_with_tip(
             "The OpenRouter proxy has no model configured for its default tier.",
             "Pass an upstream slug after -- with -m, or configure a model for the proxy's default tier.",
             console=err_console,
         )
         sys.exit(1)
-    dispatched = requested
-    client_args = list(codex_args)
-    if policy.get("required_zdr") is True:
-        client_args[:0] = ["-c", 'web_search="disabled"']
-        if requested:
-            dispatched = policy["zdr_fallbacks"].get(strip_transport_model_suffix(requested), requested)
-    if requested != dispatched:
-        console.print(f"OpenRouter ZDR fallback: requested {requested}, dispatching {dispatched}.", markup=False)
+    for notice in selection.notices:
+        err_console.print(notice, markup=False)
+    if selection.fallback_notice:
+        console.print(selection.fallback_notice, markup=False)
+    client_args = [*responses_policy_args(policy.get("required_zdr")), *codex_args]
     console.print(
         f"Starting Codex through proxy [green]{entry.proxy_id}[/green] "
-        f"({entry.template}, model={dispatched or 'proxy default'})"
+        f"({entry.template}, model={selection.dispatched or 'proxy default'})"
     )
     sys.exit(
         invoke_codex_bare_proxy(
             base_url=entry.base_url,
             sandbox=cast(CodexSandbox, sandbox),
-            model=launch_default,
+            model=selection.default,
             passthrough=client_args,
             direct_openrouter=direct_openrouter,
         )

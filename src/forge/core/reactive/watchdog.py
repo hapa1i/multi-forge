@@ -121,6 +121,32 @@ def _signal_group(pid: int, sig: signal.Signals) -> None:
         pass
 
 
+def _cleanup_anchor(anchor: subprocess.Popen[str], *, completed: bool, cancel_before_kill: bool) -> None:
+    # Keep the anchor unreaped until we have finished signaling so its PGID cannot be reused.
+    try:
+        if not completed:
+            if cancel_before_kill:
+                # Codex needs INT to cancel detached tool hosts before its own group terminates.
+                _signal_group(anchor.pid, signal.SIGINT)
+                time.sleep(INTERRUPTION_GRACE_SECONDS)
+            _signal_group(anchor.pid, signal.SIGTERM)
+            time.sleep(TERMINATION_GRACE_SECONDS)
+        _signal_group(anchor.pid, signal.SIGKILL)
+    except PermissionError:
+        # macOS can return EPERM for a group containing only the unreaped anchor.
+        # Reap an exited anchor, then probe for survivors without signaling a potentially reused PGID.
+        if anchor.poll() is None:
+            raise
+        try:
+            os.killpg(anchor.pid, 0)
+        except ProcessLookupError:
+            return
+        except PermissionError:
+            pass  # The group still exists. Report the signal that failed during cleanup.
+        raise
+    anchor.wait()
+
+
 def _watch(control: int, payload: dict[str, Any]) -> int:
     status_read, status_write = os.pipe()
     anchor: subprocess.Popen[str] | None = None
@@ -148,30 +174,22 @@ def _watch(control: int, payload: dict[str, Any]) -> int:
             if remaining <= 0:
                 return _TIMEOUT_EXIT
             readable, _, _ = select.select([control, status_read], [], [], remaining)
-            if control in readable or not readable:
+            # A delayed watcher can see the anchor's EOF after the independent deadline has fired.
+            if control in readable or not readable or time.monotonic() >= deadline:
                 return _TIMEOUT_EXIT
             if status_read in readable:
                 status = os.read(status_read, 64)
                 completed = bool(status)
                 return int(status) if status else 125
     finally:
-        if anchor is not None:
-            # Do not poll/reap the anchor before the last signal. Even a crashed
-            # anchor remains a zombie owned by us, retaining this group's identity.
-            if not completed:
-                # Codex cancels detached tool hosts on INT. TERM alone can leave
-                # them alive outside the reviewer's process group.
-                if payload.get("cancel_before_kill"):
-                    _signal_group(anchor.pid, signal.SIGINT)
-                    time.sleep(INTERRUPTION_GRACE_SECONDS)
-                _signal_group(anchor.pid, signal.SIGTERM)
-                time.sleep(TERMINATION_GRACE_SECONDS)
-            _signal_group(anchor.pid, signal.SIGKILL)
-            anchor.wait()
-        os.close(status_read)
-        if status_write >= 0:
-            os.close(status_write)
-        os.close(control)
+        try:
+            if anchor is not None:
+                _cleanup_anchor(anchor, completed=completed, cancel_before_kill=bool(payload.get("cancel_before_kill")))
+        finally:
+            os.close(status_read)
+            if status_write >= 0:
+                os.close(status_write)
+            os.close(control)
 
 
 def _anchor(status: int, payload: dict[str, Any]) -> None:

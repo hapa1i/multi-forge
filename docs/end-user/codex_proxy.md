@@ -33,6 +33,34 @@ Forge preserves tool calls, arguments, results and opaque reasoning by JSON valu
 arrive. Live tool continuation with encrypted reasoning was observed on Gemini. Astra emitted no encrypted item in the
 live test. The LiteLLM template also relays Responses subresources and uses the `openai-api` credential.
 
+## Managed sessions
+
+```bash
+forge session start coding --runtime codex --proxy openrouter-gemini
+forge session resume coding
+forge session start impl --runtime codex --resume-from plan --strategy structured --task "Implement the plan" --proxy openrouter-gemini
+forge session resume impl --task "Run the tests"
+```
+
+Choose the route at creation. Omit both route flags or use `--no-proxy` for native OpenAI authentication. A proxy-backed
+session uses the listener's credential and keeps its ID, template and loopback address. Restore that instance if it
+stops. A replacement on the same port cannot receive the session's history.
+
+The first launch uses the proxy's default model unless you pass `-- -m <slug>`. A bare resume uses the requested model
+from the last verified, completed user turn, including a model selected in the TUI. With no completed turn, Forge uses
+the initial launch selection. If the listener would map that slug to a different model, restore the original fallback or
+start a fresh session. An explicit switch to a different requested model uses its current mapping.
+
+If a completed turn is waiting for the proxy's accounting record, retry the same resume command after the record
+arrives. Forge checks the original thread and launch again before sending history. A timed-out resume or a clean abort
+that leaves the last completed foreground turn unchanged retains the previous model. If the rollout is incomplete or the
+model evidence disagrees, restore the original evidence or start a fresh session. If the first launch never established
+a thread, start a fresh session.
+
+Use `forge session model show <name>` for saved and live routing facts, `forge session model history <name> --json` for
+launch commitments, and `forge telemetry activity <name>` for this session's recorded spend. A sessionless `forge_proxy`
+thread lacks the binding required for adoption.
+
 ## Privacy and routing
 
 Forge removes the top-level `client_metadata` and `prompt_cache_key` on every direct Responses create. These fields can
@@ -94,7 +122,9 @@ requires the override before its first direct create. This setting is specific t
 it from an older LiteLLM proxy, run `forge proxy set <id> costs.on_unreported_cost=null`.
 
 `forge runtime preflight codex --proxy <id>` reports `proxy_supported` for this route. That command also reports native
-headless login readiness. The sessionless proxy launch uses its loopback credential.
+headless login readiness. To verify enrolled hooks using the running listener's credential, use
+`forge runtime preflight codex --proxy <id> --verify-enrollment`. This runs a disposable read-only turn and reports
+whether the SessionStart hook fired.
 
 If Codex shows HTTP 429, run `forge proxy metrics <id>` to see the active caps and their settings. For an individual
 request, use `forge telemetry trace show <request-id>` and

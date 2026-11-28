@@ -87,6 +87,7 @@ class DownstreamRecord:
     forge_root_run_id: str | None = None
     provider_session_id: str | None = None
     provider_command: str | None = None
+    codex_turn_ref: str | None = None
 
     # Model attempt metrics.
     provider: str | None = None
@@ -121,7 +122,7 @@ class DownstreamRecord:
     timeout_seen: bool | None = None
     reported_cost_micros: int | None = None
 
-    # Audit/drift/mutation sub-stream payload. Already redacted by callers.
+    # Kind-specific evidence. Already redacted by callers.
     audit_record_type: str | None = None
     payload: dict[str, Any] | None = None
 
@@ -144,6 +145,12 @@ class DownstreamReadResult:
 def write_downstream_record(record: DownstreamRecord) -> None:
     """Append one downstream record. Best-effort; never raises into callers."""
     data = {k: v for k, v in asdict(record).items() if v is not None}
+    if record.codex_turn_ref is not None:
+        # Keep the attempt (and its charge) readable by strict v2 readers.
+        data["payload"] = {
+            **(record.payload or {}),
+            "codex_turn_ref": data.pop("codex_turn_ref"),
+        }
     log_path = _current_log_path()
     append_jsonl_record(
         log_path,
@@ -270,7 +277,15 @@ def read_downstream_records_with_stats(
         if provider_session_id and record.get("provider_session_id") != provider_session_id:
             continue
         try:
-            records.append(dacite.from_dict(DownstreamRecord, record, config=config))
+            decoded = dacite.from_dict(DownstreamRecord, record, config=config)
+            if decoded.kind == "attempt" and decoded.payload and "codex_turn_ref" in decoded.payload:
+                reference = decoded.payload.pop("codex_turn_ref")
+                decoded.payload = decoded.payload or None
+                # Early v2 proxy launches wrote this field at the top level.
+                decoded.codex_turn_ref = (
+                    reference if isinstance(reference, str) and decoded.codex_turn_ref in (None, reference) else None
+                )
+            records.append(decoded)
         except (dacite.DaciteError, TypeError, KeyError, ValueError) as e:
             logger.warning(
                 "Skipping malformed downstream telemetry in %s: %s",

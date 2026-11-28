@@ -26,6 +26,7 @@ from forge.core.runtime.codex_preflight import (
 from forge.core.runtime.codex_rollouts import (
     find_rollouts_by_thread_id,
     rollout_head_cwd,
+    rollout_head_route,
 )
 from forge.core.state import now_iso
 from forge.install.project_compat import (
@@ -113,15 +114,15 @@ def find_adoptable_rollout(thread_id: str, cwd: Path) -> Path:
         )
 
     here = cwd.resolve()
-    in_cwd: list[Path] = []
+    in_cwd: dict[Path, str | None] = {}
     unverifiable: list[Path] = []
     elsewhere: list[str] = []
     for path in matches:
-        recorded = rollout_head_cwd(path)
+        recorded, provider = rollout_head_route(path)
         if recorded is None:
             unverifiable.append(path)
         elif Path(recorded).resolve() == here:
-            in_cwd.append(path)
+            in_cwd[path] = provider
         else:
             elsewhere.append(recorded)
 
@@ -131,7 +132,7 @@ def find_adoptable_rollout(thread_id: str, cwd: Path) -> Path:
             "Adopt from the recorded directory instead."
         )
 
-    candidates = sorted(in_cwd + unverifiable)
+    candidates = sorted([*in_cwd, *unverifiable])
     if len(candidates) > 1:
         listed = ", ".join(str(p) for p in candidates)
         raise AdoptError(
@@ -145,7 +146,13 @@ def find_adoptable_rollout(thread_id: str, cwd: Path) -> Path:
             f"directory, so it cannot be verified as belonging to {cwd}"
         )
 
-    return in_cwd[0]
+    path = candidates[0]
+    if in_cwd[path] == "forge_proxy":
+        raise AdoptError(
+            f"Cannot adopt Codex thread '{thread_id}': its forge_proxy provider alias cannot identify the original "
+            "Forge proxy. Start a fresh managed Codex session with --proxy <id-or-template>."
+        )
+    return path
 
 
 def plan_codex_adoption(ctx: ExecutionContext, thread_id: str) -> CodexAdoptPlan:

@@ -1,0 +1,120 @@
+{
+  "environment": "Disposable Docker containers with external networking disabled, isolated Forge and Codex homes and a synthetic loopback OpenRouter endpoint. No native Codex credential or token store was present. Only the existing user-granted SessionStart and PreToolUse trust records were copied at their original paths.",
+  "cases": [
+    {
+      "binary": "codex-cli 0.161.0",
+      "linux_arm64_binary_sha256": "0129f94f4f1197bd75f6c4265889061f386ed302bbc50c6e57e3e0660dfb28a7",
+      "proxy": "codex-responses-openrouter",
+      "enrollment": {
+        "ready": true,
+        "registered": true,
+        "attempted": true,
+        "codex_succeeded": true,
+        "enrolled": true,
+        "stop_review_enrolled": false
+      },
+      "advisory_default_model": "openai/gpt-6.2-astra",
+      "advisory_launch_exit_code": 0,
+      "advisory_authority_events": [
+        "authority_configured",
+        "launch_preflight",
+        "run_started",
+        "run_ended"
+      ],
+      "stop_configuration_exit_code": 1,
+      "stop_configuration_reason": "Stop requires measured Codex 0.162.1 and a current verified turn/Stop enrollment receipt.",
+      "patch_fixture": {
+        "model": "gpt-5.5 (from the pinned binary’s bundled patch-capable catalog)",
+        "required_zdr": false,
+        "advisory_exit_code": 0,
+        "advisory_events": [
+          "authority_configured",
+          "launch_preflight",
+          "run_started",
+          "request_denied",
+          "run_ended"
+        ],
+        "advisory_file_created": false,
+        "resume_exit_code": 0,
+        "feedback_file_created": false,
+        "native_tool_boundary": "The native patch returned Failed to write file after the hook allowed it. Feedback delivery is established by the subsequent Responses request.",
+        "next_request_contained_policy_warning": true,
+        "reviewer_configured": true,
+        "reviewer_cli": {
+          "openrouter_key_present": false,
+          "own_credential": true,
+          "route": "http://localhost:18423"
+        },
+        "reviewer_requests": [
+          {
+            "approved_plan_in_request": true,
+            "expected_review_credential": true,
+            "path": "/v1/v1/messages",
+            "path_note": "The fixture supplied a base ending in /v1. The Messages proxy appended /v1/messages, and the synthetic upstream accepted that path."
+          }
+        ]
+      }
+    },
+    {
+      "binary": "codex-cli 0.162.1",
+      "linux_arm64_binary_sha256": "071cbe8d821cf1b02b6d8ba6c8b7991b228fcb8519dcb68a37d31222bb8cabe5",
+      "proxy": "codex-responses-openrouter",
+      "enrollment": {
+        "ready": true,
+        "registered": true,
+        "attempted": true,
+        "codex_succeeded": true,
+        "enrolled": true,
+        "stop_review_enrolled": false
+      },
+      "advisory_default_model": "openai/gpt-6.2-astra",
+      "advisory_launch_exit_code": 0,
+      "advisory_authority_events": [
+        "authority_configured",
+        "launch_preflight",
+        "run_started",
+        "run_ended"
+      ],
+      "stop_configuration_exit_code": 1,
+      "stop_configuration_reason": "The available user trust does not cover UserPromptSubmit, PostToolUse and Stop. Forge refused before reviewer dispatch.",
+      "patch_fixture": {
+        "model": "gpt-5.5 (from the pinned binary’s bundled patch-capable catalog)",
+        "required_zdr": false,
+        "advisory_exit_code": 0,
+        "advisory_events": [
+          "authority_configured",
+          "launch_preflight",
+          "run_started",
+          "request_denied",
+          "run_ended"
+        ],
+        "advisory_file_created": false,
+        "resume_exit_code": 0,
+        "feedback_file_created": false,
+        "native_tool_boundary": "The native patch returned Failed to write file after the hook allowed it. Feedback delivery is established by the subsequent Responses request.",
+        "next_request_contained_policy_warning": true,
+        "reviewer_configured": true,
+        "reviewer_cli": {
+          "openrouter_key_present": false,
+          "own_credential": true,
+          "route": "http://localhost:18423"
+        },
+        "reviewer_requests": [
+          {
+            "approved_plan_in_request": true,
+            "expected_review_credential": true,
+            "path": "/v1/v1/messages",
+            "path_note": "The fixture supplied a base ending in /v1. The Messages proxy appended /v1/messages, and the synthetic upstream accepted that path."
+          }
+        ]
+      }
+    }
+  ],
+  "procedure": [
+    "Install the versioned Linux arm64 npm distribution after matching the published SHA-512, register user hooks in the isolated home, and replay existing trust using tests/fixtures/codex_enrollment.py.",
+    "Start codex-responses-openrouter against synthetic Responses SSE, then run forge runtime preflight codex --verify-enrollment --proxy hook-probe --json.",
+    "Start an advisory Codex session from a synthetic Claude planner. For the patch trial, configure the bundled gpt-5.5 default, allow the full tool declaration on the isolated listener, and offer one native apply_patch call.",
+    "On a separate Codex session enable the permissive tdd bundle and resume. Inspect the next Responses request for policy feedback. Configure an approved plan with --supervisor-proxy reviewer-probe and send a second patch. The Claude reviewer CLI fixture posts its input to the selected Messages proxy.",
+    "Request --trigger stop before configuring the ordinary reviewer and record Forge’s refusal when turn and Stop trust is absent."
+  ]
+}

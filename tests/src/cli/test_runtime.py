@@ -250,29 +250,61 @@ class TestVerifyEnrollment:
 
     def test_verify_enrollment_honors_proxy_preflight(self, monkeypatch) -> None:
         from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
+        from forge.core.runtime.codex_proxy_launch import CodexProxyLaunch
 
-        seen: dict[str, object] = {}
         proxy_ready = replace(
             _READY,
-            proxy_responses="proxy_unsupported",
-            ready=False,
-            blocking_reason="bad proxy",
+            auth_method="proxy_token",
+            auth_source="forge_proxy",
+            billing_mode="unknown",
+            proxy_responses="proxy_supported",
+        )
+        launch = CodexProxyLaunch(
+            "local", "codex-responses-local", "http://127.0.0.1:7070", "local", "litellm", "model", "model", None
         )
 
-        def fake_preflight(**kwargs):
-            seen["preflight_kwargs"] = kwargs
-            return proxy_ready
+        def resolve(**kwargs):
+            assert kwargs == {"proxy_name": "local", "existing_only": True}
+            return proxy_ready, launch
 
-        def fake_verify(**kwargs):
-            seen["verify_kwargs"] = kwargs
-            return self._verification(enrolled=None, attempted=False, reason="bad proxy")
+        def verify(**kwargs):
+            assert kwargs == {"preflight": proxy_ready, "proxy_launch": launch}
+            return self._verification()
 
-        monkeypatch.setattr("forge.cli.runtime.preflight_codex", fake_preflight)
-        monkeypatch.setattr("forge.core.ops.codex_enrollment.verify_codex_enrollment", fake_verify)
-
+        monkeypatch.setattr("forge.core.runtime.codex_proxy_launch.resolve_codex_proxy_launch", resolve)
+        monkeypatch.setattr("forge.core.ops.codex_enrollment.verify_codex_enrollment", verify)
         result = CliRunner().invoke(runtime, ["preflight", "codex", "--verify-enrollment", "--proxy", "local"])
+        assert result.exit_code == 0, result.output
+        assert read_fresh_codex_preflight() is None
 
-        assert result.exit_code == 1
-        assert seen["preflight_kwargs"] == {"proxy_id": "local"}
-        assert seen["verify_kwargs"] == {"preflight": proxy_ready}
-        assert read_fresh_codex_preflight() is None  # proxied preflight must not touch the direct cache
+    def test_verify_enrollment_refuses_missing_listener_without_probe_or_cache_change(self, monkeypatch) -> None:
+        from forge.core.runtime.codex_preflight_cache import (
+            read_fresh_codex_preflight,
+            write_codex_preflight_cache,
+        )
+
+        write_codex_preflight_cache(_READY)
+        monkeypatch.setattr(
+            "forge.core.runtime.codex_proxy_launch.preflight_codex",
+            lambda **kw: replace(_READY, version="0.141.0"),
+        )
+        monkeypatch.setattr(
+            "forge.core.ops.codex_enrollment._run_probe_turn",
+            lambda *a, **kw: pytest.fail("unexpected enrollment turn"),
+        )
+        result = CliRunner().invoke(
+            runtime,
+            [
+                "preflight",
+                "codex",
+                "--verify-enrollment",
+                "--proxy",
+                "missing",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 1, (result.output, result.exception)
+        verdict = json.loads(result.output)
+        assert verdict["ready"] is False and verdict["attempted"] is False and verdict["enrolled"] is None
+        assert "Proxy 'missing' is not registered" in verdict["reason"]
+        assert read_fresh_codex_preflight() == _READY

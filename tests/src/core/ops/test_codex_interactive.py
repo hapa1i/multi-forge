@@ -43,7 +43,12 @@ from forge.session.codex_handoff import (
 )
 from forge.session.exceptions import ManifestCorruptedError, ManifestUnreadableError
 from forge.session.index import IndexStore
-from forge.session.models import AuthorityIntent, CodexConfirmed, create_session_state
+from forge.session.models import (
+    AuthorityIntent,
+    CodexConfirmed,
+    RouteCommitConfirmed,
+    create_session_state,
+)
 from forge.session.routing import read_routing_events
 from tests.fixtures.session_state import publish_session
 
@@ -193,7 +198,7 @@ def _interactive_mocks(
     mock_adapter.complete.side_effect = _complete
     with (
         patch(
-            "forge.core.ops.codex_interactive.assert_codex_ready",
+            "forge.core.ops.codex_session.assert_codex_ready",
             return_value=_preflight(hook_seam=hook_seam),
         ),
         patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
@@ -619,7 +624,7 @@ class TestBridgeInteractiveStart:
         proj, ctx = _make_project(tmp_path, monkeypatch)
         original_sysconf = os.sysconf
         monkeypatch.setattr(os, "sysconf", lambda key: 65_536 if key == "SC_ARG_MAX" else original_sysconf(key))
-        monkeypatch.setattr("forge.session.codex_invoke.sanitize_codex_child_env", lambda preflight: {})
+        monkeypatch.setattr("forge.session.codex_invoke.sanitize_codex_child_env", lambda preflight, **kwargs: {})
         monkeypatch.setattr(
             "forge.core.ops.codex_interactive.compose_codex_interactive_context", lambda body: "x" * 32_768
         )
@@ -863,7 +868,7 @@ class TestInteractiveLaunchArgs:
         planner_store.write(planner)
         invoke = _FakeInvoke()
 
-        with patch("forge.core.ops.codex_interactive.assert_codex_ready") as preflight:
+        with patch("forge.core.ops.codex_session.assert_codex_ready") as preflight:
             with pytest.raises(ForgeOpError, match="advisory-authority launches"):
                 start_interactive_codex_session(
                     ctx=ctx,
@@ -968,3 +973,30 @@ class TestUpdateManifestIfPresent:
                 )
 
         assert warnings == []
+
+
+def test_superseded_proxy_run_cannot_publish_post_exit_facts(tmp_path: Path) -> None:
+    state = create_session_state(
+        "live",
+        worktree_path=str(tmp_path),
+        runtime="codex",
+        proxy_id="bound",
+        proxy_template="local",
+        proxy_base_url="http://127.0.0.1:8080",
+    )
+    state.confirmed.route_commit = RouteCommitConfirmed("sevt_" + "a" * 32, "run_111111111111")
+    entry = publish_session(IndexStore(), state, tmp_path)
+    assert entry.instance_id
+    warnings: list[str] = []
+    store = SessionStore(str(tmp_path), "live")
+    updated = _update_manifest_if_present(
+        store,
+        mutate=lambda _: pytest.fail("superseded launch changed the manifest"),
+        warnings=warnings,
+        session="live",
+        expected_instance_id=entry.instance_id,
+        expected_proxy_run_id="run_222222222222",
+    )
+    assert updated is False
+    assert "newer launch" in warnings[0]
+    assert store.read().confirmed.codex is None

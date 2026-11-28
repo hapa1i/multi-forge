@@ -1030,6 +1030,14 @@ def _verify_proxy_identity(
         )
 
 
+@dataclass(frozen=True)
+class ResponsesListener:
+    default_model: str | None
+    policy: dict[str, Any]
+    backend_id: str | None
+    provider: str | None
+
+
 def read_responses_launch(
     base_url: str,
     *,
@@ -1037,14 +1045,27 @@ def read_responses_launch(
     expected_template: str | None = None,
     timeout_s: float = 5.0,
 ) -> tuple[str | None, dict[str, Any]]:
-    """Read the effective default model and launch policy from a verified live proxy.
+    """Read the launcher's default model and effective live policy."""
+    listener = read_responses_listener(
+        base_url,
+        expected_proxy_id=expected_proxy_id,
+        expected_template=expected_template,
+        timeout_s=timeout_s,
+    )
+    return listener.default_model, listener.policy
 
-    Verify identity before endpoint capability. Direct OpenRouter also needs a
-    complete live policy so the launcher can apply ZDR and explain spend behavior.
-    """
+
+def read_responses_listener(
+    base_url: str,
+    *,
+    expected_proxy_id: str | None = None,
+    expected_template: str | None = None,
+    timeout_s: float = 5.0,
+) -> ResponsesListener:
+    """Verify identity and Responses capability against the same root that supplies the launch facts."""
     url = f"{base_url.rstrip('/')}/"
     try:
-        with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
+        with httpx.Client(timeout=httpx.Timeout(timeout_s), trust_env=False) as client:
             resp = client.get(url)
     except (httpx.RequestError, httpx.TimeoutException) as e:
         raise ProxyUnreachableError(f"proxy at {base_url} is unreachable: {e}") from e
@@ -1071,7 +1092,12 @@ def read_responses_launch(
     mode = messages.get("mode") if isinstance(messages, dict) else data.get("intercept_mode")
     if mode in ("inspect", "override"):
         policy = {**policy, "messages_inspected": True}
-    return _default_model_from_root(data), policy
+    runtime = data.get("runtime")
+    backend = runtime.get("backend_id") if isinstance(runtime, dict) else None
+    provider = data.get("provider")
+    if provider == "openrouter":
+        backend = "openrouter"  # The source for legacy OpenRouter settings without an explicit backend.
+    return ResponsesListener(_default_model_from_root(data), policy, backend, provider)
 
 
 def _live_responses_policy(data: dict[str, Any]) -> dict[str, Any]:

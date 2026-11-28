@@ -54,7 +54,6 @@ def test_late_advisory_authority_refuses_passthrough(
         proxy_responses="native_direct",
         doctor_status="ok",
     )
-    monkeypatch.setattr(codex_interactive, "assert_codex_ready", lambda: preflight)
     monkeypatch.setattr(codex_session, "assert_codex_ready", lambda: preflight)
 
     ops = (

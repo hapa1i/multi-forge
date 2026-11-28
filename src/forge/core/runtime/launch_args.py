@@ -61,7 +61,7 @@ _CODEX_RESERVED: tuple[_ReservedFlag, ...] = (
     _ReservedFlag(("-p", "--profile"), "a profile can change the provider and auth Forge preflighted"),
     _ReservedFlag(
         ("--oss", "--local-provider", "--remote", "--remote-auth-token-env"),
-        "managed Codex sessions use the native provider and auth Forge preflighted",
+        "managed Codex sessions use the provider and auth Forge preflighted",
     ),
     _ReservedFlag(("--ephemeral",), "Forge needs the persisted Codex thread for resume and artifact reconciliation"),
     _ReservedFlag(("--json",), "Forge parses the headless Codex event stream"),

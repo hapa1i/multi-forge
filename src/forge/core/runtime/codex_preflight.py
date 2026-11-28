@@ -97,7 +97,7 @@ CODEX_PROXY_CONTRACT_VALIDATED = "0.141.0"
 # mechanism. ``chatgpt_tokens`` (a ChatGPT-subscription identity) is distinct from
 # ``enterprise_token`` (an opaque access-token / agent identity); the device-auth flow
 # is just one way to obtain the former.
-CodexAuthMethod = Literal["api_key", "chatgpt_tokens", "enterprise_token", "none"]
+CodexAuthMethod = Literal["api_key", "chatgpt_tokens", "enterprise_token", "proxy_token", "none"]
 
 # Whether Forge's SessionStart transfer hook can deliver context. This
 # preflight never returns ``active`` -- Codex trust is keyed to a specific hook entry
@@ -171,13 +171,15 @@ def preflight_codex(
     runtime: RuntimeSpec | None = None,
     proxy_id: str | None = None,
     run_doctor: bool = True,
+    loopback_auth: bool = False,
 ) -> CodexPreflight:
     """Check whether native Codex can run headless on this machine. Never raises for an
     expected condition -- an unready machine returns ``ready=False`` + ``blocking_reason``.
 
     ``proxy_id`` (an *existing* proxy id, never an auto-started template) adds a
     Responses-capability check on that proxy's Codex-facing wire. ``run_doctor=False``
-    skips the (slower) ``codex doctor`` probe, falling back to env-only auth.
+    skips the (slower) ``codex doctor`` probe, falling back to env-only auth. Managed proxy launch
+    preparation sets ``loopback_auth`` and verifies the live listener separately.
     """
     runtime = runtime or get_runtime("codex")
 
@@ -187,9 +189,9 @@ def preflight_codex(
     # "Beyond the ceiling" only when the version parses AND sorts strictly above the
     # validated one; an unparseable version stays False (we can't claim it ran ahead).
     version_beyond_validated = version is not None and _version_lt(CODEX_VERSION_VALIDATED, version)
-    doctor = _probe_doctor_json(runtime) if (installed and run_doctor) else None
+    doctor = _probe_doctor_json(runtime) if installed and run_doctor and not loopback_auth else None
 
-    auth = _resolve_codex_auth(doctor)
+    auth = _Auth("proxy_token", "forge_proxy", "unknown", None) if loopback_auth else _resolve_codex_auth(doctor)
     hook_seam = _resolve_hook_seam(
         installed=installed,
         version=version,

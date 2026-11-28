@@ -81,7 +81,12 @@ def history_cmd(session_name: str | None, as_json: bool) -> None:
             table.add_row("Event", event["event_type"])
             table.add_row("Run", event["run_id"] or "-")
             table.add_row("Route", event["payload"]["route"]["kind"])
-            table.add_row("Models", _model_slot_summary(event["payload"]["marking_snapshots"]))
+            if facts := event["payload"].get("codex_proxy"):
+                table.add_row("Proxy", Text(event["payload"]["route"]["proxy_id"]))
+                table.add_row("Requested model", Text(facts["requested_model"]))
+                table.add_row("Dispatched model", Text(facts["dispatched_model"]))
+            else:
+                table.add_row("Models", _model_slot_summary(event["payload"]["marking_snapshots"]))
             table.add_row("Outcome", event["outcome"])
             console.print(table)
     else:
@@ -96,7 +101,7 @@ def session_model_summary_rows(payload: dict[str, Any]) -> list[tuple[str, str]]
     """Return the fixed-size human summary shared by terminal and direct reads."""
     commit = payload["route_commit"]
     live = payload["live_proxy"]
-    return [
+    rows = [
         ("Session", payload["session"]),
         ("Runtime", payload["runtime"]),
         ("Active", "yes" if payload["active"] else "no"),
@@ -108,6 +113,30 @@ def session_model_summary_rows(payload: dict[str, Any]) -> list[tuple[str, str]]
         ("Route evidence", commit["evidence_source"] if commit else "none"),
         ("History", payload["history_status"] or "no claim"),
         ("Live proxy", live["evidence_source"]),
+    ]
+    intent = payload["route_intent"]
+    if payload["runtime"] == "codex" and intent["kind"] == "proxy":
+        rows.extend([("Proxy", intent["proxy_id"] or "-"), ("Template", intent["template"] or "-")])
+        if commit and (facts := commit.get("codex_proxy")):
+            rows.extend(
+                [
+                    ("Committed backend", commit["backend_id"]),
+                    ("Wire shape", commit["wire_shape"]),
+                    ("Requested model", facts["requested_model"]),
+                    ("Dispatched model", facts["dispatched_model"]),
+                ]
+            )
+        if live["reachable"]:
+            rows.extend(
+                [
+                    ("Live Responses backend", live["backend_id"] or "-"),
+                    ("Live default request", live["default_requested_model"] or "-"),
+                    ("Live default dispatch", live["default_dispatched_model"] or "-"),
+                ]
+            )
+        return rows
+    return [
+        *rows,
         ("Default tier", live["default_tier"] or "-"),
         ("Launch marking entries", str(len(payload["marking"]["launch_entries"]))),
         ("Live marking entries", str(len(payload["marking"]["live_proxy_entries"]))),

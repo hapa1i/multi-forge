@@ -16,7 +16,8 @@ from forge.core.models.model_reference import normalize_model_reference
 from forge.core.run_id import is_valid_run_id
 from forge.proxy.model_routes import effective_proxy_model_maps
 from forge.proxy.runtime_truth import ProxyRuntimeTruth
-from forge.session.models import SessionState, session_runtime
+from forge.session.exceptions import ForgeSessionError
+from forge.session.models import ProxyIntent, SessionState, session_runtime
 from forge.session.routing import (
     RoutingHistory,
     custom_route_fingerprint,
@@ -113,7 +114,8 @@ def _route_intent(state: SessionState) -> dict[str, Any]:
             if launch.model_route is not None
             else normalize_model_reference(launch.direct_model)
         )
-    if runtime == "codex":
+    proxy = state.intent.proxy
+    if runtime == "codex" and proxy is None:
         return {
             "kind": "runtime_native",
             "template": None,
@@ -121,7 +123,6 @@ def _route_intent(state: SessionState) -> dict[str, Any]:
             "custom_route_fingerprint": None,
             "requested_model": None,
         }
-    proxy = state.intent.proxy
     if proxy is None:
         return {
             "kind": "direct",
@@ -134,7 +135,7 @@ def _route_intent(state: SessionState) -> dict[str, Any]:
         return {
             "kind": "proxy",
             "template": proxy.template,
-            "proxy_id": None,
+            "proxy_id": proxy.proxy_id,
             "custom_route_fingerprint": None,
             "requested_model": requested,
         }
@@ -145,6 +146,17 @@ def _route_intent(state: SessionState) -> dict[str, Any]:
         "custom_route_fingerprint": custom_route_fingerprint(proxy.base_url),
         "requested_model": requested,
     }
+
+
+def codex_proxy_commit(state: SessionState, forge_root: str | None) -> dict[str, Any] | None:
+    """Read the launch evidence for the Codex binding shown in session detail."""
+    if session_runtime(state) != "codex" or state.intent.proxy is None or not forge_root:
+        return None
+    try:
+        history = derive_routing_history(forge_root, state)
+    except ForgeSessionError as exc:
+        return {"evidence_source": "unavailable", "reason": str(exc)}
+    return _route_commit(state, history)
 
 
 def _route_commit(state: SessionState, history: RoutingHistory) -> dict[str, Any] | None:
@@ -210,6 +222,11 @@ def _commit_from_payload(
         "model_alternatives": payload["model_alternatives"],
         "billing_mode": payload["billing_mode"],
         "route_scope_tags": payload["route_scope_tags"],
+        **(
+            {"codex_proxy": payload["codex_proxy"], "wire_shape": route["wire_shape"]}
+            if "codex_proxy" in payload
+            else {}
+        ),
     }
 
 
@@ -245,6 +262,9 @@ def _live_proxy(
     route_kind = route_commit.get("kind") if route_commit and route_commit.get("kind") else intent["kind"]
     if route_kind != "proxy":
         return _empty_live_proxy("not_applicable"), None
+
+    if session_runtime(state) == "codex" and state.intent.proxy is not None:
+        return _live_codex_proxy(state.intent.proxy), None
 
     proxy_id = _first_string(
         route_commit.get("proxy_id") if route_commit else None,
@@ -312,6 +332,39 @@ def _live_proxy(
     unavailable = _empty_live_proxy("unavailable")
     unavailable.update({"reachable": runtime_reachable, "proxy_id": proxy_id, "template": template})
     return unavailable, runtime
+
+
+def _live_codex_proxy(binding: ProxyIntent) -> dict[str, Any]:
+    from forge.core.runtime.codex_proxy_launch import responses_model_selection
+    from forge.proxy.proxy_orchestrator import (
+        ProxyIdentityMismatchError,
+        ProxyNotResponsesCapableError,
+        ProxyUnreachableError,
+        read_responses_listener,
+    )
+
+    live = _empty_live_proxy("unavailable")
+    if not binding.base_url or not binding.proxy_id or not binding.template:
+        return live
+    try:
+        listener = read_responses_listener(
+            binding.base_url, expected_proxy_id=binding.proxy_id, expected_template=binding.template, timeout_s=0.5
+        )
+    except (ProxyIdentityMismatchError, ProxyNotResponsesCapableError, ProxyUnreachableError):
+        return live
+    default = responses_model_selection(listener.default_model, listener.policy, ())
+    live.update(
+        reachable=True,
+        evidence_source="runtime",
+        proxy_id=binding.proxy_id,
+        template=binding.template,
+        backend_id=listener.backend_id,
+        responses_ingress=True,
+        default_requested_model=default.requested,
+        default_dispatched_model=default.dispatched,
+        required_zdr=listener.policy.get("required_zdr"),
+    )
+    return live
 
 
 def _effort_launch_id(route_commit: dict[str, Any] | None) -> str | None:
@@ -431,7 +484,7 @@ def _marking(
             )
 
     live_entries: list[dict[str, Any]] = []
-    if live_proxy["evidence_source"] == "runtime":
+    if live_proxy["evidence_source"] == "runtime" and not live_proxy.get("responses_ingress"):
         scope = ["route:proxy", "runtime:claude_code"]
         live_backend = live_proxy["backend_id"]
         if isinstance(live_backend, str) and live_backend:

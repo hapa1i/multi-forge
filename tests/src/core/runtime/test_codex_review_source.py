@@ -41,6 +41,14 @@ def select(source, **changes):
     return select_source(source, **args)
 
 
+def test_proxy_rollout_is_ineligible_for_native_supervision_even_with_account_metadata(source_home):
+    rows = synthetic_rows()
+    rows[0]["payload"]["model_provider"] = "forge_proxy"
+    write_rollout(source_home, rows)
+    with pytest.raises(ValueError, match="Unproven native source origin or provider"):
+        bind_source(THREAD, forge_root=None)
+
+
 def test_compacted_usage_uses_event_baseline_and_exact_prefix(source_home):
     rows = synthetic_rows()
     rows.insert(3, {"type": "compacted", "payload": {"message": "synthetic compaction"}})

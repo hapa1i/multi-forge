@@ -19,6 +19,7 @@ from forge.core.ops.codex_enrollment import (
     verify_codex_enrollment,
 )
 from forge.core.runtime.codex_preflight import CodexPreflight
+from forge.core.runtime.codex_proxy_launch import CodexProxyLaunch
 from forge.session.codex_handoff import write_observation_receipt
 from forge.session.store import SessionStore
 
@@ -96,15 +97,21 @@ class TestVerifyVerdictLogic:
         assert "not trust-enrolled" in res.reason
         assert "grant trust" in res.reason
 
-    def test_failed_turn_is_unverified_not_refuted(self, monkeypatch) -> None:
+    @pytest.mark.parametrize("proxied", [False, True])
+    def test_failed_turn_is_unverified_not_refuted(self, monkeypatch, proxied: bool) -> None:
         monkeypatch.setattr(ce, "_read_user_scope_registration", lambda: ("/cfg.toml", True))
         monkeypatch.setattr(ce, "_run_probe_turn", lambda *a, **k: (False, False))
-
-        res = verify_codex_enrollment(preflight=_preflight())
+        proxy = None
+        pf = _preflight()
+        if proxied:
+            proxy = CodexProxyLaunch("bound", "local", "http://127.0.0.1:7000", "local", "litellm", "m", "m", None)
+            pf = _preflight(auth_method="proxy_token", auth_source="forge_proxy", billing_mode="unknown")
+        res = verify_codex_enrollment(preflight=pf, proxy_launch=proxy)
 
         # A turn that did not complete proves nothing about enrollment.
         assert res.enrolled is None
         assert "did not complete" in res.reason
+        assert ("Responses listener for proxy 'bound'" if proxied else "check codex auth/connectivity") in res.reason
 
     def test_managed_suppressed_sharpens_reason(self, monkeypatch) -> None:
         monkeypatch.setattr(ce, "_read_user_scope_registration", lambda: ("/cfg.toml", True))
@@ -136,6 +143,35 @@ class TestVerifyVerdictLogic:
 
 class TestRunProbeTurn:
     """The turn + receipt mechanism, patching only the codex subprocess."""
+
+    def test_proxy_only_enrollment_uses_verified_listener_and_its_own_run(self, monkeypatch) -> None:
+        launch = CodexProxyLaunch(
+            "fixture",
+            "codex-responses-local",
+            "http://127.0.0.1:9999",
+            "local",
+            "litellm",
+            "fixture-model",
+            "fixture-model",
+            None,
+        )
+        pf = _preflight(auth_method="proxy_token", auth_source="forge_proxy", billing_mode="unknown")
+        monkeypatch.setenv("OPENROUTER_API_KEY", "fixture-upstream-only")
+        monkeypatch.setattr(ce, "_read_user_scope_registration", lambda: ("config.toml", True))
+
+        def run(self, request):
+            assert request.env["FORGE_CODEX_PROXY_TOKEN"]
+            assert "OPENROUTER_API_KEY" not in request.env
+            assert request.proxy_id == "fixture"
+            assert "model_provider=forge_proxy" in request.argv
+            assert any(request.env["FORGE_RUN_ID"] in arg for arg in request.argv if "http_headers" in arg)
+            assert request.attribution.session is None
+            return _fake_result()
+
+        monkeypatch.setattr("forge.core.invoker.CodexHeadlessInvoker.run", run)
+        result = verify_codex_enrollment(preflight=pf, proxy_launch=launch)
+        assert result.attempted and result.codex_succeeded
+        assert result.enrolled is False
 
     def test_receipt_written_by_hook_is_detected(self, monkeypatch) -> None:
         # Simulate the real codex-session-start hook: it resolves the session store from

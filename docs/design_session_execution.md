@@ -304,6 +304,16 @@ All CLI-owned (§3.5):
 | `last_run_at`                                  | Per turn                                                                                                                   |
 | `context_delivery`                             | `initial_message \| session_start_hook \| hook_undelivered`; `None` for bare interactive starts (a transfer-delivery fact) |
 
+Proxy-backed runs record `proxy_token`, `forge_proxy`, and `unknown` as the local auth method, source and billing mode.
+The routing journal freezes the session instance and the requested and dispatched slugs for each launch.
+`confirmed.codex.completed_turn` identifies the last proven foreground selection on the bound thread.
+`reconciled_run_id` ties verified evidence to its launch. When the native process returns, `pending_exit` records its
+run ID and outcome until Forge can reconcile the bound rollout with the dispatch. Resume retries that join when
+accounting arrives late. An earlier manifest without an exit receipt needs independent evidence that its launch ended.
+Forge reads the rollout and accounting records outside session locks. Publication checks the original session instance,
+binding and launch commitment. Competing resumes recheck their predecessor under the manifest lock before appending to
+the routing journal.
+
 `rollout_source` provenance (the matching file is `$CODEX_HOME/sessions/…/rollout-*-<thread_id>.jsonl`):
 
 - `discovered_by_thread_id`: glob located by a stream-known thread_id.

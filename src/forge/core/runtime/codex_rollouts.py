@@ -172,18 +172,23 @@ def rollout_head_cwd(path: Path) -> str | None:
     JSON object for a ``cwd`` string wherever it nests; any failure degrades to None
     (no narrowing) rather than guessing.
     """
+    cwd, _ = rollout_head_route(path)
+    return cwd
+
+
+def rollout_head_route(path: Path) -> tuple[str | None, str | None]:
+    """Read the launch directory and recorded provider from the same metadata row."""
     try:
         with path.open(encoding="utf-8") as fh:
             line = fh.readline(_HEAD_READ_LIMIT)
-    except OSError:
-        return None
-    try:
         record = json.loads(line)
-    except json.JSONDecodeError:
-        return None
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None, None
     if not isinstance(record, dict):
-        return None
-    return _find_cwd(record, depth=0)
+        return None, None
+    payload = record.get("payload")
+    provider = payload.get("model_provider") if isinstance(payload, dict) else None
+    return _find_cwd(record, depth=0), provider if isinstance(provider, str) else None
 
 
 def _find_cwd(node: dict[str, object], *, depth: int) -> str | None:

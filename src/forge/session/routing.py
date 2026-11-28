@@ -18,7 +18,11 @@ from forge.core.models.model_practices import (
     validate_route_scope_tags,
 )
 from forge.core.models.model_reference import normalize_model_reference
-from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, VALID_WIRE_SHAPES
+from forge.core.wire_shapes import (
+    ANTHROPIC_PASSTHROUGH,
+    OPENAI_RESPONSES_PASSTHROUGH,
+    VALID_WIRE_SHAPES,
+)
 
 from .events import (
     SessionEvent,
@@ -190,6 +194,32 @@ def validate_routing_payload(event_type: str, payload: dict[str, Any]) -> None:
     )
 
 
+def codex_proxy_commits(forge_root: str | Path, state: SessionState, instance_id: str) -> tuple[SessionEvent, ...]:
+    """Read live commitments for this creation, excluding aborted or older same-name launches."""
+    history = derive_routing_history(forge_root, state)
+    binding = state.intent.proxy
+    if history.status != "supported" or binding is None or not binding.proxy_id:
+        raise SessionEventValidationError("Codex proxy binding or launch history is unproven")
+    aborted = {event.run_id for event in history.events if event.event_type == ROUTING_ABORT_EVENT}
+    owned = tuple(
+        event
+        for event in history.events
+        if event.event_type == ROUTING_COMMIT_EVENT
+        and event.run_id not in aborted
+        and event.payload.get("codex_proxy", {}).get("instance_id") == instance_id
+    )
+    if not owned or owned[-1] != history.effective_commit or owned[0].operation != "start":
+        raise SessionEventValidationError("Codex proxy history does not establish this session instance")
+    for event in owned:
+        route = event.payload["route"]
+        if (route["proxy_id"], route["template"]) != (
+            binding.proxy_id,
+            binding.template,
+        ):
+            raise SessionEventValidationError("Codex proxy commitment differs from the session binding")
+    return owned
+
+
 def _validate_historical_routing_payload(event_type: str, payload: dict[str, Any]) -> None:
     """Validate immutable payload structure without reinterpreting the launch catalog."""
     _validate_routing_payload(
@@ -209,7 +239,24 @@ def _validate_routing_payload(
 ) -> None:
     if event_type not in ROUTING_EVENT_TYPES:
         raise ValueError(f"unknown routing event type {event_type!r}")
-    _require_exact_fields(payload, ROUTING_PAYLOAD_FIELDS, "routing payload")
+    expected = ROUTING_PAYLOAD_FIELDS
+    if "codex_proxy" in payload:
+        expected = expected | {"codex_proxy"}
+        facts = payload["codex_proxy"]
+        if not isinstance(facts, dict):
+            raise ValueError("codex_proxy must be an object")
+        _require_exact_fields(
+            facts,
+            frozenset({"instance_id", "requested_model", "dispatched_model"}),
+            "codex_proxy",
+        )
+        if not isinstance(facts["instance_id"], str) or not re.fullmatch(r"[0-9a-f]{32}", facts["instance_id"]):
+            raise ValueError("codex_proxy.instance_id must be a session instance ID")
+        if not all(
+            isinstance(facts[key], str) and facts[key].strip() for key in ("requested_model", "dispatched_model")
+        ):
+            raise ValueError("codex_proxy requires verbatim requested and dispatched models")
+    _require_exact_fields(payload, expected, "routing payload")
     route = payload["route"]
     if not isinstance(route, dict):
         raise ValueError("route must be an object")
@@ -292,7 +339,15 @@ def _validate_routing_event(
 
     route = event.payload["route"]
     kind = route["kind"]
-    if kind == "runtime_native":
+    if "codex_proxy" in event.payload:
+        if event.runtime != "codex" or kind != "proxy" or event.operation not in {"start", "resume"}:
+            raise SessionEventValidationError("Codex proxy facts require a managed Codex proxy start or resume")
+        if not all(route.get(k) for k in ("template", "backend_id", "proxy_id")) or (
+            route.get("wire_shape") != OPENAI_RESPONSES_PASSTHROUGH or route["custom_route_fingerprint"] is not None
+        ):
+            raise SessionEventValidationError("Codex proxy route requires a bound Responses listener")
+        _require_codex_model_fields(event)
+    elif kind == "runtime_native":
         _require_runtime_native(event)
     elif event.runtime != "claude_code":
         raise SessionEventValidationError(f"route kind {kind!r} requires claude_code runtime", field="runtime")
@@ -508,6 +563,12 @@ def _require_runtime_native(event: SessionEvent) -> None:
     _all_none(route, ("backend_id", "proxy_id", "template", "custom_route_fingerprint"))
     if route.get("wire_shape") is not None:
         raise SessionEventValidationError("runtime_native wire_shape must be null", field="payload")
+    _require_codex_model_fields(event)
+
+
+def _require_codex_model_fields(event: SessionEvent) -> None:
+    payload = event.payload
+    kind = payload["route"]["kind"]
     for field in (
         "requested_model",
         "selected_tier",
@@ -516,11 +577,11 @@ def _require_runtime_native(event: SessionEvent) -> None:
         "direct_model",
     ):
         if payload[field] is not None:
-            raise SessionEventValidationError(f"runtime_native {field} must be null", field="payload")
+            raise SessionEventValidationError(f"{kind} {field} must be null", field="payload")
     if payload["tier_mappings"] or payload["model_alternatives"] or payload["marking_snapshots"]:
-        raise SessionEventValidationError("runtime_native maps and marking snapshots must be empty", field="payload")
+        raise SessionEventValidationError(f"{kind} maps and marking snapshots must be empty", field="payload")
     if payload["billing_mode"] != "unknown":
-        raise SessionEventValidationError("runtime_native billing_mode must be unknown", field="payload")
+        raise SessionEventValidationError(f"{kind} billing_mode must be unknown", field="payload")
     _require_route_scope_tags(event)
 
 

@@ -144,8 +144,6 @@ class TestStartFlagMatrix:
     @pytest.mark.parametrize(
         ("extra_args", "flag_label"),
         [
-            (["--proxy", "p"], "--proxy"),
-            (["--no-proxy"], "--no-proxy"),
             (["--sidecar"], "--sidecar"),
             (["--host-proxy"], "--host-proxy"),
             (["--subprocess-proxy", "p"], "--subprocess-proxy"),
@@ -219,6 +217,18 @@ class TestStartFlagMatrix:
 
 
 class TestStartCodexDispatch:
+    @pytest.mark.parametrize("args, proxy", [(["--proxy", "test-proxy"], "test-proxy"), (["--no-proxy"], None)])
+    def test_start_route_flags(self, runner: CliRunner, project: Path, args: list[str], proxy: str | None) -> None:
+        with patch("forge.cli.session_codex.launch_codex_session", return_value=0) as launch:
+            result = runner.invoke(main, [*_CODEX_BASE, *args])
+        assert result.exit_code == 0, result.output
+        assert launch.call_args.kwargs["proxy_name"] == proxy
+
+    def test_conflicting_route_flags(self, runner: CliRunner, project: Path) -> None:
+        result = runner.invoke(main, [*_CODEX_BASE, "--proxy", "test-proxy", "--no-proxy"])
+        assert result.exit_code == 1
+        assert "mutually exclusive" in result.output
+
     def test_defaults_reach_launcher(self, runner: CliRunner, project: Path) -> None:
         with (
             patch("forge.cli.guards.require_repo_root"),
@@ -236,6 +246,7 @@ class TestStartCodexDispatch:
             sandbox="workspace-write",
             worktree=False,
             branch=None,
+            proxy_name=None,
             context_delivery="initial-message",
             launch_args=RuntimeLaunchArgs(),
         )
@@ -327,6 +338,7 @@ class TestStartInteractiveDispatch:
             sandbox="workspace-write",
             worktree=False,
             branch=None,
+            proxy_name=None,
             context_delivery="initial-message",
             launch_args=RuntimeLaunchArgs(),
         )
@@ -463,6 +475,21 @@ class TestCodexLaunchArgs:
 class TestResumeCodexDispatch:
     def _codex_state(self, tmp_path: Path) -> object:
         return create_session_state("impl", worktree_path=str(tmp_path), runtime="codex")
+
+    @pytest.mark.parametrize("route", [["--proxy", "original"], ["--no-proxy"]])
+    @pytest.mark.parametrize("task", [[], ["--task", "continue"]])
+    def test_resume_refuses_route_before_launch(self, runner, tmp_path, route, task) -> None:
+        with (
+            patch("forge.cli.session_lifecycle.SessionManager") as manager,
+            patch("forge.cli.session_codex.resume_codex_session") as headless,
+            patch("forge.cli.session_codex.reattach_interactive_codex_session") as interactive,
+        ):
+            manager.return_value.get_session.return_value = self._codex_state(tmp_path)
+            result = runner.invoke(main, ["session", "resume", "impl", *route, *task])
+        assert result.exit_code == 1
+        assert "Resume uses the recorded route" in result.output
+        headless.assert_not_called()
+        interactive.assert_not_called()
 
     def test_dispatch_with_task(self, runner: CliRunner, tmp_path: Path) -> None:
         with (

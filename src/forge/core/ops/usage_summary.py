@@ -36,6 +36,7 @@ from forge.core.metric_formatting import (
 )
 from forge.core.run_id import derive_provider_session_id
 from forge.core.state import try_parse_iso
+from forge.core.state.exceptions import StateError
 from forge.core.telemetry.downstream import (
     DownstreamRecord,
     read_downstream_records_with_stats,
@@ -43,7 +44,8 @@ from forge.core.telemetry.downstream import (
 from forge.core.telemetry.upstream import UpstreamOutcome, read_upstream_outcomes
 from forge.core.usage.ledger import UsageEvent, read_usage_events
 from forge.core.usage.vocabulary import ROUTE_CLAUDE_INTERACTIVE, Confidence
-from forge.session.models import SessionState
+from forge.session.exceptions import ForgeSessionError
+from forge.session.models import SessionState, session_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -283,10 +285,15 @@ def build_session_activity_summary(
     summary = SessionActivitySummary(session=session_name, since=since.isoformat() if since else None)
     events = _read_session_usage_events(session_name, since)
 
-    _aggregate_ledger(summary, events, since)
-
     manifest = _load_manifest(session_name, forge_root)
-    summary.policy = _policy_activity(manifest, since, session_name)
+    try:
+        outcomes = read_upstream_outcomes(period_start=since, session=session_name)
+    except Exception as exc:
+        logger.debug("activity: upstream read failed for %s: %s", session_name, exc)
+        outcomes = []
+    events, outcomes, owned_roots = _scope_activity(summary, manifest, forge_root, events, outcomes)
+    _aggregate_ledger(summary, events, since)
+    summary.policy = _policy_activity(manifest, since, outcomes)
     if manifest is not None:
         subagents = manifest.confirmed.subagents
         if subagents is not None:
@@ -310,13 +317,13 @@ def build_session_activity_summary(
                 Path(manifest.forge_root), session_name, config=sup, lane=read_bound_lane(manifest, SUPERVISOR_CONSUMER)
             )
     summary.shadow = _shadow_activity(forge_root, session_name, since)
-    _build_activity_panes(summary, session_name, since, events)
+    _build_activity_panes(summary, session_name, since, events, outcomes, owned_roots)
 
     # Untagged emitters (e.g. the action tagger) never tag a session, so a per-session
     # view can undercount -- but only flag that once the session has activity to
     # contextualize it; claiming partial coverage of an empty summary is noise.
     summary.session_tagging_partial = not summary.is_empty
-    summary.notes = _activity_notes(summary)
+    summary.notes.extend(_activity_notes(summary))
     return summary
 
 
@@ -451,11 +458,9 @@ def sum_forge_added_cost(session: str, *, since: datetime | None = None) -> int 
     (correct, just slower) — an event can never predate its session's creation, so
     the bound is loss-free.
 
-    Known limitation (matches ``build_session_activity_summary``): the ledger is
-    filtered by session NAME only — ``UsageEvent`` carries no forge-root identity, so
-    two same-named sessions in different forge roots would share this total. The
-    status-line throttle cache key is root-scoped, but the ledger query is not.
-    Adding root/session identity to the ledger schema is deferred to a future card.
+    This status-line query selects by session name and start time. It can include
+    another project's same-name events during that window. The activity command
+    also receives a project root and can verify managed Codex proxy ownership.
     """
     events = read_usage_events(session=session, period_start=since)
     return _join_session_cost(events, since, exclude_interactive=True, trusted_only=True).total
@@ -783,18 +788,79 @@ def _aggregate_ledger(summary: SessionActivitySummary, events: list[UsageEvent],
     summary.cost_estimated = cost.estimated
 
 
+def _scope_activity(
+    summary: SessionActivitySummary,
+    manifest: SessionState | None,
+    forge_root: str | None,
+    events: list[UsageEvent],
+    outcomes: list[UpstreamOutcome],
+) -> tuple[list[UsageEvent], list[UpstreamOutcome], set[str] | None]:
+    """A journal identifies foreground launches. Instance-stamped consumers can own separate roots."""
+    from forge.session.index import IndexStore
+    from forge.session.routing import codex_proxy_commits
+
+    proxied_codex = manifest is not None and session_runtime(manifest) == "codex" and manifest.intent.proxy is not None
+    root = forge_root or (manifest.forge_root if manifest else None)
+    entry = None
+    identity_read_failed = False
+    if root:
+        try:
+            entry = IndexStore().peek_session(summary.session, root)
+        except (OSError, ValueError, ForgeSessionError, StateError) as exc:
+            logger.debug("activity: session identity unavailable: %s", exc)
+            identity_read_failed = True
+    if manifest is None and (entry is not None or identity_read_failed):
+        summary.notes.append("session_identity_unavailable")
+        return [], [], set()
+    instance_id = entry.instance_id if entry else None
+    if instance_id is None and (
+        identity_read_failed
+        or proxied_codex
+        or any(event.session_instance_id for event in events)
+        or any(outcome.session_instance_id for outcome in outcomes)
+    ):
+        summary.notes.append("session_identity_unavailable")
+    events = [event for event in events if event.session_instance_id in (None, instance_id)]
+    outcomes = [outcome for outcome in outcomes if outcome.session_instance_id in (None, instance_id)]
+    if not proxied_codex or manifest is None:
+        return events, outcomes, None
+    if not instance_id or not root:
+        return [], [], set()
+    try:
+        commits = codex_proxy_commits(root, manifest, instance_id)
+        launches = {commit.run_id for commit in commits if commit.run_id}
+    except (OSError, ValueError, ForgeSessionError, StateError) as exc:
+        logger.debug(
+            "activity: proxy launch ownership unavailable for %s: %s",
+            manifest.name,
+            exc,
+        )
+        summary.notes.append("routing_journal_unavailable")
+        launches = set()
+
+    roots = launches.copy()
+    records: list[UsageEvent | UpstreamOutcome] = [*events, *outcomes]
+    for record in records:
+        if record.command not in {"codex-bridge", "codex-resume"} and record.session_instance_id == instance_id:
+            if independent_root := record.root_run_id or record.run_id:
+                roots.add(independent_root)
+
+    def owned(record: UsageEvent | UpstreamOutcome) -> bool:
+        if record.command in {"codex-bridge", "codex-resume"}:
+            return record.run_id == record.root_run_id and record.run_id in launches
+        return record.session_instance_id == instance_id or (record.root_run_id or record.run_id) in roots
+
+    return [e for e in events if owned(e)], [o for o in outcomes if owned(o)], roots
+
+
 def _build_activity_panes(
     summary: SessionActivitySummary,
     session_name: str,
     since: datetime | None,
     events: list[UsageEvent],
+    outcomes: list[UpstreamOutcome],
+    owned_roots: set[str] | None,
 ) -> None:
-    try:
-        outcomes = read_upstream_outcomes(period_start=since, session=session_name)
-    except Exception as e:
-        logger.debug("activity panes: upstream read failed for %s: %s", session_name, e)
-        outcomes = []
-
     known_roots = {e.root_run_id for e in events if e.root_run_id}
     known_roots.update(o.root_run_id for o in outcomes if o.root_run_id)
     known_runs = {e.run_id for e in events if e.run_id}
@@ -803,11 +869,14 @@ def _build_activity_panes(
 
     try:
         downstream_read = read_downstream_records_with_stats(period_start=since, kind="attempt")
-        records = [
-            rec
-            for rec in downstream_read.records
-            if _downstream_visible_to_session(rec, known_roots, known_runs, provider_prefix)
-        ]
+        if owned_roots is not None:
+            records = [r for r in downstream_read.records if (r.forge_root_run_id or r.forge_run_id) in owned_roots]
+        else:
+            records = [
+                rec
+                for rec in downstream_read.records
+                if _downstream_visible_to_session(rec, known_roots, known_runs, provider_prefix)
+            ]
         skipped_legacy_schema = downstream_read.stats.skipped_legacy_schema
     except Exception as e:
         logger.debug("activity panes: downstream read failed for %s: %s", session_name, e)
@@ -821,7 +890,9 @@ def _build_activity_panes(
     upstream_roots = {outcome.root_run_id for outcome in outcomes if outcome.root_run_id}
 
     summary.upstream = _build_operation_pane(outcomes, downstream_roots, downstream_runs, summary.policy)
-    summary.downstream = _build_model_call_pane(summary, events, records, upstream_roots)
+    summary.downstream = _build_model_call_pane(
+        summary, events, records, upstream_roots, instance_scoped=owned_roots is not None
+    )
     summary.downstream.skipped_legacy_schema = skipped_legacy_schema
     if summary.downstream.rows:
         summary.total_cost_micro_usd = summary.downstream.total_cost_micro_usd
@@ -919,6 +990,8 @@ def _build_model_call_pane(
     events: list[UsageEvent],
     records: list[DownstreamRecord],
     upstream_roots: set[str],
+    *,
+    instance_scoped: bool,
 ) -> ModelCallPane:
     roots_by_command: dict[str, set[str]] = {}
     used_roots: set[str] = set()
@@ -965,12 +1038,12 @@ def _build_model_call_pane(
         )
 
     for label, grouped_records in _group_downstream_records(records).items():
-        if label in used_commands:
+        if not instance_scoped and label in used_commands:
             continue
         recs = [
             rec
             for rec in grouped_records
-            if not (rec.forge_root_run_id and rec.forge_root_run_id in used_roots)
+            if not (not instance_scoped and rec.forge_root_run_id and rec.forge_root_run_id in used_roots)
             and not (rec.forge_run_id and rec.forge_run_id in used_runs)
         ]
         if not recs:
@@ -1044,12 +1117,14 @@ def _load_manifest(session_name: str, forge_root: str | None) -> SessionState | 
         if forge_root:
             return SessionStore(forge_root, session_name).read()
         return SessionManager().get_session(session_name)
-    except Exception as e:  # best-effort: a missing/locked manifest just drops the policy half
+    except Exception as e:  # An unavailable manifest limits policy and session ownership evidence.
         logger.debug("usage summary: manifest load failed for %s: %s", session_name, e)
         return None
 
 
-def _policy_activity(manifest: SessionState | None, since: datetime | None, session_name: str) -> PolicyActivity | None:
+def _policy_activity(
+    manifest: SessionState | None, since: datetime | None, outcomes: list[UpstreamOutcome]
+) -> PolicyActivity | None:
     try:
         policy = manifest.confirmed.policy if manifest is not None else None
         decisions = policy.decisions if policy is not None else []
@@ -1105,7 +1180,7 @@ def _policy_activity(manifest: SessionState | None, since: datetime | None, sess
             if isinstance(sub_warnings, list):
                 warnings.extend(str(w) for w in sub_warnings)
 
-    _apply_upstream_policy_activity(activity, manifest_seen, warnings, since, session_name)
+    _apply_upstream_policy_activity(activity, manifest_seen, warnings, outcomes)
     activity.total_warnings = len(warnings)
     activity.recent_warnings = warnings[-_MAX_RECENT_WARNINGS:]
     # PolicyActivity is *semantic-tier* activity (supervisor + plan-check); if neither
@@ -1139,15 +1214,10 @@ def _apply_upstream_policy_activity(
     activity: PolicyActivity,
     manifest_seen: dict[tuple[str, str, str | None], int],
     warnings: list[str],
-    since: datetime | None,
-    session_name: str,
+    outcomes: list[UpstreamOutcome],
 ) -> None:
-    try:
-        outcomes = read_upstream_outcomes(period_start=since, session=session_name, command="policy-check")
-    except Exception:
-        return
     for outcome in outcomes:
-        if outcome.policy_id not in {_PLAN_CHECK_POLICY_ID, _SUPERVISOR_POLICY_ID}:
+        if outcome.command != "policy-check" or outcome.policy_id not in {_PLAN_CHECK_POLICY_ID, _SUPERVISOR_POLICY_ID}:
             continue
         decision = _upstream_outcome_decision(outcome)
         if decision is None:

@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
+from ipaddress import ip_address
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 from forge.core.effort import validate_claude_effort
 from forge.core.run_id import is_valid_run_id
@@ -20,7 +22,7 @@ from forge.policy.types import FailMode
 from .config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 
 # Schema version for session state files.
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 INDEX_VERSION = 2
 
 # Mirror of forge.core.llm.types.ReasoningEffort. Kept inline so this foundational
@@ -52,10 +54,37 @@ class Worktree:
 
 @dataclass
 class ProxyIntent:
-    """Proxy configuration intent. Both fields are required."""
+    """Codex additionally pins the resolved listener instance for native thread replay."""
 
     template: str  # e.g., "litellm-gemini"
     base_url: str  # e.g., "http://localhost:8084"
+    proxy_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.proxy_id is None:
+            return
+        parts = urlsplit(self.base_url)
+        host = parts.hostname
+        port = parts.port
+        authority = f"[{host}]:{port}" if host and ":" in host else f"{host}:{port}"
+        try:
+            local = host == "localhost" or (host is not None and ip_address(host).is_loopback)
+        except ValueError:
+            local = False
+        if (
+            not self.proxy_id.strip()
+            or not self.template.strip()
+            or parts.scheme != "http"
+            or not port
+            or parts.netloc.lower() != authority
+            or "%" in parts.netloc
+            or parts.username is not None
+            or parts.password is not None
+            or parts.path not in {"", "/"}
+            or any(not ch.isprintable() or ch.isspace() or ch in "?#\\" for ch in self.base_url)
+            or not local
+        ):
+            raise ValueError("Codex proxy binding requires an instance, template and loopback HTTP origin")
 
 
 @dataclass
@@ -654,6 +683,35 @@ class RouteCommitConfirmed:
             raise ValueError("route_commit.run_id must be a valid Forge run id")
 
 
+@dataclass(frozen=True)
+class CodexCompletedTurn:
+    """Verbatim model selection for one completed foreground turn on a bound thread."""
+
+    thread_id: str
+    requested_model: str
+    dispatched_model: str
+    turn_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if not all(value.strip() for value in (self.thread_id, self.requested_model, self.dispatched_model)):
+            raise ValueError("Codex completed turn needs a thread, requested model and dispatched model")
+
+
+CodexExitOutcome = Literal["interactive", "completed", "incomplete", "conflict"]
+
+
+@dataclass(frozen=True)
+class CodexProxyExit:
+    """Exit evidence for one launch whose native/dispatch join is still pending."""
+
+    run_id: str
+    outcome: CodexExitOutcome
+
+    def __post_init__(self) -> None:
+        if not is_valid_run_id(self.run_id):
+            raise ValueError("Invalid Codex proxy exit run ID")
+
+
 @dataclass
 class CodexConfirmed:
     """Codex runtime facts captured by the CLI (hook-free), refreshed per run.
@@ -691,6 +749,9 @@ class CodexConfirmed:
     billing_mode: str | None = None
     last_run_at: str | None = None
     context_delivery: str | None = None
+    completed_turn: CodexCompletedTurn | None = None
+    reconciled_run_id: str | None = None
+    pending_exit: CodexProxyExit | None = None
 
 
 @dataclass
@@ -889,6 +950,7 @@ def create_session_state(
     *,
     proxy_template: str | None = None,
     proxy_base_url: str | None = None,
+    proxy_id: str | None = None,
     parent_session: str | None = None,
     is_fork: bool = False,
     is_incognito: bool = False,
@@ -930,8 +992,10 @@ def create_session_state(
         raise ValueError("proxy_template and proxy_base_url must be provided together")
 
     proxy = None
+    if proxy_id is not None and (runtime != "codex" or proxy_template is None):
+        raise ValueError("a pinned proxy instance requires Codex proxy intent")
     if proxy_template is not None and proxy_base_url is not None:
-        proxy = ProxyIntent(template=proxy_template, base_url=proxy_base_url)
+        proxy = ProxyIntent(template=proxy_template, base_url=proxy_base_url, proxy_id=proxy_id)
 
     launch = LaunchIntent(
         mode=launch_mode,
@@ -978,4 +1042,24 @@ def session_state_to_dict(state: SessionState) -> dict[str, Any]:
     """
     from dataclasses import asdict
 
-    return asdict(state)
+    data = asdict(state)
+    proxy = data["intent"]["proxy"]
+    codex = data["confirmed"]["codex"]
+    if codex and codex["pending_exit"] is None:
+        del codex["pending_exit"]
+    if proxy and proxy["proxy_id"] is not None:
+        if session_runtime(state) != "codex":
+            raise ValueError("a pinned proxy instance requires Codex proxy intent")
+    else:
+        if proxy:
+            del proxy["proxy_id"]
+        if codex:
+            if (
+                codex.pop("completed_turn") is not None
+                or codex.pop("reconciled_run_id") is not None
+                or "pending_exit" in codex
+            ):
+                raise ValueError("Codex proxy replay facts require a pinned proxy")
+        if data["schema_version"] == 6:
+            data["schema_version"] = 5
+    return data

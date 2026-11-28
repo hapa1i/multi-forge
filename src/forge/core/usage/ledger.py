@@ -31,12 +31,16 @@ import dacite
 
 from forge.core.paths import get_forge_home
 from forge.core.state import utc_timestamp_z
-from forge.core.telemetry.jsonl_io import append_jsonl_record, iter_jsonl_records
+from forge.core.telemetry.jsonl_io import (
+    append_jsonl_record,
+    iter_jsonl_records,
+    stamp_session_instance,
+)
 from forge.core.usage.vocabulary import Confidence, Reporter, Route
 
 logger = logging.getLogger(__name__)
 
-USAGE_SCHEMA_VERSION = 1
+USAGE_SCHEMA_VERSION = 2
 
 _lock = threading.Lock()
 
@@ -137,9 +141,10 @@ class UsageEvent:
     source_refs: SourceRefs | None = None
 
     # Auto-stamped envelope (defaulted, so they come last per dataclass ordering).
-    schema_version: int = USAGE_SCHEMA_VERSION
+    schema_version: int = 1
     event_id: str = field(default_factory=_mint_event_id)
     ts: str = field(default_factory=utc_timestamp_z)
+    session_instance_id: str | None = None
 
 
 def _events_dir() -> Path:
@@ -161,6 +166,7 @@ def log_usage_event(event: UsageEvent) -> None:
     telemetry must never break the work it measures.
     """
     record = asdict(event)
+    stamp_session_instance(record, version=USAGE_SCHEMA_VERSION)
     log_path = _current_log_path()
     append_jsonl_record(
         log_path,

@@ -306,10 +306,12 @@ def supervisor_set(
     started_proxy_id: str | None = None
     started_proxy_template: str | None = None
 
-    current_template = manifest.intent.proxy.template if manifest.intent.proxy else None
+    # A Codex Responses binding supplies no inherited Messages route to a Claude reviewer.
+    inherited_proxy = manifest.intent.proxy if session_runtime(manifest) == "claude_code" else None
+    current_template = inherited_proxy.template if inherited_proxy else None
     current_launch = manifest.confirmed.launch
-    current_proxy_id = current_launch.proxy_id if current_launch else None
-    current_direct = not bool(manifest.intent.proxy)
+    current_proxy_id = current_launch.proxy_id if inherited_proxy and current_launch else None
+    current_direct = inherited_proxy is None
 
     sup_config = SupervisorConfig(
         review_trigger=selected_trigger,
