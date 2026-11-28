@@ -2,10 +2,10 @@
 
 [Card](card.md) · Branch `codex/codex-session-proxy-routing` · Base `455412ca` on `main`.
 
-## Current focus
+## Outcome
 
-The managed CLI matrix passed on Codex 0.141.0 and 0.172.0 using disposable homes and loopback upstreams. The remaining
-live verification dependency is a 0.162.1 home with operator-enrolled turn and Stop hooks.
+Managed proxy routing shipped on `main` on 2026-11-28. The CLI matrix passed on Codex 0.141.0 and 0.172.0 using
+disposable homes and loopback upstreams. Successful proxy-backed Stop review remains unverified.
 
 ## Native evidence
 
@@ -27,8 +27,11 @@ live verification dependency is a 0.162.1 home with operator-enrolled turn and S
   independently authenticated Messages reviewer on 0.161.0 and 0.162.1. The Docker sandbox refused the underlying file
   write after the permissive hook. [Enrollment and reviewer receipt](evidence/managed-proxy-hook-enrollment.json)
 
-- [ ] Verify successful Stop review on an operator-enrolled 0.162.1 fixture. The available fixture correctly refused
-  configuration before dispatch because its trust covered only SessionStart and PreToolUse.
+- [ ] **Deferred live verification.** On an operator-enrolled 0.162.1 home, confirm proxy-backed preflight reports
+  `stop_review_enrolled: true`, then record a foreground turn, its Stop reviewer dispatch, and session status and
+  activity. The available fixture trusted only SessionStart and PreToolUse. Forge refused Stop configuration before
+  dispatch. [Enrollment receipt](evidence/managed-proxy-hook-enrollment.json) ·
+  [Verification procedure](../../../developer/verification.md#codex-runtime-consumer-lanes-and-supervision)
 
 - [x] Run headless and TUI start and resume through the ordinary Forge CLI on the floor and newer binary. Each
   continuation kept the original thread and verified listener. [Managed CLI matrix](evidence/managed-cli-matrix.json)
@@ -72,8 +75,10 @@ Direct native resume counters need a separate measurement.
 
 ## Closeout
 
-[PR #311](https://github.com/hapa1i/multi-forge/pull/311) is open for review. The unit suite passed 12,126 tests, the
-regression suite passed 2,751, and `make pre-commit` passed all hooks.
+[PR #311](https://github.com/hapa1i/multi-forge/pull/311) merged into `main` as `e2bddf24` on 2026-11-28. The final head
+passed 12,126 unit tests, 2,755 regressions and all pre-commit hooks. The Python 3.11 and 3.13 CI lanes and wheel checks
+passed. [Test run](https://github.com/hapa1i/multi-forge/actions/runs/46143053202) ·
+[Pre-commit run](https://github.com/hapa1i/multi-forge/actions/runs/46143053203)
 
 The managed CLI, reports, Responses proxy and transfer fixtures passed all 53 Docker-harness tests. The metered headless
 fixture also verified two cost records for one tool turn, per-launch JSONL tokens, and a rejected create after reaching
@@ -84,4 +89,5 @@ The separate Claude 2.1.245 adoption control missed its second Stop artifact on 
 
 - [x] Run the relevant Docker-backed integration fixtures through Forge and retain native receipts.
 - [x] Sync the design and operator guides with the implementation and verification procedure.
-- [ ] Complete live Stop-review acceptance and record shipment before moving the card to `done/`.
+- [x] Record the merge and the outstanding live Stop check in the
+  [change log](../../change_log.md#route-managed-codex-sessions-through-a-forge-proxy).

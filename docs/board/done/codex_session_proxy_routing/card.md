@@ -1,6 +1,9 @@
 # Route managed Codex sessions through a Forge proxy
 
-**Status**: In progress on `codex/codex-session-proxy-routing` from 2026-11-27. [Execution checklist](checklist.md)
+**Status**: Done. [PR #311](https://github.com/hapa1i/multi-forge/pull/311) merged into `main` as `e2bddf24` on
+2026-11-28. The [completed checklist](checklist.md) records the shipped behavior, test evidence and deferred live Stop
+review. The proposal below preserves the original problem and acceptance criteria.
+
 [`codex_openrouter_responses`](../../done/codex_openrouter_responses/card.md) gave sessionless Codex an OpenRouter route
 and explicitly kept managed Codex sessions out of scope.
 [`openrouter_responses_by_default`](../../done/openrouter_responses_by_default/card.md) then enabled Responses on every

@@ -1,12 +1,12 @@
 # Verify and correct token totals on direct Codex resume
 
-**Status**: Proposed. Follow-up to [managed Codex proxy routing](../../doing/codex_session_proxy_routing/card.md).
+**Status**: Proposed. Follow-up to [managed Codex proxy routing](../../done/codex_session_proxy_routing/card.md).
 
 A native-auth `forge session resume <name> --task ...` passes the terminal JSONL token counters directly to the session
 usage event and downstream attempt. On the proxy route, real Codex 0.141.0 and 0.172.0 reported cumulative thread
 counters on resume. Forge subtracts the pre-launch baseline for that route. The direct path bypasses that subtraction.
 Its actual wire behavior still needs a direct-auth measurement. [Invoker](../../../../src/forge/core/invoker/codex.py) ·
-[Native proxy measurements](../../doing/codex_session_proxy_routing/evidence/managed-cli-matrix.json)
+[Native proxy measurements](../../done/codex_session_proxy_routing/evidence/managed-cli-matrix.json)
 
 ## Acceptance
 

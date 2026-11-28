@@ -10,6 +10,21 @@ Older entries are retained verbatim in [2026-08-23 through 2026-08-24](archive/c
 [2026-08-05 through 2026-08-14](archive/change_log_2026-08-05_to_2026-08-14.md), and
 [through 2026-08-04](archive/change_log_through_2026-08-04.md).
 
+## 2026-11-28
+
+### Route managed Codex sessions through a Forge proxy
+
+Headless and interactive Codex sessions can start on a Forge Responses proxy without native OpenAI credentials. Resume
+verifies the original listener and reuses the last completed foreground model. If the proxy's dispatch record arrives
+late, retrying the same command can continue the original thread. Session activity attributes headless tokens and
+per-request proxy charges to the owning session instance. [PR #311](https://github.com/hapa1i/multi-forge/pull/311)
+merged as `e2bddf24`.
+
+The native matrix covered start and resume on Codex 0.141.0 and 0.172.0. Verification passed 12,126 unit tests, 2,755
+regressions and 53 managed-session, reporting, proxy and transfer integration tests. The available 0.162.1 fixture
+refused Stop configuration before dispatch. Successful Stop review through this route remains deferred until an
+operator-enrolled fixture is available. [Completed checklist](done/codex_session_proxy_routing/checklist.md)
+
 ## 2026-11-24
 
 ### Scope proxy authentication retries to the failed client
