@@ -309,10 +309,11 @@ The routing journal freezes the session instance and the requested and dispatche
 `confirmed.codex.completed_turn` identifies the last proven foreground selection on the bound thread.
 `reconciled_run_id` ties verified evidence to its launch. When the native process returns, `pending_exit` records its
 run ID and outcome until Forge can reconcile the bound rollout with the dispatch. Resume retries that join when
-accounting arrives late. An earlier manifest without an exit receipt needs independent evidence that its launch ended.
-Forge reads the rollout and accounting records outside session locks. Publication checks the original session instance,
-binding and launch commitment. Competing resumes recheck their predecessor under the manifest lock before appending to
-the routing journal.
+accounting arrives late. If Ctrl+C interrupts a headless proxy resume, Forge can record the parsed outcome once it
+confirms the child process group has stopped. Without a parsed result it records an incomplete exit. An earlier manifest
+without an exit receipt needs independent evidence that its launch ended. Forge reads the rollout and accounting records
+outside session locks. Publication checks the original session instance, binding and launch commitment. Competing
+resumes recheck their predecessor under the manifest lock before appending to the routing journal.
 
 `rollout_source` provenance (the matching file is `$CODEX_HOME/sessions/…/rollout-*-<thread_id>.jsonl`):
 
